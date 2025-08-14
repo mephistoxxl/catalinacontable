@@ -113,7 +113,7 @@
                                                         <i class="fa fa-exclamation-circle mr-1"></i>⚠️ Estado Inconsistente
                                                     </span>
                                                     <div class="text-xs text-red-500 mt-1">Sin autorización SRI válida</div>
-                                                {% elif fila.estado_sri %}
+                                                {% elif fila.estado_sri and fila.estado_sri != '' %}
                                                     <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                                                         <i class="fa fa-info-circle mr-1"></i>{{ fila.estado_sri|upper }}
                                                     </span>

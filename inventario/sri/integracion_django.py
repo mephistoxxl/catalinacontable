@@ -36,6 +36,13 @@ class SRIIntegration:
             # Obtener factura
             factura = Factura.objects.get(id=factura_id)
             
+            # 🎯 ESTABLECER ESTADO PENDIENTE AL INICIAR PROCESAMIENTO SRI
+            # Solo si no tiene estado SRI previo (estado_sri vacío = factura local)
+            if not factura.estado_sri or factura.estado_sri == '':
+                factura.estado_sri = 'PENDIENTE'
+                factura.save(update_fields=['estado_sri'])
+                logger.info(f"Factura {factura.id} cambió estado: LOCAL → PENDIENTE (enviando al SRI)")
+            
             # Lógica de idempotencia y control por estados existentes
             # 🔧 FIX CRÍTICO: Reconocer tanto AUTORIZADA como AUTORIZADO
             if hasattr(factura, 'estado_sri') and factura.estado_sri in ('AUTORIZADA', 'AUTORIZADO'):

@@ -712,8 +712,10 @@ class Factura(models.Model):
     )
     estado_sri = models.CharField(
         max_length=20, 
-        default='PENDIENTE',
+        default='',
+        blank=True,
         choices=[
+            ('', 'Local - No enviado al SRI'),
             ('PENDIENTE', 'Pendiente'),
             ('RECIBIDA', 'Recibida por SRI'),
             ('AUTORIZADA', 'Autorizada'),
