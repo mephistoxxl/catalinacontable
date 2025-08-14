@@ -37,12 +37,12 @@ class SRIIntegration:
             factura = Factura.objects.get(id=factura_id)
             
             # Lógica de idempotencia y control por estados existentes
-            # Si ya está AUTORIZADA, no volver a enviar
-            if hasattr(factura, 'estado_sri') and factura.estado_sri == 'AUTORIZADA':
+            # 🔧 FIX CRÍTICO: Reconocer tanto AUTORIZADA como AUTORIZADO
+            if hasattr(factura, 'estado_sri') and factura.estado_sri in ('AUTORIZADA', 'AUTORIZADO'):
                 return {
                     'success': True,
-                    'message': 'La factura ya está AUTORIZADA en el SRI',
-                    'resultado': {'estado': 'AUTORIZADA'}
+                    'message': f'La factura ya está {factura.estado_sri} en el SRI',
+                    'resultado': {'estado': factura.estado_sri}
                 }
 
             # Si fue RECHAZADA, no intentar enviar desde aquí (usar reenvío explícito)
@@ -56,7 +56,8 @@ class SRIIntegration:
             if getattr(factura, 'clave_acceso', None) and hasattr(factura, 'estado_sri') and factura.estado_sri in ['RECIBIDA', 'PENDIENTE']:
                 resultado_auth = self.cliente.consultar_autorizacion(factura.clave_acceso)
                 self._actualizar_factura_con_resultado(factura, resultado_auth, factura.clave_acceso)
-                if resultado_auth.get('estado') == 'AUTORIZADA':
+                # 🔧 FIX CRÍTICO: Reconocer tanto AUTORIZADA como AUTORIZADO en consulta
+                if resultado_auth.get('estado') in ('AUTORIZADA', 'AUTORIZADO'):
                     self._generar_ride_autorizado(factura, resultado_auth)
                     return {
                         'success': True,
