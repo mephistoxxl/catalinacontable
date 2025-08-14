@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+{% load math_filters %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RIDE - Factura {{ factura.establecimiento }}-{{ factura.punto_emision }}-{{ factura.secuencia }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            font-size: 12px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            border: 2px solid #000;
+        }
+        .header {
+            display: table;
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .header-cell {
+            display: table-cell;
+            padding: 10px;
+            border: 1px solid #000;
+            vertical-align: middle;
+            text-align: center;
+        }
+        .logo-cell {
+            width: 150px;
+        }
+        .empresa-cell {
+            width: 350px;
+        }
+        .factura-cell {
+            width: 200px;
+        }
+        .section-title {
+            background-color: #f0f0f0;
+            padding: 5px;
+            font-weight: bold;
+            border: 1px solid #000;
+            margin: 0;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+        .data-table td {
+            border: 1px solid #000;
+            padding: 5px;
+        }
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+        .details-table th {
+            background-color: #d0d0d0;
+            border: 1px solid #000;
+            padding: 5px;
+            font-weight: bold;
+        }
+        .details-table td {
+            border: 1px solid #000;
+            padding: 5px;
+        }
+        .totals-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+        .totals-table td {
+            border: 1px solid #000;
+            padding: 5px;
+            text-align: right;
+        }
+        .footer {
+            display: table;
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .qr-cell {
+            display: table-cell;
+            width: 120px;
+            padding: 10px;
+            border: 1px solid #000;
+            text-align: center;
+            vertical-align: top;
+        }
+        .auth-cell {
+            display: table-cell;
+            padding: 10px;
+            border: 1px solid #000;
+            vertical-align: top;
+        }
+        .qr-placeholder {
+            width: 100px;
+            height: 100px;
+            border: 1px solid #ccc;
+            display: inline-block;
+            background-color: #f9f9f9;
+            line-height: 100px;
+            text-align: center;
+            font-size: 10px;
+        }
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="no-print" style="margin-bottom: 20px;">
+    <button onclick="window.print()" style="padding: 10px 20px; background-color: #007bff; color: white; border: none; cursor: pointer;">
+        🖨️ Imprimir RIDE
+    </button>
+    <a href="{% url 'inventario:verFactura' factura.id %}" style="padding: 10px 20px; background-color: #6c757d; color: white; text-decoration: none; margin-left: 10px;">
+        ← Volver a Factura
+    </a>
+</div>
+
+<div class="container">
+    <!-- ENCABEZADO -->
+    <div class="header">
+        <div class="header-cell logo-cell">
+            {% if opciones %}
+                <strong>{{ opciones.nombre_negocio|default:"MI EMPRESA" }}</strong>
+            {% else %}
+                <strong>MI EMPRESA</strong>
+            {% endif %}
+        </div>
+        <div class="header-cell empresa-cell">
+            <strong>{{ opciones.razon_social }}</strong><br>
+            {{ opciones.nombre_comercial }}<br>
+            <strong>RUC:</strong> {{ opciones.identificacion }}<br>
+            {{ opciones.direccion_establecimiento }}
+        </div>
+        <div class="header-cell factura-cell">
+            <strong>FACTURA</strong><br>
+            <strong>No.</strong> {{ factura.establecimiento }}-{{ factura.punto_emision }}-{{ factura.secuencia }}<br>
+            <strong>FECHA:</strong> {{ factura.fecha_emision|date:"d/m/Y" }}<br>
+            <strong>AMBIENTE:</strong> {% if opciones.tipo_ambiente == "2" %}PRODUCCIÓN{% else %}PRUEBAS{% endif %}<br>
+            <strong>EMISIÓN:</strong> NORMAL
+        </div>
+    </div>
+
+    <!-- DATOS DEL COMPRADOR -->
+    <div class="section-title">DATOS DEL COMPRADOR</div>
+    <table class="data-table">
+        <tr>
+            <td style="width: 150px;"><strong>Razón Social:</strong></td>
+            <td>{{ factura.cliente.razon_social }} {{ factura.cliente.nombre_comercial|default:"" }}</td>
+        </tr>
+        <tr>
+            <td><strong>Identificación:</strong></td>
+            <td>{{ factura.cliente.identificacion }}</td>
+        </tr>
+        <tr>
+            <td><strong>Fecha Emisión:</strong></td>
+            <td>{{ factura.fecha_emision|date:"d/m/Y" }}</td>
+        </tr>
+        {% if opciones.es_contribuyente_especial %}
+        <tr>
+            <td><strong>Contribuyente Especial:</strong></td>
+            <td>{{ opciones.numero_contribuyente_especial }}</td>
+        </tr>
+        {% endif %}
+        <tr>
+            <td><strong>Obligado a llevar Contabilidad:</strong></td>
+            <td>{{ opciones.obligado }}</td>
+        </tr>
+    </table>
+
+    <!-- DETALLE -->
+    <div class="section-title">DETALLE</div>
+    <table class="details-table">
+        <thead>
+            <tr>
+                <th>Cód.</th>
+                <th>Descripción</th>
+                <th>Cant.</th>
+                <th>P. Unit.</th>
+                <th>Descuento</th>
+                <th>P. Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for detalle in detalles %}
+            <tr>
+                <td>{{ detalle.producto.codigo }}</td>
+                <td style="text-align: left;">{{ detalle.producto.descripcion }}</td>
+                <td>{{ detalle.cantidad }}</td>
+                <td>$ {{ detalle.producto.precio|floatformat:2 }}</td>
+                <td>$ 0.00</td>
+                <td>$ {{ detalle.sub_total|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- RESUMEN -->
+    <div class="section-title">RESUMEN</div>
+    <table class="totals-table">
+        <tr>
+            <td style="width: 70%;"><strong>SUBTOTAL SIN IMPUESTOS:</strong></td>
+            <td style="width: 30%;"><strong>$ {{ factura.sub_monto|floatformat:2 }}</strong></td>
+        </tr>
+        <tr>
+            <td><strong>SUBTOTAL 0%:</strong></td>
+            <td><strong>$ 0.00</strong></td>
+        </tr>
+        <tr>
+            <td><strong>SUBTOTAL {{ opciones.valor_iva }}%:</strong></td>
+            <td><strong>$ {{ factura.base_imponible|floatformat:2 }}</strong></td>
+        </tr>
+        <tr>
+            <td><strong>IVA {{ opciones.valor_iva }}%:</strong></td>
+            <td><strong>$ {{ factura.monto_general|sub:factura.sub_monto|floatformat:2 }}</strong></td>
+        </tr>
+        <tr>
+            <td><strong>DESCUENTO:</strong></td>
+            <td><strong>$ 0.00</strong></td>
+        </tr>
+        <tr>
+            <td><strong>PROPINA:</strong></td>
+            <td><strong>$ 0.00</strong></td>
+        </tr>
+        <tr style="background-color: #f0f0f0;">
+            <td><strong>VALOR TOTAL:</strong></td>
+            <td><strong>$ {{ factura.monto_general|floatformat:2 }}</strong></td>
+        </tr>
+    </table>
+
+    <!-- INFORMACIÓN ADICIONAL -->
+    {% if opciones.telefono or opciones.correo %}
+    <div class="section-title">INFORMACIÓN ADICIONAL</div>
+    <table class="data-table">
+        {% if opciones.telefono %}
+        <tr>
+            <td style="width: 150px;"><strong>Teléfono:</strong></td>
+            <td>{{ opciones.telefono }}</td>
+        </tr>
+        {% endif %}
+        {% if opciones.correo %}
+        <tr>
+            <td><strong>Email:</strong></td>
+            <td>{{ opciones.correo }}</td>
+        </tr>
+        {% endif %}
+        {% if opciones.mensaje_factura %}
+        <tr>
+            <td><strong>Mensaje:</strong></td>
+            <td>{{ opciones.mensaje_factura }}</td>
+        </tr>
+        {% endif %}
+    </table>
+    {% endif %}
+
+    <!-- PIE CON QR Y CLAVE DE ACCESO -->
+    <div class="footer">
+        <div class="qr-cell">
+            <div class="qr-placeholder">
+                Código QR<br>
+                {{ factura.clave_acceso|slice:":10" }}...
+            </div>
+        </div>
+        <div class="auth-cell">
+            <strong>CLAVE DE ACCESO:</strong><br>
+            {{ factura.clave_acceso }}<br><br>
+            <strong>NÚMERO DE AUTORIZACIÓN:</strong><br>
+            {{ factura.clave_acceso }}<br><br>
+            <strong>FECHA AUTORIZACIÓN:</strong><br>
+            {{ factura.fecha_emision|date:"d/m/Y" }}<br><br>
+            <strong>AMBIENTE:</strong> {% if opciones.tipo_ambiente == "2" %}PRODUCCIÓN{% else %}PRUEBAS{% endif %}<br>
+            <strong>EMISIÓN:</strong> NORMAL
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

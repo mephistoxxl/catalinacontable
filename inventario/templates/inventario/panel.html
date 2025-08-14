@@ -1,0 +1,214 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+<script>
+let numeroAdministradores = '{{ administradores }}'
+let numeroUsuarios = '{{ usuarios }}'
+</script>
+<article class="bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex flex-col min-h-screen pb-20">
+    <section>
+        <!-- MENSAJES DE ERROR O EXITO -->
+        {% if messages %}
+            {% for message in messages %}
+                {% if message.level == 40 %}
+                    <div class="bg-yellow-200 border-l-4 border-yellow-600 text-yellow-800 p-2 mb-4 rounded-md shadow-sm">
+                        <p><i class="fa fa-warning mr-1 text-sm"></i> {{ message }}</p>
+                    </div>
+                {% else %}
+                    <div class="bg-green-200 border-l-4 border-green-600 text-green-800 p-2 mb-4 rounded-md shadow-sm">
+                        <p><i class="fa fa-check mr-1 text-sm"></i> {{ message }}</p>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+        <!-- FIN DE MENSAJES -->
+
+        <div class="bg-white rounded-lg shadow-md p-4 mb-4 mt-0">
+            <h4 class="text-lg font-bold text-indigo-700 mb-1">Estadísticas</h4>
+            <p class="text-sm text-gray-500 mb-2">{{ fecha }}</p>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+                <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 rounded-md shadow-sm hover:shadow-md transition-shadow">
+                    <i class="fa fa-rocket text-lg mb-1"></i>
+                    <div class="text-xl font-bold">{{ productosRegistrados }}</div>
+                    <div class="text-xs">Productos registrados</div>
+                </div>
+                <div class="bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-md shadow-sm hover:shadow-md transition-shadow">
+                    <i class="fa fa-shopping-cart text-lg mb-1"></i>
+                    <div class="text-xl font-bold">{{ productosVendidos }}</div>
+                    <div class="text-xs">Productos vendidos</div>
+                </div>
+                <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-3 rounded-md shadow-sm hover:shadow-md transition-shadow">
+                    <i class="fa fa-line-chart text-lg mb-1"></i>
+                    <div class="text-xl font-bold">{{ clientesRegistrados }}</div>
+                    <div class="text-xs">Clientes registrados</div>
+                </div>
+                <div class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white p-3 rounded-md shadow-sm hover:shadow-md transition-shadow">
+                    <i class="fa fa-users text-lg mb-1"></i>
+                    <div class="text-xl font-bold">{{ usuariosRegistrados }}</div>
+                    <div class="text-xs">Número de usuarios</div>
+                </div>
+                <div class="bg-gradient-to-r from-red-500 to-red-600 text-white p-3 rounded-md shadow-sm hover:shadow-md transition-shadow">
+                    <i class="fa fa-list-alt text-lg mb-1"></i>
+                    <div class="text-xl font-bold">{{ facturasEmitidas }}</div>
+                    <div class="text-xs">Facturas emitidas</div>
+                </div>
+                <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white p-3 rounded-md shadow-sm hover:shadow-md transition-shadow">
+                    <i class="fa fa-dollar text-lg mb-1"></i>
+                    <div class="text-xl font-bold whitespace-nowrap">$ {{ ingresoTotal }}</div>
+                    <div class="text-xs">Ingreso total</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Panel de Top Productos Vendidos -->
+        <div class="bg-gradient-to-br from-green-600 via-emerald-600 to-teal-700 rounded-xl shadow-lg p-6 text-white relative overflow-hidden">
+            <!-- Efectos de fondo -->
+            <div class="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-16 -mt-16"></div>
+            <div class="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-5 rounded-full -ml-12 -mb-12"></div>
+            
+            <div class="relative z-10">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold">Top Productos Vendidos</h3>
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-trophy text-yellow-300 text-lg"></i>
+                        <span class="text-sm opacity-90">Más populares</span>
+                    </div>
+                </div>
+
+                <!-- Lista de productos más vendidos -->
+                <div class="space-y-3">
+                    {% if topProductosVendidos %}
+                        {% for producto in topProductosVendidos %}
+                            <div class="bg-white bg-opacity-20 rounded-lg p-3 backdrop-blur-sm flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-8 h-8 bg-white bg-opacity-30 rounded-full flex items-center justify-center">
+                                        <span class="text-sm font-bold">{{ forloop.counter }}</span>
+                                    </div>
+                                    <div>
+                                        <div class="font-medium text-sm">{{ producto.producto__descripcion|truncatechars:25 }}</div>
+                                        <div class="text-xs opacity-75">Producto #{{ producto.producto__id }}</div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-lg font-bold">{{ producto.total_vendido }}</div>
+                                    <div class="text-xs opacity-75">unidades</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm text-center">
+                            <i class="fas fa-box-open text-2xl mb-2 opacity-50"></i>
+                            <div class="text-sm">No hay productos vendidos aún</div>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Estadística total -->
+                <div class="mt-4 pt-4 border-t border-white border-opacity-20">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-chart-bar text-green-300"></i>
+                            <span class="text-sm">Total productos: {{ productosRegistrados }}</span>
+                        </div>
+                        <div class="text-sm opacity-75">
+                            {{ productosVendidos }} unidades vendidas
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel de Ventas por Mes - Diseño Moderno -->
+        <div class="bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-700 rounded-xl shadow-lg p-6 text-white relative overflow-hidden">
+            <!-- Efectos de fondo -->
+            <div class="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-16 -mt-16"></div>
+            <div class="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-5 rounded-full -ml-12 -mb-12"></div>
+            
+            <div class="relative z-10">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold">Ventas por Mes</h3>
+                    <div class="flex items-center space-x-2">
+                        <span class="w-3 h-3 bg-purple-300 rounded-full"></span>
+                        <span class="text-sm opacity-90">2024</span>
+                        <span class="w-3 h-3 bg-cyan-300 rounded-full"></span>
+                        <span class="text-sm opacity-90">2025</span>
+                    </div>
+                </div>
+
+                <!-- Métricas destacadas -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-white bg-opacity-20 rounded-lg p-3 backdrop-blur-sm">
+                        <div class="text-sm opacity-90">Ventas este mes</div>
+                        <div class="text-2xl font-bold">${{ ventasEsteMes|floatformat:2 }}</div>
+                        <div class="text-xs {% if ventasEsteMes > ventasMesAnterior %}text-green-300{% else %}text-red-300{% endif %}">
+                            {% if ventasMesAnterior > 0 %}
+                                {% widthratio ventasEsteMes ventasMesAnterior 100 %}% vs mes anterior
+                            {% else %}
+                                Primer mes registrado
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="bg-white bg-opacity-20 rounded-lg p-3 backdrop-blur-sm">
+                        <div class="text-sm opacity-90">Promedio mensual</div>
+                        <div class="text-2xl font-bold">${{ promedioVentasMensuales|floatformat:2 }}</div>
+                        <div class="text-xs text-blue-300">Últimos 12 meses</div>
+                    </div>
+                </div>
+
+                <!-- Mini gráfico de barras estilizado -->
+                <div class="space-y-2">
+                    <div class="text-sm opacity-90 mb-3">Últimos 6 meses</div>
+                    <div class="flex items-end justify-between h-20 space-x-1">
+                        {% if ventasUltimosMeses %}
+                            {% for venta in ventasUltimosMeses %}
+                                <div class="flex flex-col items-center">
+                                    {% if venta.total %}
+                                        {% if venta.total > 10000 %}
+                                            <div class="bg-cyan-300 rounded-t w-6" style="height: 90%"></div>
+                                        {% elif venta.total > 5000 %}
+                                            <div class="bg-cyan-300 rounded-t w-6" style="height: 70%"></div>
+                                        {% elif venta.total > 1000 %}
+                                            <div class="bg-cyan-300 rounded-t w-6" style="height: 50%"></div>
+                                        {% else %}
+                                            <div class="bg-cyan-300 rounded-t w-6" style="height: 30%"></div>
+                                        {% endif %}
+                                    {% else %}
+                                        <div class="bg-gray-300 rounded-t w-6" style="height: 10%"></div>
+                                    {% endif %}
+                                    <span class="text-xs mt-1 opacity-75">{{ venta.mes|date:"M" }}</span>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <!-- Si no hay datos, mostrar mensaje -->
+                            <div class="w-full text-center text-sm opacity-75">
+                                No hay datos de ventas disponibles
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Indicadores de tendencia -->
+                <div class="mt-4 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        {% if ventasEsteMes >= ventasMesAnterior %}
+                            <i class="fas fa-trending-up text-green-300"></i>
+                            <span class="text-sm">Tendencia positiva</span>
+                        {% else %}
+                            <i class="fas fa-trending-down text-red-300"></i>
+                            <span class="text-sm">Necesita atención</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-sm opacity-75">
+                        Actualizado: {{ fecha }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Espaciado adicional para evitar que el footer tape el contenido -->
+    <div class="h-16"></div>
+</article>
+{% endblock %}

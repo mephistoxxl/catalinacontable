@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es">
+{% load static %}
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sistema de inventario - Iniciar sesión</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-white h-screen flex items-center justify-center p-2 overflow-hidden">
+    <div class="w-full max-w-sm">
+        <!-- Logo -->
+        <div class="w-full border-t border-l border-r border-black rounded-t-3xl p-4 text-center bg-black">
+            {% load static %}
+            <img src="{% static 'inventario/assets/logo/logo2.png' %}" alt="Logo" class="mx-auto h-28 w-auto">
+            <h2 class="mt-2 text-xl font-bold text-white">ALP FACT</h2>
+            <p class="text-sm text-gray-300">Inicia sesión para continuar</p>
+        </div>
+
+        <!-- Login Card -->
+        <div class="bg-white rounded-b-3xl shadow-xl p-4">
+            <form id="login-form" method="POST" class="space-y-6">
+                {% csrf_token %}
+                
+                <!-- Username Field -->
+                <div>
+                    <label for="{{ form.username.id_for_label }}" class="block text-xs font-medium text-gray-700 mb-1">
+                        <i class="fas fa-user mr-1 text-gray-500"></i>
+                        Identificación
+                    </label>
+                    <input type="text" 
+                           name="{{ form.username.name }}" 
+                           id="{{ form.username.id_for_label }}" 
+                           class="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent transition duration-200 text-sm"
+                           placeholder="Ingrese su identificación"
+                           required>
+                </div>
+
+                <!-- Password Field -->
+                <div>
+                    <label for="{{ form.password.id_for_label }}" class="block text-xs font-medium text-gray-700 mb-1">
+                        <i class="fas fa-lock mr-1 text-gray-500"></i>
+                        Contraseña
+                    </label>
+                    <input type="password" 
+                           name="{{ form.password.name }}" 
+                           id="{{ form.password.id_for_label }}" 
+                           class="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent transition duration-200 text-sm"
+                           placeholder="Ingrese su contraseña"
+                           required>
+                </div>
+
+                <!-- Remember me and Forgot password -->
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="remember" class="rounded border-gray-300 text-black bg-white focus:ring-gray-400">
+                        <span class="ml-2 text-sm text-gray-700">Recordarme</span>
+                    </label>
+                    <a href="/reiniciarClave" class="text-sm text-blue-600 hover:text-blue-500 transition duration-200">
+                        ¿Olvidaste la contraseña?
+                    </a>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" 
+                        class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition duration-200 transform hover:scale-105 text-sm rounded-xl">
+                    <i class="fas fa-sign-in-alt mr-1"></i>
+                    Iniciar sesión
+                </button>
+            </form>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-6">
+            <p class="text-sm text-gray-600">
+                © 2025 Sistema de Facturación. Todos los derechos reservados.
+            </p>
+        </div>
+    </div>
+
+    <!-- JavaScript for number validation -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const userInput = document.getElementById('{{ form.username.id_for_label }}');
+            
+            if (userInput) {
+                userInput.addEventListener('keypress', function(event) {
+                    if (!/\d/.test(event.key) && event.key !== 'Enter') {
+                        event.preventDefault();
+                    }
+                });
+
+                userInput.addEventListener('paste', function(event) {
+                    const paste = (event.clipboardData || window.clipboardData).getData('text');
+                    if (!/^\d+$/.test(paste)) {
+                        event.preventDefault();
+                    }
+                });
+
+                userInput.addEventListener('input', function() {
+                    this.value = this.value.replace(/\D/g, '');
+                });
+            }
+        });
+    </script>
+</body>
+</html>

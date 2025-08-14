@@ -1,0 +1,661 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4" style="padding-top: 0px; padding-bottom: 20px;">
+    <div class="max-w-6xl mx-auto">
+
+        <!-- Messages Section -->
+        {% if messages %}
+            <div class="mb-6">
+                {% for message in messages %}
+                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                {% if message.tags == 'success' %}
+                                    <i class="fa fa-check-circle text-green-500 text-lg"></i>
+                                {% elif message.tags == 'error' %}
+                                    <i class="fa fa-exclamation-circle text-red-500 text-lg"></i>
+                                {% elif message.tags == 'warning' %}
+                                    <i class="fa fa-exclamation-triangle text-yellow-500 text-lg"></i>
+                                {% else %}
+                                    <i class="fa fa-info-circle text-blue-500 text-lg"></i>
+                                {% endif %}
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium {% if message.tags == 'success' %}text-green-800{% elif message.tags == 'error' %}text-red-800{% elif message.tags == 'warning' %}text-yellow-800{% else %}text-blue-800{% endif %}">
+                                    {{ message }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        
+        <!-- RUC Messages Area -->
+        <div id="ruc-messages" class="hidden mb-6">
+            <div class="bg-white rounded-lg shadow-md p-4 border-l-4">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fa fa-info-circle text-lg"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm font-medium" id="ruc-message-text"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+                
+        <!-- Header Section -->
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 mb-0 rounded-lg mt-0">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    {% if editar %}
+                        <i class="fa fa-edit text-white text-lg"></i>
+                    {% else %}
+                        <i class="fa fa-user-plus text-white text-lg"></i>
+                    {% endif %}
+                </div>
+                <div class="ml-3">
+                    <h2 class="text-lg font-semibold text-white">
+                        {% if editar %}
+                            Editar Cliente
+                        {% else %}
+                            Agregar Cliente
+                        {% endif %}
+                    </h2>
+                    <p class="text-gray-300 text-xs">Complete todos los campos requeridos</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Form -->
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden mt-2">
+            <form role="form" method="POST" onsubmit="return validarTodo('cliente')" class="p-4">
+                {% csrf_token %}
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Columna Izquierda -->
+                    <div class="space-y-3">
+                        <!-- Tipo de Identificación -->
+                        <div class="group">
+                            <label for="id_tipoIdentificacion" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fa fa-id-card text-gray-500 mr-1"></i>
+                                {{ form.tipoIdentificacion.label }}
+                            </label>
+                            <div class="relative">
+                                {{ form.tipoIdentificacion }}
+                            </div>
+                        </div>
+
+                        <!-- Identificación con botón de búsqueda -->
+                        <div class="group">
+                            <label for="id_identificacion" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fa fa-hashtag text-gray-500 mr-1"></i>
+                                {{ form.identificacion.label }}
+                                <span id="loading-ruc" class="hidden ml-2">
+                                    <i class="fa fa-spinner fa-spin text-gray-500"></i>
+                                    <span class="text-gray-600 font-medium text-xs">Consultando...</span>
+                                </span>
+                            </label>
+                            <div class="flex items-center">
+                                <div class="flex-1">
+                                    {{ form.identificacion }}
+                                </div>
+                                <button type="button" id="buscar-ruc" class="inline-flex items-center px-3 py-2 bg-gray-800 text-white text-xs font-medium rounded-md hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-600 transition-colors duration-200 ml-1">
+                                    <i class="fa fa-search mr-1"></i>
+                                    Buscar
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Razón Social -->
+                        <div class="group">
+                            <label for="id_razon_social" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fa fa-building text-gray-500 mr-1"></i>
+                                {{ form.razon_social.label }}
+                                <span class="text-red-500">*</span>
+                            </label>
+                            {{ form.razon_social }}
+                        </div>
+
+                        <!-- Nombre Comercial -->
+                        <div class="group">
+                            <label for="id_nombre_comercial" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fa fa-store text-gray-500 mr-1"></i>
+                                {{ form.nombre_comercial.label }}
+                            </label>
+                            {{ form.nombre_comercial }}
+                        </div>
+
+                        <!-- Dirección -->
+                        <div class="group">
+                            <label for="id_direccion" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fa fa-map-marker text-gray-500 mr-1"></i>
+                                {{ form.direccion.label }}
+                                <span class="text-red-500">*</span>
+                            </label>
+                            {{ form.direccion }}
+                        </div>
+
+                        <!-- Teléfono -->
+                        <div class="group">
+                            <label for="id_telefono" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fa fa-phone text-gray-500 mr-1"></i>
+                                {{ form.telefono.label }}
+                            </label>
+                            {{ form.telefono }}
+                        </div>
+                    </div>
+
+                    <!-- Columna Derecha -->
+                    <div class="space-y-3">
+                        <!-- Correo -->
+                        <div class="group">
+                            <label for="id_correo" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fa fa-envelope text-gray-500 mr-1"></i>
+                                {{ form.correo.label }}
+                                <span class="text-red-500">*</span>
+                            </label>
+                            {{ form.correo }}
+                        </div>
+
+                        <!-- Observaciones -->
+                        <div class="group">
+                            <label for="id_observaciones" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fa fa-sticky-note text-gray-500 mr-1"></i>
+                                {{ form.observaciones.label }}
+                            </label>
+                            {{ form.observaciones }}
+                        </div>
+
+                        <!-- Tipo de Venta -->
+                        <div class="group">
+                            <label for="id_tipoVenta" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fa fa-shopping-cart text-gray-500 mr-1"></i>
+                                {{ form.tipoVenta.label }}
+                            </label>
+                            {{ form.tipoVenta }}
+                        </div>
+
+                        <!-- Tipo de Régimen -->
+                        <div class="group">
+                            <label for="id_tipoRegimen" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fa fa-university text-gray-500 mr-1"></i>
+                                {{ form.tipoRegimen.label }}
+                            </label>
+                            {{ form.tipoRegimen }}
+                        </div>
+
+                        <!-- Tipo de Cliente -->
+                        <div class="group">
+                            <label for="id_tipoCliente" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fa fa-users text-gray-500 mr-1"></i>
+                                {{ form.tipoCliente.label }}
+                            </label>
+                            {{ form.tipoCliente }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botones de Acción -->
+                <div class="flex flex-col sm:flex-row justify-center items-center space-y-2 sm:space-y-0 sm:space-x-3 mt-8 pt-6 border-t border-gray-200 mb-8">
+                    <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-all duration-200">
+                        <i class="fa fa-save mr-2"></i>
+                        Guardar Cliente
+                    </button>
+                    <button type="button" onclick="limpiarFormulario()" class="w-full sm:w-auto px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 transition-all duration-200">
+                        <i class="fa fa-eraser mr-2"></i>
+                        Limpiar Formulario
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ ESTILOS PERSONALIZADOS PARA INPUTS COMPACTOS Y FINOS -->
+<style>
+    /* Inputs de texto, email, password, number, etc. */
+    input[type="text"], 
+    input[type="email"], 
+    input[type="password"], 
+    input[type="number"], 
+    input[type="tel"], 
+    input[type="url"],
+    input[type="date"],
+    input[type="datetime-local"],
+    textarea,
+    select {
+        width: 100% !important;
+        padding: 8px 12px !important;
+        border: 0.5px solid #d1d5db !important; /* ✅ BORDE MÁS FINO */
+        border-radius: 6px !important;
+        font-size: 14px !important;
+        background-color: #ffffff !important;
+        transition: all 0.2s ease !important;
+        box-shadow: none !important;
+    }
+
+    /* Estados focus - bordes aún más sutiles */
+    input[type="text"]:focus, 
+    input[type="email"]:focus, 
+    input[type="password"]:focus, 
+    input[type="number"]:focus, 
+    input[type="tel"]:focus, 
+    input[type="url"]:focus,
+    input[type="date"]:focus,
+    input[type="datetime-local"]:focus,
+    textarea:focus,
+    select:focus {
+        outline: none !important;
+        border-color: #60a5fa !important; /* ✅ AZUL MÁS SUAVE */
+        box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.08) !important; /* ✅ SOMBRA MÁS SUTIL */
+    }
+
+    /* Estados hover - interacción sutil */
+    input[type="text"]:hover, 
+    input[type="email"]:hover, 
+    input[type="password"]:hover, 
+    input[type="number"]:hover, 
+    input[type="tel"]:hover, 
+    input[type="url"]:hover,
+    input[type="date"]:hover,
+    input[type="datetime-local"]:hover,
+    textarea:hover,
+    select:hover {
+        border-color: #9ca3af !important; /* ✅ GRIS MÁS SUAVE AL HOVER */
+    }
+
+    /* Selects específicos */
+    select {
+        background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"></polyline></svg>') !important;
+        background-repeat: no-repeat !important;
+        background-position: right 8px center !important;
+        background-size: 16px !important;
+        padding-right: 40px !important;
+        appearance: none !important;
+        -webkit-appearance: none !important;
+        -moz-appearance: none !important;
+    }
+
+    /* Checkboxes y radios */
+    input[type="checkbox"],
+    input[type="radio"] {
+        width: auto !important;
+        margin-right: 8px !important;
+        accent-color: #60a5fa !important; /* ✅ AZUL MÁS SUAVE */
+    }
+
+    /* Espaciado compacto */
+    .space-y-3 > * + * {
+        margin-top: 0.75rem !important;
+    }
+
+    /* Labels más compactos */
+    label {
+        margin-bottom: 4px !important;
+    }
+
+    /* Estados disabled más sutiles */
+    input:disabled,
+    select:disabled,
+    textarea:disabled {
+        background-color: #f9fafb !important;
+        border-color: #e5e7eb !important;
+        color: #9ca3af !important;
+        cursor: not-allowed !important;
+    }
+
+    /* Textarea específico */
+    textarea {
+        resize: vertical !important;
+        min-height: 80px !important;
+    }
+
+    /* Override para campos con error */
+    .border-red-500 {
+        border-color: #ef4444 !important;
+        background-color: #fef2f2 !important;
+    }
+
+    .border-red-500:focus {
+        border-color: #dc2626 !important;
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1) !important;
+    }
+</style>
+
+<script>
+    // Obtener el token CSRF de la cookie
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    // Función para obtener elemento del DOM de forma segura
+    function getElement(id) {
+        const element = document.getElementById(id);
+        if (!element) {
+            console.error(`Elemento con ID '${id}' no encontrado`);
+        }
+        return element;
+    }
+    
+    // Función para mostrar mensajes
+    function showMessage(message, type) {
+        console.log('Mostrando mensaje:', message, type);
+        const messageDiv = getElement('ruc-messages');
+        const messageText = document.getElementById('ruc-message-text');
+        
+        if (messageDiv && messageText) {
+            // Remover clases anteriores
+            messageDiv.className = 'mb-8';
+            
+            // Configurar colores según el tipo
+            let borderColor, bgColor, textColor, iconClass, iconColor;
+            
+            switch(type) {
+                case 'success':
+                    borderColor = 'border-green-500';
+                    bgColor = 'bg-green-50';
+                    textColor = 'text-green-800';
+                    iconClass = 'fa-check-circle';
+                    iconColor = 'text-green-500';
+                    break;
+                case 'warning':
+                    borderColor = 'border-yellow-500';
+                    bgColor = 'bg-yellow-50';
+                    textColor = 'text-yellow-800';
+                    iconClass = 'fa-exclamation-triangle';
+                    iconColor = 'text-yellow-500';
+                    break;
+                case 'danger':
+                    borderColor = 'border-red-500';
+                    bgColor = 'bg-red-50';
+                    textColor = 'text-red-800';
+                    iconClass = 'fa-exclamation-circle';
+                    iconColor = 'text-red-500';
+                    break;
+                default:
+                    borderColor = 'border-blue-500';
+                    bgColor = 'bg-blue-50';
+                    textColor = 'text-blue-800';
+                    iconClass = 'fa-info-circle';
+                    iconColor = 'text-blue-500';
+            }
+            
+            // Aplicar clases
+            messageDiv.className = `mb-4 bg-white rounded-lg shadow-md p-4 border-l-4 ${borderColor} ${bgColor}`;
+            
+            // Actualizar icono
+            const icon = messageDiv.querySelector('i');
+            if (icon) {
+                icon.className = `fa ${iconClass} ${iconColor} text-lg`;
+            }
+            
+            // Actualizar texto
+            messageText.textContent = message;
+            messageText.className = `text-sm font-medium ${textColor}`;
+            
+            // Mostrar
+            messageDiv.classList.remove('hidden');
+            
+            // Auto-ocultar después de 5 segundos
+            setTimeout(() => {
+                hideMessage();
+            }, 5000);
+        }
+    }
+    
+    // Función para ocultar mensajes
+    function hideMessage() {
+        const messageDiv = getElement('ruc-messages');
+        if (messageDiv) {
+            messageDiv.classList.add('hidden');
+        }
+    }
+    
+    // Función para limpiar campos después de consulta fallida
+    function limpiarCamposConsulta() {
+        console.log('Limpiando campos de consulta');
+        const campos = ['id_razon_social', 'id_nombre_comercial', 'id_direccion', 'id_telefono', 'id_correo'];
+        campos.forEach(id => {
+            const campo = getElement(id);
+            if (campo) {
+                campo.value = '';
+            }
+        });
+    }
+    
+    // Función para limpiar todo el formulario
+    function limpiarFormulario() {
+        console.log('Limpiando formulario completo');
+        const form = document.querySelector('form');
+        if (form) {
+            form.reset();
+        }
+        hideMessage();
+    }
+    
+    // Configurar eventos cuando el DOM esté listo
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM loaded, setting up event listeners...');
+        
+        const botonBuscar = getElement('buscar-ruc');
+        if (!botonBuscar) {
+            console.error('No se encontró el botón de búsqueda. Por favor, verifica el ID en el HTML.');
+            return;
+        }
+        console.log('Botón de búsqueda encontrado, adjuntando listener.');
+
+        // Variable para controlar si hay una consulta en progreso
+        let consultaEnProgreso = false;
+        let ultimaConsulta = 0;
+        const DEBOUNCE_TIME = 1000; // 1 segundo de debounce
+        
+        botonBuscar.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation(); // Evitar que el evento se propague
+            console.log('Botón de búsqueda clickeado');
+            
+            // Evitar múltiples consultas simultáneas
+            if (consultaEnProgreso) {
+                console.log('Ya hay una consulta en progreso');
+                return;
+            }
+            
+            // Verificar debounce
+            const ahora = Date.now();
+            if (ahora - ultimaConsulta < DEBOUNCE_TIME) {
+                console.log('Debounce: ignorando clic demasiado rápido');
+                return;
+            }
+            ultimaConsulta = ahora;
+            
+            const identificacionInput = getElement('id_identificacion');
+            const tipoIdentificacionSelect = getElement('id_tipoIdentificacion');
+            
+            if (!identificacionInput || !tipoIdentificacionSelect) {
+                console.error('No se encontraron los campos necesarios');
+                return;
+            }
+            
+            const identificacion = identificacionInput.value.trim();
+            const tipoIdentificacion = tipoIdentificacionSelect.value;
+            
+            console.log('Tipo ID:', tipoIdentificacion, 'RUC:', identificacion);
+            
+            if (tipoIdentificacion === '04') {
+                if (identificacion.length === 13) {
+                    consultaEnProgreso = true;
+                    consultarRUC(identificacion).finally(() => {
+                        consultaEnProgreso = false;
+                    });
+                } else {
+                    showMessage('El RUC debe tener 13 dígitos', 'warning');
+                }
+            } else {
+                showMessage('Seleccione tipo de identificación RUC para consultar', 'warning');
+            }
+        });
+    });
+    
+    // Función principal para consultar RUC
+    async function consultarRUC(ruc) {
+        console.log('Iniciando consulta de RUC:', ruc);
+        
+        const loadingIndicator = getElement('loading-ruc');
+        if (loadingIndicator) {
+            loadingIndicator.classList.remove('hidden');
+        }
+        hideMessage();
+        
+        try {
+            const response = await fetch(`/inventario/consultar-ruc/?ruc=${ruc}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            });
+            
+            console.log('Respuesta recibida:', response.status);
+            const data = await response.json();
+            console.log('Datos recibidos completos:', data);
+            
+            if (loadingIndicator) {
+                loadingIndicator.classList.add('hidden');
+            }
+            
+            if (data.error) {
+                showMessage(data.message || 'Error al consultar el RUC', 'warning');
+                limpiarCamposConsulta();
+                return;
+            }
+            
+            // Mapeo de campos - más explícito y con validación
+            const campos = {
+                'id_razon_social': data.razon_social || '',
+                'id_nombre_comercial': data.nombre_comercial || '',
+                'id_direccion': data.direccion || '',
+                'id_telefono': data.telefono || '',
+                'id_correo': data.email || ''
+            };
+            
+            // Llenar campos con validación individual
+            Object.entries(campos).forEach(([id, valor]) => {
+                const campo = getElement(id);
+                if (campo) {
+                    campo.value = valor;
+                    console.log(`Campo ${id} llenado con: "${valor}"`);
+                } else {
+                    console.error(`No se encontró el campo: ${id}`);
+                }
+            });
+            
+            // Establecer tipo de identificación a RUC
+            const tipoIdentificacionSelect = getElement('id_tipoIdentificacion');
+            if (tipoIdentificacionSelect) {
+                tipoIdentificacionSelect.value = '04';
+            }
+            
+            // Establecer tipo de cliente
+            const tipoClienteSelect = getElement('id_tipoCliente');
+            if (tipoClienteSelect && data.tipo_contribuyente) {
+                const tipoContribuyente = data.tipo_contribuyente.toLowerCase();
+                if (tipoContribuyente.includes('natural')) {
+                    tipoClienteSelect.value = '1';
+                } else if (tipoContribuyente.includes('sociedad')) {
+                    tipoClienteSelect.value = '2';
+                }
+            }
+            
+            // Establecer tipo de régimen
+            const tipoRegimenSelect = getElement('id_tipoRegimen');
+            if (tipoRegimenSelect && data.obligado_contabilidad) {
+                const obligado = data.obligado_contabilidad.toUpperCase();
+                tipoRegimenSelect.value = obligado === 'SI' ? '1' : '2';
+            }
+            
+            // Tipo de venta por defecto
+            const tipoVentaSelect = getElement('id_tipoVenta');
+            if (tipoVentaSelect) {
+                tipoVentaSelect.value = '1';
+            }
+            
+            // Agregar información en observaciones
+            const observacionesField = getElement('id_observaciones');
+            if (observacionesField) {
+                let observaciones = [];
+                if (data.estado) observaciones.push(`Estado: ${data.estado}`);
+                if (data.actividad_economica) observaciones.push(`Actividad: ${data.actividad_economica}`);
+                observacionesField.value = observaciones.join(' | ');
+            }
+            
+            showMessage('Datos del RUC cargados exitosamente', 'success');
+            
+        } catch (error) {
+            console.error('Error en la consulta:', error);
+            if (loadingIndicator) {
+                loadingIndicator.classList.add('hidden');
+            }
+            showMessage('Error de conexión al consultar el RUC', 'danger');
+            limpiarCamposConsulta();
+        }
+    }
+    
+    // Función de validación antes de enviar el formulario
+    function validarTodo(tipo) {
+        console.log('Validando formulario...');
+        
+        // Definir campos obligatorios
+        const camposObligatorios = [
+            { id: 'id_razon_social', nombre: 'Razón Social' },
+            { id: 'id_direccion', nombre: 'Dirección' },
+            { id: 'id_correo', nombre: 'Correo' }
+        ];
+        
+        // Verificar cada campo obligatorio
+        let camposFaltantes = [];
+        
+        camposObligatorios.forEach(campo => {
+            const elemento = getElement(campo.id);
+            if (elemento) {
+                const valor = elemento.value.trim();
+                if (!valor || valor === '') {
+                    camposFaltantes.push(campo.nombre);
+                    // Agregar clase de error visual con Tailwind
+                    elemento.classList.remove('border-gray-300', 'focus:border-blue-500');
+                    elemento.classList.add('border-red-500', 'focus:border-red-500', 'bg-red-50');
+                } else {
+                    // Quitar clase de error si el campo está lleno
+                    elemento.classList.remove('border-red-500', 'focus:border-red-500', 'bg-red-50');
+                    elemento.classList.add('border-gray-300', 'focus:border-blue-500');
+                }
+            }
+        });
+        
+        // Si hay campos faltantes, mostrar error y no enviar
+        if (camposFaltantes.length > 0) {
+            const mensaje = `Los siguientes campos son obligatorios: ${camposFaltantes.join(', ')}`;
+            showMessage(mensaje, 'danger');
+            console.log('Validación fallida:', mensaje);
+            return false; // Evita el envío del formulario
+        }
+        
+        // Si todo está bien, permitir el envío
+        console.log('Validación exitosa');
+        hideMessage();
+        return true;
+    }
+</script>
+{% endblock %}

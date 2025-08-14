@@ -1,0 +1,277 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-edit"></i> Editar Cuenta Bancaria
+                    </h4>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    {% if form.errors %}
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <h6><i class="fas fa-exclamation-triangle"></i> Errores en el formulario:</h6>
+                            <ul class="mb-0">
+                                {% for field, errors in form.errors.items %}
+                                    {% for error in errors %}
+                                    <li><strong>{{ field|title }}:</strong> {{ error }}</li>
+                                    {% endfor %}
+                                {% endfor %}
+                            </ul>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endif %}
+
+                    <form method="POST" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- Información Básica -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="text-warning border-bottom pb-2">
+                                    <i class="fas fa-info-circle"></i> Información Básica
+                                </h5>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="{{ form.banco.id_for_label }}" class="form-label fw-bold">
+                                        {{ form.banco.label }} <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.banco }}
+                                    {% if form.banco.help_text %}
+                                        <div class="form-text">{{ form.banco.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.banco.errors %}
+                                        <div class="text-danger small">{{ form.banco.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="{{ form.titular.id_for_label }}" class="form-label fw-bold">
+                                        {{ form.titular.label }} <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.titular }}
+                                    {% if form.titular.help_text %}
+                                        <div class="form-text">{{ form.titular.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.titular.errors %}
+                                        <div class="text-danger small">{{ form.titular.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Información de la Cuenta -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="text-warning border-bottom pb-2">
+                                    <i class="fas fa-credit-card"></i> Información de la Cuenta
+                                </h5>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="{{ form.numero_cuenta.id_for_label }}" class="form-label fw-bold">
+                                        {{ form.numero_cuenta.label }} <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="input-group">
+                                        {{ form.numero_cuenta }}
+                                        <span class="input-group-text">
+                                            <i class="fas fa-credit-card text-muted"></i>
+                                        </span>
+                                    </div>
+                                    {% if form.numero_cuenta.help_text %}
+                                        <div class="form-text">{{ form.numero_cuenta.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.numero_cuenta.errors %}
+                                        <div class="text-danger small">{{ form.numero_cuenta.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="{{ form.tipo_cuenta.id_for_label }}" class="form-label fw-bold">
+                                        {{ form.tipo_cuenta.label }} <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.tipo_cuenta }}
+                                    {% if form.tipo_cuenta.help_text %}
+                                        <div class="form-text">{{ form.tipo_cuenta.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.tipo_cuenta.errors %}
+                                        <div class="text-danger small">{{ form.tipo_cuenta.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="{{ form.fecha_apertura.id_for_label }}" class="form-label fw-bold">
+                                        {{ form.fecha_apertura.label }} <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="input-group">
+                                        {{ form.fecha_apertura }}
+                                        <span class="input-group-text">
+                                            <i class="fas fa-calendar-alt text-muted"></i>
+                                        </span>
+                                    </div>
+                                    {% if form.fecha_apertura.help_text %}
+                                        <div class="form-text">{{ form.fecha_apertura.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.fecha_apertura.errors %}
+                                        <div class="text-danger small">{{ form.fecha_apertura.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="{{ form.telefono.id_for_label }}" class="form-label fw-bold">
+                                        {{ form.telefono.label }}
+                                    </label>
+                                    <div class="input-group">
+                                        {{ form.telefono }}
+                                        <span class="input-group-text">
+                                            <i class="fas fa-phone text-muted"></i>
+                                        </span>
+                                    </div>
+                                    {% if form.telefono.help_text %}
+                                        <div class="form-text">{{ form.telefono.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.telefono.errors %}
+                                        <div class="text-danger small">{{ form.telefono.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Configuración de Cheques -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="text-warning border-bottom pb-2">
+                                    <i class="fas fa-receipt"></i> Configuración de Cheques
+                                </h5>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group mb-3">
+                                    <label for="{{ form.secuencial_cheque.id_for_label }}" class="form-label fw-bold">
+                                        {{ form.secuencial_cheque.label }}
+                                    </label>
+                                    <div class="input-group">
+                                        {{ form.secuencial_cheque }}
+                                        <span class="input-group-text">
+                                            <i class="fas fa-receipt text-muted"></i>
+                                        </span>
+                                    </div>
+                                    {% if form.secuencial_cheque.help_text %}
+                                        <div class="form-text">{{ form.secuencial_cheque.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.secuencial_cheque.errors %}
+                                        <div class="text-danger small">{{ form.secuencial_cheque.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Información Adicional -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="text-warning border-bottom pb-2">
+                                    <i class="fas fa-sticky-note"></i> Información Adicional
+                                </h5>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="form-group mb-3">
+                                    <label for="{{ form.observaciones.id_for_label }}" class="form-label fw-bold">
+                                        {{ form.observaciones.label }}
+                                    </label>
+                                    {{ form.observaciones }}
+                                    {% if form.observaciones.help_text %}
+                                        <div class="form-text">{{ form.observaciones.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.observaciones.errors %}
+                                        <div class="text-danger small">{{ form.observaciones.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group mb-3">
+                                    <label for="{{ form.activo.id_for_label }}" class="form-label fw-bold">
+                                        {{ form.activo.label }}
+                                    </label>
+                                    <div class="form-check form-switch mt-2">
+                                        {{ form.activo }}
+                                        <label for="{{ form.activo.id_for_label }}" class="form-check-label">
+                                            Cuenta activa
+                                        </label>
+                                    </div>
+                                    {% if form.activo.help_text %}
+                                        <div class="form-text">{{ form.activo.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.activo.errors %}
+                                        <div class="text-danger small">{{ form.activo.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botones -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button type="submit" class="btn btn-warning">
+                                        <i class="fas fa-save"></i> Guardar Cambios
+                                    </button>
+                                    <a href="{% url 'inventario:listar_bancos' %}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left"></i> Cancelar
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Validación Bootstrap
+    const forms = document.querySelectorAll('.needs-validation');
+    Array.from(forms).forEach(form => {
+        form.addEventListener('submit', event => {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            form.classList.add('was-validated');
+        }, false);
+    });
+});
+</script>
+{% endblock %}

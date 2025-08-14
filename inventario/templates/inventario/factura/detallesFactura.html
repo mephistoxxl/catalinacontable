@@ -1,0 +1,1332 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+<style>
+/* Estilos compactos para inputs y elementos del formulario */
+input[type="text"], input[type="number"], input[type="date"], select, textarea {
+    width: 100%;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid #374151;
+    border-radius: 0.25rem;
+    background-color: white;
+    box-shadow: 0 1px 1px 0 rgba(0, 0, 0, 0.03);
+    font-size: 0.8rem;
+    transition: all 0.1s ease-in-out;
+}
+
+input[type="text"]:hover, input[type="number"]:hover, input[type="date"]:hover, select:hover, textarea:hover {
+    border-color: #1f2937;
+}
+
+input[type="text"]:focus, input[type="number"]:focus, input[type="date"]:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 0.5px #3b82f6;
+}
+
+input[type="text"][readonly], input[type="number"][readonly] {
+    background-color: #f9fafb;
+    border-color: #6b7280;
+    color: #6b7280;
+    cursor: not-allowed;
+}
+
+select {
+    cursor: pointer;
+}
+
+/* Labels compactos */
+label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: color 0.15s ease-in-out;
+}
+
+/* Botones compactos */
+button {
+    font-size: 0.8rem;
+    padding: 0.375rem 0.75rem;
+}
+
+/* Tablas compactas */
+table th, table td {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+}
+
+table th {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+</style>
+
+<div class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-3" style="padding-top: 0px; padding-bottom: 0px;">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header Section - Compacto -->
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-2 mb-3 rounded-md">
+            <div class="flex items-center">
+                <i class="fas fa-list-alt text-white text-lg mr-2"></i>
+                <div>
+                    <h2 class="text-base font-semibold text-white">Detalles de la Factura</h2>
+                    <p class="text-gray-300 text-xs hidden sm:block">Agregue productos y configure el pago</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="mb-4 flex items-center rounded bg-blue-100 px-4 py-2 text-blue-800 text-sm mt-4">
+                    <i class="fa fa-check mr-2"></i> 
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Información de la factura - Compacta -->
+        {% if factura %}
+        <div class="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden mb-3">
+            <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-3 py-2">
+                <h4 class="text-white font-medium text-sm">
+                    <i class="fas fa-info-circle mr-1"></i>Información de la Factura
+                </h4>
+            </div>
+            <div class="p-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div>
+                        <p><span class="font-medium text-gray-700">Cliente:</span> {{ factura.nombre_cliente }}</p>
+                        <p><span class="font-medium text-gray-700">Identificación:</span> {{ factura.identificacion_cliente }}</p>
+                    </div>
+                    <div>
+                        <p><span class="font-medium text-gray-700">Número:</span> {{ factura.establecimiento }}-{{ factura.punto_emision }}-{{ factura.secuencia }}</p>
+                        <p><span class="font-medium text-gray-700">Fecha:</span> {{ factura.fecha_emision }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Main Content - Compacto -->
+        <div class="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden">
+            <div class="p-4">
+                <form method="POST" action="{% url 'inventario:detallesDeFactura' %}" onsubmit="return validarFormulario()" id="formularioDetalles" class="space-y-4">
+                    {% csrf_token %}
+                    
+                    <!-- Campo hidden para enviar datos de pagos al servidor -->
+                    <input type="hidden" id="pagos_efectivo_input" name="pagos_efectivo" value="[]">
+
+                    <!-- Sección para agregar productos - Compacta -->
+                    <div class="bg-gray-50 rounded-md p-3 border border-gray-200">
+                        <div class="flex items-center mb-3">
+                            <i class="fas fa-plus-circle text-blue-600 text-base mr-2"></i>
+                            <h5 class="text-sm font-medium text-gray-800">Agregar Producto</h5>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <div>
+                                <label for="codigo_producto" class="block text-xs font-medium text-gray-700 mb-1">Código del Producto:</label>
+                                <div class="flex space-x-2">
+                                    <input type="text" id="codigo_producto" name="codigo_producto" 
+                                           class="flex-1" 
+                                           placeholder="Código del producto">
+                                    <button type="button" onclick="buscarProducto()" id="btnBuscar" 
+                                            class="inline-flex items-center px-3 py-2 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all duration-150">
+                                        <i class="fa fa-search mr-1"></i>Buscar
+                                    </button>
+                                    <button type="button" onclick="agregarProducto()" id="btnAgregar"
+                                            class="inline-flex items-center px-3 py-2 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 transition-all duration-150">
+                                        <i class="fa fa-plus mr-1"></i>Agregar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label for="producto" class="block text-xs font-medium text-gray-700 mb-1">Producto</label>
+                                <input type="text" id="producto" name="producto" 
+                                       class="w-full bg-gray-100 focus:outline-none" 
+                                       placeholder="Nombre del producto" disabled data-precio="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de productos - Compacta -->
+                    <div class="bg-white rounded-md border border-gray-200 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200" id="tabla-productos">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cant.</th>
+                                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">P. Unit.</th>
+                                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <!-- Filas dinámicas se agregarán aquí -->
+                                </tbody>
+                                <tfoot class="bg-gray-50">
+                                    <tr>
+                                        <td colspan="4" class="px-3 py-2 text-right text-sm font-semibold text-gray-900">Total:</td>
+                                        <td class="px-3 py-2 text-right text-base font-bold text-gray-900" id="total-general">$0.00</td>
+                                        <td class="px-3 py-2"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN DE FORMAS DE PAGO - Compacta -->
+                    <div class="bg-white rounded-md border border-gray-200 overflow-hidden" id="seccion-formas-pago">
+                        <div class="bg-gradient-to-r from-green-600 to-green-700 px-3 py-2">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <i class="fas fa-money-bill-wave text-white text-base mr-2"></i>
+                                    <h5 class="text-white font-medium text-sm">Formas de Pago</h5>
+                                </div>
+                                <div class="bg-green-800 px-2 py-1 rounded-full">
+                                    <span class="text-white text-xs font-medium">
+                                        Total: <span id="total-formas-display" class="font-bold">$0.00</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="p-4">
+                            <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                                <!-- Columna izquierda: Botones de forma de pago - Compactos -->
+                                <div class="space-y-2">
+                                    <button type="button" class="btn-forma-pago w-full flex items-center px-3 py-2 text-left border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors text-xs" 
+                                            data-forma="efectivo" onclick="cambiarFormaPago('efectivo')">
+                                        <i class="fas fa-money-bill text-green-600 mr-2"></i>
+                                        <span class="font-medium">Efectivo</span>
+                                    </button>
+                                    <button type="button" class="btn-forma-pago w-full flex items-center px-3 py-2 text-left border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors text-xs" 
+                                            data-forma="cheque" onclick="cambiarFormaPago('cheque')">
+                                        <i class="fas fa-money-check text-blue-600 mr-2"></i>
+                                        <span class="font-medium">Cheque</span>
+                                    </button>
+                                    <button type="button" class="btn-forma-pago w-full flex items-center px-3 py-2 text-left border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors text-xs" 
+                                            data-forma="tarjeta" onclick="cambiarFormaPago('tarjeta')">
+                                        <i class="fas fa-credit-card text-purple-600 mr-2"></i>
+                                        <span class="font-medium">Tarjeta</span>
+                                    </button>
+                                    <button type="button" class="btn-forma-pago w-full flex items-center px-3 py-2 text-left border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors text-xs" 
+                                            data-forma="deposito" onclick="cambiarFormaPago('deposito')">
+                                        <i class="fas fa-university text-indigo-600 mr-2"></i>
+                                        <span class="font-medium">Depósito</span>
+                                    </button>
+                                </div>
+                                
+                                <!-- Columna derecha: Formulario de la forma de pago seleccionada - Compacto -->
+                                <div class="lg:col-span-3">
+                                    <!-- Sección Efectivo - Compacta -->
+                                    <div id="forma-efectivo" class="p-3 bg-gray-50 rounded-md border border-gray-200 hidden">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                            <div>
+                                                <label for="sri-pago-select" class="block text-xs font-medium text-gray-700 mb-1">SRI Pago:</label>
+                                                <select class="w-full" id="sri-pago-select" onchange="mostrarCampoMonto()">
+                                                    <option value="01">Sin Utilización Del Sistema Financiero</option>
+                                                    <option value="15">Compensación De Deudas</option>
+                                                    <option value="16">Tarjeta De Débito</option>
+                                                    <option value="17">Dinero Electrónico</option>
+                                                    <option value="18">Tarjeta Prepago</option>
+                                                    <option value="19">Tarjeta De Crédito</option>
+                                                    <option value="20">Otros Con Utilización Del Sistema Financiero</option>
+                                                    <option value="21">Endoso De Títulos</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label for="caja-select" class="block text-xs font-medium text-gray-700 mb-1">Caja:</label>
+                                                <select class="w-full" id="caja-select" onchange="mostrarCampoMonto()">
+                                                    <option value="">Seleccionar caja...</option>
+                                                    {% for caja in cajas %}
+                                                        <option value="{{ caja.id }}" data-descripcion="{{ caja.descripcion }}">
+                                                            {{ caja.descripcion }}
+                                                        </option>
+                                                    {% endfor %}
+                                                    {% if not cajas %}
+                                                        <option value="" disabled>No hay cajas disponibles</option>
+                                                    {% endif %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- INPUT DE VALOR - OCULTO HASTA SELECCIONAR CAJA -->
+                                        <div id="monto-container" class="hidden">
+                                            <div class="mb-3">
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Valor:</label>
+                                                <div class="relative">
+                                                    <span class="absolute left-2 top-2 text-gray-500 text-xs">$</span>
+                                                    <input type="number" class="w-full pl-6 pr-3 py-2" 
+                                                           id="monto-efectivo" step="0.01" min="0" onchange="agregarPagoEfectivo()">
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- BOTÓN CONFIRMAR PAGO -->
+                                            <div class="mb-3">
+                                                <button type="button" onclick="confirmarPagoEfectivo()" 
+                                                        class="w-full inline-flex justify-center items-center px-3 py-2 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 transition-all duration-150">
+                                                    <i class="fa fa-check mr-1"></i> Confirmar Pago
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Tabla de pagos en efectivo - Compacta -->
+                                        <div id="tabla-efectivo-container" class="hidden">
+                                            <div class="overflow-x-auto">
+                                                <table class="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-md">
+                                                    <thead class="bg-gray-50">
+                                                        <tr>
+                                                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Forma / Caja</th>
+                                                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="tabla-pagos-efectivo" class="bg-white divide-y divide-gray-200">
+                                                        <!-- Los pagos se agregarán aquí dinámicamente -->
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Las otras secciones (cheque, tarjeta, depósito) - Compactas -->
+                                    <div id="forma-cheque" class="forma-pago-detalle p-3 bg-gray-50 rounded-md border border-gray-200 hidden">
+                                        <p class="text-gray-600 text-xs">Funcionalidad de cheque en desarrollo</p>
+                                    </div>
+                                    <div id="forma-tarjeta" class="forma-pago-detalle p-3 bg-gray-50 rounded-md border border-gray-200 hidden">
+                                        <p class="text-gray-600 text-xs">Funcionalidad de tarjeta en desarrollo</p>
+                                    </div>
+                                    <div id="forma-deposito" class="forma-pago-detalle p-3 bg-gray-50 rounded-md border border-gray-200 hidden">
+                                        <p class="text-gray-600 text-xs">Funcionalidad de depósito en desarrollo</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                                <!-- Campos adicionales para crédito -->
+                                <div id="campos-credito-simple" style="display: none;">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="form-group">
+                                                <label>Plazo (días):</label>
+                                                <input type="number" name="plazo" class="form-control" min="0" placeholder="30">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-group">
+                                                <label>Unidad de Tiempo:</label>
+                                                <select name="unidad_tiempo" class="form-control">
+                                                    <option value="dias">Días</option>
+                                                    <option value="semanas">Semanas</option>
+                                                    <option value="meses">Meses</option>
+                                                    <option value="años">Años</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Confirmación de forma de pago -->
+                                <div id="confirmacion-pago" style="display: none;">
+                                    <div class="alert alert-success">
+                                        <em class="fa fa-check"></em>
+                                        <strong>Forma de pago confirmada:</strong> 
+                                        <span id="forma-confirmada"></span> por <span id="total-confirmado"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Campos ocultos para enviar los datos -->
+                        <div id="productos-hidden"></div>
+
+                        <!-- BOTONES FINALES - Compactos -->
+                        <div class="flex flex-col sm:flex-row gap-3 justify-center mt-4">
+                            <button type="submit" class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors" id="btnEnviar">
+                                <i class="fas fa-check mr-2"></i>
+                                Finalizar Factura
+                            </button>
+                            <a href="{% url 'inventario:emitirFactura' %}" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors">
+                                <i class="fas fa-times mr-2"></i>
+                                Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Espaciado adicional para evitar que el footer tape el contenido -->
+        <div class="h-24"></div>
+    </div>
+</div>
+
+<script>
+// ✅ VARIABLES EXISTENTES (SIN TOCAR)
+let productosAgregados = [];
+let contadorProductos = 0;
+
+// ✅ NUEVA VARIABLE SIMPLE PARA FORMA DE PAGO
+let formaPagoConfirmada = false;
+
+// Variables para el manejo de pagos
+let pagosEfectivo = [];
+let totalPagado = 0;
+
+// ✅ FUNCIONES EXISTENTES (SIN TOCAR - SOLO COPIADAS TAL COMO ESTÁN)
+function buscarProducto() {
+    const codigo = document.getElementById('codigo_producto').value.trim();
+    
+    if (!codigo) {
+        alert('Por favor, ingrese un código de producto.');
+        return;
+    }
+
+fetch(`/inventario/buscar_producto/?q=${encodeURIComponent(codigo)}`)
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Error en la búsqueda');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.length > 0) {
+            let producto = data[0];
+            let tipo = producto.tipo === 'servicio' ? 'Servicio' : 'Producto';
+            document.getElementById('producto').value = `${producto.nombre} (${tipo})`;
+            document.getElementById('producto').dataset.precio = producto.precio;
+            document.getElementById('producto').dataset.codigo = producto.codigo;
+            limpiarMensajesError();
+        } else {
+            alert('Producto o servicio no encontrado.');
+            limpiarCamposProducto();
+        }
+    })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al buscar el producto. Inténtelo de nuevo.');
+            limpiarCamposProducto();
+        });
+}
+
+function limpiarCamposProducto() {
+    document.getElementById('producto').value = '';
+    document.getElementById('producto').dataset.precio = "0";
+    document.getElementById('producto').dataset.codigo = "";
+}
+
+function limpiarMensajesError() {
+    // Remover mensajes de error anteriores
+    const mensajes = document.querySelectorAll('.alert');
+    mensajes.forEach(mensaje => mensaje.remove());
+}
+
+function agregarProducto() {
+    const codigo = document.getElementById('codigo_producto').value.trim();
+    const nombreProducto = document.getElementById('producto').value.trim();
+    let precio = parseFloat(document.getElementById('producto').dataset.precio || "0");
+
+    // Validaciones
+    if (!codigo || !nombreProducto) {
+        alert('Debe buscar un producto válido antes de agregarlo.');
+        return;
+    }
+
+    if (isNaN(precio) || precio <= 0) {
+        alert('El precio del producto no es válido.');
+        return;
+    }
+
+    // Verificar si el producto ya está agregado
+    if (productosAgregados.some(p => p.codigo === codigo)) {
+        alert('Este producto ya ha sido agregado. Para modificar la cantidad, elimínelo y vuelva a agregarlo.');
+        return;
+    }
+
+    let cantidad = parseInt(prompt('Ingrese la cantidad:', '1'));
+    if (!cantidad || isNaN(cantidad) || cantidad <= 0) {
+        alert('Ingrese una cantidad válida.');
+        return;
+    }
+
+    let subtotal = (cantidad * precio);
+
+    // Agregar al array de productos
+    const productoData = {
+        id: contadorProductos++,
+        codigo: codigo,
+        nombre: nombreProducto,
+        cantidad: cantidad,
+        precio: precio,
+        subtotal: subtotal
+    };
+
+    productosAgregados.push(productoData);
+    
+    console.log('✅ Producto agregado:', productoData);
+    console.log('📦 Total productos en array:', productosAgregados.length);
+    console.log('📋 Array completo:', productosAgregados);
+
+    // Agregar a la tabla
+    agregarFilaTabla(productoData);
+
+    // Actualizar campos ocultos
+    actualizarCamposOcultos();
+
+    // Actualizar total
+    actualizarTotal();
+
+    // Limpiar campos
+    document.getElementById('codigo_producto').value = '';
+    limpiarCamposProducto();
+
+    console.log('Productos agregados:', productosAgregados);
+}
+
+function agregarFilaTabla(producto) {
+    const tabla = document.getElementById('tabla-productos').getElementsByTagName('tbody')[0];
+    
+    let nuevaFila = document.createElement('tr');
+    nuevaFila.setAttribute('data-producto-id', producto.id);
+    
+    nuevaFila.innerHTML = `
+        <td>${producto.codigo}</td>
+        <td>${producto.nombre}</td>
+        <td>${producto.cantidad}</td>
+        <td>$${producto.precio.toFixed(2)}</td>
+        <td class="subtotal">$${producto.subtotal.toFixed(2)}</td>
+        <td class="accion">
+            <button type="button" class="btn btn-danger btn-sm" onclick="eliminarProducto(${producto.id})">
+                Eliminar
+            </button>
+        </td>
+    `;
+    
+    tabla.appendChild(nuevaFila);
+    
+    // Asegurar que los botones permanezcan visibles
+    const btnEnviar = document.getElementById('btnEnviar');
+    const btnCancelar = document.querySelector('a.btn-secondary');
+    
+    if (btnEnviar) btnEnviar.style.display = 'inline-block';
+    if (btnCancelar) btnCancelar.style.display = 'inline-block';
+}
+
+function eliminarProducto(productoId) {
+    // Remover del array
+    productosAgregados = productosAgregados.filter(p => p.id !== productoId);
+    
+    // Remover de la tabla
+    const fila = document.querySelector(`tr[data-producto-id="${productoId}"]`);
+    if (fila) {
+        fila.remove();
+    }
+    
+    // Actualizar campos ocultos y total
+    actualizarCamposOcultos();
+    actualizarTotal();
+    
+    console.log('Producto eliminado. Productos restantes:', productosAgregados);
+}
+
+function actualizarCamposOcultos() {
+    console.log('=== ACTUALIZANDO CAMPOS OCULTOS ===');
+    console.log('productosAgregados:', productosAgregados);
+
+    const container = document.getElementById('productos-hidden');
+    if (!container) {
+        console.log('❌ Container productos-hidden NO encontrado');
+        return;
+    }
+
+    console.log('✅ Container productos-hidden encontrado:', container);
+    container.innerHTML = '';
+
+    productosAgregados.forEach((producto) => {
+        console.log(`Creando campos para producto: ${producto.codigo} - cantidad: ${producto.cantidad}`);
+
+        let inputCodigo = document.createElement('input');
+        inputCodigo.type = 'hidden';
+        inputCodigo.name = 'productos_codigos[]';
+        inputCodigo.value = producto.codigo;
+        container.appendChild(inputCodigo);
+
+        let inputCantidad = document.createElement('input');
+        inputCantidad.type = 'hidden';
+        inputCantidad.name = 'productos_cantidades[]';
+        inputCantidad.value = producto.cantidad;
+        container.appendChild(inputCantidad);
+
+        // NUEVO: enviar nombre/descripcion
+        let inputNombre = document.createElement('input');
+        inputNombre.type = 'hidden';
+        inputNombre.name = 'productos_nombres[]';
+        inputNombre.value = producto.nombre;
+        container.appendChild(inputNombre);
+    });
+
+    console.log('=== CAMPOS OCULTOS CREADOS ===');
+    console.log('Total inputs creados:', container.children.length);
+    console.log('HTML del container:', container.innerHTML);
+}
+
+// ✅ FUNCIÓN EXISTENTE MODIFICADA: Ahora también actualiza formas de pago
+function actualizarTotal() {
+    const total = productosAgregados.reduce((sum, producto) => sum + producto.subtotal, 0);
+    document.getElementById('total-general').textContent = `${total.toFixed(2)}`;
+    
+    // ✅ ACTUALIZAR: Siempre mantener visible la sección de formas de pago
+    document.getElementById('seccion-formas-pago').style.display = 'block';
+    // Actualizar el total en la sección de formas de pago
+    document.getElementById('total-formas-display').textContent = `${total.toFixed(2)}`;
+    
+    // Autocompletar monto de efectivo si está visible
+    const montoEfectivo = document.getElementById('monto-efectivo');
+    if (montoEfectivo && document.getElementById('forma-efectivo').style.display !== 'none') {
+        montoEfectivo.value = total.toFixed(2);
+    }
+}
+
+// 🔥 FUNCIÓN VALIDAR FORMULARIO - BULLETPROOF VERSION
+function validarFormulario() {
+    console.log('🚀 === INICIANDO VALIDACIÓN BULLETPROOF ===');
+    
+    // Verificar productos
+    if (!productosAgregados || productosAgregados.length === 0) {
+        alert('Debe agregar al menos un producto.');
+        return false;
+    }
+    
+    console.log('📦 Productos en array:', productosAgregados.length);
+    
+    // FORZAR creación de campos ocultos DIRECTAMENTE en el formulario
+    const formulario = document.getElementById('formularioDetalles');
+    
+    // Eliminar campos ocultos existentes
+    formulario.querySelectorAll('input[name="productos_codigos[]"]').forEach(el => el.remove());
+    formulario.querySelectorAll('input[name="productos_cantidades[]"]').forEach(el => el.remove());
+    formulario.querySelectorAll('input[name="productos_nombres[]"]').forEach(el => el.remove());
+
+    console.log('🧹 Campos anteriores eliminados');
+    
+    // Crear campos DIRECTAMENTE en el formulario (NO en el contenedor)
+    productosAgregados.forEach((producto, index) => {
+        console.log(`🔧 Creando campos para: ${producto.codigo} x ${producto.cantidad}`);
+        
+        // Crear input de código
+        const inputCodigo = document.createElement('input');
+        inputCodigo.type = 'hidden';
+        inputCodigo.name = 'productos_codigos[]';
+        inputCodigo.value = producto.codigo;
+        formulario.appendChild(inputCodigo);
+        
+        // Crear input de cantidad
+        const inputCantidad = document.createElement('input');
+        inputCantidad.type = 'hidden';
+        inputCantidad.name = 'productos_cantidades[]';
+        inputCantidad.value = producto.cantidad;
+        formulario.appendChild(inputCantidad);
+
+        // NUEVO: Crear input de nombre/descripcion
+        const inputNombre = document.createElement('input');
+        inputNombre.type = 'hidden';
+        inputNombre.name = 'productos_nombres[]';
+        inputNombre.value = producto.nombre;
+        formulario.appendChild(inputNombre);
+
+        console.log(`✅ Campos creados: ${producto.codigo} = ${producto.cantidad} = ${producto.nombre}`);
+    });
+    
+    // Verificar INMEDIATAMENTE que se crearon
+    const codigosVerificacion = formulario.querySelectorAll('input[name="productos_codigos[]"]');
+    const cantidadesVerificacion = formulario.querySelectorAll('input[name="productos_cantidades[]"]');
+    
+    console.log(`🔍 VERIFICACIÓN: ${codigosVerificacion.length} códigos, ${cantidadesVerificacion.length} cantidades`);
+    
+    if (codigosVerificacion.length === 0) {
+        alert('ERROR CRÍTICO: No se pudieron crear los campos de productos. Reintente.');
+        return false;
+    }
+    
+    // Mostrar valores específicos
+    codigosVerificacion.forEach((input, i) => {
+        console.log(`   Código ${i}: ${input.value}`);
+    });
+    cantidadesVerificacion.forEach((input, i) => {
+        console.log(`   Cantidad ${i}: ${input.value}`);
+    });
+    
+    // Verificar formas de pago
+    if (!pagosEfectivo || pagosEfectivo.length === 0) {
+        alert('Debe agregar al menos una forma de pago.');
+        return false;
+    }
+    
+    console.log('💰 Pagos verificados:', pagosEfectivo.length);
+    
+    // Actualizar campo de pagos
+    const pagosInput = document.getElementById('pagos_efectivo_input');
+    if (pagosInput) {
+        pagosInput.value = JSON.stringify(pagosEfectivo);
+        console.log('💳 Datos de pago actualizados');
+    }
+    
+    // Deshabilitar botón para evitar doble envío
+    const btnEnviar = document.getElementById('btnEnviar');
+    if (btnEnviar) {
+        btnEnviar.disabled = true;
+        btnEnviar.textContent = 'Procesando...';
+    }
+    
+    console.log('🎯 VALIDACIÓN EXITOSA - ENVIANDO FORMULARIO');
+    
+    return true;
+}
+
+function bloquearFormulario() {
+    document.getElementById('codigo_producto').disabled = true;
+    document.getElementById('producto').disabled = true;
+    document.getElementById('btnBuscar').disabled = true;
+    document.getElementById('btnAgregar').disabled = true;
+    document.getElementById('btnEnviar').disabled = true;
+    document.querySelectorAll('.btn-danger').forEach(btn => btn.disabled = true);
+}
+
+// ✅ NUEVA FUNCIÓN SIMPLE PARA CONFIRMAR FORMA DE PAGO
+function confirmarFormaPago() {
+    const selectFormaPago = document.getElementById('forma-pago-principal');
+    const codigoFormaPago = selectFormaPago.value;
+    const nombreFormaPago = selectFormaPago.options[selectFormaPago.selectedIndex].text;
+    const totalPago = document.getElementById('total-pago-input').value;
+    
+    if (!codigoFormaPago) {
+        alert('Debe seleccionar una forma de pago');
+        return;
+    }
+    
+    // Mostrar confirmación
+    document.getElementById('forma-confirmada').textContent = nombreFormaPago;
+    document.getElementById('total-confirmado').textContent = totalPago;
+    document.getElementById('confirmacion-pago').style.display = 'block';
+    
+    // Marcar como confirmada
+    formaPagoConfirmada = true;
+    
+    // Cambiar texto del botón
+    const botonConfirmar = event.target;
+    botonConfirmar.innerHTML = '<em class="fa fa-check"></em> Forma de Pago Confirmada';
+    botonConfirmar.className = 'btn btn-success btn-block';
+    botonConfirmar.disabled = true;
+    
+    console.log('Forma de pago confirmada:', codigoFormaPago, nombreFormaPago, totalPago);
+}
+
+// ✅ FUNCIÓN PARA MANEJAR CAMPOS DE CRÉDITO
+function manejarCamposCredito() {
+    const selectFormaPago = document.getElementById('forma-pago-principal');
+    const camposCredito = document.getElementById('campos-credito-simple');
+    
+    // Mostrar campos de crédito si selecciona "Otros con utilización del sistema financiero"
+    if (selectFormaPago.value === '20') {
+        camposCredito.style.display = 'block';
+    } else {
+        camposCredito.style.display = 'none';
+    }
+}
+
+// ✅ NUEVA FUNCIÓN: Confirmar pago en efectivo
+function confirmarPagoEfectivo() {
+    const montoInput = document.getElementById('monto-efectivo');
+    const sriPagoSelect = document.getElementById('sri-pago-select');
+    const cajaSelect = document.getElementById('caja-select');
+    
+    const monto = parseFloat(montoInput.value);
+    const sriPago = sriPagoSelect.value;
+    const cajaId = cajaSelect.value;
+    
+    if (!monto || monto <= 0) {
+        alert('Debe ingresar un monto válido');
+        return;
+    }
+    
+    if (!sriPago) {
+        alert('Debe seleccionar una forma de pago SRI');
+        return;
+    }
+    
+    // ✅ OPCIONAL: Validar caja solo si hay cajas disponibles
+    if (cajaSelect.options.length > 1 && !cajaId) {
+        alert('Debe seleccionar una caja');
+        return;
+    }
+    
+    // ✅ CREAR PAGO
+    const pago = {
+        id: Date.now(),
+        monto: monto,
+        tipo: 'efectivo',
+        sri_pago: sriPago,
+        sri_pago_descripcion: sriPagoSelect.options[sriPagoSelect.selectedIndex].text,
+        caja_id: cajaId || 'efectivo',
+        caja_descripcion: cajaId ? cajaSelect.options[cajaSelect.selectedIndex].text : 'Efectivo'
+    };
+    
+    pagosEfectivo.push(pago);
+    
+    // Actualizar tabla
+    actualizarTablaPagosEfectivo();
+    
+    // Actualizar total pagado
+    actualizarTotalPagado();
+    
+    // Limpiar formulario
+    montoInput.value = '';
+    sriPagoSelect.selectedIndex = 0;
+    if (cajaSelect.options.length > 1) {
+        cajaSelect.selectedIndex = 0;
+    }
+    
+    // Ocultar campo de monto después de confirmar
+    document.getElementById('monto-container').style.display = 'none';
+    
+    console.log('✅ Pago en efectivo confirmado:', pago);
+}
+
+// Función para cambiar entre formas de pago
+function cambiarFormaPago(forma) {
+    // Ocultar todas las formas de pago con transición suave
+    document.querySelectorAll('.forma-pago-detalle').forEach(el => {
+        el.style.display = 'none';
+        el.classList.remove('show');
+    });
+    
+    // También ocultar la sección de efectivo
+    const efectivoSection = document.getElementById('forma-efectivo');
+    if (efectivoSection) {
+        efectivoSection.style.display = 'none';
+        efectivoSection.classList.remove('show');
+    }
+    
+    // Mostrar la forma seleccionada con transición
+    setTimeout(() => {
+        if (forma === 'efectivo') {
+            if (efectivoSection) {
+                efectivoSection.style.display = 'block';
+                efectivoSection.classList.add('show');
+            }
+        } else {
+            const formaSeleccionada = document.getElementById('forma-' + forma);
+            if (formaSeleccionada) {
+                formaSeleccionada.style.display = 'block';
+                formaSeleccionada.classList.add('show');
+            }
+        }
+    }, 50);
+    
+    // Actualizar estado activo de los botones
+    document.querySelectorAll('.btn-forma-pago').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    const btnSeleccionado = document.querySelector(`[data-forma="${forma}"]`);
+    if (btnSeleccionado) {
+        btnSeleccionado.classList.add('active');
+    }
+
+    // Si es efectivo, auto-completar el monto y mostrar campo
+    if (forma === 'efectivo') {
+        setTimeout(() => {
+            const totalACobrar = document.getElementById('total-formas-display').textContent;
+            const montoEfectivo = document.getElementById('monto-efectivo');
+            const montoContainer = document.getElementById('monto-container');
+            
+            if (montoEfectivo && totalACobrar) {
+                const monto = totalACobrar.replace('$', '').trim();
+                montoEfectivo.value = monto;
+            }
+            
+            // ✅ MOSTRAR el campo de monto automáticamente
+            if (montoContainer) {
+                montoContainer.style.display = 'block';
+                montoContainer.classList.add('show');
+            }
+        }, 150);
+    }
+}
+
+// Función para agregar pago en efectivo
+function agregarPagoEfectivo() {
+    const montoInput = document.getElementById('monto-efectivo');
+    const sriPagoSelect = document.getElementById('sri-pago-select');
+    const cajaSelect = document.getElementById('caja-select');
+    
+    const monto = parseFloat(montoInput.value);
+    const sriPago = sriPagoSelect.value;
+    const cajaId = cajaSelect.value;
+    
+    // ✅ VALIDACIÓN: Solo procesar si hay una caja seleccionada
+    if (!cajaId) {
+        // No hacer nada si no hay caja seleccionada
+        return;
+    }
+    
+    if (!monto || monto <= 0) {
+        alert('Debe ingresar un monto válido');
+        return;
+    }
+    
+    if (!sriPago) {
+        alert('Debe seleccionar una forma de pago SRI');
+        return;
+    }
+    
+    // ✅ MODIFICAR: Guardar información completa de la caja
+    const pago = {
+        id: Date.now(),
+        monto: monto,
+        tipo: 'efectivo',
+        sri_pago: sriPago,
+        sri_pago_descripcion: sriPagoSelect.options[sriPagoSelect.selectedIndex].text,
+        caja_id: cajaId,  // ✅ NUEVO: ID de la caja para enviar al servidor
+        caja_descripcion: cajaSelect.options[cajaSelect.selectedIndex].text
+    };
+    
+    pagosEfectivo.push(pago);
+    
+    // Actualizar tabla
+    actualizarTablaPagosEfectivo();
+    
+    // Actualizar total pagado
+    actualizarTotalPagado();
+    
+    // Limpiar input y resetear dropdowns
+    montoInput.value = '';
+    sriPagoSelect.selectedIndex = 0;
+    cajaSelect.selectedIndex = 0;
+    
+    // Ocultar campo de monto al resetear
+    document.getElementById('monto-container').style.display = 'none';
+}
+
+// ✅ NUEVA FUNCIÓN: Mostrar/ocultar campo de monto según selección de caja
+function mostrarCampoMonto() {
+    const cajaSelect = document.getElementById('caja-select');
+    const montoContainer = document.getElementById('monto-container');
+    
+    if (cajaSelect.value) {
+        // Si hay una caja seleccionada, mostrar el campo de monto
+        montoContainer.style.display = 'block';
+        montoContainer.classList.add('show');
+        
+        // Auto-completar con el total si está disponible
+        const totalACobrar = document.getElementById('total-formas-display').textContent;
+        const montoEfectivo = document.getElementById('monto-efectivo');
+        if (montoEfectivo && totalACobrar) {
+            const monto = totalACobrar.replace('$', '').trim();
+            montoEfectivo.value = monto;
+        }
+    } else {
+        // Si no hay caja seleccionada, ocultar el campo de monto
+        montoContainer.style.display = 'none';
+        montoContainer.classList.remove('show');
+        // Limpiar el valor del monto
+        document.getElementById('monto-efectivo').value = '';
+    }
+}
+
+// Función para eliminar pago en efectivo
+function eliminarPagoEfectivo(id) {
+    pagosEfectivo = pagosEfectivo.filter(p => p.id !== id);
+    actualizarTablaPagosEfectivo();
+    actualizarTotalPagado();
+}
+
+// Función para actualizar la tabla de pagos en efectivo
+function actualizarTablaPagosEfectivo() {
+    const tbody = document.getElementById('tabla-pagos-efectivo');
+    const tablaContainer = document.getElementById('tabla-efectivo-container');
+    
+    if (!tbody || !tablaContainer) return;
+    
+    tbody.innerHTML = '';
+    
+    // Si no hay pagos, ocultar la tabla
+    if (pagosEfectivo.length === 0) {
+        tablaContainer.style.display = 'none';
+        return;
+    }
+    
+    // Si hay pagos, mostrar la tabla y llenarla
+    tablaContainer.style.display = 'block';
+    
+    pagosEfectivo.forEach(pago => {
+        const fila = document.createElement('tr');
+        fila.innerHTML = `
+            <td>
+                <strong>Efectivo</strong><br>
+                <small class="text-muted">Caja: ${pago.caja_descripcion || 'No especificada'}</small><br>
+                <small class="text-muted">SRI: ${pago.sri_pago_descripcion || 'Sin especificar'}</small>
+            </td>
+            <td><strong>$${pago.monto.toFixed(2)}</strong></td>
+        `;
+        tbody.appendChild(fila);
+    });
+}
+
+// Función para actualizar el total pagado
+function actualizarTotalPagado() {
+    totalPagado = pagosEfectivo.reduce((sum, pago) => sum + pago.monto, 0);
+    console.log('Total pagado:', totalPagado);
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Página de detalles de factura cargada');
+    
+    // ✅ ASEGURAR que la sección de formas de pago esté siempre visible
+    document.getElementById('seccion-formas-pago').style.display = 'block';
+    
+    // ✅ AGREGAR: Event listener para cambio de caja
+    document.getElementById('caja-select').addEventListener('change', mostrarCampoMonto);
+    
+    actualizarTotal();
+    
+    // Agregar listener para Enter en código de producto
+    const codigoProductoInput = document.getElementById('codigo_producto');
+    if (codigoProductoInput) {
+        codigoProductoInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                buscarProducto();
+            }
+        });
+    }
+    
+    // Agregar listeners para los botones de forma de pago
+    document.querySelectorAll('.btn-forma-pago').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const forma = this.dataset.forma;
+            cambiarFormaPago(forma);
+        });
+    });
+    
+    // Agregar listener para Enter en monto efectivo
+    const montoEfectivoInput = document.getElementById('monto-efectivo');
+    if (montoEfectivoInput) {
+        montoEfectivoInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                agregarPagoEfectivo();
+            }
+        });
+    }
+
+    // Inicializar con TODO LIMPIO - NO seleccionar efectivo por defecto
+    setTimeout(() => {
+        // ✅ QUITAR clase active de TODOS los botones
+        document.querySelectorAll('.btn-forma-pago').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // ✅ OCULTAR TODAS las secciones de forma de pago
+        document.querySelectorAll('.forma-pago-detalle').forEach(el => {
+            el.style.display = 'none';
+        });
+        
+        // ✅ OCULTAR también la sección de efectivo
+        const efectivoSection = document.getElementById('forma-efectivo');
+        if (efectivoSection) {
+            efectivoSection.style.display = 'none';
+        }
+        
+        // ✅ OCULTAR la tabla de pagos
+        const tablaContainer = document.getElementById('tabla-efectivo-container');
+        if (tablaContainer) {
+            tablaContainer.style.display = 'none';
+        }
+        
+        // ✅ OCULTAR el campo de monto
+        const montoContainer = document.getElementById('monto-container');
+        if (montoContainer) {
+            montoContainer.style.display = 'none';
+        }
+        
+        console.log('✅ Formulario inicializado: TODO LIMPIO, nada seleccionado');
+    }, 100);
+});
+</script>
+
+<style>
+/* ✅ ESTILOS EXISTENTES (SIN TOCAR) */
+.card {
+    margin-bottom: 1rem;
+}
+
+.table th, .table td {
+    vertical-align: middle;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+#total-general {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.alert {
+    margin-top: 1rem;
+}
+
+.d-flex {
+    display: flex;
+}
+
+.mr-2 {
+    margin-right: 0.5rem;
+}
+
+.ml-2 {
+    margin-left: 0.5rem;
+}
+
+.text-right {
+    text-align: right;
+}
+
+/* Estilos para mantener los botones siempre visibles */
+#btnEnviar,
+.form-group .btn-secondary {
+    display: inline-block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    margin: 5px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+/* ✅ NUEVOS ESTILOS PARA FORMAS DE PAGO - SIMPLIFICADOS */
+.formas-pago-botones {
+    display: block;
+}
+
+.btn-forma-pago {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 10px 15px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 4px;
+    margin-bottom: 5px;
+    width: 100%;
+    display: block;
+    color: #000 !important;
+}
+
+.btn-forma-pago .fa {
+    color: #000 !important;
+}
+
+.btn-forma-pago:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.btn-forma-pago.active {
+    background: #007bff;
+    color: white;
+    border-color: #0056b3;
+}
+
+/* 🔧 ESTILOS ADICIONALES PARA EVITAR DESCUADRE */
+
+/* Contenedor principal con altura mínima */
+#seccion-formas-pago .card-body {
+    min-height: 450px;
+}
+
+/* Columnas con altura fija */
+.col-md-3 {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+.col-md-9 {
+    position: relative;
+    min-height: 400px;
+}
+
+/* Prevenir saltos de layout */
+.d-flex.flex-column {
+    min-height: 250px;
+    justify-content: flex-start;
+    gap: 8px;
+}
+
+/* Transiciones suaves para todos los elementos dinámicos */
+#forma-efectivo,
+#forma-cheque,
+#forma-tarjeta,
+#forma-deposito,
+#monto-container,
+#tabla-efectivo-container {
+    transition: all 0.3s ease-in-out;
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 1000px;
+    overflow: hidden;
+}
+
+/* Ocultar elementos con transición suave */
+#forma-efectivo[style*="display: none"],
+#forma-cheque[style*="display: none"],
+#forma-tarjeta[style*="display: none"],
+#forma-deposito[style*="display: none"],
+#monto-container[style*="display: none"],
+#tabla-efectivo-container[style*="display: none"] {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+/* Mostrar elementos con transición suave */
+#forma-efectivo[style*="display: block"],
+#forma-cheque[style*="display: block"],
+#forma-tarjeta[style*="display: block"],
+#forma-deposito[style*="display: block"],
+#monto-container[style*="display: block"],
+#tabla-efectivo-container[style*="display: block"] {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 1000px;
+}
+
+/* Asegurar que el contenedor principal mantenga su tamaño */
+.row.sameheight-container {
+    display: flex;
+    align-items: stretch;
+}
+
+.sameheight-item {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Responsive: mantener proporción en móviles */
+@media (max-width: 768px) {
+    .col-md-3,
+    .col-md-9 {
+        width: 100%;
+        margin-bottom: 15px;
+    }
+    
+    .d-flex.flex-column {
+        min-height: auto;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .btn-forma-pago {
+        flex: 1;
+        min-width: 120px;
+    }
+}
+
+/* Prevenir overflow horizontal */
+.card {
+    overflow-x: hidden;
+}
+
+.table-responsive {
+    overflow-x: auto;
+    max-width: 100%;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Función para copiar el total a cobrar al input de efectivo
+function autocompletarMontoEfectivo() {
+    const totalACobrar = document.getElementById('total-formas-display').textContent;
+    const montoEfectivo = document.getElementById('monto-efectivo');
+    if (montoEfectivo && totalACobrar) {
+        // Extraer solo el número del total (eliminar el símbolo $)
+        const monto = totalACobrar.replace('$', '').trim();
+        montoEfectivo.value = monto;
+    }
+}
+
+// Event listener para cuando se muestra la sección de efectivo
+document.addEventListener('DOMContentLoaded', function() {
+    const btnEfectivo = document.querySelector('[data-forma="efectivo"]');
+    if (btnEfectivo) {
+        btnEfectivo.addEventListener('click', autocompletarMontoEfectivo);
+    }
+});
+
+// ✅ FUNCIÓN DE UTILIDAD PARA DEBUG MANUAL (conservada pero mejorada)
+function debugFormulario() {
+    console.log('🔍 === DEBUG MANUAL ===');
+    console.log('📦 Productos agregados:', productosAgregados.length);
+    productosAgregados.forEach((p, i) => {
+        console.log(`  ${i}: ${p.codigo} x${p.cantidad} = $${p.subtotal}`);
+    });
+    
+    console.log('💰 Pagos registrados:', pagosEfectivo.length);
+    pagosEfectivo.forEach((p, i) => {
+        console.log(`  ${i}: ${p.tipo} $${p.monto}`);
+    });
+    
+    const container = document.getElementById('productos-hidden');
+    console.log('🔧 Campos ocultos:', container ? container.children.length : 'NO ENCONTRADO');
+    
+    if (container && container.children.length > 0) {
+        console.log('📋 Campos creados:');
+        Array.from(container.children).forEach((input, i) => {
+            console.log(`  ${i}: ${input.name} = ${input.value}`);
+        });
+    }
+    
+    // Ejecutar actualización manual
+    console.log('� Ejecutando actualización manual...');
+    actualizarCamposOcultos();
+}
+
+// ✅ INICIALIZACIÓN FINAL SEGURA
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 === SISTEMA DE FACTURACIÓN INICIADO ===');
+    
+    // Verificar elementos críticos
+    const elementosCriticos = ['productos-hidden', 'codigo_producto', 'btnEnviar'];
+    elementosCriticos.forEach(id => {
+        const elemento = document.getElementById(id);
+        console.log(`${elemento ? '✅' : '❌'} ${id}: ${elemento ? 'encontrado' : 'NO encontrado'}`);
+    });
+    
+    // Verificar funciones críticas
+    console.log(`${typeof actualizarCamposOcultos === 'function' ? '✅' : '❌'} actualizarCamposOcultos disponible`);
+    console.log(`${typeof validarFormulario === 'function' ? '✅' : '❌'} validarFormulario disponible`);
+    
+    console.log('✅ === INICIALIZACIÓN COMPLETADA ===');
+});
+</script>
+{% endblock %}

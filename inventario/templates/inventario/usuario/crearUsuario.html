@@ -1,0 +1,90 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+<div class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4" style="padding-top: 0px; padding-bottom: 0px;">
+	<div class="max-w-2xl mx-auto">
+		<!-- Mensajes (si los hay) -->
+		{% if messages %}
+			<div class="mb-6">
+				{% for message in messages %}
+					<div class="bg-white rounded-lg shadow-md p-4 border-l-4 {% if message.level == 40 %}border-yellow-500 bg-yellow-50{% else %}border-green-500 bg-green-50{% endif %}">
+						<div class="flex items-center">
+							<div class="flex-shrink-0">
+								{% if message.level == 40 %}
+									<i class="fa fa-warning text-yellow-500 text-xl"></i>
+								{% else %}
+									<i class="fa fa-check text-green-500 text-xl"></i>
+								{% endif %}
+							</div>
+							<div class="ml-3">
+								<p class="text-sm font-medium {% if message.level == 40 %}text-yellow-800{% else %}text-green-800{% endif %}">
+									{{ message }}
+								</p>
+							</div>
+						</div>
+					</div>
+				{% endfor %}
+			</div>
+		{% endif %}
+
+		<!-- Header Section -->
+		<div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 mb-0 rounded-lg mt-0">
+			<div class="flex items-center">
+				<div class="flex-shrink-0">
+					<i class="fas fa-user-plus text-white text-xl"></i>
+				</div>
+				<div class="ml-3">
+					<h2 class="text-lg font-semibold text-white">Crear nuevo usuario</h2>
+					<p class="text-gray-300 text-xs">Agregue un nuevo usuario al sistema</p>
+				</div>
+			</div>
+		</div>
+
+		<!-- Formulario -->
+		<div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden p-6 mt-4">
+			<form role="form" method="POST" onsubmit="return validarTodo('usuario')">
+				{% csrf_token %}
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+					<div class="space-y-4">
+						<div>
+							<label for="{{ form.username.name }}" class="block text-sm font-medium text-gray-700">{{form.username.label}}</label>
+							{{form.username}}
+						</div>
+						<div>
+							<label for="{{ form.first_name.name }}" class="block text-sm font-medium text-gray-700">{{form.first_name.label}}</label>
+							{{form.first_name}}
+						</div>
+						<div>
+							<label for="{{ form.last_name.name }}" class="block text-sm font-medium text-gray-700">{{form.last_name.label}}</label>
+							{{form.last_name}}
+						</div>
+						<div>
+							<label for="{{ form.email.name }}" class="block text-sm font-medium text-gray-700">{{form.email.label}}</label>
+							{{form.email}}
+						</div>
+					</div>
+					<div class="space-y-4">
+						<div>
+							<label for="{{ form.level.name }}" class="block text-sm font-medium text-gray-700">{{form.level.label}}</label>
+							{{form.level}}
+						</div>
+						<div>
+							<label for="{{ form.password.name }}" class="block text-sm font-medium text-gray-700">{{form.password.label}}</label>
+							{{form.password}}
+						</div>
+						<div>
+							<label for="{{ form.rep_password.name }}" class="block text-sm font-medium text-gray-700">{{form.rep_password.label}}</label>
+							{{form.rep_password}}
+						</div>
+					</div>
+				</div>
+				<div class="flex gap-2 mt-8">
+					<button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-900 hover:bg-gray-800">
+						<i class="fa fa-save mr-2"></i> Ingresar
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
+{% endblock %}

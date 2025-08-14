@@ -1,0 +1,83 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+<article class="content forms-page">
+    <div class="title-block">
+        <h3 class="title">Gestión de Cajas</h3>
+        <p class="title-description">Lista de cajas existentes y formulario para agregar nuevas cajas.</p>
+    </div>
+
+    <section class="section">
+        <div class="row sameheight-container">
+            <div class="col-md-12">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="card card-primary">
+                            <div class="card-header">
+                                <div class="header-block">
+                                    <em class="fa fa-check"></em>
+                                    <p class="title">{{ message }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <!-- Tabla de cajas existentes -->
+                <div class="card card-block sameheight-item">
+                    <h4>Cajas Existentes</h4>
+                    <div class="mb-3">
+                        <a href="{% url 'inventario:agregarCaja' %}" class="btn btn-primary">
+                            <i class="fa fa-plus"></i> Nueva Caja
+                        </a>
+                    </div>
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Descripción</th>
+                                <th>Estado</th>
+                                <th>Fecha Creación</th>
+                                <th>Creado Por</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for caja in cajas %}
+                                <tr>
+                                    <td>{{ caja.id }}</td>
+                                    <td>{{ caja.descripcion }}</td>
+                                    <td>
+                                        {% if caja.activo %}
+                                            <span class="badge badge-success">Activo</span>
+                                        {% else %}
+                                            <span class="badge badge-danger">Inactivo</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ caja.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                                    <td>{{ caja.creado_por.username }}</td>
+                                    <td>
+                                        <a href="{% url 'inventario:verCaja' caja.id %}" class="btn btn-info btn-sm">
+                                            <i class="fa fa-eye"></i> Ver
+                                        </a>
+                                        <a href="{% url 'inventario:editarCaja' caja.id %}" class="btn btn-warning btn-sm">
+                                            <i class="fa fa-edit"></i> Editar
+                                        </a>
+                                        <a href="{% url 'inventario:eliminarCaja' caja.id %}" class="btn btn-danger btn-sm" onclick="return confirm('¿Estás seguro de eliminar esta caja?');">
+                                            <i class="fa fa-trash"></i> Eliminar
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="6">No hay cajas registradas.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+</article>
+{% endblock %}

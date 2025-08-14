@@ -1,0 +1,169 @@
+{% extends 'inventario/comun/base.html' %}
+{% load static %}
+
+{% block content %}
+<article class="content forms-page">
+    <div class="title-block">
+        <h3 class="title">Agregar banco</h3>
+        <p class="title-description">Introduzca los datos de la cuenta bancaria</p>
+    </div>
+
+    <section class="section">
+        <div class="row sameheight-container">
+            <div class="col-md-12">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="card card-primary">
+                            <div class="card-header">
+                                <div class="header-block">
+                                    <em class="fa fa-check"></em>
+                                    <p class="title">{{ message }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <div class="card sameheight-item">
+                    <div class="card-header">
+                        <div class="header-block">
+                            <p class="title"> <em class="fa fa-university"></em> Datos de la cuenta bancaria </p>
+                        </div>
+                    </div>
+                    <div class="card-block">
+                        <form method="post">
+                            {% csrf_token %}
+                            
+                            <div class="form-group row">
+                                <label class="col-sm-2 form-control-label" for="{{ form.banco.id_for_label }}">
+                                    {{ form.banco.label }}:
+                                </label>
+                                <div class="col-sm-10">
+                                    {{ form.banco }}
+                                    {% if form.banco.errors %}
+                                        <div class="text-danger">{{ form.banco.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="form-group row">
+                                <label class="col-sm-2 form-control-label" for="{{ form.titular.id_for_label }}">
+                                    {{ form.titular.label }}:
+                                </label>
+                                <div class="col-sm-10">
+                                    {{ form.titular }}
+                                    {% if form.titular.errors %}
+                                        <div class="text-danger">{{ form.titular.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="form-group row">
+                                <label class="col-sm-2 form-control-label" for="{{ form.numero_cuenta.id_for_label }}">
+                                    {{ form.numero_cuenta.label }}:
+                                </label>
+                                <div class="col-sm-10">
+                                    {{ form.numero_cuenta }}
+                                    {% if form.numero_cuenta.errors %}
+                                        <div class="text-danger">{{ form.numero_cuenta.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="form-group row">
+                                <label class="col-sm-2 form-control-label" for="{{ form.tipo_cuenta.id_for_label }}">
+                                    {{ form.tipo_cuenta.label }}:
+                                </label>
+                                <div class="col-sm-10">
+                                    {{ form.tipo_cuenta }}
+                                    {% if form.tipo_cuenta.errors %}
+                                        <div class="text-danger">{{ form.tipo_cuenta.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="form-group row">
+                                <label class="col-sm-2 form-control-label" for="{{ form.fecha_apertura.id_for_label }}">
+                                    {{ form.fecha_apertura.label }}:
+                                </label>
+                                <div class="col-sm-10">
+                                    {{ form.fecha_apertura }}
+                                    {% if form.fecha_apertura.errors %}
+                                        <div class="text-danger">{{ form.fecha_apertura.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="form-group row">
+                                <label class="col-sm-2 form-control-label" for="{{ form.telefono.id_for_label }}">
+                                    {{ form.telefono.label }}:
+                                </label>
+                                <div class="col-sm-10">
+                                    {{ form.telefono }}
+                                    {% if form.telefono.errors %}
+                                        <div class="text-danger">{{ form.telefono.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                           
+
+                            <div class="form-group row">
+                                <label class="col-sm-2 form-control-label" for="{{ form.secuencial_cheque.id_for_label }}">
+                                    {{ form.secuencial_cheque.label }}:
+                                </label>
+                                <div class="col-sm-10">
+                                    {{ form.secuencial_cheque }}
+                                    {% if form.secuencial_cheque.errors %}
+                                        <div class="text-danger">{{ form.secuencial_cheque.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="form-group row">
+                                <label class="col-sm-2 form-control-label" for="{{ form.observaciones.id_for_label }}">
+                                    {{ form.observaciones.label }}:
+                                </label>
+                                <div class="col-sm-10">
+                                    {{ form.observaciones }}
+                                    {% if form.observaciones.errors %}
+                                        <div class="text-danger">{{ form.observaciones.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="form-group row">
+                                <label class="col-sm-2 form-control-label" for="{{ form.activo.id_for_label }}">
+                                    {{ form.activo.label }}:
+                                </label>
+                                <div class="col-sm-10">
+                                    <div class="form-check">
+                                        {{ form.activo }}
+                                        <label class="form-check-label" for="{{ form.activo.id_for_label }}">
+                                            Cuenta activa
+                                        </label>
+                                    </div>
+                                    {% if form.activo.errors %}
+                                        <div class="text-danger">{{ form.activo.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="form-group row">
+                                <div class="col-sm-10 col-sm-offset-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fa fa-save"></i> Guardar banco
+                                    </button>
+                                    <a href="{% url 'inventario:listar_bancos' %}" class="btn btn-secondary">
+                                        <i class="fa fa-arrow-left"></i> Volver
+                                    </a>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</article>
+{% endblock %}

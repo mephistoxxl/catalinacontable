@@ -1,0 +1,476 @@
+{% extends "inventario/comun/base.html" %}
+{% load math_filters %}
+
+{% block content %}
+
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4" style="padding-top: 0px; padding-bottom: 20px;">
+    <div class="max-w-6xl mx-auto">
+
+        <!-- Messages Section -->
+        {% if messages %}
+            <div class="mb-6">
+                {% for message in messages %}
+                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                {% if message.tags == 'success' %}
+                                    <i class="fa fa-check-circle {% if message.tags == 'success' %}text-green-500{% elif message.tags == 'error' %}text-red-500{% elif message.tags == 'warning' %}text-yellow-500{% else %}text-blue-500{% endif %} text-lg"></i>
+                                {% elif message.tags == 'error' %}
+                                    <i class="fa fa-exclamation-circle text-red-500 text-lg"></i>
+                                {% elif message.tags == 'warning' %}
+                                    <i class="fa fa-exclamation-triangle text-yellow-500 text-lg"></i>
+                                {% else %}
+                                    <i class="fa fa-info-circle text-blue-500 text-lg"></i>
+                                {% endif %}
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium {% if message.tags == 'success' %}text-green-800{% elif message.tags == 'error' %}text-red-800{% elif message.tags == 'warning' %}text-yellow-800{% else %}text-blue-800{% endif %}">
+                                    {{ message }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+                
+        <!-- Header Section -->
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 mb-0 rounded-lg mt-0">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fa fa-file-invoice-dollar text-white text-lg"></i>
+                </div>
+                <div class="ml-3">
+                    <h2 class="text-lg font-semibold text-white">Listar Facturas</h2>
+                    <p class="text-gray-300 text-xs">Verifique las facturas agregadas</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 relative">
+            <div class="row">
+                <!-- Table Section -->
+                <div class="p-4">
+                    <div class="row">
+                        <!-- Table Section -->
+                        <div class="col-lg-12">
+                            <div class="overflow-x-auto">
+                                <div class="flex justify-between items-center mb-3">
+                                    <h3 class="text-base font-semibold text-gray-800">Facturas Registradas</h3>
+                                    <span class="text-sm text-gray-600">Total: {{ tabla|length }} facturas</span>
+                                </div>
+                                
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID del cliente</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado SRI</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sub-Total</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IVA</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        {% for fila in tabla %}
+                                        <tr class="hover:bg-gray-50 transition-colors duration-150">
+                                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ fila.id }}</td>
+                                            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ fila.cliente.identificacion }}</td>
+                                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ fila.fecha_emision|date:"d/m/Y" }}</td>
+                                            <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                                {# Mostrar Autorizada, Rechazada/No Autorizada, Recibida o Pendiente #}
+                                                {% if fila.numero_autorizacion and fila.fecha_autorizacion %}
+                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                        <i class="fa fa-check-circle mr-1"></i>✅ Autorizada SRI
+                                                    </span>
+                                                    <div class="text-xs text-gray-500 mt-1">{{ fila.numero_autorizacion|truncatechars:20 }}...</div>
+                                                {% elif fila.estado_sri == 'RECHAZADA' or fila.estado_sri == 'NO_AUTORIZADA' or fila.estado_sri == 'NO AUTORIZADO' %}
+                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                        <i class="fa fa-times-circle mr-1"></i>❌ No Autorizada
+                                                    </span>
+                                                    <div class="text-xs text-gray-500 mt-1">{{ fila.clave_acceso|truncatechars:20 }}...</div>
+                                                {% elif fila.estado_sri == 'RECIBIDA' %}
+                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                        <i class="fa fa-clock mr-1"></i>📨 Recibida por SRI
+                                                    </span>
+                                                    <div class="text-xs text-gray-500 mt-1">{{ fila.clave_acceso|truncatechars:20 }}...</div>
+                                                {% elif fila.estado_sri == 'PENDIENTE' %}
+                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                        <i class="fa fa-hourglass-half mr-1"></i>⏳ Pendiente en SRI
+                                                    </span>
+                                                    <div class="text-xs text-gray-500 mt-1">{{ fila.clave_acceso|truncatechars:20 }}...</div>
+                                                {% elif fila.estado_sri == 'ERROR' %}
+                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                        <i class="fa fa-exclamation-triangle mr-1"></i>⚠️ Error SRI
+                                                    </span>
+                                                    <div class="text-xs text-gray-500 mt-1">{{ fila.clave_acceso|truncatechars:20 }}...</div>
+                                                {% elif fila.estado_sri %}
+                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                        <i class="fa fa-info-circle mr-1"></i>{{ fila.estado_sri|upper }}
+                                                    </span>
+                                                    <div class="text-xs text-gray-500 mt-1">{{ fila.clave_acceso|truncatechars:20 }}...</div>
+                                                {% elif fila.clave_acceso %}
+                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                        <i class="fa fa-clock mr-1"></i>📝 Generada Localmente
+                                                    </span>
+                                                    <div class="text-xs text-gray-500 mt-1">{{ fila.clave_acceso|truncatechars:20 }}...</div>
+                                                {% else %}
+                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                        <i class="fa fa-times-circle mr-1"></i>❌ Sin Generar
+                                                    </span>
+                                                    <div class="text-xs text-gray-500 mt-1">Pendiente generación</div>
+                                                {% endif %}
+                                            </td>
+                                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-semibold">${{ fila.sub_monto|floatformat:2 }}</td>
+                                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-semibold">${{ fila.monto_general|floatformat:2 }}</td>
+                                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                                {% for impuesto in fila.totales_impuestos.all %}
+                                                    {% if impuesto.codigo == '2' %}
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{{ impuesto.tarifa }}% (${{ impuesto.valor|floatformat:2 }})</span>
+                                                    {% endif %}
+                                                {% empty %}
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">${{ fila.monto_general|sub:fila.sub_monto|floatformat:2 }}</span>
+                                                {% endfor %}
+                                            </td>
+                                            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                                                <div class="relative inline-block text-left" id="dropdown-{{ forloop.counter }}">
+                                                    <button type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-2.5 py-1.5 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="toggleDropdown('{{ forloop.counter }}')">
+                                                        Acciones
+                                                        <i class="fa fa-chevron-down ml-1 -mr-0.5 h-3 w-3"></i>
+                                                    </button>
+                                                    
+                                                    <div class="origin-top-right absolute right-0 mt-1 w-48 rounded-md shadow-xl bg-white ring-1 ring-black ring-opacity-5 hidden z-[9999]" id="dropdown-menu-{{ forloop.counter }}">
+                                                        <div class="py-2">
+                                                            <a href="/inventario/verFactura/{{ fila.id }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                                                <i class="fa fa-eye mr-2 text-blue-500"></i>
+                                                                <span>Editar/Ver Factura</span>
+                                                            </a>
+                                                            {% if not fila.numero_autorizacion or not fila.fecha_autorizacion %}
+                                                                <button onclick="autorizarDocumento({{ fila.id }})" class="flex items-center w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 hover:text-green-900 border-none bg-transparent">
+                                                                    <i class="fa fa-certificate mr-2 text-green-500"></i>
+                                                                    <span>🔐 Enviar al SRI</span>
+                                                                </button>
+                                                            {% else %}
+                                                                <div class="flex items-center px-4 py-2 text-sm text-green-600 bg-green-50 cursor-not-allowed">
+                                                                    <i class="fa fa-check-circle mr-2 text-green-500"></i>
+                                                                    <span>✅ Autorizada por SRI</span>
+                                                                </div>
+                                                            {% endif %}
+                                                            <div class="border-t border-gray-100"></div>
+                                                            <a href="/inventario/generarFactura/{{ fila.id }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                                                <i class="fa fa-file-csv mr-2 text-gray-500"></i>
+                                                                <span>Generar reporte (CSV)</span>
+                                                            </a>
+                                                            <a href="/inventario/generarFacturaPDF/{{ fila.id }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                                                <i class="fa fa-file-pdf mr-2 text-red-500"></i>
+                                                                <span>Generar reporte (PDF)</span>
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleDropdown(counter) {
+        console.log('Abriendo dropdown:', counter); // Debug
+        
+        const dropdown = document.getElementById('dropdown-menu-' + counter);
+        const allDropdowns = document.querySelectorAll('[id^="dropdown-menu-"]');
+        
+        // Cerrar todos los otros dropdowns
+        allDropdowns.forEach(d => {
+            if (d !== dropdown) {
+                d.classList.add('hidden');
+                d.style.position = '';
+                d.style.top = '';
+                d.style.left = '';
+                d.style.right = '';
+            }
+        });
+        
+        // Toggle el dropdown actual
+        if (dropdown) {
+            dropdown.classList.toggle('hidden');
+            console.log('Dropdown visibility:', !dropdown.classList.contains('hidden')); // Debug
+            
+            // Ajustar posición en móviles
+            if (window.innerWidth < 768 && !dropdown.classList.contains('hidden')) {
+                const button = event.target.closest('button');
+                if (button) {
+                    const rect = button.getBoundingClientRect();
+                    dropdown.style.position = 'fixed';
+                    dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+                    dropdown.style.left = 'auto';
+                    dropdown.style.right = '10px';
+                    dropdown.style.zIndex = '9999';
+                }
+            }
+        } else {
+            console.error('No se encontró dropdown-menu-' + counter);
+        }
+    }
+
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('.relative')) {
+            document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
+                d.classList.add('hidden');
+                d.style.position = '';
+                d.style.top = '';
+                d.style.left = '';
+                d.style.right = '';
+            });
+        }
+    });
+    
+    // Resetear posición al cambiar tamaño de ventana
+    window.addEventListener('resize', function() {
+        document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
+            d.classList.add('hidden');
+            d.style.position = '';
+            d.style.top = '';
+            d.style.left = '';
+            d.style.right = '';
+        });
+    });
+
+    // Función para autorizar documento en el SRI
+    function autorizarDocumento(facturaId) {
+        if (!confirm('🔐 AUTORIZACIÓN SRI - FACTURA ELECTRÓNICA\n\n¿Está seguro de que desea autorizar esta factura?\n\n📝 Este proceso:\n• Genera el XML de la factura\n• Firma digitalmente el documento\n• Envía al SRI para autorización oficial\n• NO se puede deshacer una vez autorizada\n\n⚠️ Verificar que todos los datos estén correctos antes de continuar.')) {
+            return;
+        }
+
+        // Cerrar dropdown
+        document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
+            d.classList.add('hidden');
+        });
+
+        // Mostrar loading
+        const loadingHtml = `
+            <div id="loading-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                    <div class="mt-3 text-center">
+                        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+                            <i class="fa fa-spinner fa-spin text-blue-600 text-xl"></i>
+                        </div>
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mt-3">🔄 Procesando Autorización SRI</h3>
+                        <div class="mt-2 px-7 py-3">
+                            <p class="text-sm text-gray-500">
+                                🔐 Generando XML y firmando digitalmente...<br>
+                                📤 Enviando al Servicio de Rentas Internas...<br><br>
+                                ⏱️ Este proceso puede tomar 30 segundos a 2 minutos.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', loadingHtml);
+
+        // Realizar petición AJAX
+        fetch(`/inventario/autorizar-documento/${facturaId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Quitar loading
+            document.getElementById('loading-modal').remove();
+
+            if (data.success) {
+                // Mostrar mensaje de éxito
+                mostrarModal('success', 'Documento Autorizado', data.message);
+                // Recargar página después de 2 segundos
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                // Mostrar mensaje de error
+                mostrarModal('error', 'Error en Autorización', data.message || 'Error desconocido');
+            }
+        })
+        .catch(error => {
+            // Quitar loading
+            document.getElementById('loading-modal').remove();
+            console.error('Error:', error);
+            mostrarModal('error', '❌ Error de Conexión', `No se pudo conectar con el servidor del SRI.\n\n🔍 Verificar:\n• Conexión a internet\n• Estado del servidor SRI\n• Configuración del sistema\n\nDetalle técnico: ${error.message}`);
+        });
+    }
+
+    // Función para mostrar modales de resultado
+    function mostrarModal(tipo, titulo, mensaje) {
+        const iconClass = tipo === 'success' ? 'fa-check-circle text-green-600' : 'fa-exclamation-circle text-red-600';
+        const bgColor = tipo === 'success' ? 'bg-green-100' : 'bg-red-100';
+        
+        const modalHtml = `
+            <div id="result-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                    <div class="mt-3 text-center">
+                        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full ${bgColor}">
+                            <i class="fa ${iconClass} text-xl"></i>
+                        </div>
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mt-3">${titulo}</h3>
+                        <div class="mt-2 px-7 py-3">
+                            <p class="text-sm text-gray-500">${mensaje}</p>
+                        </div>
+                        <div class="items-center px-4 py-3">
+                            <button onclick="document.getElementById('result-modal').remove()" 
+                                    class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300">
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+
+    // Función para obtener CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // ✅ NUEVA FUNCIÓN: Autorizar documento en el SRI
+    function autorizarDocumento(facturaId) {
+        // Mostrar loading
+        const loadingHtml = `
+            <div id="loading-modal" class="fixed inset-0 z-50 overflow-y-auto" style="background-color: rgba(0, 0, 0, 0.5);">
+                <div class="flex items-center justify-center min-h-screen">
+                    <div class="bg-white rounded-lg p-6 max-w-md mx-4">
+                        <div class="text-center">
+                            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">Procesando en SRI...</h3>
+                            <p class="text-sm text-gray-500">Generando XML, firmando y enviando al SRI</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', loadingHtml);
+
+        // Enviar solicitud al SRI
+        fetch(`/inventario/sri/autorizar/${facturaId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Quitar loading
+            const loadingModal = document.getElementById('loading-modal');
+            if (loadingModal) {
+                loadingModal.remove();
+            }
+
+            // Mostrar resultado
+            if (data.success) {
+                mostrarModal({
+                    titulo: '✅ Autorización Exitosa',
+                    mensaje: data.message,
+                    detalles: `
+                        <div class="mt-4 text-sm">
+                            <p><strong>Estado:</strong> ${data.resultado.estado || 'Procesado'}</p>
+                            ${data.resultado.numero_autorizacion ? `<p><strong>Autorización:</strong> ${data.resultado.numero_autorizacion}</p>` : ''}
+                            ${data.resultado.clave_acceso ? `<p><strong>Clave:</strong> ${data.resultado.clave_acceso}</p>` : ''}
+                        </div>
+                    `,
+                    tipo: 'success'
+                });
+                
+                // Recargar página después de 3 segundos
+                setTimeout(() => {
+                    window.location.reload();
+                }, 3000);
+            } else {
+                mostrarModal({
+                    titulo: '❌ Error en Autorización',
+                    mensaje: data.message,
+                    detalles: data.error_detalle ? `<pre class="mt-4 text-xs bg-gray-100 p-2 rounded">${JSON.stringify(data.error_detalle, null, 2)}</pre>` : '',
+                    tipo: 'error'
+                });
+            }
+        })
+        .catch(error => {
+            // Quitar loading
+            const loadingModal = document.getElementById('loading-modal');
+            if (loadingModal) {
+                loadingModal.remove();
+            }
+
+            mostrarModal({
+                titulo: '🔥 Error de Conexión',
+                mensaje: 'No se pudo conectar con el servidor',
+                detalles: `<p class="mt-2 text-sm text-gray-600">Error: ${error.message}</p>`,
+                tipo: 'error'
+            });
+        });
+    }
+
+    // Función auxiliar para mostrar modales
+    function mostrarModal({titulo, mensaje, detalles = '', tipo = 'info'}) {
+        const iconos = {
+            success: '✅',
+            error: '❌',
+            warning: '⚠️',
+            info: 'ℹ️'
+        };
+        
+        const colores = {
+            success: 'text-green-600',
+            error: 'text-red-600', 
+            warning: 'text-yellow-600',
+            info: 'text-blue-600'
+        };
+
+        const modalHtml = `
+            <div id="resultado-modal" class="fixed inset-0 z-50 overflow-y-auto" style="background-color: rgba(0, 0, 0, 0.5);">
+                <div class="flex items-center justify-center min-h-screen">
+                    <div class="bg-white rounded-lg p-6 max-w-lg mx-4">
+                        <div class="text-center">
+                            <div class="text-4xl mb-4">${iconos[tipo]}</div>
+                            <h3 class="text-lg font-medium ${colores[tipo]} mb-2">${titulo}</h3>
+                            <p class="text-gray-700 mb-4">${mensaje}</p>
+                            ${detalles}
+                            <button onclick="document.getElementById('resultado-modal').remove()" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+<article class="content forms-page">
+    <div class="title-block">
+        <h3 class="title">Editar Secuencia</h3>
+        <p class="title-description">
+            Modifique los elementos de la secuencia seleccionada a continuación.
+        </p>
+    </div>
+
+    <section class="section">
+        <div class="row sameheight-container">
+            <div class="col-md-12">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-info">
+                            <em class="fa fa-info-circle"></em> {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <div class="card card-block sameheight-item">
+                    <form id="secuenciaForm" role="form" method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+
+                        <!-- Descripción -->
+                        <div class="form-group">
+                            <label for="{{ form.descripcion.id_for_label }}">{{ form.descripcion.label }}</label>
+                            {{ form.descripcion }}
+                        </div>
+
+                        <!-- Tipo de Documento -->
+                        <div class="form-group">
+                            <label for="{{ form.tipo_documento.id_for_label }}">{{ form.tipo_documento.label }}</label>
+                            {{ form.tipo_documento }}
+                        </div>
+
+                        <!-- Establecimiento -->
+                        <div class="form-group">
+                            <label for="{{ form.establecimiento.id_for_label }}">{{ form.establecimiento.label }}</label>
+                            {{ form.establecimiento }}
+                        </div>
+
+                        <!-- Punto de Emisión -->
+                        <div class="form-group">
+                            <label for="{{ form.punto_emision.id_for_label }}">{{ form.punto_emision.label }}</label>
+                            {{ form.punto_emision }}
+                        </div>
+
+                        <!-- Número Secuencial -->
+                        <div class="form-group">
+                            <label for="{{ form.secuencial.id_for_label }}">{{ form.secuencial.label }}</label>
+                            {{ form.secuencial }}
+                        </div>
+
+                        <!-- Checkboxes -->
+                        <div class="row form-group">
+                            <div class="col-md-2">
+                                <div class="form-check">
+                                    {{ form.activo }}
+                                    <label class="form-check-label" for="{{ form.activo.id_for_label }}">{{ form.activo.label }}</label>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="form-check">
+                                    {{ form.iva }}
+                                    <label class="form-check-label" for="{{ form.iva.id_for_label }}">{{ form.iva.label }}</label>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="form-check">
+                                    {{ form.fiscal }}
+                                    <label class="form-check-label" for="{{ form.fiscal.id_for_label }}">{{ form.fiscal.label }}</label>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="form-check">
+                                    {{ form.documento_electronico }}
+                                    <label class="form-check-label" for="{{ form.documento_electronico.id_for_label }}">{{ form.documento_electronico.label }}</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botones -->
+                        <div class="form-group mt-3">
+                            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                            <a href="{% url 'inventario:lista_secuencias' %}" class="btn btn-secondary">Cancelar</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+</article>
+{% endblock %}

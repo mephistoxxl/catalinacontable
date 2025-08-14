@@ -1,0 +1,209 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block extra_css %}
+<style>
+/* Estilos para la página de formas de pago */
+.forma-pago-container {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.btn-forma-pago {
+    width: 100%;
+    text-align: left;
+    margin-bottom: 10px;
+    padding: 15px;
+    font-size: 16px;
+}
+
+.forma-pago-efectivo {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 20px;
+    border-radius: 5px;
+    margin-top: 20px;
+}
+
+.total-section {
+    background: #e3f2fd;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.btn-guardar {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<article class="content forms-page">
+    <div class="title-block">
+        <h3 class="title">Forma de Pago</h3>
+        <p class="title-description">Seleccione la forma de pago para la factura</p>
+    </div>
+
+    <section class="section">
+        <div class="row">
+            <div class="col-md-8 offset-md-2">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Total a Pagar</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="total-section">
+                            Total: $<span id="total-pagar">{{ total|floatformat:2 }}</span>
+                        </div>
+
+                        <form method="POST" action="{% url 'inventario:guardarFormaPago' factura_id=factura.id %}">
+                            {% csrf_token %}
+                            
+                            <!-- Forma de Pago - Efectivo por defecto -->
+                            <div class="forma-pago-efectivo">
+                                <h6><i class="fa fa-money"></i> Pago en Efectivo</h6>
+                                
+                                <div class="form-group">
+                                    <label for="caja">Caja:</label>
+                                    <select class="form-control" id="caja" name="caja" required>
+                                        {% for caja in cajas %}
+                                            <option value="{{ caja.id }}" {% if forloop.first %}selected{% endif %}>
+                                                {{ caja.nombre }} - {{ caja.descripcion }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="monto_efectivo">Monto Recibido:</label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="monto_efectivo" 
+                                           name="monto_efectivo" 
+                                           step="0.01" 
+                                           min="{{ total }}"
+                                           value="{{ total }}"
+                                           required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="cambio">Cambio:</label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="cambio" 
+                                           readonly 
+                                           value="$0.00">
+                                </div>
+                            </div>
+
+                        <select class="form-control" id="forma_pago" name="forma_pago" required>
+                            <option value="">Seleccione forma de pago...</option>
+                            {% for codigo, descripcion in formas_pago %}
+                                <option value="{{ codigo }}" {% if codigo == '01' %}selected{% endif %}>
+                                    {{ descripcion }}
+                                </option>
+                            {% endfor %}
+                        </select>
+
+                            <button type="button" class="btn btn-success btn-lg btn-guardar" onclick="guardarFormaPago()">
+                                <i class="fas fa-save"></i> Guardar y Continuar
+                            </button>
+                            <a href="{% url 'inventario:verFactura' factura.id %}" class="btn btn-secondary btn-lg ml-2">
+                                 <i class="fas fa-arrow-left"></i> Volver
+                             </a>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</article>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const montoInput = document.getElementById('monto_efectivo');
+    const cambioInput = document.getElementById('cambio');
+    const total = parseFloat(document.getElementById('total-pagar').textContent.replace('$', ''));
+
+    function calcularCambio() {
+        const montoRecibido = parseFloat(montoInput.value) || 0;
+        const cambio = montoRecibido - total;
+        cambioInput.value = '$' + cambio.toFixed(2);
+        
+        // Validar si el monto es suficiente
+        if (cambio < 0) {
+            cambioInput.style.color = 'red';
+        } else {
+            cambioInput.style.color = 'green';
+        }
+    }
+
+    montoInput.addEventListener('input', calcularCambio);
+    calcularCambio(); // Calcular inicialmente
+
+    function guardarFormaPago() {
+        const caja = document.getElementById('caja').value;
+        const montoRecibido = montoInput.value;
+        
+        // Validaciones
+        if (!caja) {
+            alert('Por favor seleccione una caja');
+            return;
+        }
+        
+        if (!montoRecibido || parseFloat(montoRecibido) <= 0) {
+            alert('Por favor ingrese un monto válido');
+            return;
+        }
+        
+        if (parseFloat(montoRecibido) < total) {
+            alert('El monto recibido debe ser mayor o igual al total');
+            return;
+        }
+        
+        // Preparar datos
+        const formData = new FormData();
+        formData.append('forma_pago', 'efectivo');
+        formData.append('caja', caja);
+        formData.append('monto_efectivo', montoRecibido);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        
+        // Deshabilitar botón
+        const btnGuardar = document.querySelector('button[onclick="guardarFormaPago()"]');
+        btnGuardar.disabled = true;
+        btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+        
+        // Enviar petición
+        fetch("{% url 'inventario:guardarFormaPago' factura_id=factura.id %}", {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                window.location.href = data.redirect_url;
+            } else {
+                alert('Error: ' + data.message);
+                btnGuardar.disabled = false;
+                btnGuardar.innerHTML = '<i class="fas fa-save"></i> Guardar y Continuar';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al guardar la forma de pago');
+            btnGuardar.disabled = false;
+            btnGuardar.innerHTML = '<i class="fas fa-save"></i> Guardar y Continuar';
+        });
+    }
+
+    // Hacer disponible la función globalmente
+    window.guardarFormaPago = guardarFormaPago;
+});
+</script>
+{% endblock %}

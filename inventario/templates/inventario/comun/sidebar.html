@@ -1,0 +1,457 @@
+<!-- Mobile overlay -->
+<div id="mobile-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-50 lg:hidden hidden"></div>
+
+<!-- Sidebar -->
+<aside id="sidebar" class="fixed left-0 top-0 h-full w-64 bg-white text-black z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">
+    <div class="flex flex-col h-full">
+        <!-- Logo and Brand -->
+        <div class="flex items-center justify-between p-6 border-b border-gray-300">
+            <div class="flex flex-col items-center flex-1">
+                <div class="mb-2">
+                    {% load static %}
+                    <img id="logo-endogeno" src="{% static 'inventario/assets/logo/endogeno.png' %}" alt="Logo" class="h-20 w-auto">
+                </div>
+            </div>
+            <!-- Close button for mobile -->
+            <button id="close-sidebar-button" class="lg:hidden p-2 hover:bg-gray-100 rounded-md">
+                <i class="fa fa-times text-gray-600"></i>
+            </button>
+        </div>
+
+        <!-- Navigation Menu -->
+        <nav class="flex-1 overflow-y-auto py-4">
+            <ul class="space-y-1 px-2">
+
+                <!-- Dashboard -->
+                <li>
+                    <a href="/inventario/panel" class="flex items-center px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black font-medium">
+                        <i class="fa fa-home mr-3 w-4 text-gray-600"></i>
+                        Inicio
+                    </a>
+                </li>
+
+                <!-- Clientes -->
+                <li>
+                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                        <div class="flex items-center">
+                            <i class="fa fa-handshake-o mr-3 w-4 text-gray-600"></i>
+                            Clientes
+                        </div>
+                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                    </button>
+                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1 ml-3">
+                        <li>
+                            <a href="/inventario/listarClientes" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
+                                Listar clientes
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/inventario/agregarCliente" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
+                                Agregar cliente
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <!-- Productos -->
+                <li>
+                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                        <div class="flex items-center">
+                            <i class="fa fa-shopping-basket mr-3 w-4 text-gray-600"></i>
+                            Producto
+                        </div>
+                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                    </button>
+                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1 ml-3">
+                        <li>
+                            <a href="/inventario/listarProductos" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
+                                Listar productos
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/inventario/agregarProducto" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
+                                Agregar producto
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <!-- Proveedores -->
+                <li>
+                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                        <div class="flex items-center">
+                            <i class="fa fa-book mr-3 w-4 text-gray-600"></i>
+                            Proveedor
+                        </div>
+                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                    </button>
+                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1 ml-3">
+                        <li>
+                            <a href="/inventario/listarProveedores" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
+                                Listar proveedores
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/inventario/agregarProveedor" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
+                                Agregar proveedor
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <!-- Almacenes -->
+                <li>
+                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                        <div class="flex items-center">
+                            <i class="fa fa-building mr-3 w-4 text-gray-600"></i>
+                            Almacenes
+                        </div>
+                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                    </button>
+                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1 ml-3">
+                        <li>
+                            <a href="/inventario/almacenes/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
+                                Listar almacenes
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <!-- Bancos -->
+                <li>
+                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                        <div class="flex items-center">
+                            <i class="fa fa-university mr-3 w-4 text-gray-600"></i>
+                            Bancos
+                        </div>
+                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                    </button>
+                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1 ml-3">
+                        <li>
+                            <a href="/inventario/bancos/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
+                                Listar bancos
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/inventario/bancos/crear/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
+                                Crear banco
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <!-- Cajas -->
+                <li>
+                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                        <div class="flex items-center">
+                            <i class="fa fa-money mr-3 w-4 text-gray-600"></i>
+                            Cajas
+                        </div>
+                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                    </button>
+                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1 ml-3">
+                        <li>
+                            <a href="/inventario/cajas/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
+                                Listar cajas
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/inventario/cajas/agregar/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
+                                Agregar caja
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <!-- Pedidos -->
+                <li>
+                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                        <div class="flex items-center">
+                            <i class="fa fa-gift mr-3 w-4 text-gray-600"></i>
+                            Pedido
+                        </div>
+                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                    </button>
+                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1 ml-3">
+                        <li>
+                            <a href="/inventario/listarPedidos" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
+                                Listar pedidos
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/inventario/agregarPedido" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
+                                Añadir pedido
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <!-- Factura -->
+                <li>
+                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                        <div class="flex items-center">
+                            <i class="fa fa-ticket mr-3 w-4 text-gray-600"></i>
+                            Factura
+                        </div>
+                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                    </button>
+                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1">
+                        <li>
+                            <a href="/inventario/listarFacturas" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
+                                Listar facturas
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'inventario:facturas_sri_problemas' %}" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-exclamation-triangle mr-3 w-3 text-red-600"></i>
+                                <span class="text-red-600">Problemas SRI</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/inventario/login_facturador/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-money mr-3 w-3 text-gray-600"></i>
+                                Emitir factura
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <!-- Servicios -->
+                <li>
+                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                        <div class="flex items-center">
+                            <i class="fa fa-wrench mr-3 w-4 text-gray-600"></i>
+                            Servicios
+                        </div>
+                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                    </button>
+                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1">
+                        <li>
+                            <a href="/inventario/listarServicios" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
+                                Listar servicios
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/inventario/agregarServicio" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
+                                Agregar servicio
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <!-- Facturadores -->
+                <li>
+                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                        <div class="flex items-center">
+                            <i class="fa fa-id-card mr-3 w-4 text-gray-600"></i>
+                            Facturadores
+                        </div>
+                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                    </button>
+                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1">
+                        <li>
+                            <a href="/inventario/facturadores/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
+                                Listar facturadores
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/inventario/facturadores/crear/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
+                                Crear facturador
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <!-- Usuarios -->
+                <li>
+                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                        <div class="flex items-center">
+                            <i class="fa fa-users mr-3 w-4 text-gray-600"></i>
+                            Usuarios
+                        </div>
+                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                    </button>
+                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1">
+                        <li>
+                            <a href="/inventario/crearUsuario" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
+                                Agregar usuario
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/inventario/listarUsuarios" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
+                                Listar usuarios
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <!-- Opciones -->
+                <li>
+                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                        <div class="flex items-center">
+                            <i class="fa fa-cog mr-3 w-4 text-gray-600"></i>
+                            Opciones
+                        </div>
+                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                    </button>
+                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1">
+                        <li>
+                            <a href="/inventario/importarBDD" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-upload mr-3 w-3 text-gray-600"></i>
+                                Importar BDD
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/inventario/descargarBDD" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-download mr-3 w-3 text-gray-600"></i>
+                                Descargar BDD
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/inventario/configuracionGeneral" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-cog mr-3 w-3 text-gray-600"></i>
+                                Configuración general
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/inventario/ListaSecuencias/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-sort-numeric-asc mr-3 w-3 text-gray-600"></i>
+                                Secuencias
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <!-- Chat IA -->
+                <li>
+                    <a href="/inventario/chatIA" class="flex items-center px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black font-medium">
+                        <i class="fa fa-circle-o mr-3 w-4 text-gray-600"></i>
+                        Chat con IA
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</aside>
+
+
+
+
+
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+<!-- jQuery y Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/metisMenu/3.0.7/metisMenu.min.js"></script>
+
+<script>
+// Initialize dropdown functionality
+$(document).ready(function() {
+    // Mobile sidebar variables
+    const sidebar = $('#sidebar');
+    const mobileMenuButton = $('#mobile-menu-button');
+    const closeSidebarButton = $('#close-sidebar-button');
+    const mobileOverlay = $('#mobile-overlay');
+    
+    // Mobile menu toggle
+    mobileMenuButton.on('click', function() {
+        sidebar.removeClass('-translate-x-full');
+        mobileOverlay.removeClass('hidden');
+        $('body').addClass('overflow-hidden'); // Prevent body scroll
+    });
+    
+    // Close sidebar function
+    function closeSidebar() {
+        sidebar.addClass('-translate-x-full');
+        mobileOverlay.addClass('hidden');
+        $('body').removeClass('overflow-hidden');
+    }
+    
+    // Close sidebar events
+    closeSidebarButton.on('click', closeSidebar);
+    mobileOverlay.on('click', closeSidebar);
+    
+    // Close sidebar when clicking on a navigation link (mobile)
+    sidebar.find('a[href^="/inventario/"]').on('click', function() {
+        if (window.innerWidth < 1024) { // Only on mobile/tablet
+            setTimeout(closeSidebar, 200); // Small delay for better UX
+        }
+    });
+    
+    // Handle window resize
+    $(window).on('resize', function() {
+        if (window.innerWidth >= 1024) {
+            // Desktop: ensure sidebar is visible and overlay is hidden
+            sidebar.removeClass('-translate-x-full');
+            mobileOverlay.addClass('hidden');
+            $('body').removeClass('overflow-hidden');
+        } else {
+            // Mobile: ensure sidebar is hidden by default
+            if (!mobileOverlay.hasClass('hidden')) {
+                // If overlay is visible, keep sidebar open
+                sidebar.removeClass('-translate-x-full');
+            } else {
+                // If overlay is hidden, hide sidebar
+                sidebar.addClass('-translate-x-full');
+            }
+        }
+    });
+    
+    // Toggle dropdown menus
+    $('.dropdown-btn').on('click', function(e) {
+        e.preventDefault();
+        const dropdown = $(this).next('.dropdown-menu');
+        const icon = $(this).find('.fa-chevron-down');
+        
+        // Close other dropdowns
+        $('.dropdown-menu').not(dropdown).slideUp(200);
+        $('.fa-chevron-down').not(icon).removeClass('rotate-180');
+        
+        // Toggle current dropdown
+        dropdown.slideToggle(200);
+        icon.toggleClass('rotate-180');
+    });
+    
+    // Close dropdowns when clicking outside (but not when clicking mobile menu)
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('.dropdown-btn').length && 
+            !$(e.target).closest('#mobile-menu-button').length &&
+            !$(e.target).closest('.fa-bars').length) {
+            $('.dropdown-menu').slideUp(200);
+            $('.fa-chevron-down').removeClass('rotate-180');
+        }
+    });
+    
+    // Handle navigation links
+    $('a[href^="/inventario/"]').on('click', function(e) {
+        e.stopPropagation(); // Prevent dropdown from closing when clicking links
+    });
+    
+    // Add rotation CSS class for chevron icons
+    if (!$('style:contains("rotate-180")').length) {
+        $('<style>.rotate-180 { transform: rotate(180deg); }</style>').appendTo('head');
+    }
+});
+</script>

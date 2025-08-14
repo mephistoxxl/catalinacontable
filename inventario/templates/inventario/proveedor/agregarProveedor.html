@@ -1,0 +1,321 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+
+<div class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4" style="padding-top: 5px; padding-bottom: 20px;">
+    <div class="max-w-4xl mx-auto">
+        
+        <!-- Header Section -->
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 mb-2 rounded-lg shadow-lg">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fa fa-truck text-white text-lg"></i>
+                </div>
+                <div class="ml-3">
+                    <h2 class="text-lg font-semibold text-white">
+                        {% if editar %}
+                            Editar Proveedor
+                        {% else %}
+                            Agregar Proveedor
+                        {% endif %}
+                    </h2>
+                    <p class="text-gray-300 text-xs">Complete todos los campos requeridos</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages Section -->
+        {% if messages %}
+            <div class="mb-4">
+                {% for message in messages %}
+                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-green-500 bg-green-50">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fa fa-check-circle text-green-500 text-lg"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-green-800">{{ message }}</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <!-- Error Messages -->
+        {% if form.non_field_errors %}
+            <div class="mb-4">
+                {% for error in form.non_field_errors %}
+                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-red-500 bg-red-50">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fa fa-exclamation-circle text-red-500 text-lg"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-red-800">{{ error }}</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <!-- Main Form -->
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden mt-2">
+            <form role="form" method="POST" onsubmit="return validarTodo('proveedor')" class="p-6">
+                {% csrf_token %}
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
+                    <!-- Columna Izquierda -->
+                    <div class="space-y-6">
+                        <!-- Cédula con Tipo -->
+                        <div class="space-y-2">
+                            <label for="{{ form.cedula.name }}" class="block text-sm font-medium text-gray-700">
+                                <i class="fa fa-id-card mr-2 text-gray-500"></i>
+                                {{ form.cedula.label }}
+                            </label>
+                            <div class="flex space-x-2">
+                                <div class="w-1/4">
+                                    {{ form.tipoCedula }}
+                                </div>
+                                <div class="flex-1">
+                                    {{ form.cedula }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Nombre -->
+                        <div class="space-y-2">
+                            <label for="{{ form.nombre.name }}" class="block text-sm font-medium text-gray-700">
+                                <i class="fa fa-user mr-2 text-gray-500"></i>
+                                {{ form.nombre.label }}
+                            </label>
+                            {{ form.nombre }}
+                        </div>
+
+                        <!-- Apellido -->
+                        <div class="space-y-2">
+                            <label for="{{ form.apellido.name }}" class="block text-sm font-medium text-gray-700">
+                                <i class="fa fa-user mr-2 text-gray-500"></i>
+                                {{ form.apellido.label }}
+                            </label>
+                            {{ form.apellido }}
+                        </div>
+
+                        <!-- Dirección -->
+                        <div class="space-y-2">
+                            <label for="{{ form.direccion.name }}" class="block text-sm font-medium text-gray-700">
+                                <i class="fa fa-map-marker-alt mr-2 text-gray-500"></i>
+                                {{ form.direccion.label }}
+                            </label>
+                            {{ form.direccion }}
+                        </div>
+                    </div>
+
+                    <!-- Columna Derecha -->
+                    <div class="space-y-6">
+                        <!-- Fecha de Nacimiento -->
+                        <div class="space-y-2">
+                            <label for="{{ form.nacimiento.name }}" class="block text-sm font-medium text-gray-700">
+                                <i class="fa fa-calendar mr-2 text-gray-500"></i>
+                                {{ form.nacimiento.label }}
+                            </label>
+                            {{ form.nacimiento }}
+                        </div>
+
+                        <!-- Teléfono -->
+                        <div class="space-y-2">
+                            <label for="{{ form.telefono.name }}" class="block text-sm font-medium text-gray-700">
+                                <i class="fa fa-phone mr-2 text-gray-500"></i>
+                                {{ form.telefono.label }}
+                            </label>
+                            {{ form.telefono }}
+                        </div>
+
+                        <!-- Correo -->
+                        <div class="space-y-2">
+                            <label for="{{ form.correo.name }}" class="block text-sm font-medium text-gray-700">
+                                <i class="fa fa-envelope mr-2 text-gray-500"></i>
+                                {{ form.correo.label }}
+                            </label>
+                            {{ form.correo }}
+                        </div>
+
+                        <!-- Checkbox para campos opcionales -->
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="checkbox" class="form-checkbox h-4 w-4 text-blue-600 transition duration-150 ease-in-out" 
+                                       onchange="toggleCamposOpcionales(this)" id="mostrar_opcionales">
+                                <span class="ml-2 text-sm text-gray-700">Mostrar campos opcionales</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campos Opcionales (Ocultos por defecto) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6" style="display: none;" id="campos_opcionales">
+                    <!-- Teléfono 2 -->
+                    <div class="space-y-2">
+                        <label for="{{ form.telefono2.name }}" class="block text-sm font-medium text-gray-700">
+                            <i class="fa fa-phone mr-2 text-gray-500"></i>
+                            {{ form.telefono2.label }}
+                        </label>
+                        {{ form.telefono2 }}
+                    </div>
+
+                    <!-- Correo 2 -->
+                    <div class="space-y-2">
+                        <label for="{{ form.correo2.name }}" class="block text-sm font-medium text-gray-700">
+                            <i class="fa fa-envelope mr-2 text-gray-500"></i>
+                            {{ form.correo2.label }}
+                        </label>
+                        {{ form.correo2 }}
+                    </div>
+                </div>
+
+                <!-- Botones de Acción -->
+                <div class="flex flex-col sm:flex-row justify-center items-center space-y-2 sm:space-y-0 sm:space-x-3 mt-8 pt-6 border-t border-gray-200 mb-8">
+                    <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-all duration-200">
+                        <i class="fa fa-save mr-2"></i>
+                        {% if editar %}Actualizar{% else %}Guardar{% endif %} Proveedor
+                    </button>
+                    <button type="button" onclick="limpiarFormulario()" class="w-full sm:w-auto px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 transition-all duration-200">
+                        <i class="fa fa-eraser mr-2"></i>
+                        Limpiar Formulario
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ ESTILOS PERSONALIZADOS PARA INPUTS COMPACTOS Y FINOS -->
+<style>
+    /* Inputs de texto, email, password, number, etc. */
+    input[type="text"], 
+    input[type="email"], 
+    input[type="password"], 
+    input[type="number"], 
+    input[type="tel"], 
+    input[type="url"],
+    input[type="date"],
+    input[type="datetime-local"],
+    textarea,
+    select {
+        width: 100% !important;
+        padding: 8px 12px !important;
+        border: 0.5px solid #d1d5db !important; /* ✅ BORDE MÁS FINO */
+        border-radius: 6px !important;
+        font-size: 14px !important;
+        background-color: #ffffff !important;
+        transition: all 0.2s ease !important;
+        box-shadow: none !important;
+    }
+
+    /* Estados focus - bordes aún más sutiles */
+    input[type="text"]:focus, 
+    input[type="email"]:focus, 
+    input[type="password"]:focus, 
+    input[type="number"]:focus, 
+    input[type="tel"]:focus, 
+    input[type="url"]:focus,
+    input[type="date"]:focus,
+    input[type="datetime-local"]:focus,
+    textarea:focus,
+    select:focus {
+        outline: none !important;
+        border-color: #60a5fa !important; /* ✅ AZUL MÁS SUAVE */
+        box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.08) !important; /* ✅ SOMBRA MÁS SUTIL */
+    }
+
+    /* Estados hover - interacción sutil */
+    input[type="text"]:hover, 
+    input[type="email"]:hover, 
+    input[type="password"]:hover, 
+    input[type="number"]:hover, 
+    input[type="tel"]:hover, 
+    input[type="url"]:hover,
+    input[type="date"]:hover,
+    input[type="datetime-local"]:hover,
+    textarea:hover,
+    select:hover {
+        border-color: #9ca3af !important; /* ✅ GRIS MÁS SUAVE AL HOVER */
+    }
+
+    /* Selects específicos */
+    select {
+        background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"></polyline></svg>') !important;
+        background-repeat: no-repeat !important;
+        background-position: right 8px center !important;
+        background-size: 16px !important;
+        padding-right: 40px !important;
+        appearance: none !important;
+        -webkit-appearance: none !important;
+        -moz-appearance: none !important;
+    }
+
+    /* Checkboxes y radios */
+    input[type="checkbox"],
+    input[type="radio"] {
+        width: auto !important;
+        margin-right: 8px !important;
+        accent-color: #60a5fa !important; /* ✅ AZUL MÁS SUAVE */
+    }
+
+    /* Espaciado compacto */
+    .space-y-6 > * + * {
+        margin-top: 1.5rem !important;
+    }
+
+    /* Labels más compactos */
+    label {
+        margin-bottom: 4px !important;
+    }
+
+    /* Estados disabled más sutiles */
+    input:disabled,
+    select:disabled,
+    textarea:disabled {
+        background-color: #f9fafb !important;
+        border-color: #e5e7eb !important;
+        color: #9ca3af !important;
+        cursor: not-allowed !important;
+    }
+
+    /* Textarea específico */
+    textarea {
+        resize: vertical !important;
+        min-height: 80px !important;
+    }
+</style>
+
+<script>
+function toggleCamposOpcionales(checkbox) {
+    const camposOpcionales = document.getElementById('campos_opcionales');
+    
+    if (checkbox.checked) {
+        camposOpcionales.style.display = 'grid';
+    } else {
+        camposOpcionales.style.display = 'none';
+    }
+}
+
+function limpiarFormulario() {
+    if (confirm('¿Está seguro de que desea limpiar el formulario?')) {
+        document.querySelector('form').reset();
+        document.getElementById('mostrar_opcionales').checked = false;
+        document.getElementById('campos_opcionales').style.display = 'none';
+    }
+}
+
+// Inicializar campos opcionales como ocultos
+document.addEventListener('DOMContentLoaded', function() {
+    const checkbox = document.getElementById('mostrar_opcionales');
+    const camposOpcionales = document.getElementById('campos_opcionales');
+    
+    checkbox.checked = false;
+    camposOpcionales.style.display = 'none';
+});
+</script>
+
+{% endblock %}

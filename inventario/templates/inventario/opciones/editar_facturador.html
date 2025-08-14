@@ -1,0 +1,73 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+<article class="content forms-page">
+    <div class="title-block">
+        <h1 class="title"> Editar Facturador </h1>
+        <p class="title-description"> Modifica los datos del facturador y guarda los cambios. </p>
+    </div>
+
+    <section class="section">
+        <div class="row">
+            <div class="col-md-12">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            <em class="fa fa-check"></em> {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <div class="card">
+                    <div class="card-block">
+                        <form method="post">
+                            {% csrf_token %}
+
+                            <div class="form-group">
+                                <label for="nombres">Nombres:</label>
+                                {{ form.nombres }}
+                            </div>
+
+                            <div class="form-group">
+                                <label for="telefono">Teléfono:</label>
+                                {{ form.telefono }}
+                            </div>
+
+                            <div class="form-group">
+                                <label for="correo">Correo:</label>
+                                {{ form.correo }}
+                            </div>
+
+                            <div class="form-group">
+                                <label for="descuento_permitido">Descuento Permitido:</label>
+                                {{ form.descuento_permitido }}
+                            </div>
+
+                            <div class="form-group">
+                                <label for="activo">Activo:</label>
+                                <div class="form-check">
+                                    <!-- Campo oculto para asegurar que se envía False si no está marcado -->
+                                    <input type="hidden" name="activo" value="False">
+                                    <input class="form-check-input" type="checkbox"
+                                           id="activo" name="activo" value="True"
+                                           {% if form.activo.value %}checked{% endif %}>
+                                    <label class="form-check-label" for="activo">Activo</label>
+                                </div>
+                            </div>
+
+                            <div class="form-group text-right">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa fa-save"></i> Guardar cambios
+                                </button>
+                                <a href="{% url 'inventario:listar_facturadores' %}" class="btn btn-secondary">
+                                    <i class="fa fa-times"></i> Cancelar
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</article>
+{% endblock %}

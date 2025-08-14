@@ -1,0 +1,851 @@
+{% extends "inventario/comun/base.html" %}
+{% load form_extras %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-bold text-white mb-1">Configuración General</h3>
+                        <p class="text-gray-200 text-xs">Complete la información para facturación electrónica</p>
+                    </div>
+                    <div class="mt-2 sm:mt-0 sm:ml-4">
+                        <a href="{% url 'inventario:firma_electronica' %}" class="inline-flex items-center px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs font-medium rounded-md transition-colors duration-200 shadow-sm">
+                            <i class="fa fa-key mr-1"></i> Cargar Firma
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Content -->
+            <div class="p-3 mt-2">
+                <!-- Messages Section -->
+                {% if messages %}
+                    <div class="mb-6">
+                        {% for message in messages %}
+                            <div class="bg-white rounded-lg shadow-md p-4 border-l-4 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        {% if message.tags == 'success' %}
+                                            <i class="fa fa-check-circle text-green-500 text-lg"></i>
+                                        {% elif message.tags == 'error' %}
+                                            <i class="fa fa-exclamation-circle text-red-500 text-lg"></i>
+                                        {% elif message.tags == 'warning' %}
+                                            <i class="fa fa-exclamation-triangle text-yellow-500 text-lg"></i>
+                                        {% else %}
+                                            <i class="fa fa-info-circle text-blue-500 text-lg"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div class="ml-3">
+                                        <p class="text-sm font-medium {% if message.tags == 'success' %}text-green-800{% elif message.tags == 'error' %}text-red-800{% elif message.tags == 'warning' %}text-yellow-800{% else %}text-blue-800{% endif %}">
+                                            {{ message }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                
+                <!-- RUC Messages Area -->
+                <div id="ruc-messages" class="hidden mb-6">
+                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fa fa-info-circle text-lg"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium" id="ruc-message-text"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <form role="form" method="POST" onsubmit="return validarTodo('opciones')" enctype="multipart/form-data">
+                    {% csrf_token %}
+                        
+                        <!-- INFORMACIÓN BÁSICA -->
+                        <div class="p-2 border-b border-gray-200">
+                            <h5 class="text-sm font-semibold text-gray-800 mb-1 flex items-center">
+                                <i class="fa fa-building text-gray-700 mr-1"></i> 
+                                Información de la Empresa
+                            </h5>
+                        
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div class="space-y-2">
+                                <!-- Columna 1 -->
+                                <!-- RUC con botón de búsqueda -->
+                                <div class="space-y-1">
+                                    <label for="{{ form.identificacion.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                        RUC de la empresa:
+                                        <span id="loading-ruc" class="hidden ml-2">
+                                            <i class="fa fa-spinner fa-spin text-gray-500"></i>
+                                            <span class="text-gray-600 font-medium text-xs">Consultando...</span>
+                                        </span>
+                                    </label>
+                                    {{ form.identificacion.errors }}
+                                    <div class="flex items-center">
+                                        <div class="flex-1">
+                                            {{ form.identificacion|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-gray-500 focus:ring-1 focus:ring-gray-500" }}
+                                        </div>
+                                        <button type="button" id="buscar-ruc" class="inline-flex items-center px-3 py-2 bg-gray-800 text-white text-xs font-medium rounded-md hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-600 transition-colors duration-200 ml-1">
+                                            <i class="fa fa-search mr-1"></i>
+                                            Buscar
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="space-y-0">
+                                    <label for="{{ form.razon_social.id_for_label }}" class="block text-sm font-medium text-gray-700">Razón Social:</label>
+                                    {{ form.razon_social.errors }}
+                                    {{ form.razon_social|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
+                                </div>
+                                
+                                <div class="space-y-1">
+                                    <label for="{{ form.nombre_comercial.id_for_label }}" class="block text-sm font-medium text-gray-700">Nombre Comercial:</label>
+                                    {{ form.nombre_comercial.errors }}
+                                    {{ form.nombre_comercial|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
+                                </div>
+                                
+                                <div class="space-y-1">
+                                    <label for="{{ form.direccion_establecimiento.id_for_label }}" class="block text-sm font-medium text-gray-700">Dirección:</label>
+                                    {{ form.direccion_establecimiento.errors }}
+                                    {{ form.direccion_establecimiento|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
+                                </div>
+                                
+                                <div class="space-y-1">
+                                    <label for="{{ form.correo.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                        {{ form.correo.label }} <span class="text-red-500">*</span>
+                                    </label>
+                                    {{ form.correo.errors }}
+                                    {{ form.correo|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
+                                </div>
+                                
+                                <div class="space-y-1">
+                                    <label for="{{ form.telefono.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                        {{ form.telefono.label }}
+                                    </label>
+                                    {{ form.telefono.errors }}
+                                    {{ form.telefono|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-2">
+                                <!-- Columna 2 -->
+                                <div class="space-y-1">
+                                    <label for="{{ form.obligado.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                        {{ form.obligado.label }}
+                                    </label>
+                                    {{ form.obligado.errors }}
+                                    {{ form.obligado|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
+                                </div>
+                                
+                                <div class="space-y-1">
+                                    <label for="{{ form.tipo_regimen.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                        {{ form.tipo_regimen.label }}
+                                    </label>
+                                    {{ form.tipo_regimen.errors }}
+                                    {{ form.tipo_regimen|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
+                                </div>
+                                
+                                <div class="space-y-1">
+                                    <label for="{{ form.moneda.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                        {{ form.moneda.label }}
+                                    </label>
+                                    {{ form.moneda.errors }}
+                                    {{ form.moneda|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
+                                    <small class="text-gray-500 text-xs">Moneda oficial para Ecuador</small>
+                                </div>
+                                
+                                <div class="space-y-1">
+                                    <label for="{{ form.valor_iva.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                        {{ form.valor_iva.label }}
+                                    </label>
+                                    {{ form.valor_iva.errors }}
+                                    {{ form.valor_iva|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
+                                    <small class="text-gray-500 text-xs">Porcentaje de IVA vigente</small>
+                                </div>
+                                
+                                <div class="space-y-1">
+                                    <label for="{{ form.mensaje_factura.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                        {{ form.mensaje_factura.label }}
+                                    </label>
+                                    {{ form.mensaje_factura.errors }}
+                                    {{ form.mensaje_factura|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
+                                </div>
+                                
+                                <div class="space-y-1">
+                                    <label for="{{ form.nombre_negocio.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                        {{ form.nombre_negocio.label }}
+                                    </label>
+                                    {{ form.nombre_negocio.errors }}
+                                    {{ form.nombre_negocio|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+
+                        <!-- INFORMACIÓN TRIBUTARIA ESPECIAL -->
+                        <div class="p-2 border-b border-gray-200">
+                            <h5 class="text-sm font-semibold text-gray-800 mb-1 flex items-center">
+                                <i class="fa fa-file-text text-gray-700 mr-1"></i> 
+                                Información Tributaria Especial
+                            </h5>
+                            <p class="text-gray-600 text-xs mb-1">Complete solo si su empresa tiene estas designaciones del SRI</p>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="space-y-4">
+                                <!-- Contribuyente Especial -->
+                                <div class="space-y-1">
+                                    {{ form.es_contribuyente_especial.errors }}
+                                    <div class="flex items-center">
+                                        {{ form.es_contribuyente_especial|add_class:"rounded border-gray-300 text-gray-600 focus:ring-gray-500 mr-3" }}
+                                        <label class="text-sm font-medium text-gray-700" for="{{ form.es_contribuyente_especial.id_for_label }}">
+                                            Es contribuyente especial
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="space-y-1" id="grupo_numero_contribuyente" {% if configuracion.es_contribuyente_especial %}style="display:block;"{% else %}style="display:none;"{% endif %}>
+                                    <label for="{{ form.numero_contribuyente_especial.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                        Número de Resolución de Contribuyente Especial
+                                    </label>
+                                    {{ form.numero_contribuyente_especial.errors }}
+                                    {{ form.numero_contribuyente_especial|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <!-- Agente de Retención -->
+                                <div class="space-y-1">
+                                    {{ form.es_agente_retencion.errors }}
+                                    <div class="flex items-center">
+                                        {{ form.es_agente_retencion|add_class:"rounded border-gray-300 text-gray-600 focus:ring-gray-500 mr-3" }}
+                                        <label class="text-sm font-medium text-gray-700" for="{{ form.es_agente_retencion.id_for_label }}">
+                                            Es agente de retención
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="space-y-1" id="grupo_numero_agente" {% if configuracion.es_agente_retencion %}style="display:block;"{% else %}style="display:none;"{% endif %}>
+                                    <label for="{{ form.numero_agente_retencion.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                        Número de Resolución de Agente de Retención
+                                    </label>
+                                    {{ form.numero_agente_retencion.errors }}
+                                    {{ form.numero_agente_retencion|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+
+                        <!-- LOGO -->
+                        <div class="p-2">
+                            <h5 class="text-sm font-semibold text-gray-800 mb-1 flex items-center">
+                                <i class="fa fa-image text-gray-700 mr-1"></i> 
+                                Logo de la Empresa
+                            </h5>
+                        
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <!-- Logo Actual -->
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-medium text-gray-700">Logo Actual:</label>
+                                    <div class="bg-white border border-gray-200 rounded-lg p-4 text-center shadow-sm">
+                                        {% if configuracion.imagen %}
+                                            <img src="{{ configuracion.imagen.url }}" alt="Logo actual" class="max-h-32 mx-auto rounded-lg shadow-sm border border-gray-100">
+                                        {% else %}
+                                            {% load static %}
+                                            <img src="{% static 'inventario/assets/logo/logo2.png' %}" alt="Logo por defecto" class="max-h-32 mx-auto rounded-lg shadow-sm border border-gray-100">
+                                        {% endif %}
+                                        <p class="text-xs text-gray-500 mt-2">{% if configuracion.imagen %}{{ configuracion.imagen.name|default:"logo.png" }}{% else %}Logo por defecto{% endif %}</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- Subir Nuevo Logo -->
+                                <div class="space-y-2">
+                                    <label for="{{ form.imagen.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                        {% if configuracion.imagen %}Cambiar Logo:{% else %}Subir Logo:{% endif %}
+                                    </label>
+                                    {{ form.imagen.errors }}
+                                    
+                                    <!-- Área de Drop Zone moderna -->
+                                    <div class="relative">
+                                        <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-all duration-200 bg-gradient-to-br from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 hover:shadow-md cursor-pointer">
+                                            <div class="space-y-3">
+                                                <div class="mx-auto w-14 h-14 bg-gray-800 rounded-full flex items-center justify-center shadow-lg">
+                                                    <i class="fa fa-cloud-upload text-white text-xl"></i>
+                                                </div>
+                                                <div>
+                                                    <p class="text-sm font-medium text-gray-700">Arrastra tu logo aquí</p>
+                                                    <p class="text-xs text-gray-500 my-1">o</p>
+                                                    <button type="button" onclick="document.getElementById('{{ form.imagen.id_for_label }}').click()" class="inline-flex items-center px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium rounded-md transition-colors duration-200 shadow-sm hover:shadow-md">
+                                                        <i class="fa fa-folder-open mr-2"></i>
+                                                        Seleccionar archivo
+                                                    </button>
+                                                </div>
+                                                <p class="text-xs text-gray-400">PNG, JPG, GIF hasta 2MB</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Input file oculto -->
+                                        {{ form.imagen|add_class:"hidden" }}
+                                        
+                                        <!-- Información del archivo seleccionado -->
+                                        <div id="file-info" class="hidden mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                                            <div class="flex items-center text-sm text-green-800">
+                                                <i class="fa fa-check-circle mr-2"></i>
+                                                <span id="file-name"></span>
+                                                <span class="ml-auto text-xs text-green-600" id="file-size"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="pt-6 pb-12 text-center border-t border-gray-200">
+                            <button type="submit" class="inline-flex items-center px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-md shadow-sm transition-colors duration-200 hover:shadow-md">
+                                <i class="fa fa-save mr-2"></i> Guardar Configuración
+                            </button>
+                        </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== FUNCIÓN DE TEST SIMPLE =====
+function consultarRUCSimple() {
+    console.log('=== FUNCIÓN DE TEST LLAMADA ===');
+    
+    // Intentar diferentes IDs posibles para el campo RUC
+    let rucInput = document.getElementById('id_identificacion');
+    if (!rucInput) {
+        rucInput = document.querySelector('input[name="identificacion"]');
+    }
+    if (!rucInput) {
+        rucInput = document.querySelector('input[id*="identificacion"]');
+    }
+    
+    console.log('Campo RUC encontrado:', !!rucInput);
+    if (rucInput) {
+        console.log('ID del campo:', rucInput.id);
+        console.log('Name del campo:', rucInput.name);
+        
+        const ruc = rucInput.value.trim();
+        console.log('RUC ingresado:', ruc);
+        
+        if (ruc.length === 13) {
+            // Llamar a la función original
+            consultarRUC(ruc);
+        } else {
+            alert(`El RUC debe tener 13 dígitos. Actual: ${ruc.length} dígitos`);
+        }
+    } else {
+        console.error('No se encontró el campo de RUC');
+        // Mostrar todos los inputs para debug
+        const allInputs = document.querySelectorAll('input');
+        console.log('Todos los inputs encontrados:');
+        allInputs.forEach((input, index) => {
+            console.log(`${index}: id="${input.id}", name="${input.name}", type="${input.type}"`);
+        });
+        alert('Error: No se encontró el campo de RUC');
+    }
+}
+
+// ===== FUNCIONES PARA CONSULTA DE RUC (COPIADO DE CLIENTE) =====
+
+// Obtener el token CSRF de la cookie
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Función para obtener elemento del DOM de forma segura
+function getElement(id) {
+    let element = document.getElementById(id);
+    if (!element && id.startsWith('id_')) {
+        // Intentar buscar por name si no encontramos por id
+        const name = id.replace('id_', '');
+        element = document.querySelector(`input[name="${name}"]`);
+        if (!element) {
+            element = document.querySelector(`select[name="${name}"]`);
+        }
+        if (!element) {
+            element = document.querySelector(`textarea[name="${name}"]`);
+        }
+    }
+    if (!element) {
+        console.error(`Elemento con ID '${id}' no encontrado`);
+    }
+    return element;
+}
+
+// Función para mostrar mensajes
+function showMessage(message, type) {
+    console.log('Mostrando mensaje:', message, type);
+    const messageDiv = getElement('ruc-messages');
+    const messageText = document.getElementById('ruc-message-text');
+    
+    if (messageDiv && messageText) {
+        // Remover clases anteriores
+        messageDiv.className = 'mb-8';
+        
+        // Configurar colores según el tipo
+        let borderColor, bgColor, textColor, iconClass, iconColor;
+        
+        switch(type) {
+            case 'success':
+                borderColor = 'border-green-500';
+                bgColor = 'bg-green-50';
+                textColor = 'text-green-800';
+                iconClass = 'fa-check-circle';
+                iconColor = 'text-green-500';
+                break;
+            case 'warning':
+                borderColor = 'border-yellow-500';
+                bgColor = 'bg-yellow-50';
+                textColor = 'text-yellow-800';
+                iconClass = 'fa-exclamation-triangle';
+                iconColor = 'text-yellow-500';
+                break;
+            case 'danger':
+                borderColor = 'border-red-500';
+                bgColor = 'bg-red-50';
+                textColor = 'text-red-800';
+                iconClass = 'fa-exclamation-circle';
+                iconColor = 'text-red-500';
+                break;
+            default:
+                borderColor = 'border-blue-500';
+                bgColor = 'bg-blue-50';
+                textColor = 'text-blue-800';
+                iconClass = 'fa-info-circle';
+                iconColor = 'text-blue-500';
+        }
+        
+        // Aplicar clases
+        messageDiv.className = `mb-4 bg-white rounded-lg shadow-md p-4 border-l-4 ${borderColor} ${bgColor}`;
+        
+        // Actualizar icono
+        const icon = messageDiv.querySelector('i');
+        if (icon) {
+            icon.className = `fa ${iconClass} ${iconColor} text-lg`;
+        }
+        
+        // Actualizar texto
+        messageText.textContent = message;
+        messageText.className = `text-sm font-medium ${textColor}`;
+        
+        // Mostrar
+        messageDiv.classList.remove('hidden');
+        
+        // Auto-ocultar después de 5 segundos
+        setTimeout(() => {
+            hideMessage();
+        }, 5000);
+    }
+}
+
+// Función para ocultar mensajes
+function hideMessage() {
+    const messageDiv = getElement('ruc-messages');
+    if (messageDiv) {
+        messageDiv.classList.add('hidden');
+    }
+}
+
+// Función para limpiar campos después de consulta fallida
+function limpiarCamposConsulta() {
+    console.log('Limpiando campos de consulta');
+    const nombres = ['razon_social', 'nombre_comercial', 'direccion_establecimiento'];
+    nombres.forEach(name => {
+        let campo = document.getElementById(`id_${name}`);
+        if (!campo) {
+            campo = document.querySelector(`input[name="${name}"]`);
+        }
+        if (!campo) {
+            campo = document.querySelector(`textarea[name="${name}"]`);
+        }
+        if (campo) {
+            campo.value = '';
+        }
+    });
+}
+
+// Función principal para consultar RUC (EXACTAMENTE IGUAL QUE EN CLIENTE)
+async function consultarRUC(ruc) {
+    console.log('Iniciando consulta de RUC:', ruc);
+    
+    const loadingIndicator = getElement('loading-ruc');
+    if (loadingIndicator) {
+        loadingIndicator.classList.remove('hidden');
+    }
+    hideMessage();
+    
+    try {
+        const response = await fetch(`/inventario/consultar-ruc/?ruc=${ruc}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+        
+        console.log('Respuesta recibida:', response.status);
+        const data = await response.json();
+        console.log('Datos recibidos completos:', data);
+        console.log('data.error:', data.error);
+        console.log('data.message:', data.message);
+        
+        if (loadingIndicator) {
+            loadingIndicator.classList.add('hidden');
+        }
+        
+        if (data.error) {
+            console.log('La API devolvió error:', data.error);
+            showMessage(data.message || 'Error al consultar el RUC', 'warning');
+            limpiarCamposConsulta();
+            return;
+        }
+        
+        // Mapeo EXACTO como en cliente, pero adaptado a los nombres de configuración
+        const campos = {
+            'razon_social': data.razon_social || '',
+            'nombre_comercial': data.nombre_comercial || '',
+            'direccion_establecimiento': data.direccion || '',
+            'telefono': data.telefono || '',
+            'correo': data.email || ''
+        };
+        
+        // Llenar campos con validación individual (IGUAL QUE EN CLIENTE)
+        Object.entries(campos).forEach(([name, valor]) => {
+            // Buscar por ID estándar de Django
+            let campo = document.getElementById(`id_${name}`);
+            if (!campo) {
+                // Fallback: buscar por name
+                campo = document.querySelector(`input[name="${name}"]`);
+            }
+            if (!campo) {
+                campo = document.querySelector(`textarea[name="${name}"]`);
+            }
+            
+            if (campo) {
+                campo.value = valor;
+                console.log(`Campo ${name} llenado con: "${valor}"`);
+            } else {
+                console.error(`No se encontró el campo: ${name}`);
+            }
+        });
+        
+        // Manejar obligado contabilidad (select)
+        let obligadoSelect = document.getElementById('id_obligado');
+        if (!obligadoSelect) {
+            obligadoSelect = document.querySelector('select[name="obligado"]');
+        }
+        if (obligadoSelect && data.obligado_contabilidad) {
+            const obligado = data.obligado_contabilidad.toUpperCase();
+            obligadoSelect.value = obligado === 'SI' ? 'SI' : 'NO';
+        }
+        
+        // Agregar información en observaciones/mensaje si está disponible
+        let mensajeField = document.getElementById('id_mensaje_factura');
+        if (!mensajeField) {
+            mensajeField = document.querySelector('textarea[name="mensaje_factura"]');
+        }
+        if (mensajeField && data.actividad_economica) {
+            let observaciones = [];
+            if (data.estado) observaciones.push(`Estado: ${data.estado}`);
+            if (data.actividad_economica) observaciones.push(`Actividad: ${data.actividad_economica}`);
+            mensajeField.value = observaciones.join(' | ');
+        }
+        
+        showMessage('Datos del RUC cargados exitosamente', 'success');
+        
+    } catch (error) {
+        console.error('Error en la consulta:', error);
+        if (loadingIndicator) {
+            loadingIndicator.classList.add('hidden');
+        }
+        showMessage('Error de conexión al consultar el RUC', 'danger');
+        limpiarCamposConsulta();
+    }
+}
+
+// ===== CONFIGURAR EVENTOS CUANDO EL DOM ESTÉ LISTO =====
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== DOM LOADED - CONFIGURANDO EVENTOS ===');
+    
+    // TEST: Verificar que elementos existen
+    const botonBuscar = document.getElementById('buscar-ruc');
+    
+    // Buscar el input de RUC de forma más flexible
+    let inputRUC = document.getElementById('id_identificacion');
+    if (!inputRUC) {
+        inputRUC = document.querySelector('input[name="identificacion"]');
+    }
+    if (!inputRUC) {
+        inputRUC = document.querySelector('input[id*="identificacion"]');
+    }
+    
+    console.log('Botón buscar encontrado:', !!botonBuscar);
+    console.log('Input RUC encontrado:', !!inputRUC);
+    if (inputRUC) {
+        console.log('ID del input RUC:', inputRUC.id);
+        console.log('Name del input RUC:', inputRUC.name);
+    }
+    
+    if (botonBuscar) {
+        console.log('✅ Configurando event listener para botón buscar');
+        
+        botonBuscar.addEventListener('click', function(e) {
+            console.log('=== CLICK DETECTADO ===');
+            e.preventDefault();
+            e.stopPropagation();
+            
+            consultarRUCSimple();
+        });
+    } else {
+        console.error('❌ No se encontró el botón de búsqueda RUC');
+    }
+
+    // ===== RESTO DE FUNCIONALIDAD ORIGINAL =====
+
+    // Obtener elementos por id o por name si el id no existe
+    let checkContribuyente = document.getElementById('id_es_contribuyente_especial');
+    if (!checkContribuyente) {
+        checkContribuyente = document.querySelector('input[name="es_contribuyente_especial"]');
+    }
+    const grupoContribuyente = document.getElementById('grupo_numero_contribuyente');
+    let inputContribuyente = document.getElementById('id_numero_contribuyente_especial');
+    if (!inputContribuyente) {
+        inputContribuyente = document.querySelector('input[name="numero_contribuyente_especial"]');
+    }
+
+    let checkAgente = document.getElementById('id_es_agente_retencion');
+    if (!checkAgente) {
+        checkAgente = document.querySelector('input[name="es_agente_retencion"]');
+    }
+    const grupoAgente = document.getElementById('grupo_numero_agente');
+    let inputAgente = document.getElementById('id_numero_agente_retencion');
+    if (!inputAgente) {
+        inputAgente = document.querySelector('select[name="numero_agente_retencion"]');
+    }
+
+    function toggleContribuyente() {
+        if (checkContribuyente && grupoContribuyente && inputContribuyente) {
+            if (checkContribuyente.checked) {
+                grupoContribuyente.style.display = 'block';
+                inputContribuyente.required = true;
+            } else {
+                grupoContribuyente.style.display = 'none';
+                inputContribuyente.required = false;
+                inputContribuyente.value = '';
+            }
+        }
+    }
+
+    function toggleAgente() {
+        if (checkAgente && grupoAgente && inputAgente) {
+            if (checkAgente.checked) {
+                grupoAgente.style.display = 'block';
+                inputAgente.required = true;
+            } else {
+                grupoAgente.style.display = 'none';
+                inputAgente.required = false;
+                if (inputAgente.tagName === 'SELECT') {
+                    inputAgente.selectedIndex = 0;
+                } else {
+                    inputAgente.value = '';
+                }
+            }
+        }
+    }
+
+    if (checkContribuyente) {
+        checkContribuyente.addEventListener('change', toggleContribuyente);
+        toggleContribuyente();
+    }
+    if (checkAgente) {
+        checkAgente.addEventListener('change', toggleAgente);
+        toggleAgente();
+    }
+    
+    // ===== DRAG & DROP PARA LOGO =====
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.querySelector('input[type="file"][name="imagen"]');
+    const fileInfo = document.getElementById('file-info');
+    const fileName = document.getElementById('file-name');
+    const fileSize = document.getElementById('file-size');
+    
+    if (dropZone && fileInput) {
+        // Función para formatear el tamaño del archivo
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // Función para mostrar información del archivo
+        function showFileInfo(file) {
+            if (fileName && fileSize && fileInfo) {
+                fileName.textContent = file.name;
+                fileSize.textContent = formatFileSize(file.size);
+                fileInfo.classList.remove('hidden');
+            }
+        }
+        
+        // Función para validar archivo
+        function validateFile(file) {
+            const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+            const maxSize = 2 * 1024 * 1024; // 2MB
+            
+            if (!validTypes.includes(file.type)) {
+                alert('Solo se permiten archivos de imagen (JPG, PNG, GIF)');
+                return false;
+            }
+            
+            if (file.size > maxSize) {
+                alert('El archivo es demasiado grande. Máximo 2MB');
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // Prevenir comportamientos por defecto
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        // Efectos visuales para drag
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+        
+        function highlight(e) {
+            dropZone.classList.add('border-gray-500', 'bg-gray-200');
+            dropZone.classList.remove('border-gray-300', 'bg-gradient-to-br');
+        }
+        
+        function unhighlight(e) {
+            dropZone.classList.remove('border-gray-500', 'bg-gray-200');
+            dropZone.classList.add('border-gray-300', 'bg-gradient-to-br');
+        }
+        
+        // Manejar drop
+        dropZone.addEventListener('drop', handleDrop, false);
+        
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            
+            if (files.length > 0) {
+                const file = files[0];
+                if (validateFile(file)) {
+                    fileInput.files = files;
+                    showFileInfo(file);
+                }
+            }
+        }
+        
+        // Manejar selección manual
+        fileInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                if (validateFile(file)) {
+                    showFileInfo(file);
+                }
+            }
+        });
+        
+        // Hacer clickeable toda el área
+        dropZone.addEventListener('click', function(e) {
+            if (e.target.tagName !== 'BUTTON') {
+                fileInput.click();
+            }
+        });
+    }
+});
+
+// ===== FUNCIÓN DE VALIDACIÓN =====
+function validarTodo(tipo) {
+    console.log('Validando formulario de configuración...');
+    
+    // Definir campos obligatorios para configuración (usando names, no IDs)
+    const camposObligatorios = [
+        { name: 'identificacion', nombre: 'RUC de la empresa' },
+        { name: 'razon_social', nombre: 'Razón Social' },
+        { name: 'correo', nombre: 'Correo' }
+    ];
+    
+    // Verificar cada campo obligatorio
+    let camposFaltantes = [];
+    
+    camposObligatorios.forEach(campo => {
+        let elemento = document.getElementById(`id_${campo.name}`);
+        if (!elemento) {
+            elemento = document.querySelector(`input[name="${campo.name}"]`);
+        }
+        if (!elemento) {
+            elemento = document.querySelector(`select[name="${campo.name}"]`);
+        }
+        if (!elemento) {
+            elemento = document.querySelector(`textarea[name="${campo.name}"]`);
+        }
+        
+        if (elemento) {
+            const valor = elemento.value.trim();
+            if (!valor || valor === '') {
+                camposFaltantes.push(campo.nombre);
+                // Agregar clase de error visual
+                elemento.classList.remove('border-gray-300', 'focus:border-blue-500');
+                elemento.classList.add('border-red-500', 'focus:border-red-500', 'bg-red-50');
+            } else {
+                // Quitar clase de error si el campo está lleno
+                elemento.classList.remove('border-red-500', 'focus:border-red-500', 'bg-red-50');
+                elemento.classList.add('border-gray-300', 'focus:border-blue-500');
+            }
+        }
+    });
+    
+    // Si hay campos faltantes, mostrar error y no enviar
+    if (camposFaltantes.length > 0) {
+        const mensaje = `Los siguientes campos son obligatorios: ${camposFaltantes.join(', ')}`;
+        showMessage(mensaje, 'danger');
+        console.log('Validación fallida:', mensaje);
+        return false; // Evita el envío del formulario
+    }
+    
+    // Si todo está bien, permitir el envío
+    console.log('Validación exitosa');
+    hideMessage();
+    return true;
+}
+</script>
+{% endblock %}

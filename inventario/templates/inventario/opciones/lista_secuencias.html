@@ -1,0 +1,131 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+<div class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4" style="padding-top: 0px; padding-bottom: 0px;">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header Section -->
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 mb-0 rounded-lg mt-0">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-list-ol text-white text-xl"></i>
+                </div>
+                <div class="ml-3">
+                    <h2 class="text-lg font-semibold text-white">Gestión de Secuencias</h2>
+                    <p class="text-gray-300 text-xs">Visualice todas las secuencias registradas</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden mt-4">
+            <div class="p-0">
+                <div class="row">
+                    <div class="col-lg-12">
+                        <div class="overflow-x-auto">
+                            <div class="flex justify-between items-center mb-1">
+                                <h3 class="text-base font-semibold text-gray-800">Secuencias Registradas</h3>
+                                <span class="text-sm text-gray-600">Total: {{ secuencias|length }} secuencias</span>
+                                <a href="/inventario/secuencias/crear/" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-900 hover:bg-gray-800 ml-2">
+                                    <i class="fa fa-plus mr-2"></i> Agregar Nueva Secuencia
+                                </a>
+                            </div>
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de Documento</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Secuencial</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Establecimiento</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Punto Emisión</th>
+                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Activo</th>
+                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">IVA</th>
+                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Fiscal</th>
+                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Doc. Electrónico</th>
+                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    {% for secuencia in secuencias %}
+                                    <tr class="hover:bg-gray-50 transition-colors duration-150">
+                                        <td class="px-4 py-3 text-sm text-gray-900 font-mono">{{ secuencia.id }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-900">{{ secuencia.descripcion }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-900">{{ secuencia.tipo_documento }}</td>
+                                        <td class="px-4 py-3 text-right text-sm text-gray-900 font-semibold">{{ secuencia.secuencial }}</td>
+                                        <td class="px-4 py-3 text-right text-sm text-gray-900 font-mono">{{ secuencia.establecimiento }}</td>
+                                        <td class="px-4 py-3 text-right text-sm text-gray-900 font-mono">{{ secuencia.punto_emision }}</td>
+                                        <td class="px-4 py-3 text-center text-sm">
+                                            {% if secuencia.activo %}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Sí</span>
+                                            {% else %}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">No</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="px-4 py-3 text-center text-sm">
+                                            {% if secuencia.iva %}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Sí</span>
+                                            {% else %}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">No</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="px-4 py-3 text-center text-sm">
+                                            {% if secuencia.fiscal %}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Sí</span>
+                                            {% else %}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">No</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="px-4 py-3 text-center text-sm">
+                                            {% if secuencia.documento_electronico %}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">Sí</span>
+                                            {% else %}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">No</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="px-4 py-3 text-center text-sm font-medium">
+                                            <div class="relative inline-block text-left" id="dropdown-{{ forloop.counter }}">
+                                                <button type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-2.5 py-1.5 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="toggleDropdown('{{ forloop.counter }}')">
+                                                    Acciones
+                                                    <i class="fas fa-chevron-down ml-1 -mr-0.5 h-3 w-3"></i>
+                                                </button>
+                                                <div class="origin-top-right absolute right-0 mt-2 w-36 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 hidden z-[9999]" id="dropdown-menu-{{ forloop.counter }}">
+                                                    <div class="py-1">
+                                                        <a href="{% url 'inventario:editar_secuencia' secuencia.id %}" class="block px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100">
+                                                            <i class="fa fa-pencil mr-1"></i>Editar
+                                                        </a>
+                                                        <a href="{% url 'inventario:eliminar_secuencia' secuencia.id %}" class="block px-3 py-1.5 text-xs text-red-700 hover:bg-red-50">
+                                                            <i class="fa fa-trash mr-1"></i>Eliminar
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    function toggleDropdown(counter) {
+        const dropdown = document.getElementById('dropdown-menu-' + counter);
+        const allDropdowns = document.querySelectorAll('[id^="dropdown-menu-"]');
+        allDropdowns.forEach(d => {
+            if (d !== dropdown) d.classList.add('hidden');
+        });
+        dropdown.classList.toggle('hidden');
+    }
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('.relative')) {
+            document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
+                d.classList.add('hidden');
+            });
+        }
+    });
+</script>
+{% endblock %}

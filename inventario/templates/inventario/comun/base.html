@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+{% include "inventario/comun/estilos.html" %}
+<body>
+	<!-- Aca se incluiran las plantillas por separado para facilitar su edicion -->
+        <div class="main-wrapper">
+            <div class="app header-fixed sidebar-fixed flex flex-col min-h-screen" id="app">
+			{% include "inventario/comun/header.html" %}
+			{% include "inventario/comun/sidebar.html" %}
+			<main class="flex-1">
+			{% block content %}
+			{% endblock %}
+			</main>
+			{% include "inventario/comun/footer.html" %}
+			{% include "inventario/comun/modal.html" %}
+            </div>
+        </div> <!-- Fin de la pantalla -->
+
+
+	<!-- Controla lo de los colores aparentemente-->
+        <div class="ref" id="ref">
+            <div class="color-primary"></div>
+            <div class="chart">
+                <div class="color-primary"></div>
+                <div class="color-secondary"></div>
+            </div>
+        </div> <!-- Fin de la cosa esta-->
+        {% include "inventario/comun/scripts.html" %}
+</body>
+</html>

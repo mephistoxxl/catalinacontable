@@ -1,0 +1,47 @@
+=== MANUAL DE VERIFICACIÓN DE FIRMA ELECTRÓNICA ===
+
+Para que el RIDE aparezca firmado, necesitas seguir estos pasos:
+
+1. **VERIFICAR CONFIGURACIÓN EN ADMIN**
+   - Abre tu administrador de Django (http://localhost:8000/admin/)
+   - Ve a "Inventario > Opciones"
+   - Verifica que tengas:
+     * Un archivo de firma electrónica (.p12 o .pfx) cargado
+     * La contraseña configurada
+     * La fecha de caducidad generada automáticamente
+
+2. **VERIFICAR ARCHIVO DE FIRMA**
+   - El archivo debe estar en: `media/firmas/`
+   - El archivo debe tener extensión .p12 o .pfx
+   - El certificado debe estar vigente (no vencido)
+
+3. **VERIFICAR PERMISOS**
+   - Asegúrate de que Django tenga permisos para leer el archivo
+   - La carpeta `media/firmas/` debe tener permisos de lectura
+
+4. **VERIFICAR MANUALMENTE**
+   - Abre una terminal Python:
+   ```python
+   import os
+   from inventario.models import Opciones
+   opciones = Opciones.objects.first()
+   print("Firma electrónica:", opciones.firma_electronica)
+   print("Contraseña configurada:", bool(opciones.password_firma))
+   print("Fecha caducidad:", opciones.fecha_caducidad_firma)
+   ```
+
+5. **SOLUCIÓN AL ERROR DE CGI**
+   - El error que estás viendo es por Python 3.13
+   - Solución temporal: instalar Django 4.2.x o superior
+   - O usar Python 3.11 o 3.12
+
+6. **VERIFICAR EN PRODUCCIÓN**
+   - Después de configurar la firma, genera una factura nueva
+   - Descarga el PDF del RIDE
+   - Abre el PDF con Adobe Reader
+   - Deberías ver una firma digital válida
+
+Si no tienes el archivo .p12, necesitas:
+1. Obtenerlo de tu proveedor de firma electrónica
+2. Instalarlo en tu computadora
+3. Exportarlo como .p12 con su contraseña

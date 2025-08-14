@@ -1,0 +1,275 @@
+{% extends 'inventario/comun/base.html' %}
+{% load static %}
+
+{% block content %}
+
+<!-- JavaScript modernizado -->
+
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4" style="padding-top: 0px; padding-bottom: 20px;">
+    <div class="max-w-6xl mx-auto">
+
+        <!-- Messages Section -->
+        {% if messages %}
+            <div class="mb-6">
+                {% for message in messages %}
+                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-green-500 bg-green-50">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fa fa-check-circle text-green-500 text-lg"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-green-800">{{ message }}</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+                
+        <!-- Header Section -->
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 mb-0 rounded-lg mt-0">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fa fa-university text-white text-lg"></i>
+                </div>
+                <div class="ml-3">
+                    <h2 class="text-lg font-semibold text-white">Listar Bancos</h2>
+                    <p class="text-gray-300 text-xs">Verifique las cuentas bancarias agregadas al sistema</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 relative">
+            <div class="row">
+                <!-- Table Section -->
+                <div class="p-4">
+                    <div class="row">
+                        <!-- Table Section -->
+                        <div class="col-lg-12">
+                            <div class="relative">
+                                <div class="flex justify-between items-center mb-3">
+                                    <h3 class="text-base font-semibold text-gray-800">Cuentas Bancarias Registradas</h3>
+                                    <span class="text-sm text-gray-600">Total: {{ bancos|length }} cuentas</span>
+                                </div>
+                                        <div class="overflow-x-auto">
+                                            <table class="min-w-full divide-y divide-gray-200">
+                                                <thead class="bg-gray-50">
+                                                        <tr>
+                                                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                                                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Banco</th>
+                                                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Titular</th>
+                                                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número de Cuenta</th>
+                                                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                                                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo Inicial</th>
+                                                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                                                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opciones</th>
+                                                        </tr>
+                                                </thead>
+                                            <tbody class="bg-white divide-y divide-gray-200">
+                                                {% for banco in bancos %}
+                                                        <tr class="hover:bg-gray-50 transition-colors duration-150">
+                                                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ forloop.counter }}</td>
+                                                                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ banco.banco }}</td>
+                                                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ banco.titular }}</td>
+                                                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-mono">{{ banco.numero_cuenta }}</td>
+                                                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                                                        {% if banco.tipo_cuenta == 'CORRIENTE' %}
+                                                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Corriente</span>
+                                                                        {% elif banco.tipo_cuenta == 'AHORROS' %}
+                                                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Ahorros</span>
+                                                                        {% elif banco.tipo_cuenta == 'VISTA' %}
+                                                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Vista</span>
+                                                                        {% elif banco.tipo_cuenta == 'PLAZO_FIJO' %}
+                                                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">Plazo Fijo</span>
+                                                                        {% endif %}
+                                                                </td>
+                                                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-semibold">${{ banco.saldo_inicial|floatformat:2 }}</td>
+                                                                <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                                                        {% if banco.activo %}
+                                                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                                                        Sí
+                                                                                </span>
+                                                                        {% else %}
+                                                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                                                        No
+                                                                                </span>
+                                                                        {% endif %}
+                                                                </td>
+                                                                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                                                                        <div class="relative inline-block text-left" id="dropdown-{{ forloop.counter }}">
+                                                        <button type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-2.5 py-1.5 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="toggleDropdown('{{ forloop.counter }}')">
+                                                            Acciones
+                                                            <i class="fa fa-chevron-down ml-1 -mr-0.5 h-3 w-3"></i>
+                                                        </button>
+                                                        
+                                                        <div class="origin-top-right absolute right-0 mt-1 w-44 rounded-md shadow-xl bg-white ring-1 ring-black ring-opacity-5 hidden z-[9999]" id="dropdown-menu-{{ forloop.counter }}">
+                                                            <div class="py-2">
+                                                                <a href="{% url 'inventario:ver_banco' banco.id %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                                                    <i class="fa fa-eye mr-2 text-green-500"></i>
+                                                                    <span>Ver</span>
+                                                                </a>
+                                                                <a href="{% url 'inventario:editar_banco' banco.id %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                                                    <i class="fa fa-edit mr-2 text-blue-500"></i>
+                                                                    <span>Editar</span>
+                                                                </a>
+                                                                <div class="border-t border-gray-100"></div>
+                                                                <button onclick="abrir_modal_eliminacion('{% url 'inventario:eliminar' 'banco' banco.id %}')" class="flex items-center w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 hover:text-red-900">
+                                                                    <i class="fa fa-trash mr-2 text-red-500"></i>
+                                                                    <span>Eliminar</span>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                                </td>
+                                                        </tr>
+                                                {% endfor %}
+                                        </tbody>
+                                        </table>
+                                        </div>
+                        </div>
+                                <div class="mt-4">
+                                    <a href="{% url 'inventario:crear_banco' %}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-700 transition-colors">
+                                        <i class="fa fa-plus-circle mr-2"></i>
+                                        Nueva Cuenta Bancaria
+                                    </a>
+                                </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Eliminación Moderno -->
+<div id="modalEliminacion" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center">
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                        <i class="fa fa-exclamation-triangle text-red-600 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">Confirmar Eliminación</h3>
+                    </div>
+                </div>
+                <button onclick="cerrarModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <!-- Body -->
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500">
+                    ¿Está seguro de que desea eliminar esta cuenta bancaria?<br>
+                    <span class="font-semibold text-red-600">Esta acción no se puede deshacer.</span>
+                </p>
+            </div>
+            
+            <!-- Footer -->
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="cerrarModal()" class="px-4 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                    Cancelar
+                </button>
+                <a id="linkEliminacion" href="#" class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                    <i class="fa fa-trash mr-1"></i>Eliminar
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Función para manejar el dropdown de acciones
+    function toggleDropdown(counter) {
+        event.stopPropagation(); // Prevenir que el evento se propague
+        
+        const dropdown = document.getElementById('dropdown-menu-' + counter);
+        const allDropdowns = document.querySelectorAll('[id^="dropdown-menu-"]');
+        
+        // Cerrar todos los dropdowns primero
+        allDropdowns.forEach(d => {
+            d.classList.add('hidden');
+            d.style.position = '';
+            d.style.top = '';
+            d.style.left = '';
+            d.style.right = '';
+        });
+        
+        // Abrir el dropdown actual
+        if (dropdown) {
+            dropdown.classList.remove('hidden');
+            
+            // Ajustar posición en móviles
+            if (window.innerWidth < 768) {
+                const button = event.target.closest('button');
+                if (button) {
+                    const rect = button.getBoundingClientRect();
+                    dropdown.style.position = 'fixed';
+                    dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+                    dropdown.style.left = 'auto';
+                    dropdown.style.right = '10px';
+                    dropdown.style.zIndex = '9999';
+                }
+            }
+        }
+    }
+
+    // Cerrar dropdowns al hacer clic fuera
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('.relative')) {
+            document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
+                d.classList.add('hidden');
+                d.style.position = '';
+                d.style.top = '';
+                d.style.left = '';
+                d.style.right = '';
+            });
+        }
+    });
+    
+    // Resetear posición al cambiar tamaño de ventana
+    window.addEventListener('resize', function() {
+        document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
+            d.classList.add('hidden');
+            d.style.position = '';
+            d.style.top = '';
+            d.style.left = '';
+            d.style.right = '';
+        });
+    });
+
+    // Función para abrir el modal de eliminación
+    function abrir_modal_eliminacion(url) {
+        event.stopPropagation();
+        
+        const linkEliminacion = document.getElementById('linkEliminacion');
+        if (linkEliminacion) {
+            linkEliminacion.href = url;
+        }
+        
+        const modal = document.getElementById('modalEliminacion');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+    
+    function cerrarModal() {
+        const modal = document.getElementById('modalEliminacion');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+    
+    // Cerrar modal al hacer clic fuera
+    window.onclick = function(event) {
+        const modal = document.getElementById('modalEliminacion');
+        if (event.target === modal) {
+            modal.classList.add('hidden');
+        }
+    }
+</script>
+
+{% endblock %}

@@ -1,0 +1,59 @@
+<header class="bg-white shadow-md px-4 py-3 flex items-center justify-between">
+    <!-- Mobile menu button -->
+    <div class="lg:hidden">
+        <button id="mobile-menu-button" class="p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+            <i class="fa fa-bars text-lg"></i>
+        </button>
+    </div>
+    
+    <!-- Spacer for desktop to center the profile menu -->
+    <div class="hidden lg:block"></div>
+
+
+                    <div class="header-block header-block-nav ml-auto">
+                        <ul class="nav-profile relative">
+                        <!-- NOTIFICACIONES -->        
+
+                        <!-- FIN DE LAS NOTIFICACIONES -->
+
+                        <!-- NOMBRE DEL USUARIO ACTUAL -->
+                            <li class="profile dropdown relative">
+                                <button class="flex items-center space-x-2 px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" 
+                                        onclick="toggleDropdown()" 
+                                        id="dropdownProfile">
+                                    <em class="fa fa-user text-gray-600"></em>
+                                    <span class="text-sm font-medium">{{ usuario }}</span>
+                                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                <div id="profileDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200">
+                                    <a class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" href="/inventario/perfil/ver/{{ id_usuario }}">
+                                        <i class="fa fa-user mr-2"></i>Perfil
+                                    </a>
+                                    <div class="border-t border-gray-200"></div>
+                                    <a class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" href="/inventario/salir">
+                                        <i class="fa fa-power-off mr-2"></i>Cerrar sesión
+                                    </a>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </header>
+
+                <script>
+                    function toggleDropdown() {
+                        const dropdown = document.getElementById('profileDropdown');
+                        dropdown.classList.toggle('hidden');
+                    }
+
+                    // Cerrar dropdown al hacer clic fuera
+                    document.addEventListener('click', function(event) {
+                        const dropdown = document.getElementById('profileDropdown');
+                        const button = document.getElementById('dropdownProfile');
+                        
+                        if (!button.contains(event.target) && !dropdown.contains(event.target)) {
+                            dropdown.classList.add('hidden');
+                        }
+                    });
+                </script>
