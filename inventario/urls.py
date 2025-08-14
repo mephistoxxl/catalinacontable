@@ -130,6 +130,7 @@ urlpatterns = [
     path('sri/xml/<int:factura_id>/', views.generar_xml_factura_view, name='generar_xml_factura'),
     path('sri/problemas/', views.FacturasSRIProblemas.as_view(), name='facturas_sri_problemas'),
     path('sri/sincronizar-masivo/', views.sincronizar_masivo_sri, name='sincronizar_masivo_sri'),
+    path('sri/validar-xml/<int:factura_id>/', views.validar_xml_factura, name='validar_xml_factura'),
 
 ]
 

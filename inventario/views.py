@@ -4441,9 +4441,11 @@ def sincronizar_masivo_sri(request):
                 resultado = integration.consultar_estado_factura(factura.id)
                 
                 if resultado['success']:
+                    # Recargar la factura para obtener el estado actualizado
+                    factura.refresh_from_db()
                     estado_nuevo = factura.estado_sri
                     
-                    if estado_nuevo == 'RECHAZADA' or estado_nuevo == 'NO_AUTORIZADA':
+                    if estado_nuevo in ('RECHAZADA', 'NO_AUTORIZADA'):
                         rechazadas += 1
                     
                     resultados.append({
@@ -4492,6 +4494,63 @@ def sincronizar_masivo_sri(request):
             'success': False,
             'message': f'Error interno: {str(e)}'
         }, status=500)
+
+
+@csrf_exempt
+def validar_xml_factura(request, factura_id):
+    """
+    Valida el XML de una factura específica contra el XSD del SRI
+    """
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False,
+            'message': 'Método no permitido'
+        }, status=405)
+    
+    try:
+        from inventario.sri.integracion_django import SRIIntegration
+        
+        # Verificar que la factura existe
+        factura = get_object_or_404(Factura, id=factura_id)
+        
+        if not factura.clave_acceso:
+            return JsonResponse({
+                'success': False,
+                'message': 'La factura no tiene clave de acceso generada'
+            })
+        
+        integration = SRIIntegration()
+        
+        try:
+            # Generar XML con validación
+            xml_path = integration.generar_xml_factura(factura, validar_xsd=True)
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'XML generado y validado exitosamente',
+                'xml_path': xml_path,
+                'validacion': 'XML cumple con el XSD del SRI'
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': 'XML no válido según XSD del SRI',
+                'error': str(e),
+                'validacion': 'XML NO cumple con el XSD'
+            })
+            
+    except Factura.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': f'No se encontró la factura con ID {factura_id}'
+        })
+    except Exception as e:
+        logger.error(f"Error en validar_xml_factura: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'Error interno del servidor: {str(e)}'
+        })
 
 
 @csrf_exempt

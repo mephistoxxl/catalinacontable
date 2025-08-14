@@ -6,6 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 import logging
 import re
+import os
 from lxml import etree
 logger = logging.getLogger(__name__)
 
@@ -21,14 +22,50 @@ class SRIXMLGenerator:
     def validar_xml_contra_xsd(self, xml_content, xsd_path):
         """
         Valida el XML contra el XSD oficial del SRI.
+        
+        Args:
+            xml_content (str): Contenido XML a validar
+            xsd_path (str): Ruta al archivo XSD
+            
+        Returns:
+            bool: True si el XML es válido
+            
+        Raises:
+            Exception: Si el XML no es válido con detalles específicos
         """
-        with open(xsd_path, 'rb') as xsd_file:
-            schema_root = etree.XML(xsd_file.read())
-            schema = etree.XMLSchema(schema_root)
-            xml_doc = etree.fromstring(xml_content.encode('utf-8'))
+        try:
+            from lxml import etree
+            
+            # Verificar que el archivo XSD existe
+            if not os.path.exists(xsd_path):
+                raise FileNotFoundError(f"Archivo XSD no encontrado: {xsd_path}")
+            
+            # Cargar el esquema XSD
+            with open(xsd_path, 'rb') as xsd_file:
+                schema_root = etree.XML(xsd_file.read())
+                schema = etree.XMLSchema(schema_root)
+            
+            # Parsear el XML
+            try:
+                xml_doc = etree.fromstring(xml_content.encode('utf-8'))
+            except etree.XMLSyntaxError as e:
+                raise Exception(f"Error de sintaxis XML: {str(e)}")
+            
+            # Validar contra el esquema
             if not schema.validate(xml_doc):
-                raise Exception(f"El XML no cumple con el XSD: {schema.error_log}")
-        return True
+                # Crear mensaje de error detallado
+                errores = []
+                for error in schema.error_log:
+                    errores.append(f"Línea {error.line}: {error.message}")
+                
+                mensaje_error = "El XML no cumple con el XSD del SRI:\n" + "\n".join(errores)
+                raise Exception(mensaje_error)
+            
+            return True
+            
+        except Exception as e:
+            # Re-raise con contexto adicional
+            raise Exception(f"Error validando XML contra XSD: {str(e)}")
     def __init__(self, ambiente=None):
         # NOTA: El parámetro ambiente se ignora porque se lee de Opciones.tipo_ambiente
         # Se mantiene por compatibilidad con código existente

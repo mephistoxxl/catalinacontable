@@ -77,31 +77,45 @@ class SRIIntegration:
                     'message': f'La factura debe estar en estado PENDIENTE. Estado actual: {factura.estado}'
                 }
             
-            # Generar XML
+            # 🔧 FIX: Generar y persistir la clave de acceso ANTES del XML
+            if not factura.clave_acceso:
+                clave_acceso = self._generar_clave_acceso(factura)
+                factura.clave_acceso = clave_acceso
+                factura.save()
+                logger.info(f"Clave de acceso generada y persistida: {clave_acceso}")
+            else:
+                clave_acceso = factura.clave_acceso
+                logger.info(f"Usando clave de acceso existente: {clave_acceso}")
+            
+            # Generar XML (ahora la factura ya tiene clave_acceso)
             xml_path = self.generar_xml_factura(factura)
+            
+            # 🔧 FIX: Validar XML contra XSD antes de firmar y enviar
+            self._validar_xml_generado(xml_path)
             
             # Firmar XML
             from .firmador import firmar_xml
             xml_firmado_path = xml_path.replace('.xml', '_firmado.xml')
             firmar_xml(xml_path, xml_firmado_path)
             
-            # Generar clave de acceso
-            clave_acceso = self._generar_clave_acceso(factura)
-            
-            # Enviar al SRI
+            # Enviar al SRI (usando la clave ya persistida)
             with open(xml_firmado_path, 'r', encoding='utf-8') as f:
                 xml_firmado_content = f.read()
             
             resultado = self.cliente.enviar_comprobante(xml_firmado_content, clave_acceso)
             
-            # Actualizar factura con resultado
+            # Actualizar factura con resultado (sin cambiar la clave de acceso)
             self._actualizar_factura_con_resultado(factura, resultado, clave_acceso)
             
             # Si fue recibido, solicitar autorización
             if resultado.get('estado') == 'RECIBIDA':
                 resultado_auth = self.cliente.consultar_autorizacion(clave_acceso)
                 
-                if resultado_auth.get('estado') == 'AUTORIZADA':
+                # 🔧 FIX: SIEMPRE actualizar el estado tras consultar autorización
+                self._actualizar_factura_con_resultado(factura, resultado_auth, clave_acceso)
+                
+                estado_auth = resultado_auth.get('estado', '').upper()
+                if estado_auth in ('AUTORIZADA', 'AUTORIZADO'):
                     # Generar RIDE autorizado
                     self._generar_ride_autorizado(factura, resultado_auth)
                     
@@ -110,7 +124,7 @@ class SRIIntegration:
                         'message': 'Factura autorizada exitosamente',
                         'resultado': resultado_auth
                     }
-                elif resultado_auth.get('estado') == 'PENDIENTE':
+                elif estado_auth == 'PENDIENTE':
                     # Estado pendiente - no es un error, solo necesita más tiempo
                     mensajes_auth = resultado_auth.get('mensajes', [])
                     mensaje_detalle = mensajes_auth[0].get('mensaje', 'El comprobante está pendiente de autorización') if mensajes_auth else 'El comprobante está pendiente de autorización'
@@ -159,12 +173,13 @@ class SRIIntegration:
                 'message': f'Error interno: {str(e)}'
             }
     
-    def generar_xml_factura(self, factura):
+    def generar_xml_factura(self, factura, validar_xsd=True):
         """
         Genera el XML de una factura y lo guarda en el sistema de archivos
         
         Args:
             factura: Instancia de Factura
+            validar_xsd: Si debe validar contra XSD (por defecto True)
             
         Returns:
             str: Ruta del archivo XML generado
@@ -181,15 +196,91 @@ class SRIIntegration:
             # Crear directorio si no existe
             os.makedirs(os.path.dirname(xml_path), exist_ok=True)
             
+            # 🔧 FIX: Validar XML contra XSD antes de guardar (opcional)
+            if validar_xsd:
+                try:
+                    xsd_path = self._obtener_ruta_xsd()
+                    xml_generator.validar_xml_contra_xsd(xml_content, xsd_path)
+                    logger.info("✅ XML generado válido según XSD")
+                except Exception as e:
+                    logger.warning(f"⚠️ XML generado no cumple XSD: {e}")
+                    # No fallar aquí para permitir debugging, se validará nuevamente en _validar_xml_generado
+            
             # Guardar XML
             with open(xml_path, 'w', encoding='utf-8') as f:
                 f.write(xml_content)
             
+            logger.info(f"XML generado en: {xml_path}")
             return xml_path
             
         except Exception as e:
             logger.error(f"Error generando XML para factura {factura.numero}: {str(e)}")
             raise Exception(f"Error generando XML: {str(e)}")
+    
+    def _validar_xml_generado(self, xml_path):
+        """
+        Valida el XML generado contra el XSD oficial del SRI
+        
+        Args:
+            xml_path: Ruta del archivo XML a validar
+            
+        Raises:
+            Exception: Si el XML no es válido según el XSD
+        """
+        try:
+            # Leer el contenido del XML
+            with open(xml_path, 'r', encoding='utf-8') as f:
+                xml_content = f.read()
+            
+            # Obtener la ruta del XSD
+            xsd_path = self._obtener_ruta_xsd()
+            
+            # Crear generador para usar el método de validación
+            xml_generator = SRIXMLGenerator()
+            
+            # Validar contra el XSD
+            logger.info(f"Validando XML contra XSD: {xsd_path}")
+            xml_generator.validar_xml_contra_xsd(xml_content, xsd_path)
+            logger.info("✅ XML válido según XSD del SRI")
+            
+        except Exception as e:
+            logger.error(f"❌ Error de validación XSD: {str(e)}")
+            # Guardar XML problemático para debugging
+            debug_path = xml_path.replace('.xml', '_INVALID.xml')
+            import shutil
+            shutil.copy(xml_path, debug_path)
+            logger.error(f"XML inválido guardado para debugging en: {debug_path}")
+            raise Exception(f"XML no válido según XSD del SRI: {str(e)}")
+    
+    def _obtener_ruta_xsd(self):
+        """
+        Obtiene la ruta del archivo XSD correspondiente
+        
+        Returns:
+            str: Ruta del archivo XSD
+        """
+        import os
+        
+        # XSD para facturas (código 01)
+        xsd_filename = 'factura_V1.1.0.xsd'
+        
+        # Buscar XSD en el directorio del módulo SRI
+        sri_dir = os.path.dirname(__file__)
+        xsd_path = os.path.join(sri_dir, xsd_filename)
+        
+        if not os.path.exists(xsd_path):
+            # Buscar en subdirectorio xsd
+            xsd_path = os.path.join(sri_dir, 'xsd', xsd_filename)
+            
+        if not os.path.exists(xsd_path):
+            # Buscar en directorio padre
+            parent_dir = os.path.dirname(sri_dir)
+            xsd_path = os.path.join(parent_dir, 'xsd', xsd_filename)
+            
+        if not os.path.exists(xsd_path):
+            raise FileNotFoundError(f"No se encontró el archivo XSD: {xsd_filename}")
+        
+        return xsd_path
     
     def _generar_clave_acceso(self, factura):
         """
@@ -200,7 +291,15 @@ class SRIIntegration:
             
         Returns:
             str: Clave de acceso generada
+            
+        Raises:
+            ValueError: Si la factura ya tiene clave de acceso (evitar regeneración)
         """
+        # 🔧 FIX: Evitar regenerar si ya existe
+        if factura.clave_acceso:
+            logger.warning(f"Factura {factura.id} ya tiene clave de acceso: {factura.clave_acceso}")
+            return factura.clave_acceso
+        
         # Formato: [fecha(8)][tipo_comprobante(2)][ruc(13)][ambiente(1)][serie(6)][numero_secuencial(9)][codigo_numerico(8)][tipo_emision(1)][digito_verificador(1)]
         
         fecha = (factura.fecha_emision or datetime.now()).strftime('%d%m%Y')
@@ -229,7 +328,9 @@ class SRIIntegration:
         clave_base = f"{fecha}{tipo_comprobante}{ruc}{ambiente}{serie}{secuencial}{codigo_numerico}{tipo_emision}"
         digito_verificador = self._calcular_digito_verificador(clave_base)
         
-        return clave_base + digito_verificador
+        clave_completa = clave_base + digito_verificador
+        logger.info(f"Clave de acceso generada para factura {factura.id}: {clave_completa}")
+        return clave_completa
     
     def _calcular_digito_verificador(self, clave):
         """
@@ -265,23 +366,32 @@ class SRIIntegration:
         Args:
             factura: Instancia de Factura
             resultado: Dict con resultado del SRI
-            clave_acceso: Clave de acceso generada
+            clave_acceso: Clave de acceso (solo para verificación, no para sobrescribir)
         """
-        factura.clave_acceso = clave_acceso
+        # 🔧 FIX: Solo actualizar clave_acceso si no existe (evitar sobrescribir)
+        if not factura.clave_acceso:
+            factura.clave_acceso = clave_acceso
+            logger.warning(f"Clave de acceso asignada tardíamente a factura {factura.id}: {clave_acceso}")
+        elif factura.clave_acceso != clave_acceso:
+            logger.error(f"INCONSISTENCIA: Factura {factura.id} tiene clave {factura.clave_acceso} pero se intentó usar {clave_acceso}")
+            # Usar la clave que ya está en la factura para mantener consistencia
+            clave_acceso = factura.clave_acceso
         
         estado = resultado.get('estado', 'ERROR')
-        # Normalizar variantes de estado que puede devolver el SRI
-        estado_normalizado = (
-            estado.replace(' ', '_') if isinstance(estado, str) else estado
-        )
+        # 🔧 FIX: Normalizar variantes de estado que puede devolver el SRI
+        estado_normalizado = estado.upper().replace(' ', '_') if isinstance(estado, str) else str(estado).upper()
+        
+        logger.info(f"Actualizando factura {factura.id} con estado SRI: '{estado}' (normalizado: '{estado_normalizado}')")
 
-        if estado in ('AUTORIZADA', 'AUTORIZADO') or estado_normalizado == 'AUTORIZADO':
+        # 🔧 FIX: Manejo completo de estados AUTORIZADA/AUTORIZADO
+        if estado_normalizado in ('AUTORIZADA', 'AUTORIZADO'):
             if hasattr(factura, 'estado'):
                 factura.estado = 'AUTORIZADO'
             if hasattr(factura, 'estado_sri'):
                 factura.estado_sri = 'AUTORIZADA'
             if hasattr(factura, 'mensaje_sri'):
                 factura.mensaje_sri = 'Comprobante autorizado'
+                
             # Obtener datos de autorización
             autorizaciones = resultado.get('autorizaciones', [])
             if autorizaciones:
@@ -289,35 +399,54 @@ class SRIIntegration:
                 if hasattr(factura, 'numero_autorizacion'):
                     factura.numero_autorizacion = aut.get('numeroAutorizacion')
                 if hasattr(factura, 'fecha_autorizacion'):
-                    factura.fecha_autorizacion = aut.get('fechaAutorizacion')
+                    fecha_str = aut.get('fechaAutorizacion')
+                    if fecha_str:
+                        try:
+                            from datetime import datetime
+                            factura.fecha_autorizacion = datetime.fromisoformat(fecha_str.replace('Z', '+00:00'))
+                        except:
+                            logger.warning(f"Error parseando fecha autorización: {fecha_str}")
                 if hasattr(factura, 'xml_autorizado'):
                     factura.xml_autorizado = aut.get('comprobante') or factura.xml_autorizado
+            
+            logger.info(f"Factura {factura.id} marcada como AUTORIZADA")
 
-        elif estado in ('NO_AUTORIZADA', 'RECHAZADA', 'NO AUTORIZADO') or estado_normalizado in ('NO_AUTORIZADO', 'RECHAZADA'):
+        # 🔧 FIX: Manejo completo de estados de rechazo
+        elif estado_normalizado in ('NO_AUTORIZADA', 'RECHAZADA', 'NO_AUTORIZADO', 'DEVUELTA'):
             if hasattr(factura, 'estado'):
                 factura.estado = 'RECHAZADO'
             if hasattr(factura, 'estado_sri'):
                 factura.estado_sri = 'RECHAZADA'
             if hasattr(factura, 'mensaje_sri'):
-                factura.mensaje_sri = 'Comprobante rechazado por el SRI'
+                mensajes = resultado.get('mensajes', [])
+                mensaje_detalle = mensajes[0].get('mensaje', 'Comprobante rechazado') if mensajes else 'Comprobante rechazado'
+                factura.mensaje_sri = f"Rechazado: {mensaje_detalle}"
+            
+            logger.info(f"Factura {factura.id} marcada como RECHAZADA")
 
-        elif estado == 'RECIBIDA':
+        elif estado_normalizado == 'RECIBIDA':
             if hasattr(factura, 'estado'):
                 factura.estado = 'RECIBIDA'
             if hasattr(factura, 'estado_sri'):
                 factura.estado_sri = 'RECIBIDA'
             if hasattr(factura, 'mensaje_sri'):
                 factura.mensaje_sri = 'Comprobante recibido por el SRI'
+            
+            logger.info(f"Factura {factura.id} marcada como RECIBIDA")
 
-        elif estado == 'PENDIENTE':
+        elif estado_normalizado == 'PENDIENTE':
             if hasattr(factura, 'estado'):
                 factura.estado = 'PENDIENTE'
             if hasattr(factura, 'estado_sri'):
                 factura.estado_sri = 'PENDIENTE'
             if hasattr(factura, 'mensaje_sri'):
-                factura.mensaje_sri = 'Comprobante pendiente de autorización por el SRI'
+                mensajes = resultado.get('mensajes', [])
+                mensaje_detalle = mensajes[0].get('mensaje', 'Pendiente de autorización') if mensajes else 'Pendiente de autorización'
+                factura.mensaje_sri = f"Pendiente: {mensaje_detalle}"
+            
+            logger.info(f"Factura {factura.id} marcada como PENDIENTE")
 
-        else:  # ERROR
+        else:  # ERROR y otros estados
             if hasattr(factura, 'estado'):
                 factura.estado = 'ERROR'
             if hasattr(factura, 'estado_sri'):
@@ -326,12 +455,16 @@ class SRIIntegration:
                 mensajes = resultado.get('mensajes', [])
                 mensaje_error = mensajes[0].get('mensaje', 'Error desconocido') if mensajes else 'Error desconocido'
                 factura.mensaje_sri = f"Error: {mensaje_error}"
+            
+            logger.warning(f"Factura {factura.id} marcada como ERROR - Estado desconocido: {estado}")
         
-        # Guardar mensajes completos si el campo existe
+        # 🔧 FIX: Guardar mensajes completos si el campo existe
         if hasattr(factura, 'mensaje_sri_detalle'):
             factura.mensaje_sri_detalle = str(resultado.get('mensajes', []))
         
+        # 🔧 FIX: SIEMPRE guardar los cambios
         factura.save()
+        logger.info(f"Factura {factura.id} actualizada y guardada en BD")
     
     def _generar_ride_autorizado(self, factura, resultado):
         """
@@ -389,18 +522,25 @@ class SRIIntegration:
             
             resultado = self.cliente.consultar_autorizacion(factura.clave_acceso)
             
-            # Actualizar estado
+            # 🔧 FIX: Actualizar estado SIEMPRE tras consultar
             self._actualizar_factura_con_resultado(factura, resultado, factura.clave_acceso)
             
-            # Crear respuesta más informativa
-            estado = resultado.get('estado', 'ERROR')
-            if estado == 'AUTORIZADA':
+            # 🔧 FIX: Crear respuesta más informativa con mejor manejo de estados
+            estado = resultado.get('estado', 'ERROR').upper()
+            if estado in ('AUTORIZADA', 'AUTORIZADO'):
+                # 🔧 FIX: Generar RIDE si está autorizada
+                if hasattr(self, '_generar_ride_autorizado'):
+                    try:
+                        self._generar_ride_autorizado(factura, resultado)
+                    except Exception as e:
+                        logger.warning(f"Error generando RIDE para factura {factura.id}: {e}")
+                
                 message = 'Factura autorizada exitosamente'
                 success = True
             elif estado == 'PENDIENTE':
                 message = 'La factura aún está pendiente de autorización. Intente nuevamente en unos minutos.'
                 success = False
-            elif estado == 'NO_AUTORIZADA':
+            elif estado in ('NO_AUTORIZADA', 'RECHAZADA', 'NO_AUTORIZADO', 'DEVUELTA'):
                 message = 'La factura fue rechazada por el SRI'
                 success = False
             else:
@@ -507,5 +647,112 @@ def consultar_lote_facturas():
                 'numero': factura.numero,
                 'resultado': resultado
             })
+    
+    return resultados
+
+
+def validar_xml_existente(xml_path):
+    """
+    Valida un archivo XML existente contra el XSD
+    Útil para debugging y pruebas
+    
+    Args:
+        xml_path: Ruta del archivo XML a validar
+        
+    Returns:
+        dict: Resultado de la validación
+    """
+    try:
+        integration = SRIIntegration()
+        
+        # Leer el XML
+        with open(xml_path, 'r', encoding='utf-8') as f:
+            xml_content = f.read()
+        
+        # Obtener XSD
+        xsd_path = integration._obtener_ruta_xsd()
+        
+        # Validar
+        xml_generator = SRIXMLGenerator()
+        xml_generator.validar_xml_contra_xsd(xml_content, xsd_path)
+        
+        return {
+            'success': True,
+            'message': 'XML válido según XSD del SRI',
+            'xml_path': xml_path,
+            'xsd_path': xsd_path
+        }
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'message': str(e),
+            'xml_path': xml_path,
+            'error': str(e)
+        }
+
+
+def validar_lote_xml_facturas():
+    """
+    Valida todos los XML de facturas existentes
+    Útil para verificar la calidad de XMLs ya generados
+    """
+    import glob
+    
+    xml_pattern = os.path.join(settings.MEDIA_ROOT, "facturas_xml", "*.xml")
+    xml_files = glob.glob(xml_pattern)
+    
+    resultados = []
+    validos = 0
+    invalidos = 0
+    
+    for xml_file in xml_files:
+        resultado = validar_xml_existente(xml_file)
+        resultados.append(resultado)
+        
+        if resultado['success']:
+            validos += 1
+        else:
+            invalidos += 1
+    
+    return {
+        'total_archivos': len(xml_files),
+        'validos': validos,
+        'invalidos': invalidos,
+        'resultados': resultados
+    }
+    """
+    Genera claves de acceso para facturas que no las tienen
+    Útil para corregir datos existentes
+    """
+    facturas_sin_clave = Factura.objects.filter(clave_acceso__isnull=True)
+    integration = SRIIntegration()
+    
+    resultados = []
+    for factura in facturas_sin_clave:
+        try:
+            # Generar clave de acceso
+            clave_acceso = integration._generar_clave_acceso(factura)
+            factura.clave_acceso = clave_acceso
+            factura.save()
+            
+            resultados.append({
+                'factura_id': factura.id,
+                'numero': factura.numero,
+                'clave_generada': clave_acceso,
+                'success': True
+            })
+            
+            logger.info(f"Clave generada para factura {factura.numero}: {clave_acceso}")
+            
+        except Exception as e:
+            resultados.append({
+                'factura_id': factura.id,
+                'numero': factura.numero,
+                'error': str(e),
+                'success': False
+            })
+            
+            logger.error(f"Error generando clave para factura {factura.numero}: {e}")
     
     return resultados

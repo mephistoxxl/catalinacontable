@@ -272,9 +272,14 @@
                     <h5 class="text-base font-semibold text-gray-800">
                         <i class="fas fa-server text-blue-600 mr-2"></i>Estado en el SRI
                     </h5>
-                    <button type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm" onclick="consultarEstadoSRI()">
-                        <i class="fas fa-sync mr-2"></i>Consultar Estado
-                    </button>
+                    <div class="flex gap-2">
+                        <button type="button" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm" onclick="validarXMLSRI()">
+                            <i class="fas fa-check-double mr-2"></i>Validar XML
+                        </button>
+                        <button type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm" onclick="consultarEstadoSRI()">
+                            <i class="fas fa-sync mr-2"></i>Consultar Estado
+                        </button>
+                    </div>
                 </div>
                 <div class="px-6 py-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -370,6 +375,13 @@
                             <!-- Contenido dinámico -->
                         </div>
                     </div>
+                    
+                    <!-- Resultado de la validación XML -->
+                    <div id="resultado-validacion" class="mt-4" style="display: none;">
+                        <div class="p-4 rounded border-l-4" id="mensaje-validacion">
+                            <!-- Contenido dinámico -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -442,6 +454,65 @@ function consultarEstadoSRI() {
     .finally(() => {
         // Restaurar botón
         btn.innerHTML = '<i class="fas fa-sync mr-2"></i>Consultar Estado';
+        btn.disabled = false;
+    });
+}
+
+function validarXMLSRI() {
+    const btn = document.querySelector('button[onclick="validarXMLSRI()"]');
+    const resultado = document.getElementById('resultado-validacion');
+    const mensaje = document.getElementById('mensaje-validacion');
+    
+    // Mostrar loading
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Validando...';
+    btn.disabled = true;
+    
+    // Hacer petición AJAX
+    fetch('{% url "inventario:validar_xml_factura" factura.id %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        resultado.style.display = 'block';
+        
+        if (data.success) {
+            mensaje.className = 'p-4 rounded border-l-4 border-green-500 bg-green-50';
+            mensaje.innerHTML = `
+                <h6 class="font-semibold text-green-800 mb-2">
+                    <i class="fas fa-check-circle mr-1"></i>Validación Exitosa
+                </h6>
+                <p class="text-sm text-green-700"><strong>Estado:</strong> ${data.estado}</p>
+                <p class="text-sm text-green-700"><strong>Mensaje:</strong> ${data.mensaje}</p>
+                ${data.detalle ? `<div class="text-sm text-green-700 mt-2"><strong>Detalle:</strong><pre class="mt-1 p-2 bg-gray-100 rounded text-xs">${data.detalle}</pre></div>` : ''}
+            `;
+        } else {
+            mensaje.className = 'p-4 rounded border-l-4 border-red-500 bg-red-50';
+            mensaje.innerHTML = `
+                <h6 class="font-semibold text-red-800 mb-2">
+                    <i class="fas fa-times-circle mr-1"></i>Error de Validación
+                </h6>
+                <p class="text-sm text-red-700"><strong>Error:</strong> ${data.message}</p>
+                ${data.errores ? `<div class="text-sm text-red-700 mt-2"><strong>Errores encontrados:</strong><pre class="mt-1 p-2 bg-gray-100 rounded text-xs">${data.errores}</pre></div>` : ''}
+            `;
+        }
+    })
+    .catch(error => {
+        resultado.style.display = 'block';
+        mensaje.className = 'p-4 rounded border-l-4 border-red-500 bg-red-50';
+        mensaje.innerHTML = `
+            <h6 class="font-semibold text-red-800 mb-2">
+                <i class="fas fa-times-circle mr-1"></i>Error de Conexión
+            </h6>
+            <p class="text-sm text-red-700">No se pudo validar el XML: ${error.message}</p>
+        `;
+    })
+    .finally(() => {
+        // Restaurar botón
+        btn.innerHTML = '<i class="fas fa-check mr-2"></i>Validar XML';
         btn.disabled = false;
     });
 }
