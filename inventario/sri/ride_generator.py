@@ -671,8 +671,15 @@ class RIDEGenerator:
         filename = f"RIDE_{factura.establecimiento}-{factura.punto_emision}-{str(factura.secuencia).zfill(9)}.pdf"
         output_path = os.path.join(output_dir, filename)
         
-        # Generar clave de acceso si no existe
+        # 🔧 FIX CRÍTICO: SIEMPRE usar la clave de acceso ya generada de la factura
+        # NUNCA generar nueva clave - debe existir desde la creación de la factura
         clave_acceso = getattr(factura, 'clave_acceso', None)
+        
+        if not clave_acceso:
+            raise ValueError(f"Factura {factura.id} no tiene clave de acceso. "
+                           f"La clave debe generarse al crear/guardar la factura.")
+        
+        logger.info(f"Generando RIDE para factura {factura.id} con clave: {clave_acceso}")
         
         # Generar el RIDE normal
         pdf_path = self.generar_ride_factura(factura, detalles, opciones, output_path, clave_acceso=clave_acceso)

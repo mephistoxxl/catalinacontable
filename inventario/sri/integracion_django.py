@@ -77,15 +77,23 @@ class SRIIntegration:
                     'message': f'La factura debe estar en estado PENDIENTE. Estado actual: {factura.estado}'
                 }
             
-            # 🔧 FIX: Generar y persistir la clave de acceso ANTES del XML
+            # 🔧 FIX CRÍTICO: NUNCA regenerar clave de acceso - usar siempre la existente
+            # La clave debe haberse generado al crear/guardar la factura
             if not factura.clave_acceso:
-                clave_acceso = self._generar_clave_acceso(factura)
-                factura.clave_acceso = clave_acceso
-                factura.save()
-                logger.info(f"Clave de acceso generada y persistida: {clave_acceso}")
+                # Si no tiene clave, forzar guardar para que se genere automáticamente
+                logger.warning(f"Factura {factura.id} sin clave de acceso. Forzando generación...")
+                factura.save()  # Esto disparará la generación automática en el modelo
+                
+                # Verificar que se generó correctamente
+                if not factura.clave_acceso:
+                    raise ValueError(f"No se pudo generar clave de acceso para factura {factura.id}")
+                    
+                logger.info(f"Clave de acceso generada automáticamente: {factura.clave_acceso}")
             else:
-                clave_acceso = factura.clave_acceso
-                logger.info(f"Usando clave de acceso existente: {clave_acceso}")
+                logger.info(f"Usando clave de acceso existente: {factura.clave_acceso}")
+            
+            # IMPORTANTE: Usar SIEMPRE la clave de la factura (ya persistida)
+            clave_acceso = factura.clave_acceso
             
             # Generar XML (ahora la factura ya tiene clave_acceso)
             xml_path = self.generar_xml_factura(factura)

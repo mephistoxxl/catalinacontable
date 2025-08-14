@@ -48,7 +48,7 @@ urlpatterns = [
     path('detallesDeFactura', views.DetallesFactura.as_view(), name='detallesDeFactura'),
     path('listarFacturas', views.ListarFacturas.as_view(), name='listarFacturas'),
     path('verFactura/<int:p>', views.VerFactura.as_view(), name='verFactura'),
-    path('autorizar-documento/<int:factura_id>/', views.autorizar_documento_sri, name='autorizar_documento_sri'),
+    # path para autorizar documento movida a sección SRI (línea ~127)
     path('descargarRIDE/<int:p>/', views.VerFactura.as_view(), name='descargar_ride'),
     path('rideView/<int:p>/', views.RideView.as_view(), name='ride_view'),
     path('generarFactura/<int:p>', views.GenerarFactura.as_view(), name='generarFactura'),

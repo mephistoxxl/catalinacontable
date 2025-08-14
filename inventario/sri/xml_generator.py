@@ -28,10 +28,11 @@ class SRIXMLGenerator:
             xsd_path (str): Ruta al archivo XSD
             
         Returns:
-            bool: True si el XML es válido
-            
-        Raises:
-            Exception: Si el XML no es válido con detalles específicos
+            dict: {
+                'valido': bool,
+                'mensaje': str,
+                'errores': str (si hay errores)
+            }
         """
         try:
             from lxml import etree
@@ -40,28 +41,66 @@ class SRIXMLGenerator:
             if not os.path.exists(xsd_path):
                 raise FileNotFoundError(f"Archivo XSD no encontrado: {xsd_path}")
             
-            # Cargar el esquema XSD
+            # Cargar esquemas dependientes primero (xmldsig)
+            sri_dir = os.path.dirname(xsd_path)
+            xmldsig_path = os.path.join(sri_dir, 'xmldsig-core-schema.xsd')
+            
+            # Cargar el esquema XSD principal con resolución de imports
             with open(xsd_path, 'rb') as xsd_file:
-                schema_root = etree.XML(xsd_file.read())
-                schema = etree.XMLSchema(schema_root)
+                # Crear un resolver personalizado para los esquemas
+                class SchemaResolver(etree.Resolver):
+                    def resolve(self, url, id, context):
+                        if 'xmldsig' in url or 'xmldsig-core-schema' in url:
+                            if os.path.exists(xmldsig_path):
+                                return self.resolve_filename(xmldsig_path, context)
+                        return None
+                
+                parser = etree.XMLParser()
+                parser.resolvers.add(SchemaResolver())
+                
+                try:
+                    schema_doc = etree.parse(xsd_file, parser)
+                    schema = etree.XMLSchema(schema_doc)
+                except etree.XMLSchemaParseError as e:
+                    # Si falla con resolver, intentar sin él
+                    xsd_file.seek(0)
+                    schema_root = etree.XML(xsd_file.read())
+                    schema = etree.XMLSchema(schema_root)
             
             # Parsear el XML
             try:
-                xml_doc = etree.fromstring(xml_content.encode('utf-8'))
+                # Si xml_content es una ruta de archivo, leer el archivo
+                if os.path.isfile(xml_content):
+                    with open(xml_content, 'rb') as xml_file:
+                        xml_doc = etree.parse(xml_file)
+                else:
+                    # Si es contenido XML como string
+                    xml_doc = etree.fromstring(xml_content.encode('utf-8'))
             except etree.XMLSyntaxError as e:
-                raise Exception(f"Error de sintaxis XML: {str(e)}")
+                return {
+                    'valido': False,
+                    'mensaje': 'Error de sintaxis XML',
+                    'errores': f"Error de sintaxis en línea {e.lineno}: {e.msg}"
+                }
             
             # Validar contra el esquema
-            if not schema.validate(xml_doc):
+            if schema.validate(xml_doc):
+                return {
+                    'valido': True,
+                    'mensaje': 'XML válido según el esquema XSD del SRI'
+                }
+            else:
                 # Crear mensaje de error detallado
                 errores = []
                 for error in schema.error_log:
                     errores.append(f"Línea {error.line}: {error.message}")
                 
                 mensaje_error = "El XML no cumple con el XSD del SRI:\n" + "\n".join(errores)
-                raise Exception(mensaje_error)
-            
-            return True
+                return {
+                    'valido': False,
+                    'mensaje': 'XML inválido',
+                    'errores': mensaje_error
+                }
             
         except Exception as e:
             # Re-raise con contexto adicional

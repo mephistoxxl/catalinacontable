@@ -1307,11 +1307,19 @@ class DetallesFactura(LoginRequiredMixin, View):
             factura.save()
             print(f"Factura guardada con ID: {factura.id}")
         
-        # Generar clave de acceso SRI si no existe usando método del modelo
+        # 🔧 FIX CRÍTICO: Asegurar que la clave de acceso se genere INMEDIATAMENTE
+        # Esto garantiza que la misma clave se use para PDF y autorización SRI
         if not hasattr(factura, 'clave_acceso') or not factura.clave_acceso:
-            # El modelo ya tiene su propio método generar_clave_acceso()
-            # que se llama automáticamente en save() si no existe clave_acceso
-            pass
+            print("⚠️  Factura sin clave de acceso, forzando generación...")
+            factura.save()  # Esto disparará la generación automática en el modelo
+            factura.refresh_from_db()  # Recargar para obtener la clave generada
+            
+            if factura.clave_acceso:
+                print(f"✅ Clave de acceso generada: {factura.clave_acceso}")
+            else:
+                raise ValueError(f"ERROR CRÍTICO: No se pudo generar clave de acceso para factura {factura.id}")
+        else:
+            print(f"✅ Clave de acceso ya existe: {factura.clave_acceso}")
 
         # ✅ CORREGIDO: PROCESAR FORMAS DE PAGO DESPUÉS DE ASEGURAR ID
         try:
@@ -1663,129 +1671,8 @@ class ListarFacturas(LoginRequiredMixin, View):
     #Fin de vista---------------------------------------------------------------------------------------#
 
 
-# Vista para autorizar documentos en el SRI -------------------------------------------------------#
-@csrf_exempt
-@require_http_methods(["POST"])
-def autorizar_documento_sri(request, factura_id):
-    """
-    Vista para autorizar una factura en el SRI usando el sistema existente
-    """
-    try:
-        # Obtener la factura
-        factura = get_object_or_404(Factura, id=factura_id)
-        
-        # VALIDACIONES PREVIAS
-        
-        # 1. Verificar si ya está autorizada
-        if hasattr(factura, 'clave_acceso') and factura.clave_acceso:
-            return JsonResponse({
-                'success': False,
-                'message': f'Esta factura ya ha sido autorizada anteriormente.\nClave de acceso: {factura.clave_acceso}'
-            })
-        
-        # 2. Verificar si tiene productos
-        detalles = DetalleFactura.objects.filter(factura=factura)
-        if not detalles.exists():
-            return JsonResponse({
-                'success': False,
-                'message': 'La factura no tiene productos agregados. No se puede autorizar una factura vacía.'
-            })
-        
-        # 3. Verificar datos del cliente
-        if not factura.cliente or not factura.cliente.identificacion:
-            return JsonResponse({
-                'success': False,
-                'message': 'La factura no tiene cliente asignado o el cliente no tiene identificación válida.'
-            })
-        
-        # 4. Verificar configuración de empresa
-        try:
-            opciones = Opciones.objects.first()
-            if not opciones:
-                return JsonResponse({
-                    'success': False,
-                    'message': 'No se ha configurado la información de la empresa. Configure los datos en Configuración General.'
-                })
-            
-            if not opciones.ruc or not opciones.razon_social:
-                return JsonResponse({
-                    'success': False,
-                    'message': 'Faltan datos de la empresa (RUC o Razón Social). Complete la configuración.'
-                })
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'message': 'Error al verificar configuración de empresa.'
-            })
-        
-        # 5. Verificar que tenga secuencia válida
-        if not factura.secuencia or not factura.establecimiento or not factura.punto_emision:
-            return JsonResponse({
-                'success': False,
-                'message': 'La factura no tiene secuencia, establecimiento o punto de emisión válidos.'
-            })
-        
-        # INTENTAR AUTORIZACIÓN
-        logger.info(f"Iniciando autorización SRI para factura {factura_id}")
-        
-        # Importar el módulo de integración Django del SRI
-        from .sri.integracion_django import procesar_factura_completa
-        
-        # Procesar la factura completa (generar XML, firmar y enviar al SRI)
-        resultado = procesar_factura_completa(factura)
-        
-        if resultado['success']:
-            logger.info(f"Factura {factura_id} autorizada exitosamente")
-            return JsonResponse({
-                'success': True,
-                'message': f"""✅ ¡Factura autorizada exitosamente!
-
-📋 Detalles:
-• Clave de acceso: {resultado.get('clave_acceso', 'N/A')}
-• Número de autorización: {resultado.get('numero_autorizacion', 'N/A')}
-• Fecha: {resultado.get('fecha_autorizacion', 'N/A')}
-
-La factura electrónica ha sido procesada y aprobada por el SRI.""",
-                'clave_acceso': resultado.get('clave_acceso'),
-                'numero_autorizacion': resultado.get('numero_autorizacion'),
-                'fecha_autorizacion': resultado.get('fecha_autorizacion')
-            })
-        else:
-            logger.error(f"Error al autorizar factura {factura_id}: {resultado.get('message')}")
-            return JsonResponse({
-                'success': False,
-                'message': f"""❌ Error al autorizar la factura:
-
-{resultado.get('message', 'Error desconocido')}
-
-Posibles causas:
-• Datos incorrectos en la factura
-• Problemas de conectividad con el SRI
-• Certificado digital vencido o inválido
-• Configuración incorrecta"""
-            })
-            
-    except ImportError:
-        logger.error("No se pudo importar el módulo de integración del SRI")
-        return JsonResponse({
-            'success': False,
-            'message': """❌ Error del sistema: Módulo de integración SRI no disponible
-
-El sistema de facturación electrónica no está correctamente configurado.
-Contacte al administrador del sistema."""
-        })
-    except Exception as e:
-        logger.error(f"Error crítico al autorizar factura {factura_id}: {str(e)}")
-        return JsonResponse({
-            'success': False,
-            'message': f"""❌ Error interno del servidor:
-
-{str(e)}
-
-Si el problema persiste, contacte al soporte técnico."""
-        })
-
-#Fin de vista autorización SRI-----------------------------------------------------------------#
+# Vista para autorizar documentos en el SRI - ELIMINADA (DUPLICADA)
+# Esta función fue movida al final del archivo con la implementación actualizada
 
 
 # Vista para consultar estado individual de una factura en el SRI ------------------------------#
