@@ -211,10 +211,15 @@ class SRIXMLGenerator:
                 time.sleep(0.5)  # Esperar 500ms
                 intentos += 1
             
-            # Si después de todos los intentos no hay formas de pago, usar por defecto
+            # Si después de todos los intentos no hay formas de pago, FALLAR COMPLETAMENTE
             if not factura.formas_pago.exists():
-                logger.warning("❌ No se encontraron formas de pago después de esperar. Creando forma de pago por defecto.")
-                self._crear_forma_pago_por_defecto_emergencia(factura)
+                error_msg = (
+                    f"❌ ERROR CRÍTICO: Factura {factura.id} no tiene formas de pago después de {max_intentos} intentos. "
+                    "TODAS las facturas DEBEN tener formas de pago completas antes de generar XML. "
+                    "Verifique que la vista guarde correctamente en el modelo FormaPago."
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
             
             logger.debug(f"Establecimiento: {factura.establecimiento}, Punto emisión: {factura.punto_emision}, Secuencial: {factura.secuencia}")
             
@@ -231,10 +236,6 @@ class SRIXMLGenerator:
                 getattr(emisor, 'correo', 'configurar@empresa.com') == 'configurar@empresa.com' or
                 getattr(emisor, 'telefono', '0000000000') == '0000000000'):
                 raise ValueError("La configuración de empresa está incompleta")
-            
-            # Verificar que ahora sí tenemos formas de pago
-            if not factura.formas_pago.exists():
-                raise ValueError("No se pudieron crear formas de pago para la factura")
             
             logger.info(f"📄 Generando XML con {factura.formas_pago.count()} formas de pago")
             
@@ -721,104 +722,3 @@ class SRIXMLGenerator:
             return '\n'.join(lines)
         else:
             return '<?xml version="1.0" encoding="UTF-8"?>\n' + '\n'.join(lines)
-
-    def _crear_forma_pago_por_defecto_emergencia(self, factura):
-        """Crear forma de pago por defecto en caso de emergencia CON MANEJO DE ERRORES"""
-        try:
-            from inventario.models import FormaPago, Caja
-            from decimal import Decimal
-            
-            logger.info(f"🚨 Creando forma de pago de emergencia para factura {factura.id}")
-            
-            # ========== PASO 1: BUSCAR O CREAR CAJA POR DEFECTO ==========
-            caja_por_defecto = None
-            
-            # Intentar buscar caja activa existente
-            caja_por_defecto = Caja.objects.filter(activo=True).first()
-            
-            if not caja_por_defecto:
-                logger.warning("❌ No hay cajas activas. Creando caja de emergencia...")
-                
-                # Crear caja de emergencia
-                try:
-                    caja_por_defecto = Caja.objects.create(
-                        descripcion="CAJA EMERGENCIA XML",
-                        activo=True
-                    )
-                    logger.info(f"✅ Caja de emergencia creada: ID {caja_por_defecto.id}")
-                    
-                except Exception as e:
-                    logger.error(f"❌ Error creando caja de emergencia: {e}")
-                    
-                    # ÚLTIMO RECURSO: Crear caja con SQL directo
-                    from django.db import connection
-                    with connection.cursor() as cursor:
-                        cursor.execute("""
-                            INSERT INTO inventario_caja (descripcion, activo)
-                            VALUES ('CAJA EMERGENCIA XML', true)
-                            RETURNING id
-                        """)
-                        caja_id = cursor.fetchone()[0]
-                        caja_por_defecto = Caja.objects.get(id=caja_id)
-                        logger.info(f"✅ Caja de emergencia creada con SQL directo: ID {caja_id}")
-            
-            # ========== PASO 2: VALIDAR TOTAL DE LA FACTURA ==========
-            total_pago = factura.monto_general or Decimal('0.00')
-            
-            # Asegurar que el total sea un Decimal válido
-            if not isinstance(total_pago, Decimal):
-                total_pago = Decimal(str(total_pago))
-            
-            # Si el total es 0, usar un valor mínimo
-            if total_pago <= 0:
-                total_pago = Decimal('0.01')
-                logger.warning(f"⚠️ Total de factura era 0, usando {total_pago}")
-            
-            logger.info(f"💰 Total para forma de pago: ${total_pago}")
-            
-            # ========== PASO 3: CREAR FORMA DE PAGO CON VALIDACIONES ==========
-            try:
-                # Verificar que no existe ya una forma de pago
-                if factura.formas_pago.exists():
-                    logger.info("✅ Ya existen formas de pago, no creando duplicado")
-                    return True
-                
-                # Crear forma de pago
-                forma_pago = FormaPago(
-                    factura=factura,
-                    forma_pago='01',  # Sin utilización del sistema financiero
-                    caja=caja_por_defecto,
-                    total=total_pago
-                )
-                
-                # Validar antes de guardar
-                forma_pago.full_clean()
-                forma_pago.save()
-                
-                logger.info(f"✅ Forma de pago de emergencia creada exitosamente: ID {forma_pago.id}")
-                return True
-                
-            except Exception as e:
-                logger.error(f"❌ Error en validaciones de FormaPago: {e}")
-                
-                # ÚLTIMO RECURSO: Crear con SQL directo
-                try:
-                    from django.db import connection
-                    with connection.cursor() as cursor:
-                        cursor.execute("""
-                            INSERT INTO inventario_formapago (factura_id, forma_pago, caja_id, total)
-                            VALUES (%s, '01', %s, %s)
-                        """, [factura.id, caja_por_defecto.id, str(total_pago)])
-                        
-                    logger.info(f"✅ Forma de pago creada con SQL directo para factura {factura.id}")
-                    return True
-                    
-                except Exception as sql_error:
-                    logger.error(f"❌ Error crítico con SQL directo: {sql_error}")
-                    raise ValueError(f"No se pudo crear forma de pago: {sql_error}")
-            
-        except Exception as e:
-            logger.error(f"❌ Error crítico en _crear_forma_pago_por_defecto_emergencia: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            raise ValueError(f"Error creando forma de pago de emergencia: {e}")

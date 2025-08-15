@@ -4064,8 +4064,8 @@ class FormasPagoView(LoginRequiredMixin, View):
         # Obtener cajas activas
         cajas = Caja.objects.filter(activo=True).order_by('descripcion')
         
-        # Obtener formas de pago SRI
-        formas_pago_sri = SRIFormaPago.objects.all().order_by('codigo')
+        # Usar las opciones de forma de pago del modelo FormaPago directamente
+        formas_pago_sri = FormaPago.FORMAS_PAGO_CHOICES
         
         # Seleccionar la primera caja por defecto
         primera_caja = cajas.first()
@@ -4090,20 +4090,27 @@ class GuardarFormaPagoView(LoginRequiredMixin, View):
         
         try:
             # Obtener datos del formulario
-            forma_pago_id = request.POST.get('forma_pago')
+            forma_pago_codigo = request.POST.get('forma_pago')  # Ahora es el código directamente
             caja_id = request.POST.get('caja')
             monto_recibido = request.POST.get('monto_recibido') or request.POST.get('monto_efectivo')
             
             # Validar datos
-            if not forma_pago_id or not caja_id or not monto_recibido:
+            if not forma_pago_codigo or not caja_id or not monto_recibido:
                 return JsonResponse({
                     'success': False,
                     'message': 'Todos los campos son obligatorios'
                 })
             
             # Obtener objetos
-            forma_pago = get_object_or_404(SRIFormaPago, pk=forma_pago_id)
             caja = get_object_or_404(Caja, pk=caja_id)
+            
+            # Validar que el código de forma de pago sea válido
+            codigos_validos = [codigo for codigo, _ in FormaPago.FORMAS_PAGO_CHOICES]
+            if forma_pago_codigo not in codigos_validos:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Código de forma de pago inválido'
+                })
             
             # Convertir monto
             try:
@@ -4118,14 +4125,16 @@ class GuardarFormaPagoView(LoginRequiredMixin, View):
             total_factura = factura.monto_general or factura.sub_monto or 0
             cambio = monto - total_factura
             
-            # Guardar forma de pago
-            forma_pago_factura = FormaPagoFactura.objects.create(
+            # Guardar forma de pago usando el modelo correcto
+            forma_pago_factura = FormaPago.objects.create(
                 factura=factura,
-                forma_pago=forma_pago,
+                forma_pago=forma_pago_codigo,  # Usar directamente el código
                 caja=caja,
-                monto=monto,
-                cambio=cambio if cambio > 0 else 0
+                total=monto  # El modelo FormaPago usa 'total', no 'monto'
             )
+            
+            # Log para debugging
+            logger.info(f"✅ Forma de pago guardada: ID={forma_pago_factura.id}, Código={forma_pago_codigo}, Total=${monto}")
             
             return JsonResponse({
                 'success': True,
