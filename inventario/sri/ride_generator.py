@@ -580,23 +580,31 @@ class RIDEGenerator:
                 Paragraph('<b>Plazo</b>', self.styles['CabeceraBlanca']),
                 Paragraph('<b>Tiempo días</b>', self.styles['CabeceraBlanca'])
             ]
-            pagos = getattr(factura, 'pagos', None)
+            
+            # ✅ USAR RELACIÓN CORRECTA: formas_pago (no pagos)
+            formas_pago = factura.formas_pago.all() if hasattr(factura, 'formas_pago') else None
             pago_data = [pago_headers]
-            if pagos:
-                for pago in pagos:
-                    forma = getattr(pago, 'forma_pago', str(pago))
-                    valor = f"{getattr(pago, 'valor', 0.0):.2f}"
-                    plazo = str(getattr(pago, 'plazo', '0'))
-                    tiempo = str(getattr(pago, 'tiempo', 'días'))
+            
+            if formas_pago and formas_pago.exists():
+                print(f"📋 RIDE: Procesando {formas_pago.count()} formas de pago")
+                for forma_pago in formas_pago:
+                    # Mapear códigos SRI a descripción legible
+                    forma_descripcion = self._obtener_descripcion_forma_pago(forma_pago.forma_pago)
+                    valor = f"${forma_pago.total:.2f}"
+                    plazo = str(getattr(forma_pago, 'plazo', '0'))
+                    tiempo_dias = str(getattr(forma_pago, 'unidad_tiempo', 'días'))
+                    
                     pago_data.append([
-                        Paragraph(forma, self.styles['Campo']),
+                        Paragraph(forma_descripcion, self.styles['Campo']),
                         Paragraph(valor, self.styles['Campo']),
                         Paragraph(plazo, self.styles['Campo']),
-                        Paragraph(tiempo, self.styles['Campo'])
+                        Paragraph(tiempo_dias, self.styles['Campo'])
                     ])
+                    print(f"  • {forma_descripcion}: {valor}")
             else:
                 # 🚫 NO MAS DEFAULTS - Solo usar pagos registrados
-                raise ValueError("RIDE requiere formas de pago registradas - no se encontraron pagos válidos")
+                print("❌ RIDE: No se encontraron formas de pago registradas")
+                raise ValueError("RIDE requiere formas de pago registradas - verifique que la factura tenga pagos válidos")
             # Ejemplo para la tabla de pagos
             tabla_pago = Table(pago_data, colWidths=[
                 ancho_tabla*0.46, ancho_tabla*0.18, ancho_tabla*0.13, ancho_tabla*0.23
@@ -711,3 +719,38 @@ class RIDEGenerator:
     def _obtener_tipo_emision(self, tipo_emision):
         """Obtener descripción del tipo de emisión"""
         return "NORMAL" if tipo_emision == "1" else "CONTINGENCIA"
+    
+    def _obtener_descripcion_forma_pago(self, codigo_sri):
+        """
+        Mapear códigos SRI de forma de pago a descripciones legibles
+        según tabla 24 del SRI
+        """
+        descripciones = {
+            '01': 'Sin utilización del sistema financiero',
+            '02': 'Compensación de deudas',
+            '03': 'Tarjeta de débito',
+            '04': 'Dinero electrónico',
+            '05': 'Tarjeta prepago',
+            '06': 'Tarjeta de crédito',
+            '07': 'Otros con utilización del sistema financiero',
+            '08': 'Endoso de títulos',
+            '09': 'Factoring',
+            '10': 'Comprobante pago exterior',
+            '11': 'Compensación por avería',
+            '12': 'Pagos por consignación',
+            '13': 'Comprobante venta interna',
+            '14': 'Tarjeta corporativa',
+            '15': 'Transferencia crédito',
+            '16': 'Transferencia débito',
+            '17': 'Transferencia',
+            '18': 'Depósito en cuenta',
+            '19': 'Cheque propio',
+            '20': 'Cheque certificado',
+            '21': 'Cheque del exterior',
+            '22': 'Cheque no negociable',
+            '23': 'Giro postal',
+            '24': 'Moneda electrónica',
+            '25': 'Pago recurrente'
+        }
+        
+        return descripciones.get(codigo_sri, f"Forma de pago {codigo_sri}")

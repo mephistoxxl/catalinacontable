@@ -552,7 +552,12 @@ class SRIIntegration:
             from .ride_generator import RIDEGenerator
             
             ride_gen = RIDEGenerator()
-            pdf_content = ride_gen.generar_ride(factura, resultado)
+            # ✅ USAR MÉTODO CORRECTO: generar_ride_factura_firmado
+            pdf_path = ride_gen.generar_ride_factura_firmado(factura, firmar=False)
+            
+            # Leer contenido del PDF generado
+            with open(pdf_path, 'rb') as pdf_file:
+                pdf_content = pdf_file.read()
             
             # Obtener RUC para organizar archivos
             opciones = Opciones.objects.first()

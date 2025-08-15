@@ -4235,29 +4235,29 @@ class GuardarFormaPagoView(LoginRequiredMixin, View):
             suma_total_con_nuevo = suma_pagos_existentes + monto
             print(f"   Suma con nuevo pago: ${suma_total_con_nuevo}")
             
-            # 🚫 VALIDACIÓN ESTRICTA: La suma NO puede exceder el total de la factura
-            if suma_total_con_nuevo > factura.monto_general:
-                exceso = suma_total_con_nuevo - factura.monto_general
-                return JsonResponse({
-                    'success': False,
-                    'message': f'SUMA EXCEDE TOTAL: ${suma_total_con_nuevo} > ${factura.monto_general}. Exceso: ${exceso}. Ajuste el monto.'
-                })
+            # 🚫 VALIDACIÓN ESTRICTA: SOLO se permite IGUALDAD EXACTA
+            if suma_total_con_nuevo != factura.monto_general:
+                if suma_total_con_nuevo > factura.monto_general:
+                    exceso = suma_total_con_nuevo - factura.monto_general
+                    return JsonResponse({
+                        'success': False,
+                        'message': f'SUMA EXCEDE TOTAL: ${suma_total_con_nuevo} > ${factura.monto_general}. Exceso: ${exceso}. Ajuste el monto.'
+                    })
+                else:
+                    faltante = factura.monto_general - suma_total_con_nuevo
+                    return JsonResponse({
+                        'success': False,
+                        'message': f'PAGO INCOMPLETO: ${suma_total_con_nuevo} < ${factura.monto_general}. Faltan: ${faltante}. Solo se permiten pagos que completen EXACTAMENTE el total.'
+                    })
             
-            # Información para el usuario sobre coherencia
-            faltante = factura.monto_general - suma_total_con_nuevo
-            if faltante > 0:
-                print(f"   ⚠️ Faltante después de este pago: ${faltante}")
-            else:
-                print(f"   ✅ Pagos completos - coherencia perfecta")
+            print(f"   ✅ Pagos completos - coherencia perfecta: ${suma_total_con_nuevo} = ${factura.monto_general}")
             
-            # Calcular cambio (solo si es pago único que cubre el total)
+            # Calcular cambio (solo si hay exceso en este pago específico)
             cambio = Decimal('0.00')
-            if suma_total_con_nuevo >= factura.monto_general:
-                # Solo hay cambio si este pago específico excede lo que falta
-                falta_antes_del_pago = factura.monto_general - suma_pagos_existentes
-                if monto > falta_antes_del_pago:
-                    cambio = monto - falta_antes_del_pago
-                    print(f"   💰 Cambio calculado: ${cambio}")
+            falta_antes_del_pago = factura.monto_general - suma_pagos_existentes
+            if monto > falta_antes_del_pago:
+                cambio = monto - falta_antes_del_pago
+                print(f"   💰 Cambio calculado: ${cambio}")
             
             print(f"✅ Validación pasada - creando forma de pago")
             
@@ -4269,30 +4269,29 @@ class GuardarFormaPagoView(LoginRequiredMixin, View):
                 total=monto                    # Monto exacto ingresado
             )
             
-            # Verificar coherencia final después de la creación
+            # Verificar coherencia final después de la creación (debe ser exacta)
             pagos_finales = factura.formas_pago.all()
             suma_final = sum(p.total for p in pagos_finales)
-            faltante_final = factura.monto_general - suma_final
             
             # Log para debugging con información completa
             logger.info(f"✅ Forma de pago guardada: ID={forma_pago_factura.id}, Código={forma_pago_codigo}, Total=${monto}")
-            logger.info(f"📊 Estado final: Suma=${suma_final}, Total factura=${factura.monto_general}, Faltante=${faltante_final}")
+            logger.info(f"📊 Estado final: Suma=${suma_final}, Total factura=${factura.monto_general}")
             
-            # Preparar mensaje de respuesta con información de coherencia
-            mensaje_coherencia = ""
-            if faltante_final > 0:
-                mensaje_coherencia = f" Faltan ${faltante_final} para completar el total."
-            elif faltante_final == 0:
-                mensaje_coherencia = " ✅ Factura completamente pagada."
+            # ASSERT: Debe ser exactamente igual (validación redundante de seguridad)
+            if suma_final != factura.monto_general:
+                logger.error(f"❌ ERROR CRÍTICO: Suma final ${suma_final} ≠ Total ${factura.monto_general}")
+                raise Exception("ERROR INTERNO: Coherencia perdida después de crear forma de pago")
             
+            # Mensaje de éxito confirmando coherencia perfecta
             return JsonResponse({
                 'success': True,
-                'message': f'Forma de pago guardada exitosamente.{mensaje_coherencia}',
+                'message': f'✅ Forma de pago guardada - Factura COMPLETAMENTE PAGADA (${suma_final})',
                 'cambio': str(cambio) if cambio > 0 else '0.00',
                 'suma_actual': str(suma_final),
                 'total_factura': str(factura.monto_general),
-                'faltante': str(faltante_final) if faltante_final > 0 else '0.00',
-                'completado': faltante_final == 0,
+                'faltante': '0.00',
+                'completado': True,
+                'coherencia_perfecta': True,
                 'redirect_url': reverse('inventario:detallesDeFactura')
             })
             
