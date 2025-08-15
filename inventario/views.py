@@ -4173,16 +4173,21 @@ class GuardarFormaPagoView(LoginRequiredMixin, View):
                     'message': 'Todos los campos son obligatorios'
                 })
             
-            # Obtener objetos
-            caja = get_object_or_404(Caja, pk=caja_id)
-            
-            # Validar que el código de forma de pago sea válido
-            codigos_validos = [codigo for codigo, _ in FormaPago.FORMAS_PAGO_CHOICES]
-            if forma_pago_codigo not in codigos_validos:
+            # Obtener objetos y validar existencia
+            try:
+                caja = Caja.objects.get(pk=caja_id)
+                if not caja.activo:
+                    return JsonResponse({
+                        'success': False,
+                        'message': f'La caja \'{caja.descripcion}\' está inactiva - seleccione una caja activa'
+                    })
+            except Caja.DoesNotExist:
                 return JsonResponse({
                     'success': False,
-                    'message': 'Código de forma de pago inválido'
+                    'message': f'Caja con ID {caja_id} no encontrada'
                 })
+            
+            print(f"   Caja validada: {caja.descripcion} (ID: {caja.id}, Activa: {caja.activo})")
             
             # Convertir monto
             try:
@@ -4193,25 +4198,101 @@ class GuardarFormaPagoView(LoginRequiredMixin, View):
                     'message': 'Monto inválido'
                 })
             
-            # Calcular cambio
-            total_factura = factura.monto_general or factura.sub_monto or 0
-            cambio = monto - total_factura
+            # 🔍 VALIDACIÓN ESTRICTA: Verificar coherencia acumulada ANTES de crear
+            print(f"🔍 VALIDANDO coherencia acumulada en GuardarFormaPagoView")
+            print(f"   Factura ID: {factura.id}")
+            print(f"   Total factura: ${factura.monto_general}")
+            print(f"   Nuevo monto: ${monto}")
             
-            # Guardar forma de pago usando el modelo correcto
+            # Validar que el monto sea mayor a 0
+            if monto <= 0:
+                return JsonResponse({
+                    'success': False,
+                    'message': f'El monto debe ser mayor a 0 (recibido: ${monto})'
+                })
+            
+            # Validar código SRI según tabla oficial
+            codigos_sri_oficiales = [
+                '01', '02', '03', '04', '05', '06', '07', '08', '09', '10',
+                '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
+                '21', '22', '23', '24', '25'
+            ]
+            
+            if forma_pago_codigo not in codigos_sri_oficiales:
+                return JsonResponse({
+                    'success': False,
+                    'message': f'Código SRI \'{forma_pago_codigo}\' no válido - debe usar código oficial (01-25)'
+                })
+            
+            # Obtener pagos existentes y calcular suma actual
+            pagos_existentes = factura.formas_pago.all()
+            suma_pagos_existentes = sum(p.total for p in pagos_existentes)
+            
+            print(f"   Pagos existentes: {pagos_existentes.count()}")
+            print(f"   Suma actual: ${suma_pagos_existentes}")
+            
+            # Calcular suma total después de agregar el nuevo pago
+            suma_total_con_nuevo = suma_pagos_existentes + monto
+            print(f"   Suma con nuevo pago: ${suma_total_con_nuevo}")
+            
+            # 🚫 VALIDACIÓN ESTRICTA: La suma NO puede exceder el total de la factura
+            if suma_total_con_nuevo > factura.monto_general:
+                exceso = suma_total_con_nuevo - factura.monto_general
+                return JsonResponse({
+                    'success': False,
+                    'message': f'SUMA EXCEDE TOTAL: ${suma_total_con_nuevo} > ${factura.monto_general}. Exceso: ${exceso}. Ajuste el monto.'
+                })
+            
+            # Información para el usuario sobre coherencia
+            faltante = factura.monto_general - suma_total_con_nuevo
+            if faltante > 0:
+                print(f"   ⚠️ Faltante después de este pago: ${faltante}")
+            else:
+                print(f"   ✅ Pagos completos - coherencia perfecta")
+            
+            # Calcular cambio (solo si es pago único que cubre el total)
+            cambio = Decimal('0.00')
+            if suma_total_con_nuevo >= factura.monto_general:
+                # Solo hay cambio si este pago específico excede lo que falta
+                falta_antes_del_pago = factura.monto_general - suma_pagos_existentes
+                if monto > falta_antes_del_pago:
+                    cambio = monto - falta_antes_del_pago
+                    print(f"   💰 Cambio calculado: ${cambio}")
+            
+            print(f"✅ Validación pasada - creando forma de pago")
+            
+            # Guardar forma de pago usando el modelo correcto con valores exactos
             forma_pago_factura = FormaPago.objects.create(
                 factura=factura,
-                forma_pago=forma_pago_codigo,  # Usar directamente el código
-                caja=caja,
-                total=monto  # El modelo FormaPago usa 'total', no 'monto'
+                forma_pago=forma_pago_codigo,  # Código SRI exacto seleccionado
+                caja=caja,                     # Caja exacta seleccionada
+                total=monto                    # Monto exacto ingresado
             )
             
-            # Log para debugging
+            # Verificar coherencia final después de la creación
+            pagos_finales = factura.formas_pago.all()
+            suma_final = sum(p.total for p in pagos_finales)
+            faltante_final = factura.monto_general - suma_final
+            
+            # Log para debugging con información completa
             logger.info(f"✅ Forma de pago guardada: ID={forma_pago_factura.id}, Código={forma_pago_codigo}, Total=${monto}")
+            logger.info(f"📊 Estado final: Suma=${suma_final}, Total factura=${factura.monto_general}, Faltante=${faltante_final}")
+            
+            # Preparar mensaje de respuesta con información de coherencia
+            mensaje_coherencia = ""
+            if faltante_final > 0:
+                mensaje_coherencia = f" Faltan ${faltante_final} para completar el total."
+            elif faltante_final == 0:
+                mensaje_coherencia = " ✅ Factura completamente pagada."
             
             return JsonResponse({
                 'success': True,
-                'message': 'Forma de pago guardada exitosamente',
+                'message': f'Forma de pago guardada exitosamente.{mensaje_coherencia}',
                 'cambio': str(cambio) if cambio > 0 else '0.00',
+                'suma_actual': str(suma_final),
+                'total_factura': str(factura.monto_general),
+                'faltante': str(faltante_final) if faltante_final > 0 else '0.00',
+                'completado': faltante_final == 0,
                 'redirect_url': reverse('inventario:detallesDeFactura')
             })
             
