@@ -585,12 +585,8 @@ function actualizarTotal() {
     // Actualizar el total en la sección de formas de pago
     document.getElementById('total-formas-display').textContent = `${total.toFixed(2)}`;
     
-    // ✅ NUEVO: Si no hay pagos y el total es pequeño, agregar pago automático
-    if (pagosEfectivo.length === 0 && total > 0 && total <= 100) {
-        setTimeout(() => {
-            autoAgregarPagoCompleto(total);
-        }, 500);
-    }
+    // 🚫 NO MAS PAGO AUTOMATICO - Usuario debe agregar manualmente
+    // Se eliminó la función autoAgregarPagoCompleto()
     
     // Autocompletar monto de efectivo si está visible
     const montoEfectivo = document.getElementById('monto-efectivo');
@@ -599,56 +595,7 @@ function actualizarTotal() {
     }
 }
 
-// ✅ NUEVA FUNCIÓN: Auto-agregar pago completo para facturas pequeñas
-function autoAgregarPagoCompleto(total) {
-    console.log('🎯 AUTO-AGREGANDO pago completo por $' + total);
-    
-    // Solo auto-agregar si no hay pagos existentes
-    if (pagosEfectivo.length > 0) {
-        console.log('⚠️ Ya hay pagos existentes, no auto-agregar');
-        return;
-    }
-    
-    // Buscar la primera caja disponible
-    const cajaSelect = document.getElementById('caja-select');
-    let cajaId = null;
-    let cajaDescripcion = 'Efectivo';
-    
-    if (cajaSelect && cajaSelect.options.length > 1) {
-        cajaId = cajaSelect.options[1].value; // Primera caja real (saltear "Seleccionar caja")
-        cajaDescripcion = cajaSelect.options[1].text;
-        console.log('📦 Caja seleccionada automáticamente:', cajaId, cajaDescripcion);
-    }
-    
-    // Crear pago automático
-    const pagoAutomatico = {
-        id: Date.now(),
-        monto: total,
-        tipo: 'efectivo',
-        sri_pago: '01', // Sin utilización del sistema financiero
-        sri_pago_descripcion: 'Sin Utilización Del Sistema Financiero',
-        caja_id: cajaId || 'efectivo',
-        caja_descripcion: cajaDescripcion
-    };
-    
-    pagosEfectivo.push(pagoAutomatico);
-    
-    // Actualizar tabla y totales
-    actualizarTablaPagosEfectivo();
-    actualizarTotalPagado();
-    
-    console.log('✅ Pago automático agregado:', pagoAutomatico);
-    console.log('📊 Array pagosEfectivo actual:', pagosEfectivo);
-    
-    // 🔍 MOSTRAR ALERTA VISUAL AL USUARIO
-    alert('✅ PAGO AUTOMÁTICO AGREGADO\n\n' + 
-          'Tipo: Efectivo\n' +
-          'Monto: $' + total.toFixed(2) + '\n' +
-          'Caja: ' + cajaDescripcion + '\n\n' +
-          'Puedes modificarlo antes de enviar.');
-}
-
-// 🔥 FUNCIÓN VALIDAR FORMULARIO - BULLETPROOF VERSION
+// 🔥 FUNCIÓN VALIDAR FORMULARIO - ESTRICTA SIN FALLBACKS
 function validarFormulario() {
     console.log('🚀 === INICIANDO VALIDACIÓN BULLETPROOF ===');
     
@@ -719,49 +666,14 @@ function validarFormulario() {
     
     // Verificar formas de pago
     if (!pagosEfectivo || pagosEfectivo.length === 0) {
-        console.log('⚠️ No hay pagos - Intentando crear pago automático');
-        
-        // 🎯 FORZAR CREACIÓN DE PAGO AUTOMÁTICO AQUÍ MISMO
-        const total = productosAgregados.reduce((sum, producto) => sum + producto.subtotal, 0);
-        
-        if (total > 0 && total <= 100) {
-            console.log('🤖 Creando pago automático de emergencia por $' + total);
-            
-            // Buscar la primera caja disponible
-            const cajaSelect = document.getElementById('caja-select');
-            let cajaId = null;
-            let cajaDescripcion = 'Efectivo';
-            
-            if (cajaSelect && cajaSelect.options.length > 1) {
-                cajaId = cajaSelect.options[1].value;
-                cajaDescripcion = cajaSelect.options[1].text;
-            }
-            
-            // ✅ IMPORTANTE: Usar el total CALCULADO, no asumir que será igual
-            // El backend puede recalcular con impuestos/redondeos
-            const pagoEmergencia = {
-                id: Date.now(),
-                monto: total,  // Usar total calculado en frontend
-                tipo: 'efectivo',
-                sri_pago: '01',
-                sri_pago_descripcion: 'Sin Utilización Del Sistema Financiero',
-                caja_id: cajaId || 'efectivo',
-                caja_descripcion: cajaDescripcion,
-                esAutomatico: true  // Marcar como automático para debug
-            };
-            
-            pagosEfectivo.push(pagoEmergencia);
-            console.log('✅ Pago de emergencia creado:', pagoEmergencia);
-            
-            // ⚠️ ADVERTENCIA AL USUARIO sobre posibles diferencias
-            console.warn('⚠️ NOTA: El total final puede diferir debido a cálculos de impuestos en el servidor');
-        }
-        
-        // Verificar nuevamente después del pago automático
-        if (pagosEfectivo.length === 0) {
-            alert('Debe agregar al menos una forma de pago.');
-            return false;
-        }
+        // 🚫 NO MAS PAGOS AUTOMATICOS - Usuario debe agregar explícitamente
+        alert('ERROR: Debe agregar al menos una forma de pago manualmente.\n\n' +
+              'Pasos:\n' +
+              '1. Haga clic en "Efectivo" en Formas de Pago\n' +
+              '2. Seleccione una caja\n' +
+              '3. Ingrese el monto\n' +
+              '4. Haga clic en "Confirmar Pago"');
+        return false;
     }
     
     console.log('💰 Pagos verificados:', pagosEfectivo.length);

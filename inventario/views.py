@@ -1366,10 +1366,20 @@ class DetallesFactura(LoginRequiredMixin, View):
                     # Procesar cada pago
                     for i, pago in enumerate(pagos_list):
                         try:
-                            # Extraer datos del pago con valores por defecto seguros
-                            sri_pago = pago.get('sri_pago', '01')  # Default: Sin utilización sistema financiero
-                            caja_valor = pago.get('caja', 'CAJA VENTAS')  # Default string seguro
-                            monto = Decimal(str(pago.get('monto', 0)))
+                            # Extraer datos del pago SIN DEFAULTS
+                            sri_pago = pago.get('sri_pago')
+                            if not sri_pago:
+                                raise Exception(f"Pago {i+1}: forma de pago SRI requerida - no se especificó")
+                                
+                            caja_valor = pago.get('caja')
+                            if not caja_valor:
+                                raise Exception(f"Pago {i+1}: caja requerida - no se especificó")
+                                
+                            monto = pago.get('monto')
+                            if monto is None:
+                                raise Exception(f"Pago {i+1}: monto requerido - no se especificó")
+                                
+                            monto = Decimal(str(monto))
                             
                             print(f"Procesando pago {i+1}: SRI={sri_pago}, Caja={caja_valor}, Monto={monto}")
                             
@@ -1451,21 +1461,9 @@ class DetallesFactura(LoginRequiredMixin, View):
                     print("❌ No se recibieron datos de pagos válidos")
                     # � ÚLTIMA LÍNEA DE DEFENSA: Crear pago automático si es factura pequeña
                     if factura.monto_general <= Decimal('100.00'):
-                        print(f"🤖 CREANDO PAGO AUTOMÁTICO DE EMERGENCIA para factura de ${factura.monto_general}")
-                        # Buscar primera caja activa
-                        caja_obj = Caja.objects.filter(activo=True).first()
-                        
-                        # Importar FormaPago dinamicamente
-                        from django.apps import apps
-                        FormaPago = apps.get_model('inventario', 'FormaPago')
-                        
-                        forma_pago_emergencia = FormaPago.objects.create(
-                            factura=factura,
-                            forma_pago='01',  # Sin utilización del sistema financiero
-                            total=factura.monto_general,
-                            caja=caja_obj if caja_obj else None
-                        )
-                        print(f"✅ Pago de emergencia creado: ID={forma_pago_emergencia.id}, Monto=${factura.monto_general}")
+                        print(f"🤖 ELIMINANDO PAGO AUTOMATICO - NO MAS FALLBACKS")
+                        # 🚫 NO MAS FALLBACKS - SIN DATOS = FALLA CRITICA  
+                        raise Exception("FORMAS DE PAGO REQUERIDAS - Usuario debe seleccionar pagos explícitamente")
                     else:
                         # �🚫 NO MÁS FALLBACKS - SIN DATOS = FALLA CRÍTICA
                         raise Exception("FORMAS DE PAGO REQUERIDAS - No se recibieron datos validos")
@@ -1499,46 +1497,14 @@ class DetallesFactura(LoginRequiredMixin, View):
             diferencia = abs(factura.monto_general - suma_pagos)
             
             if diferencia > tolerancia:
-                # 🔧 INTENTO DE CORRECCIÓN AUTOMÁTICA para diferencias pequeñas por redondeos
-                if diferencia <= Decimal('0.50') and formas_pago_creadas.count() == 1:
-                    forma_pago = formas_pago_creadas.first()
-                    print(f"🔧 CORRIGIENDO diferencia de ${diferencia} en pago único")
-                    print(f"   Pago anterior: ${forma_pago.total}")
-                    print(f"   Total factura: ${factura.monto_general}")
-                    
-                    # Ajustar el pago al total de la factura
-                    forma_pago.total = factura.monto_general
-                    forma_pago.save()
-                    
-                    print(f"✅ Pago corregido a: ${forma_pago.total}")
-                    
-                    # Recalcular para verificar
-                    from django.db import models
-                    suma_pagos_corregida = factura.formas_pago.all().aggregate(
-                        total=models.Sum('total')
-                    )['total'] or Decimal('0.00')
-                    
-                    diferencia_corregida = abs(factura.monto_general - suma_pagos_corregida)
-                    print(f"📊 Diferencia después de corrección: ${diferencia_corregida}")
-                    
-                    if diferencia_corregida <= tolerancia:
-                        print("✅ Corrección exitosa - coherencia restaurada")
-                    else:
-                        error_msg = (
-                            f"INCOHERENCIA PERSISTENTE: "
-                            f"Total factura (${factura.monto_general}) ≠ Suma pagos (${suma_pagos_corregida}). "
-                            f"Diferencia: ${diferencia_corregida}"
-                        )
-                        print(f"❌ {error_msg}")
-                        raise Exception(f"VALIDACIÓN FALLIDA - {error_msg}")
-                else:
-                    error_msg = (
-                        f"INCOHERENCIA EN FORMAS DE PAGO: "
-                        f"Total factura (${factura.monto_general}) ≠ Suma pagos (${suma_pagos}). "
-                        f"Diferencia: ${diferencia}"
-                    )
-                    print(f"❌ {error_msg}")
-                    raise Exception(f"VALIDACIÓN FALLIDA - {error_msg}")
+                # � RECHAZAR PAGOS INCONSISTENTES - NO MAS CORRECCIONES AUTOMATICAS
+                error_msg = (
+                    f"INCOHERENCIA EN FORMAS DE PAGO: "
+                    f"Total factura (${factura.monto_general}) ≠ Suma pagos (${suma_pagos}). "
+                    f"Diferencia: ${diferencia} - Usuario debe corregir manualmente"
+                )
+                print(f"❌ {error_msg}")
+                raise Exception(f"VALIDACIÓN FALLIDA - {error_msg}")
             else:
                 print(f"✅ Coherencia validada: Diferencia ${diferencia} dentro de tolerancia")
                 

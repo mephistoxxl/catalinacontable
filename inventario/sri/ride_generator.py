@@ -595,12 +595,8 @@ class RIDEGenerator:
                         Paragraph(tiempo, self.styles['Campo'])
                     ])
             else:
-                pago_data.append([
-                    Paragraph(getattr(factura, 'forma_pago', 'SIN UTILIZACION DEL SISTEMA FINANCIERO'), self.styles['Campo']),
-                    Paragraph(f"{getattr(factura, 'total', 0.0):.2f}", self.styles['Campo']),
-                    Paragraph('0', self.styles['Campo']),
-                    Paragraph('días', self.styles['Campo'])
-                ])
+                # 🚫 NO MAS DEFAULTS - Solo usar pagos registrados
+                raise ValueError("RIDE requiere formas de pago registradas - no se encontraron pagos válidos")
             # Ejemplo para la tabla de pagos
             tabla_pago = Table(pago_data, colWidths=[
                 ancho_tabla*0.46, ancho_tabla*0.18, ancho_tabla*0.13, ancho_tabla*0.23

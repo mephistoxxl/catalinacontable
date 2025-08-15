@@ -1848,12 +1848,12 @@ class FormaPago(models.Model):
         verbose_name="Factura"
     )
     
-    # ✅ OBLIGATORIO: Forma de pago según tabla SRI
+    # ✅ OBLIGATORIO: Forma de pago según tabla SRI - SIN DEFAULT
     forma_pago = models.CharField(
         max_length=2, 
         choices=FORMAS_PAGO_CHOICES, 
-        default='01',
-        verbose_name="Forma de Pago"
+        verbose_name="Forma de Pago",
+        help_text="Selección obligatoria según tabla 24 SRI"
     )
     
     # ✅ CORREGIDO: Campo Caja como ForeignKey

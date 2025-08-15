@@ -486,41 +486,13 @@ class SRIXMLGenerator:
             diferencia = abs(total_factura - suma_pagos)
             
             if diferencia > tolerancia:
-                # 🔧 INTENTO DE CORRECCIÓN AUTOMÁTICA para diferencias pequeñas por redondeos
-                if diferencia <= Decimal('0.50') and len(formas_pago_list) == 1:
-                    forma_pago = formas_pago_list[0]
-                    logger.warning(f"🔧 CORRIGIENDO diferencia de ${diferencia} en pago único para XML SRI")
-                    logger.info(f"   Pago anterior: ${forma_pago.total}")
-                    logger.info(f"   Total factura: ${total_factura}")
-                    
-                    # Ajustar el pago al total de la factura
-                    forma_pago.total = total_factura
-                    forma_pago.save()
-                    
-                    logger.info(f"✅ Pago corregido a: ${forma_pago.total}")
-                    
-                    # Recalcular para verificar
-                    suma_pagos_corregida = sum(fp.total for fp in factura.formas_pago.all())
-                    diferencia_corregida = abs(total_factura - suma_pagos_corregida)
-                    
-                    logger.info(f"📊 Diferencia después de corrección: ${diferencia_corregida}")
-                    
-                    if diferencia_corregida <= tolerancia:
-                        logger.info("✅ Corrección exitosa - coherencia SRI restaurada")
-                    else:
-                        error_msg = (
-                            f"INCOHERENCIA PERSISTENTE EN XML SRI: Total factura (${total_factura}) ≠ Suma pagos (${suma_pagos_corregida}). "
-                            f"Diferencia: ${diferencia_corregida}. XML SRI REQUIERE coherencia exacta."
-                        )
-                        logger.error(error_msg)
-                        raise ValueError(error_msg)
-                else:
-                    error_msg = (
-                        f"INCOHERENCIA EN XML SRI: Total factura (${total_factura}) ≠ Suma pagos (${suma_pagos}). "
-                        f"Diferencia: ${diferencia}. XML SRI REQUIERE coherencia exacta."
-                    )
-                    logger.error(error_msg)
-                    raise ValueError(error_msg)
+                # � RECHAZAR PAGOS INCONSISTENTES - NO MAS CORRECCIONES AUTOMATICAS
+                error_msg = (
+                    f"INCOHERENCIA EN XML SRI: Total factura (${total_factura}) ≠ Suma pagos (${suma_pagos}). "
+                    f"Diferencia: ${diferencia}. XML SRI REQUIERE coherencia exacta - Usuario debe corregir"
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
             else:
                 logger.info(f"✅ Coherencia SRI validada: Diferencia ${diferencia} dentro de tolerancia")
         
