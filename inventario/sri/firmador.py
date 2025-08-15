@@ -7,21 +7,32 @@ from inventario.models import Opciones
 
 def firmar_xml(xml_path, xml_firmado_path):
     """
-    Firma un archivo XML usando la firma electrónica y contraseña almacenadas en Opciones.
+    ⚠️  OBSOLETO: Firma un archivo XML usando XMLDSig básico.
     
-    ⚠️  IMPORTANTE: Esta implementación usa XMLDSig básico, pero SRI requiere XAdES-BES.
-    📋 TODO: Migrar a una librería que soporte XAdES-BES nativo o extender esta para 
-         agregar xades:QualifyingProperties.
+    🚨 IMPORTANTE: Esta implementación usa XMLDSig básico, pero SRI requiere XAdES-BES.
+    📋 ACCIÓN REQUERIDA: Migrar a firmador_xades.py que implementa XAdES-BES
+    
+    ❌ PROBLEMAS CONOCIDOS:
+       - SRI puede RECHAZAR documentos firmados solo con XMLDSig
+       - No incluye timestamp requerido por XAdES-BES
+       - No incluye información del certificado como requiere SRI
+    
+    ✅ SOLUCIÓN: Usar firmar_xml_xades_bes() de firmador_xades.py
     
     📚 Librerías recomendadas para XAdES-BES:
+       - firmador_xades.py: Implementación personalizada
        - endesive: Soporta XAdES-BES out-of-the-box
        - signxml + extensión manual para xades:QualifyingProperties
-       - PyXMLSec: Más control pero mayor complejidad
     
     Args:
         xml_path (str): Ruta al archivo XML a firmar.
         xml_firmado_path (str): Ruta donde se guardará el XML firmado.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning("🚨 USANDO FIRMA XMLDSig BÁSICA - SRI PUEDE RECHAZAR ESTE DOCUMENTO")
+    logger.warning("📋 Recomendación: Migrar a XAdES-BES usando firmador_xades.py")
+    
     opciones = Opciones.objects.first()
     if not opciones or not opciones.firma_electronica or not opciones.password_firma:
         raise Exception('Firma electrónica o contraseña no configuradas en Opciones')

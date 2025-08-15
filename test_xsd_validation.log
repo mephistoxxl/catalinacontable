@@ -1,0 +1,7 @@
+2025-08-14 19:12:09,731 - inventario.sri.xml_generator - INFO - Generando XML para factura 158
+2025-08-14 19:12:09,749 - inventario.sri.xml_generator - DEBUG - Establecimiento: 003, Punto emisión: 005, Secuencial: 000000024
+2025-08-14 19:12:09,758 - inventario.sri.xml_generator - INFO - Emisor: PUMALPA MORILLO LINA YOLANDA - RUC: 1713959011001
+2025-08-14 19:12:09,758 - inventario.sri.xml_generator - INFO - Ambiente: 1 (PRUEBAS)
+2025-08-14 19:12:09,798 - inventario.sri.xml_generator - INFO - XML de factura 158 generado exitosamente
+2025-08-14 19:12:09,828 - inventario.sri.integracion_django - INFO - XML generado en: C:\Users\CORE I7\Desktop\sisfact\media\facturas_xml\factura_003-005-000000024_20250814_191209.xml
+2025-08-14 19:12:09,840 - inventario.sri.integracion_django - ERROR - Error procesando factura Factura 003-005-000000024: Field 'id' expected a number but got <Factura: Factura 003-005-000000024>.

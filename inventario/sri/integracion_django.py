@@ -104,15 +104,14 @@ class SRIIntegration:
             clave_acceso = factura.clave_acceso
             
             # Generar XML (ahora la factura ya tiene clave_acceso)
+            # ✅ XML se valida automáticamente contra XSD en generar_xml_factura
             xml_path = self.generar_xml_factura(factura)
             
-            # 🔧 FIX: Validar XML contra XSD antes de firmar y enviar
-            self._validar_xml_generado(xml_path)
-            
-            # Firmar XML
-            from .firmador import firmar_xml
+            # 🎯 FIRMAR XML CON XAdES-BES (requerimiento SRI)
             xml_firmado_path = xml_path.replace('.xml', '_firmado.xml')
-            firmar_xml(xml_path, xml_firmado_path)
+            success = self._firmar_xml_xades_bes(xml_path, xml_firmado_path)
+            if not success:
+                raise Exception("Error al firmar XML con XAdES-BES")
             
             # Enviar al SRI (usando la clave ya persistida)
             with open(xml_firmado_path, 'r', encoding='utf-8') as f:
@@ -212,15 +211,29 @@ class SRIIntegration:
             # Crear directorio si no existe
             os.makedirs(os.path.dirname(xml_path), exist_ok=True)
             
-            # 🔧 FIX: Validar XML contra XSD antes de guardar (opcional)
+            # 🔧 FIX: Validar XML contra XSD OBLIGATORIAMENTE
             if validar_xsd:
                 try:
                     xsd_path = self._obtener_ruta_xsd()
                     xml_generator.validar_xml_contra_xsd(xml_content, xsd_path)
                     logger.info("✅ XML generado válido según XSD")
                 except Exception as e:
-                    logger.warning(f"⚠️ XML generado no cumple XSD: {e}")
-                    # No fallar aquí para permitir debugging, se validará nuevamente en _validar_xml_generado
+                    # 🚨 CRÍTICO: XML inválido debe detener todo el proceso
+                    error_msg = f"XML generado NO VÁLIDO según XSD del SRI: {str(e)}"
+                    logger.error(f"❌ {error_msg}")
+                    
+                    # Guardar XML problemático para debugging
+                    debug_filename = f"factura_{factura.numero}_INVALID_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
+                    debug_path = os.path.join(settings.MEDIA_ROOT, "facturas_xml", "debug", debug_filename)
+                    os.makedirs(os.path.dirname(debug_path), exist_ok=True)
+                    
+                    with open(debug_path, 'w', encoding='utf-8') as f:
+                        f.write(xml_content)
+                    
+                    logger.error(f"📁 XML inválido guardado para debugging en: {debug_path}")
+                    
+                    # 🛑 FALLAR COMPLETAMENTE - No continuar con XML inválido
+                    raise Exception(f"Validación XSD FALLÓ: {error_msg}. XML debug guardado en: {debug_path}")
             
             # Guardar XML
             with open(xml_path, 'w', encoding='utf-8') as f:
@@ -236,6 +249,8 @@ class SRIIntegration:
     def _validar_xml_generado(self, xml_path):
         """
         Valida el XML generado contra el XSD oficial del SRI
+        📋 Nota: Este método se mantiene para validaciones independientes,
+        pero la validación principal ahora se hace en generar_xml_factura()
         
         Args:
             xml_path: Ruta del archivo XML a validar
@@ -255,18 +270,20 @@ class SRIIntegration:
             xml_generator = SRIXMLGenerator()
             
             # Validar contra el XSD
-            logger.info(f"Validando XML contra XSD: {xsd_path}")
+            logger.info(f"🔍 Validando XML independiente contra XSD: {xsd_path}")
             xml_generator.validar_xml_contra_xsd(xml_content, xsd_path)
             logger.info("✅ XML válido según XSD del SRI")
             
         except Exception as e:
-            logger.error(f"❌ Error de validación XSD: {str(e)}")
+            logger.error(f"❌ Error de validación XSD independiente: {str(e)}")
             # Guardar XML problemático para debugging
-            debug_path = xml_path.replace('.xml', '_INVALID.xml')
+            debug_path = xml_path.replace('.xml', '_INVALID_VALIDATION.xml')
             import shutil
             shutil.copy(xml_path, debug_path)
-            logger.error(f"XML inválido guardado para debugging en: {debug_path}")
-            raise Exception(f"XML no válido según XSD del SRI: {str(e)}")
+            logger.error(f"📁 XML inválido guardado para debugging en: {debug_path}")
+            
+            # 🛑 FALLAR COMPLETAMENTE
+            raise Exception(f"XML NO VÁLIDO según XSD del SRI: {str(e)}. Debug: {debug_path}")
     
     def _obtener_ruta_xsd(self):
         """
@@ -482,6 +499,51 @@ class SRIIntegration:
         factura.save()
         logger.info(f"Factura {factura.id} actualizada y guardada en BD")
     
+    def _firmar_xml_xades_bes(self, xml_path, xml_firmado_path):
+        """
+        Firma XML con XAdES-BES usando múltiples estrategias
+        
+        Args:
+            xml_path (str): Ruta al XML sin firmar
+            xml_firmado_path (str): Ruta donde guardar el XML firmado
+            
+        Returns:
+            bool: True si firma exitosa, False en caso contrario
+        """
+        try:
+            # Estrategia 1: Usar firmador XAdES-BES personalizado
+            try:
+                from .firmador_xades import firmar_xml_xades_bes
+                firmar_xml_xades_bes(xml_path, xml_firmado_path)
+                logger.info("XML firmado exitosamente con XAdES-BES personalizado")
+                return True
+            except Exception as e:
+                logger.warning(f"Firmador XAdES-BES personalizado falló: {e}")
+            
+            # Estrategia 2: Fallback a endesive si está disponible
+            try:
+                from .firmador_xades import firmar_xml_con_endesive
+                firmar_xml_con_endesive(xml_path, xml_firmado_path)
+                logger.info("XML firmado exitosamente con endesive XAdES")
+                return True
+            except Exception as e:
+                logger.warning(f"Firmador endesive falló: {e}")
+            
+            # Estrategia 3: Fallback a XMLDSig básico (con advertencia)
+            logger.warning("⚠️ USANDO XMLDSig BÁSICO - SRI puede rechazar la firma")
+            try:
+                from .firmador import firmar_xml
+                firmar_xml(xml_path, xml_firmado_path)
+                logger.warning("XML firmado con XMLDSig básico (no XAdES-BES)")
+                return True
+            except Exception as e:
+                logger.error(f"Incluso XMLDSig básico falló: {e}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error crítico en proceso de firma: {e}")
+            return False
+    
     def _generar_ride_autorizado(self, factura, resultado):
         """
         Genera el RIDE (Representación Impresa del Documento Electrónico)
@@ -632,6 +694,30 @@ class SRIIntegration:
                 'success': False,
                 'message': str(e)
             }
+
+    def _es_estado_autorizado(self, estado):
+        """
+        🔍 Verifica si un estado indica que la factura está autorizada
+        
+        Args:
+            estado (str): Estado a verificar
+            
+        Returns:
+            bool: True si el estado indica autorización
+        """
+        if not estado:
+            return False
+            
+        # Normalizar a mayúsculas para comparación
+        estado_upper = str(estado).upper().strip()
+        
+        # Estados que indican autorización
+        estados_autorizados = {
+            'AUTORIZADA',
+            'AUTORIZADO'
+        }
+        
+        return estado_upper in estados_autorizados
 
 
 # Funciones auxiliares para uso en Django Admin o Views
