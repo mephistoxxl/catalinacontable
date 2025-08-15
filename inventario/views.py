@@ -1457,7 +1457,7 @@ class DetallesFactura(LoginRequiredMixin, View):
         factura.save()
         try:
             from .sri.xml_generator import SRIXMLGenerator
-            from .sri.firmador import firmar_xml
+            from .sri.firmador_xades import firmar_xml_xades_bes
             from django.conf import settings
             import os
 
@@ -1481,13 +1481,15 @@ class DetallesFactura(LoginRequiredMixin, View):
                 xml_file.write(xml_content)
 
             # Validar XML contra XSD oficial antes de firmar
+            xml_generator.validar_xml_contra_xsd(xml_content, xml_generator._obtener_ruta_xsd())
+            print("✅ XML validado exitosamente contra XSD")
 
-
-            # Firmar el XML
+            # Firmar el XML con XAdES-BES (NO XMLDSig básico)
             xml_firmado_filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}_firmada.xml"
             xml_firmado_output_path = os.path.join(xml_dir, xml_firmado_filename)
             try:
-                firmar_xml(xml_output_path, xml_firmado_output_path)
+                print("🔐 Firmando XML con XAdES-BES (requerido por SRI)...")
+                firmar_xml_xades_bes(xml_output_path, xml_firmado_output_path)
                 print(f"✅ XML firmado exitosamente: {xml_firmado_output_path}")
             except Exception as e:
                 print(f"❌ Error al firmar el XML: {e}")
@@ -1968,31 +1970,16 @@ class VerFactura(LoginRequiredMixin, View):
                             # Si no se firmó, devuelve solo el path original
                             ride_path = Path(result).name
                             
-                    except ImportError:
-                        # Fallback: generar sin firma si hay error de importación
-                        ride_generator = RIDEGenerator()
-                        ride_generator.generar_ride_factura(
-                            factura=factura,
-                            detalles=detalles,
-                            opciones=opciones,
-                            output_path=output_path,
-                            logo_path=logo_path,
-                            clave_acceso=clave_acceso
-                        )
-                        ride_path = filename
+                    except ImportError as e:
+                        # 🚫 NO MÁS FALLBACKS - SI NO HAY FIRMA, NO SE GENERA NADA
+                        logger.error(f"🚫 CRÍTICO: Error de importación para firma de PDF: {e}")
+                        logger.error("🚫 NO SE GENERARÁ PDF SIN FIRMA VÁLIDA")
+                        raise Exception(f"FIRMA DE PDF REQUERIDA - Error de importación: {e}")
                     except Exception as e:
-                        # Fallback: generar sin firma si hay error en la firma
-                        logger.warning(f"Error en firma de PDF, generando sin firma: {e}")
-                        ride_generator = RIDEGenerator()
-                        ride_generator.generar_ride_factura(
-                            factura=factura,
-                            detalles=detalles,
-                            opciones=opciones,
-                            output_path=output_path,
-                            logo_path=logo_path,
-                            clave_acceso=clave_acceso
-                        )
-                        ride_path = filename
+                        # 🚫 NO MÁS FALLBACKS - SI LA FIRMA FALLA, TODO SE DETIENE
+                        logger.error(f"🚫 CRÍTICO: Error en firma de PDF: {e}")
+                        logger.error("🚫 NO SE GENERARÁ PDF SIN FIRMA VÁLIDA")
+                        raise Exception(f"FIRMA DE PDF REQUERIDA - Error en firma: {e}")
                     logger.info(f"RIDE generado exitosamente: {output_path}")
             except Exception as e:
                 logger.error(f"Error generando RIDE: {e}")

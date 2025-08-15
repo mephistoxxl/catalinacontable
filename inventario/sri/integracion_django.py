@@ -529,20 +529,16 @@ class SRIIntegration:
             except Exception as e:
                 logger.warning(f"Firmador endesive falló: {e}")
             
-            # Estrategia 3: Fallback a XMLDSig básico (con advertencia)
-            logger.warning("⚠️ USANDO XMLDSig BÁSICO - SRI puede rechazar la firma")
-            try:
-                from .firmador import firmar_xml
-                firmar_xml(xml_path, xml_firmado_path)
-                logger.warning("XML firmado con XMLDSig básico (no XAdES-BES)")
-                return True
-            except Exception as e:
-                logger.error(f"Incluso XMLDSig básico falló: {e}")
-                return False
+            # ❌ NO MÁS FALLBACKS - SI LA FIRMA XAdES-BES FALLA, TODO SE DETIENE
+            logger.error("🚫 CRÍTICO: Firma XAdES-BES falló completamente")
+            logger.error("🚫 NO SE ENVIARÁ XML SIN FIRMA VÁLIDA XAdES-BES")
+            logger.error("🚫 PROCESO DETENIDO - REVISAR CONFIGURACIÓN DE FIRMA")
+            raise Exception("FIRMA XAdES-BES REQUERIDA - NO SE PERMITE FALLBACK A XMLDSig BÁSICO")
                 
         except Exception as e:
             logger.error(f"Error crítico en proceso de firma: {e}")
-            return False
+            # 🚫 NO MÁS RETURNS FALSE - SIEMPRE RAISE EXCEPTION
+            raise Exception(f"PROCESO DE FIRMA FALLÓ COMPLETAMENTE: {e}")
     
     def _generar_ride_autorizado(self, factura, resultado):
         """
