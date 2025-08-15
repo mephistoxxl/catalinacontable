@@ -1436,22 +1436,23 @@ class DetallesFactura(LoginRequiredMixin, View):
                 except json.JSONDecodeError as json_error:
                     print(f"❌ Error decodificando JSON de pagos: {json_error}")
                     print(f"Datos recibidos: {pagos_data}")
-                    # Crear forma de pago por defecto
-                    self._crear_forma_pago_por_defecto(factura)
+                    # 🚫 NO MÁS FALLBACKS - DATOS INCORRECTOS = ERROR CRÍTICO
+                    raise Exception(f"DATOS DE PAGO INVÁLIDOS - JSON malformado: {json_error}")
                 except Exception as general_error:
                     print(f"❌ Error general procesando formas de pago: {general_error}")
-                    # Crear forma de pago por defecto
-                    self._crear_forma_pago_por_defecto(factura)
+                    # 🚫 NO MÁS FALLBACKS - ERROR EN PROCESAMIENTO = FALLA CRÍTICA
+                    raise Exception(f"ERROR PROCESANDO FORMAS DE PAGO: {general_error}")
             else:
-                print("⚠️ No se recibieron datos de pagos válidos, creando forma de pago por defecto")
-                self._crear_forma_pago_por_defecto(factura)
+                print("❌ No se recibieron datos de pagos válidos")
+                # 🚫 NO MÁS FALLBACKS - SIN DATOS = FALLA CRÍTICA
+                raise Exception("FORMAS DE PAGO REQUERIDAS - No se recibieron datos válidos")
                 
         except Exception as e:
             print(f"❌ Error crítico en procesamiento de formas de pago: {e}")
             import traceback
             print(f"Traceback: {traceback.format_exc()}")
-            # Crear forma de pago por defecto como respaldo
-            self._crear_forma_pago_por_defecto(factura)
+            # 🚫 NO MÁS FALLBACKS - ERROR CRÍTICO DEBE DETENER TODO
+            raise Exception(f"PROCESAMIENTO DE FORMAS DE PAGO FALLÓ: {e}")
 
         # ✅ AHORA SÍ: Guardar factura final (con formas de pago ya creadas)
         factura.save()
@@ -1516,38 +1517,10 @@ class DetallesFactura(LoginRequiredMixin, View):
         # Redirigir directamente a la vista de factura
         return redirect('inventario:verFactura', p=factura.id)
 
-    def _crear_forma_pago_por_defecto(self, factura):
-        """Método auxiliar para crear forma de pago por defecto"""
-        try:
-            # Buscar la primera caja activa disponible
-            caja_por_defecto = Caja.objects.filter(activo=True).first()
-            
-            # Determinar los campos correctos del modelo FormaPago
-            forma_pago_data = {
-                'factura': factura,
-                'total': factura.monto_general
-            }
-            
-            # Agregar campos opcionales si existen
-            from django.apps import apps
-            FormaPago = apps.get_model('inventario', 'FormaPago')
-            campos_modelo = [f.name for f in FormaPago._meta.fields]
-            
-            if 'forma_pago' in campos_modelo:
-                forma_pago_data['forma_pago'] = '01'  # Sin utilización del sistema financiero
-            elif 'tipo_pago' in campos_modelo:
-                forma_pago_data['tipo_pago'] = '01'
-                
-            if 'caja' in campos_modelo and caja_por_defecto:
-                forma_pago_data['caja'] = caja_por_defecto
-            elif 'caja_id' in campos_modelo and caja_por_defecto:
-                forma_pago_data['caja_id'] = caja_por_defecto.id
-            
-            forma_pago_defecto = FormaPago.objects.create(**forma_pago_data)
-            print(f"✅ Forma de pago por defecto creada: ID={forma_pago_defecto.id}, Total=${factura.monto_general}")
-            
-        except Exception as e:
-            print(f"❌ Error creando forma de pago por defecto: {e}")
+    # 🚫 FUNCIÓN ELIMINADA: _crear_forma_pago_por_defecto
+    # Esta función creaba automáticamente pagos con código "01" cuando había errores,
+    # lo que enviaba información incompleta al SRI. 
+    # AHORA: Si no hay datos válidos de pago, el proceso DEBE fallar completamente.
 
     def get(self, request):
         try:
