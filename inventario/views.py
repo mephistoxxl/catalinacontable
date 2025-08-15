@@ -1381,66 +1381,109 @@ class DetallesFactura(LoginRequiredMixin, View):
                                 
                             monto = Decimal(str(monto))
                             
+                            # ✅ VALIDACIÓN ESTRICTA: Cada campo debe ser exacto como seleccionó el usuario
+                            print(f"🔍 VALIDANDO pago {i+1} - selección exacta del usuario:")
+                            print(f"   SRI: '{sri_pago}' (debe estar en códigos válidos)")
+                            print(f"   Monto: {monto} (debe ser > 0)")
+                            print(f"   Caja: '{caja_valor}' (debe existir y estar activa)")
+                            
+                            # Validar código SRI exacto según tabla 24 del SRI
+                            if not sri_pago or sri_pago.strip() == '':
+                                raise Exception(f"Pago {i+1}: Código SRI vacío - debe seleccionar método de pago")
+                            
+                            # Lista de códigos SRI válidos oficiales
+                            codigos_sri_validos = [
+                                '01',  # Sin utilización del sistema financiero
+                                '02',  # Compensación de deudas
+                                '03',  # Tarjeta de débito
+                                '04',  # Dinero electrónico
+                                '05',  # Tarjeta prepago
+                                '06',  # Tarjeta de crédito
+                                '07',  # Otros con utilización del sistema financiero
+                                '08',  # Endoso de títulos
+                                '09',  # Factoring
+                                '10',  # Comprobante pago exterior
+                                '11',  # Compensación por avería
+                                '12',  # Pagos por consignación
+                                '13',  # Comprobante venta interna
+                                '14',  # Tarjeta corporativa
+                                '15',  # Transferencia crédito
+                                '16',  # Transferencia débito
+                                '17',  # Transferencia
+                                '18',  # Depósito en cuenta
+                                '19',  # Cheque propio
+                                '20',  # Cheque certificado
+                                '21',  # Cheque del exterior
+                                '22',  # Cheque no negociable
+                                '23',  # Giro postal
+                                '24',  # Moneda electrónica
+                                '25'   # Pago recurrente
+                            ]
+                            
+                            if sri_pago not in codigos_sri_validos:
+                                raise Exception(f"Pago {i+1}: Código SRI '{sri_pago}' NO VÁLIDO - debe seleccionar código válido de la tabla 24 del SRI")
+                            
+                            # Validar monto exacto
+                            if monto <= 0:
+                                raise Exception(f"Pago {i+1}: Monto ${monto} debe ser mayor a 0")
+                            
+                            print(f"✅ Pago {i+1} validado - usando valores EXACTOS seleccionados")
+                            
                             print(f"Procesando pago {i+1}: SRI={sri_pago}, Caja={caja_valor}, Monto={monto}")
                             
                             if monto > 0:
-                                # ✅ BUSCAR O CREAR LA CAJA CORRECTAMENTE
+                                # 🚫 RECHAZAR SI NO HAY CAJA VÁLIDA - NO MAS DEFAULTS
                                 caja_obj = None
-                                if caja_valor and caja_valor != 'CAJA VENTAS':
+                                if caja_valor:
                                     try:
                                         # Intentar buscar por ID primero
                                         if caja_valor.isdigit():
                                             caja_obj = Caja.objects.filter(id=int(caja_valor), activo=True).first()
                                         else:
-                                            # Buscar por descripción
+                                            # Buscar por descripción exacta
                                             caja_obj = Caja.objects.filter(descripcion=caja_valor, activo=True).first()
                                     except Exception as caja_error:
-                                        print(f"⚠️ Error buscando caja '{caja_valor}': {caja_error}")
+                                        raise Exception(f"Error buscando caja '{caja_valor}': {caja_error}")
                                 
-                                # Si no se encuentra la caja, usar la primera caja activa disponible
+                                # 🚫 NO MAS CAJAS POR DEFECTO - RECHAZAR SI NO ES VÁLIDA
                                 if not caja_obj:
-                                    caja_obj = Caja.objects.filter(activo=True).first()
-                                    if caja_obj:
-                                        print(f"⚠️ Usando caja por defecto: {caja_obj.descripcion}")
-                                    else:
-                                        print("❌ No hay cajas activas disponibles")
-                                        continue
+                                    raise Exception(f"Pago {i+1}: Caja '{caja_valor}' no encontrada o inactiva - debe seleccionar caja válida")
                                 
-                                # ✅ CREAR FORMA DE PAGO - Ajustar campos según el modelo real
+                                print(f"✅ Caja validada: {caja_obj.descripcion} (ID: {caja_obj.id})")
+                                
+                                # ✅ CREAR FORMA DE PAGO CON VALORES EXACTOS SELECCIONADOS
                                 try:
-                                    # Intentar diferentes combinaciones de campos
+                                    print(f"🎯 CREANDO pago con valores EXACTOS seleccionados:")
+                                    print(f"   SRI Pago: '{sri_pago}' (seleccionado por usuario)")
+                                    print(f"   Caja: '{caja_obj.descripcion}' (ID: {caja_obj.id})")
+                                    print(f"   Monto: ${monto} (ingresado por usuario)")
+                                    
+                                    # USAR EXACTAMENTE LOS VALORES SELECCIONADOS
                                     forma_pago_data = {
                                         'factura': factura,
-                                        'total': monto
+                                        'forma_pago': sri_pago,  # EXACTO como seleccionó
+                                        'total': monto,          # EXACTO como ingresó
+                                        'caja': caja_obj         # EXACTA como seleccionó
                                     }
                                     
-                                    # Agregar campo de forma de pago (probar diferentes nombres)
-                                    if hasattr(FormaPago._meta.get_field('forma_pago'), 'choices'):
-                                        forma_pago_data['forma_pago'] = sri_pago
-                                    elif hasattr(FormaPago._meta, 'get_field') and 'tipo_pago' in [f.name for f in FormaPago._meta.fields]:
-                                        forma_pago_data['tipo_pago'] = sri_pago
-                                    
-                                    # Agregar campo de caja (probar diferentes nombres)
-                                    if 'caja' in [f.name for f in FormaPago._meta.fields]:
-                                        forma_pago_data['caja'] = caja_obj
-                                    elif 'caja_id' in [f.name for f in FormaPago._meta.fields]:
-                                        forma_pago_data['caja_id'] = caja_obj.id if caja_obj else None
-                                    
                                     forma_pago_creada = FormaPago.objects.create(**forma_pago_data)
-                                    print(f"✅ Forma de pago creada: ID={forma_pago_creada.id}, Tipo={sri_pago}, Monto=${monto}, Caja={caja_obj.descripcion if caja_obj else 'N/A'}")
+                                    print(f"✅ Forma de pago creada EXACTAMENTE como seleccionó:")
+                                    print(f"   ID: {forma_pago_creada.id}")
+                                    print(f"   Código SRI: {forma_pago_creada.forma_pago}")
+                                    print(f"   Monto: ${forma_pago_creada.total}")
+                                    print(f"   Caja: {forma_pago_creada.caja.descripcion if forma_pago_creada.caja else 'Sin caja'}")
+                                    
+                                    # 🔍 VALIDACIÓN INMEDIATA: Verificar coherencia parcial
+                                    pagos_hasta_ahora = factura.formas_pago.all()
+                                    suma_parcial = sum(p.total for p in pagos_hasta_ahora)
+                                    print(f"📊 Suma parcial de pagos: ${suma_parcial} de ${factura.monto_general}")
+                                    
+                                    if suma_parcial > factura.monto_general:
+                                        raise Exception(f"SUMA DE PAGOS EXCEDE TOTAL: ${suma_parcial} > ${factura.monto_general}")
                                     
                                 except Exception as create_error:
                                     print(f"❌ Error creando forma de pago: {create_error}")
-                                    print(f"Campos del modelo FormaPago: {[f.name for f in FormaPago._meta.fields]}")
-                                    # Intentar crear con campos mínimos
-                                    try:
-                                        forma_pago_minima = FormaPago.objects.create(
-                                            factura=factura,
-                                            total=monto
-                                        )
-                                        print(f"✅ Forma de pago básica creada: ID={forma_pago_minima.id}, Monto=${monto}")
-                                    except Exception as min_error:
-                                        print(f"❌ Error creando forma de pago básica: {min_error}")
+                                    raise Exception(f"No se pudo crear forma de pago con valores seleccionados: {create_error}")
                             else:
                                 print(f"⚠️ Pago {i+1} ignorado por monto cero o negativo: ${monto}")
                                 
@@ -1492,21 +1535,26 @@ class DetallesFactura(LoginRequiredMixin, View):
             
             print(f"📊 Suma total de pagos: ${suma_pagos}")
             
-            # Validar que las sumas coincidan (con tolerancia mínima para decimales)
-            tolerancia = Decimal('0.01')  # 1 centavo de tolerancia
-            diferencia = abs(factura.monto_general - suma_pagos)
+            # 🔍 VALIDACIÓN CRÍTICA FINAL: Coherencia EXACTA sin tolerancia
+            print(f"📊 Suma total de pagos: ${suma_pagos}")
             
-            if diferencia > tolerancia:
-                # � RECHAZAR PAGOS INCONSISTENTES - NO MAS CORRECCIONES AUTOMATICAS
-                error_msg = (
-                    f"INCOHERENCIA EN FORMAS DE PAGO: "
-                    f"Total factura (${factura.monto_general}) ≠ Suma pagos (${suma_pagos}). "
-                    f"Diferencia: ${diferencia} - Usuario debe corregir manualmente"
-                )
-                print(f"❌ {error_msg}")
-                raise Exception(f"VALIDACIÓN FALLIDA - {error_msg}")
-            else:
-                print(f"✅ Coherencia validada: Diferencia ${diferencia} dentro de tolerancia")
+            # ✅ VALIDACIÓN ESTRICTA: Las sumas deben coincidir EXACTAMENTE
+            # NO MAS TOLERANCIAS - Valores EXACTOS como seleccionó el usuario
+            if suma_pagos != factura.monto_general:
+                print(f"❌ COHERENCIA FALLIDA:")
+                print(f"   Total factura: ${factura.monto_general}")
+                print(f"   Suma pagos:    ${suma_pagos}")
+                print(f"   Diferencia:    ${abs(suma_pagos - factura.monto_general)}")
+                
+                if suma_pagos < factura.monto_general:
+                    faltante = factura.monto_general - suma_pagos
+                    raise Exception(f"SUMA DE PAGOS INSUFICIENTE: Faltan ${faltante} para completar ${factura.monto_general} - debe agregar más pagos")
+                else:
+                    exceso = suma_pagos - factura.monto_general
+                    raise Exception(f"SUMA DE PAGOS EXCEDE TOTAL: Sobran ${exceso} del total ${factura.monto_general} - debe ajustar montos de pagos")
+            
+            print(f"✅ COHERENCIA PERFECTA: Suma pagos ${suma_pagos} = Total factura ${factura.monto_general}")
+            print(f"✅ TODOS LOS VALORES EXACTOS COMO SELECCIONÓ EL USUARIO")
                 
         except Exception as validation_error:
             print(f"❌ Error crítico en validación de coherencia: {validation_error}")
