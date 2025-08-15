@@ -1454,7 +1454,49 @@ class DetallesFactura(LoginRequiredMixin, View):
             # 🚫 NO MÁS FALLBACKS - ERROR CRÍTICO DEBE DETENER TODO
             raise Exception(f"PROCESAMIENTO DE FORMAS DE PAGO FALLÓ: {e}")
 
-        # ✅ AHORA SÍ: Guardar factura final (con formas de pago ya creadas)
+        # 🔍 VALIDACIÓN CRÍTICA: Verificar coherencia entre pagos y total de factura
+        try:
+            print("🔍 Validando coherencia entre formas de pago y total de factura...")
+            
+            # Calcular suma total de las formas de pago
+            suma_pagos = Decimal('0.00')
+            formas_pago_creadas = factura.formas_pago.all()
+            
+            print(f"📊 Total factura: ${factura.monto_general}")
+            print(f"📊 Formas de pago creadas: {formas_pago_creadas.count()}")
+            
+            for forma_pago in formas_pago_creadas:
+                print(f"  • Pago: ${forma_pago.total} (Código: {forma_pago.forma_pago})")
+                suma_pagos += forma_pago.total
+            
+            print(f"📊 Suma total de pagos: ${suma_pagos}")
+            
+            # Validar que las sumas coincidan (con tolerancia mínima para decimales)
+            tolerancia = Decimal('0.01')  # 1 centavo de tolerancia
+            diferencia = abs(factura.monto_general - suma_pagos)
+            
+            if diferencia > tolerancia:
+                error_msg = (
+                    f"INCOHERENCIA EN FORMAS DE PAGO: "
+                    f"Total factura (${factura.monto_general}) ≠ Suma pagos (${suma_pagos}). "
+                    f"Diferencia: ${diferencia}"
+                )
+                print(f"❌ {error_msg}")
+                raise Exception(f"VALIDACIÓN FALLIDA - {error_msg}")
+            else:
+                print(f"✅ Coherencia validada: Diferencia ${diferencia} dentro de tolerancia")
+                
+        except Exception as validation_error:
+            print(f"❌ Error crítico en validación de coherencia: {validation_error}")
+            # Eliminar formas de pago creadas para mantener consistencia
+            try:
+                factura.formas_pago.all().delete()
+                print("🧹 Formas de pago eliminadas por error de validación")
+            except:
+                pass
+            raise Exception(f"VALIDACIÓN DE COHERENCIA FALLÓ: {validation_error}")
+
+        # ✅ AHORA SÍ: Guardar factura final (con formas de pago ya creadas y validadas)
         factura.save()
         try:
             from .sri.xml_generator import SRIXMLGenerator

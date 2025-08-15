@@ -462,6 +462,39 @@ class SRIXMLGenerator:
         if factura.placa:
             ET.SubElement(info_factura, 'placa').text = factura.placa
         
+        # 🔍 VALIDACIÓN CRÍTICA SRI: Verificar coherencia entre pagos y total de factura
+        if factura.formas_pago.exists():
+            logger.info("🔍 Validando coherencia entre pagos y total para XML SRI...")
+            
+            # Calcular suma total de las formas de pago
+            from decimal import Decimal
+            suma_pagos = Decimal('0.00')
+            formas_pago_list = list(factura.formas_pago.all())
+            
+            for forma_pago in formas_pago_list:
+                suma_pagos += forma_pago.total
+                logger.debug(f"Pago: ${forma_pago.total} (Código: {forma_pago.forma_pago})")
+            
+            # Obtener total de la factura
+            total_factura = factura.monto_general
+            
+            logger.info(f"📊 Total factura: ${total_factura}")
+            logger.info(f"📊 Suma pagos: ${suma_pagos}")
+            
+            # Validar que las sumas coincidan (con tolerancia mínima para decimales)
+            tolerancia = Decimal('0.01')  # 1 centavo de tolerancia
+            diferencia = abs(total_factura - suma_pagos)
+            
+            if diferencia > tolerancia:
+                error_msg = (
+                    f"INCOHERENCIA EN XML SRI: Total factura (${total_factura}) ≠ Suma pagos (${suma_pagos}). "
+                    f"Diferencia: ${diferencia}. XML SRI REQUIERE coherencia exacta."
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            else:
+                logger.info(f"✅ Coherencia SRI validada: Diferencia ${diferencia} dentro de tolerancia")
+        
         # Pagos - LEER DE RELACIÓN formas_pago
         if factura.formas_pago.exists():
             pagos = ET.SubElement(info_factura, 'pagos')
