@@ -244,19 +244,11 @@ class SRIXAdESFirmador:
         return obj
     
     def _calcular_signature_value(self, doc, signed_info, signature_value_elem, ns_ds):
-        """Calcular y establecer el SignatureValue real"""
+        """Calcular y establecer el SignatureValue real con padding PKCS#1 v1.5"""
         try:
-            ns_xades = "http://uri.etsi.org/01903/v1.3.2#"  # Define namespace aquí también
+            ns_xades = "http://uri.etsi.org/01903/v1.3.2#"
             
-            # Canonicalizar SignedInfo
-            signed_info_c14n = etree.tostring(
-                signed_info,
-                method="c14n",
-                exclusive=False,
-                with_comments=False
-            )
-            
-            # Calcular digest del documento (sin signature)
+            # 1. Calcular digest del documento (sin signature)
             doc_copy = etree.fromstring(etree.tostring(doc))
             signature_elem = doc_copy.find(f".//{{{ns_ds}}}Signature")
             if signature_elem is not None:
@@ -272,13 +264,9 @@ class SRIXAdESFirmador:
             doc_digest = hashlib.sha256(doc_c14n).digest()
             doc_digest_b64 = base64.b64encode(doc_digest).decode('utf-8')
             
-            # Actualizar DigestValue del documento
-            digest_value_elem = signed_info.find(f".//{{{ns_ds}}}Reference[@URI='']/{{{ns_ds}}}DigestValue")
-            if digest_value_elem is not None:
-                digest_value_elem.text = doc_digest_b64
-            
-            # Calcular digest de SignedProperties
+            # 2. Calcular digest de SignedProperties
             signed_props = doc.find(f".//{{{ns_xades}}}SignedProperties")
+            signed_props_digest_b64 = ""
             if signed_props is not None:
                 signed_props_c14n = etree.tostring(
                     signed_props,
@@ -289,15 +277,31 @@ class SRIXAdESFirmador:
                 
                 signed_props_digest = hashlib.sha256(signed_props_c14n).digest()
                 signed_props_digest_b64 = base64.b64encode(signed_props_digest).decode('utf-8')
-                
-                # Actualizar DigestValue de SignedProperties
-                props_digest_elem = signed_info.find(f".//{{{ns_ds}}}Reference[@URI='#signed-properties']/{{{ns_ds}}}DigestValue")
-                if props_digest_elem is not None:
-                    props_digest_elem.text = signed_props_digest_b64
             
-            # Firmar SignedInfo
+            # 3. Actualizar DigestValue del documento ANTES de firmar
+            digest_value_elem = signed_info.find(f".//{{{ns_ds}}}Reference[@URI='']/{{{ns_ds}}}DigestValue")
+            if digest_value_elem is not None:
+                digest_value_elem.text = doc_digest_b64
+            
+            # 4. Actualizar DigestValue de SignedProperties ANTES de firmar
+            props_digest_elem = signed_info.find(f".//{{{ns_ds}}}Reference[@URI='#signed-properties']/{{{ns_ds}}}DigestValue")
+            if props_digest_elem is not None and signed_props_digest_b64:
+                props_digest_elem.text = signed_props_digest_b64
+            
+            # 5. Recalcular SignedInfo con valores actualizados
+            signed_info_c14n = etree.tostring(
+                signed_info,
+                method="c14n",
+                exclusive=False,
+                with_comments=False
+            )
+            
+            # 6. Firmar SignedInfo con padding PKCS#1 v1.5
+            from cryptography.hazmat.primitives.asymmetric import padding
+            
             signature_bytes = self.private_key.sign(
                 signed_info_c14n,
+                padding.PKCS1v15(),
                 hashes.SHA256()
             )
             

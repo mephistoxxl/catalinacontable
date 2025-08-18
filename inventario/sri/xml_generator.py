@@ -124,20 +124,14 @@ class SRIXMLGenerator:
         """
         Limpia texto para XML según especificaciones del SRI
         - No permite saltos de línea (pattern [^\n]*)
-        - Escapa caracteres especiales XML
+        - Elimina espacios múltiples
+        - No escapa caracteres especiales XML (el XML library lo hace automáticamente)
         """
         if not texto:
             return ""
         
         # Convertir a string y eliminar saltos de línea
         texto = str(texto).replace('\n', ' ').replace('\r', ' ')
-        
-        # Escapar caracteres especiales XML
-        texto = texto.replace("&", "&amp;")
-        texto = texto.replace("<", "&lt;")
-        texto = texto.replace(">", "&gt;")
-        texto = texto.replace('"', "&quot;")
-        texto = texto.replace("'", "&apos;")
         
         # Eliminar espacios múltiples
         texto = re.sub(r'\s+', ' ', texto)
