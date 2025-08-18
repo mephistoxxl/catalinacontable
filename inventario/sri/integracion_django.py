@@ -18,8 +18,19 @@ class SRIIntegration:
     """
     
     def __init__(self):
-        """Inicializa la integración con configuración desde Django"""
-        self.ambiente = getattr(settings, 'SRI_AMBIENTE', 'pruebas')
+        """Inicializa la integración con configuración desde Opciones"""
+        # 🔄 SINCRONIZAR con Opciones.tipo_ambiente
+        try:
+            opciones = Opciones.objects.first()
+            if opciones and opciones.tipo_ambiente:
+                self.ambiente = 'produccion' if opciones.tipo_ambiente == '2' else 'pruebas'
+            else:
+                # Fallback a configuración de settings
+                self.ambiente = getattr(settings, 'SRI_AMBIENTE', 'pruebas')
+        except Exception:
+            # Fallback a configuración de settings
+            self.ambiente = getattr(settings, 'SRI_AMBIENTE', 'pruebas')
+        
         self.cliente = SRIClient(ambiente=self.ambiente)
         
     def procesar_factura(self, factura_id):
@@ -213,13 +224,13 @@ class SRIIntegration:
             
             # 🔧 FIX: Validar XML contra XSD OBLIGATORIAMENTE
             if validar_xsd:
-                try:
-                    xsd_path = self._obtener_ruta_xsd()
-                    xml_generator.validar_xml_contra_xsd(xml_content, xsd_path)
-                    logger.info("✅ XML generado válido según XSD")
-                except Exception as e:
+                xsd_path = self._obtener_ruta_xsd()
+                resultado_validacion = xml_generator.validar_xml_contra_xsd(xml_content, xsd_path)
+                
+                if not resultado_validacion['valido']:
                     # 🚨 CRÍTICO: XML inválido debe detener todo el proceso
-                    error_msg = f"XML generado NO VÁLIDO según XSD del SRI: {str(e)}"
+                    errores_detalle = resultado_validacion.get('errores', 'Sin detalles de error')
+                    error_msg = f"XML generado NO VÁLIDO según XSD del SRI: {resultado_validacion['mensaje']}\nDetalles: {errores_detalle}"
                     logger.error(f"❌ {error_msg}")
                     
                     # Guardar XML problemático para debugging
@@ -234,6 +245,8 @@ class SRIIntegration:
                     
                     # 🛑 FALLAR COMPLETAMENTE - No continuar con XML inválido
                     raise Exception(f"Validación XSD FALLÓ: {error_msg}. XML debug guardado en: {debug_path}")
+                else:
+                    logger.info("✅ XML generado válido según XSD")
             
             # Guardar XML
             with open(xml_path, 'w', encoding='utf-8') as f:
@@ -258,24 +271,24 @@ class SRIIntegration:
         Raises:
             Exception: Si el XML no es válido según el XSD
         """
-        try:
-            # Leer el contenido del XML
-            with open(xml_path, 'r', encoding='utf-8') as f:
-                xml_content = f.read()
+        # Leer el contenido del XML
+        with open(xml_path, 'r', encoding='utf-8') as f:
+            xml_content = f.read()
+        
+        # Obtener la ruta del XSD
+        xsd_path = self._obtener_ruta_xsd()
+        
+        # Crear generador para usar el método de validación
+        xml_generator = SRIXMLGenerator()
+        
+        # Validar contra el XSD
+        logger.info(f"🔍 Validando XML independiente contra XSD: {xsd_path}")
+        resultado_validacion = xml_generator.validar_xml_contra_xsd(xml_content, xsd_path)
+        
+        if not resultado_validacion['valido']:
+            errores_detalle = resultado_validacion.get('errores', 'Sin detalles de error')
+            logger.error(f"❌ Error de validación XSD independiente: {resultado_validacion['mensaje']}\nDetalles: {errores_detalle}")
             
-            # Obtener la ruta del XSD
-            xsd_path = self._obtener_ruta_xsd()
-            
-            # Crear generador para usar el método de validación
-            xml_generator = SRIXMLGenerator()
-            
-            # Validar contra el XSD
-            logger.info(f"🔍 Validando XML independiente contra XSD: {xsd_path}")
-            xml_generator.validar_xml_contra_xsd(xml_content, xsd_path)
-            logger.info("✅ XML válido según XSD del SRI")
-            
-        except Exception as e:
-            logger.error(f"❌ Error de validación XSD independiente: {str(e)}")
             # Guardar XML problemático para debugging
             debug_path = xml_path.replace('.xml', '_INVALID_VALIDATION.xml')
             import shutil
@@ -283,7 +296,9 @@ class SRIIntegration:
             logger.error(f"📁 XML inválido guardado para debugging en: {debug_path}")
             
             # 🛑 FALLAR COMPLETAMENTE
-            raise Exception(f"XML NO VÁLIDO según XSD del SRI: {str(e)}. Debug: {debug_path}")
+            raise Exception(f"XML NO VÁLIDO según XSD del SRI: {resultado_validacion['mensaje']}. Detalles: {errores_detalle}. Debug: {debug_path}")
+        else:
+            logger.info("✅ XML válido según XSD del SRI")
     
     def _obtener_ruta_xsd(self):
         """
@@ -344,7 +359,17 @@ class SRIIntegration:
             raise ValueError("RUC no configurado en Opciones")
         ruc = opciones.identificacion.zfill(13)
         
-        ambiente = '1' if self.ambiente == 'pruebas' else '2'
+        # 🔄 SINCRONIZAR con Opciones.tipo_ambiente
+        try:
+            opciones = Opciones.objects.first()
+            if opciones and opciones.tipo_ambiente:
+                ambiente = opciones.tipo_ambiente
+            else:
+                # Fallback a ambiente actual
+                ambiente = '1' if self.ambiente == 'pruebas' else '2'
+        except Exception:
+            # Fallback a ambiente actual
+            ambiente = '1' if self.ambiente == 'pruebas' else '2'
         serie = f"{factura.establecimiento}{factura.punto_emision}"
         
         # Usar el campo correcto para la secuencia
