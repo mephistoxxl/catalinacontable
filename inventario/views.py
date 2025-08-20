@@ -1371,7 +1371,8 @@ class DetallesFactura(LoginRequiredMixin, View):
                             if not sri_pago:
                                 raise Exception(f"Pago {i+1}: forma de pago SRI requerida - no se especificó")
                                 
-                            caja_valor = pago.get('caja')
+                            # Aceptar tanto 'caja' como 'caja_id'
+                            caja_valor = pago.get('caja') or pago.get('caja_id')
                             if not caja_valor:
                                 raise Exception(f"Pago {i+1}: caja requerida - no se especificó")
                                 
@@ -1517,6 +1518,11 @@ class DetallesFactura(LoginRequiredMixin, View):
             print(f"Traceback: {traceback.format_exc()}")
             # 🚫 NO MÁS FALLBACKS - ERROR CRÍTICO DEBE DETENER TODO
             raise Exception(f"PROCESAMIENTO DE FORMAS DE PAGO FALLÓ: {e}")
+            
+        # 🔍 VALIDACIÓN FINAL: Verificar que al menos se haya creado una forma de pago
+        pagos_creados = factura.formas_pago.all().count()
+        if pagos_creados == 0:
+            raise Exception("FORMAS DE PAGO REQUERIDAS - No se crearon formas de pago válidas. Por favor, agregue al menos una forma de pago antes de enviar.")
 
         # 🔍 VALIDACIÓN CRÍTICA: Verificar coherencia entre pagos y total de factura
         try:

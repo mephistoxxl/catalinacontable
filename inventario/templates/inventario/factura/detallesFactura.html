@@ -665,6 +665,10 @@ function validarFormulario() {
     });
     
     // Verificar formas de pago
+    console.log('🔍 Verificando formas de pago:', pagosEfectivo);
+    console.log('🔍 Tipo de pagosEfectivo:', typeof pagosEfectivo);
+    console.log('🔍 Longitud de pagosEfectivo:', pagosEfectivo ? pagosEfectivo.length : 'undefined');
+    
     if (!pagosEfectivo || pagosEfectivo.length === 0) {
         // 🚫 NO MAS PAGOS AUTOMATICOS - Usuario debe agregar explícitamente
         alert('ERROR: Debe agregar al menos una forma de pago manualmente.\n\n' +
@@ -672,7 +676,7 @@ function validarFormulario() {
               '1. Haga clic en "Efectivo" en Formas de Pago\n' +
               '2. Seleccione una caja\n' +
               '3. Ingrese el monto\n' +
-              '4. Haga clic en "Confirmar Pago"');
+              '4. Haga clic en "Agregar Pago" o presione Enter');
         return false;
     }
     
