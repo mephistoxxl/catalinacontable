@@ -800,7 +800,7 @@ function confirmarPagoEfectivo() {
         tipo: 'efectivo',
         sri_pago: sriPago,
         sri_pago_descripcion: sriPagoSelect.options[sriPagoSelect.selectedIndex].text,
-        caja_id: cajaId || 'efectivo',
+        caja: cajaId || 'efectivo',
         caja_descripcion: cajaId ? cajaSelect.options[cajaSelect.selectedIndex].text : 'Efectivo'
     };
     
@@ -920,7 +920,7 @@ function agregarPagoEfectivo() {
         tipo: 'efectivo',
         sri_pago: sriPago,
         sri_pago_descripcion: sriPagoSelect.options[sriPagoSelect.selectedIndex].text,
-        caja_id: cajaId,  // ✅ NUEVO: ID de la caja para enviar al servidor
+        caja: cajaId,  // ✅ NUEVO: ID de la caja para enviar al servidor
         caja_descripcion: cajaSelect.options[cajaSelect.selectedIndex].text
     };
     
