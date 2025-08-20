@@ -400,6 +400,8 @@ fetch(`/inventario/buscar_producto/?q=${encodeURIComponent(codigo)}`)
             let tipo = producto.tipo === 'servicio' ? 'Servicio' : 'Producto';
             document.getElementById('producto').value = `${producto.nombre} (${tipo})`;
             document.getElementById('producto').dataset.precio = producto.precio;
+            document.getElementById('producto').dataset.ivaPercent = producto.iva_percent || '0.12';
+            document.getElementById('producto').dataset.precioCiva = producto.precio_con_iva;
             document.getElementById('producto').dataset.codigo = producto.codigo;
             limpiarMensajesError();
         } else {
@@ -456,6 +458,15 @@ function agregarProducto() {
 
     let subtotal = (cantidad * precio);
 
+    // Calcular precios con IVA
+    let ivaPercent = parseFloat(document.getElementById('producto').dataset.ivaPercent || '0.12');
+    let precioConIva = precio * (1 + ivaPercent);
+    let totalConIva = cantidad * precioConIva;
+
+    // Redondear a 2 decimales
+    precioConIva = Math.round(precioConIva * 100) / 100;
+    totalConIva = Math.round(totalConIva * 100) / 100;
+    
     // Agregar al array de productos
     const productoData = {
         id: contadorProductos++,
@@ -463,7 +474,10 @@ function agregarProducto() {
         nombre: nombreProducto,
         cantidad: cantidad,
         precio: precio,
-        subtotal: subtotal
+        precioConIva: precioConIva,
+        subtotal: subtotal,
+        totalConIva: totalConIva,
+        ivaPercent: ivaPercent
     };
 
     productosAgregados.push(productoData);
@@ -494,12 +508,24 @@ function agregarFilaTabla(producto) {
     let nuevaFila = document.createElement('tr');
     nuevaFila.setAttribute('data-producto-id', producto.id);
     
+    // Calcular IVA para mostrar
+    const ivaValor = (producto.precioConIva - producto.precio).toFixed(2);
+    const ivaPorcentaje = (producto.ivaPercent * 100).toFixed(0);
+    
     nuevaFila.innerHTML = `
         <td>${producto.codigo}</td>
         <td>${producto.nombre}</td>
         <td>${producto.cantidad}</td>
-        <td>$${producto.precio.toFixed(2)}</td>
-        <td class="subtotal">$${producto.subtotal.toFixed(2)}</td>
+        <td>
+            <div>Base: $${producto.precio.toFixed(2)}</div>
+            <div class="text-xs text-gray-500">IVA ${ivaPorcentaje}%: $${ivaValor}</div>
+            <div class="font-bold">Total: $${producto.precioConIva.toFixed(2)}</div>
+        </td>
+        <td class="subtotal">
+            <div>Base: $${producto.subtotal.toFixed(2)}</div>
+            <div class="text-xs text-gray-500">IVA: $${(producto.totalConIva - producto.subtotal).toFixed(2)}</div>
+            <div class="font-bold">Total: $${producto.totalConIva.toFixed(2)}</div>
+        </td>
         <td class="accion">
             <button type="button" class="btn btn-danger btn-sm" onclick="eliminarProducto(${producto.id})">
                 Eliminar
@@ -577,13 +603,18 @@ function actualizarCamposOcultos() {
 
 // ✅ FUNCIÓN EXISTENTE MODIFICADA: Ahora también actualiza formas de pago
 function actualizarTotal() {
-    const total = productosAgregados.reduce((sum, producto) => sum + producto.subtotal, 0);
-    document.getElementById('total-general').textContent = `${total.toFixed(2)}`;
+    // Calcular total con IVA
+    const totalConIva = productosAgregados.reduce((sum, producto) => sum + producto.totalConIva, 0);
+    // Redondear a 2 decimales
+    const totalRedondeado = Math.round(totalConIva * 100) / 100;
+    
+    // Actualizar totales en la interfaz
+    document.getElementById('total-general').textContent = `${totalRedondeado.toFixed(2)}`;
     
     // ✅ ACTUALIZAR: Siempre mantener visible la sección de formas de pago
     document.getElementById('seccion-formas-pago').style.display = 'block';
-    // Actualizar el total en la sección de formas de pago
-    document.getElementById('total-formas-display').textContent = `${total.toFixed(2)}`;
+    // Actualizar el total en la sección de formas de pago (con IVA)
+    document.getElementById('total-formas-display').textContent = `${totalRedondeado.toFixed(2)}`;
     
     // 🚫 NO MAS PAGO AUTOMATICO - Usuario debe agregar manualmente
     // Se eliminó la función autoAgregarPagoCompleto()
@@ -1011,7 +1042,7 @@ document.addEventListener('DOMContentLoaded', function() {
         montoEfectivoInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                agregarPagoEfectivo();
+                confirmarPagoEfectivo();
             }
         });
     }

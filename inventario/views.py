@@ -1458,10 +1458,14 @@ def buscar_producto(request):
         # Buscar producto exacto
         producto = Producto.objects.filter(codigo__iexact=codigo).first()
         if producto:
+            precio_base = float(producto.precio) if producto.precio else 0.0
+            iva_percent = float(producto.iva) if hasattr(producto, 'iva') else 0.12  # IVA por defecto 12%
             resultados.append({
                 'codigo': producto.codigo,
                 'nombre': producto.descripcion,
-                'precio': float(producto.precio) if producto.precio else 0.0,
+                'precio': precio_base,
+                'iva_percent': iva_percent,
+                'precio_con_iva': precio_base * (1 + iva_percent),
                 'tipo': 'producto'
             })
 
