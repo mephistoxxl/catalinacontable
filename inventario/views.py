@@ -1322,31 +1322,70 @@ class DetallesFactura(LoginRequiredMixin, View):
         else:
             print(f"✅ Clave de acceso ya existe: {factura.clave_acceso}")
 
-        # ✅ CORREGIDO: PROCESAR FORMAS DE PAGO DESPUÉS DE ASEGURAR ID
+        # ✅ PROCESAR FORMAS DE PAGO
         try:
-            # Initialize error handling for payment processing
             print("=== PROCESANDO FORMAS DE PAGO ===")
             print(f"📋 POST data keys: {list(request.POST.keys())}")
-            print(f"📋 POST data completo: {dict(request.POST)}")
             
-            # Obtener datos de pagos del JavaScript (enviados como JSON string)
+            # Obtener y validar datos de pagos
             pagos_data = request.POST.get('pagos_efectivo', '[]')
-            print(f"📦 Datos de pagos recibidos (raw): '{pagos_data}'")
-            print(f"📦 Tipo: {type(pagos_data)}, Longitud: {len(pagos_data)}")
+            print(f"📦 Datos de pagos recibidos: {pagos_data}")
             
-            import json
-            try:
-                pagos_list = json.loads(pagos_data)
-                # Resto del código de procesamiento de pagos aquí
-                pass
-            except json.JSONDecodeError as json_error:
-                print(f"❌ Error decodificando JSON de pagos: {json_error}")
-                raise Exception(f"DATOS DE PAGO INVÁLIDOS: {json_error}")
+            pagos_list = json.loads(pagos_data)
+            if not pagos_list:
+                raise Exception("FORMAS DE PAGO REQUERIDAS - No se recibieron datos de pago")
+            
+            # Limpiar formas de pago anteriores
+            if hasattr(factura, 'formas_pago'):
+                factura.formas_pago.all().delete()
+            
+            # Procesar cada pago
+            suma_pagos = Decimal('0.00')
+            for pago in pagos_list:
+                # Validar campos requeridos
+                sri_pago = pago.get('sri_pago')
+                if not sri_pago:
+                    raise Exception("Código SRI de forma de pago es requerido")
+                
+                try:
+                    monto = Decimal(str(pago.get('monto', '0')))
+                except InvalidOperation:
+                    raise Exception("Monto de pago inválido")
+                
+                # Obtener la caja (acepta tanto 'caja' como 'caja_id')
+                caja_id = pago.get('caja') or pago.get('caja_id')
+                if not caja_id:
+                    raise Exception("Caja no especificada para el pago")
+                
+                try:
+                    caja = Caja.objects.get(id=caja_id, activo=True)
+                except Caja.DoesNotExist:
+                    raise Exception(f"Caja {caja_id} no existe o está inactiva")
+                
+                # Crear forma de pago
+                FormaPago.objects.create(
+                    factura=factura,
+                    forma_pago=sri_pago,
+                    total=monto,
+                    caja=caja
+                )
+                suma_pagos += monto
+            
+            # Validar que la suma coincida con el total de la factura
+            if suma_pagos != factura.monto_general:
+                raise Exception(f"La suma de pagos (${suma_pagos}) no coincide con el total de la factura (${factura.monto_general})")
+            
+            # Guardar la factura y retornar respuesta exitosa
+            factura.save()
+            messages.success(request, "Factura procesada correctamente")
+            return redirect('inventario:verFactura', p=factura.id)
+            
+        except json.JSONDecodeError as e:
+            messages.error(request, f"Error en datos de pago: {str(e)}")
+            return redirect('inventario:emitirFactura')
         except Exception as e:
-            print(f"❌ Error general en procesamiento de formas de pago: {e}")
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
-            raise Exception(f"PROCESAMIENTO DE FORMAS DE PAGO FALLÓ: {e}")
+            messages.error(request, str(e))
+            return redirect('inventario:emitirFactura')
 
     def get(self, request):
         try:
