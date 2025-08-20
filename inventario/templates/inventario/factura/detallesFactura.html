@@ -777,7 +777,10 @@ function confirmarPagoEfectivo() {
     const sriPagoSelect = document.getElementById('sri-pago-select');
     const cajaSelect = document.getElementById('caja-select');
     
-    const monto = parseFloat(montoInput.value);
+    // Normalizar el valor del monto (reemplazar coma por punto)
+    let montoStr = montoInput.value.replace(',', '.');
+    // Parsear y redondear a 2 decimales
+    const monto = Math.round(parseFloat(montoStr) * 100) / 100;
     const sriPago = sriPagoSelect.value;
     const cajaId = cajaSelect.value;
     
@@ -960,8 +963,15 @@ function actualizarTablaPagosEfectivo() {
 
 // Función para actualizar el total pagado
 function actualizarTotalPagado() {
-    totalPagado = pagosEfectivo.reduce((sum, pago) => sum + pago.monto, 0);
-    console.log('Total pagado:', totalPagado);
+    // Sumar todos los montos y redondear a 2 decimales
+    totalPagado = pagosEfectivo.reduce((sum, pago) => {
+        // Asegurar que cada monto individual esté redondeado a 2 decimales
+        const montoRedondeado = Math.round(pago.monto * 100) / 100;
+        return sum + montoRedondeado;
+    }, 0);
+    // Redondear el total final a 2 decimales
+    totalPagado = Math.round(totalPagado * 100) / 100;
+    console.log('Total pagado (redondeado a 2 decimales):', totalPagado.toFixed(2));
 }
 
 // Event listeners

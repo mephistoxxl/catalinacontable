@@ -1340,7 +1340,9 @@ class DetallesFactura(LoginRequiredMixin, View):
                 factura.formas_pago.all().delete()
             
             # Procesar cada pago
+            PRECISION_DOS_DECIMALES = Decimal('0.01')
             suma_pagos = Decimal('0.00')
+            
             for pago in pagos_list:
                 # Validar campos requeridos
                 sri_pago = pago.get('sri_pago')
@@ -1348,7 +1350,11 @@ class DetallesFactura(LoginRequiredMixin, View):
                     raise Exception("Código SRI de forma de pago es requerido")
                 
                 try:
-                    monto = Decimal(str(pago.get('monto', '0')))
+                    # Normalizar el monto: reemplazar coma por punto y asegurar 2 decimales
+                    monto_str = str(pago.get('monto', '0')).replace(',', '.')
+                    monto = Decimal(monto_str).quantize(PRECISION_DOS_DECIMALES, rounding=ROUND_HALF_UP)
+                    if monto <= 0:
+                        raise Exception("El monto debe ser mayor a cero")
                 except InvalidOperation:
                     raise Exception("Monto de pago inválido")
                 
@@ -1362,7 +1368,7 @@ class DetallesFactura(LoginRequiredMixin, View):
                 except Caja.DoesNotExist:
                     raise Exception(f"Caja {caja_id} no existe o está inactiva")
                 
-                # Crear forma de pago
+                # Crear forma de pago con monto normalizado
                 FormaPago.objects.create(
                     factura=factura,
                     forma_pago=sri_pago,
@@ -1371,9 +1377,16 @@ class DetallesFactura(LoginRequiredMixin, View):
                 )
                 suma_pagos += monto
             
+            # Normalizar tanto la suma como el total de la factura a 2 decimales
+            suma_pagos = suma_pagos.quantize(PRECISION_DOS_DECIMALES, rounding=ROUND_HALF_UP)
+            monto_factura = factura.monto_general.quantize(PRECISION_DOS_DECIMALES, rounding=ROUND_HALF_UP)
+            
             # Validar que la suma coincida con el total de la factura
-            if suma_pagos != factura.monto_general:
-                raise Exception(f"La suma de pagos (${suma_pagos}) no coincide con el total de la factura (${factura.monto_general})")
+            if suma_pagos != monto_factura:
+                raise Exception(
+                    f"La suma de pagos (${suma_pagos}) no coincide con el total de la factura (${monto_factura}). "
+                    f"Por favor, verifique que los montos ingresados sumen exactamente el total de la factura."
+                )
             
             # Guardar la factura y retornar respuesta exitosa
             factura.save()
