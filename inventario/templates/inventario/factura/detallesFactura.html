@@ -262,7 +262,7 @@ table th {
                                                 <div class="relative">
                                                     <span class="absolute left-2 top-2 text-gray-500 text-xs">$</span>
                                                     <input type="number" class="w-full pl-6 pr-3 py-2" 
-                                                           id="monto-efectivo" step="0.01" min="0" onchange="agregarPagoEfectivo()">
+                                                           id="monto-efectivo" step="0.01" min="0">
                                                 </div>
                                             </div>
                                             
@@ -791,21 +791,21 @@ function confirmarPagoEfectivo() {
         return;
     }
     
-    // ✅ OPCIONAL: Validar caja solo si hay cajas disponibles
-    if (cajaSelect.options.length > 1 && !cajaId) {
-        alert('Debe seleccionar una caja');
+    // Exigir cajaId válido
+    if (!cajaId) {
+        alert('Debe seleccionar una caja válida');
         return;
     }
     
-    // ✅ CREAR PAGO
+    // CREAR PAGO sin defaults
     const pago = {
         id: Date.now(),
         monto: monto,
         tipo: 'efectivo',
         sri_pago: sriPago,
         sri_pago_descripcion: sriPagoSelect.options[sriPagoSelect.selectedIndex].text,
-        caja: cajaId || 'efectivo',
-        caja_descripcion: cajaId ? cajaSelect.options[cajaSelect.selectedIndex].text : 'Efectivo'
+        caja: cajaId,
+        caja_descripcion: cajaSelect.options[cajaSelect.selectedIndex].text
     };
     
     pagosEfectivo.push(pago);
@@ -891,59 +891,7 @@ function cambiarFormaPago(forma) {
     }
 }
 
-// Función para agregar pago en efectivo
-function agregarPagoEfectivo() {
-    const montoInput = document.getElementById('monto-efectivo');
-    const sriPagoSelect = document.getElementById('sri-pago-select');
-    const cajaSelect = document.getElementById('caja-select');
-    
-    const monto = parseFloat(montoInput.value);
-    const sriPago = sriPagoSelect.value;
-    const cajaId = cajaSelect.value;
-    
-    // ✅ VALIDACIÓN: Solo procesar si hay una caja seleccionada
-    if (!cajaId) {
-        // No hacer nada si no hay caja seleccionada
-        return;
-    }
-    
-    if (!monto || monto <= 0) {
-        alert('Debe ingresar un monto válido');
-        return;
-    }
-    
-    if (!sriPago) {
-        alert('Debe seleccionar una forma de pago SRI');
-        return;
-    }
-    
-    // ✅ MODIFICAR: Guardar información completa de la caja
-    const pago = {
-        id: Date.now(),
-        monto: monto,
-        tipo: 'efectivo',
-        sri_pago: sriPago,
-        sri_pago_descripcion: sriPagoSelect.options[sriPagoSelect.selectedIndex].text,
-        caja: cajaId,  // ✅ NUEVO: ID de la caja para enviar al servidor
-        caja_descripcion: cajaSelect.options[cajaSelect.selectedIndex].text
-    };
-    
-    pagosEfectivo.push(pago);
-    
-    // Actualizar tabla
-    actualizarTablaPagosEfectivo();
-    
-    // Actualizar total pagado
-    actualizarTotalPagado();
-    
-    // Limpiar input y resetear dropdowns
-    montoInput.value = '';
-    sriPagoSelect.selectedIndex = 0;
-    cajaSelect.selectedIndex = 0;
-    
-    // Ocultar campo de monto al resetear
-    document.getElementById('monto-container').style.display = 'none';
-}
+
 
 // ✅ NUEVA FUNCIÓN: Mostrar/ocultar campo de monto según selección de caja
 function mostrarCampoMonto() {

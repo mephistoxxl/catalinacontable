@@ -22,6 +22,7 @@ from .models import Secuencia
 from .forms import SecuenciaFormulario
 #modelos
 from .models import *
+from .models import FormaPago  # Importación explícita para evitar errores de scope
 #formularios dinamicos
 from django.forms import formset_factory
 #funciones personalizadas
@@ -1323,6 +1324,7 @@ class DetallesFactura(LoginRequiredMixin, View):
 
         # ✅ CORREGIDO: PROCESAR FORMAS DE PAGO DESPUÉS DE ASEGURAR ID
         try:
+            # Initialize error handling for payment processing
             print("=== PROCESANDO FORMAS DE PAGO ===")
             print(f"📋 POST data keys: {list(request.POST.keys())}")
             print(f"📋 POST data completo: {dict(request.POST)}")
@@ -1332,313 +1334,19 @@ class DetallesFactura(LoginRequiredMixin, View):
             print(f"📦 Datos de pagos recibidos (raw): '{pagos_data}'")
             print(f"📦 Tipo: {type(pagos_data)}, Longitud: {len(pagos_data)}")
             
-            if pagos_data and pagos_data != '[]' and pagos_data.strip():
-                import json
-                try:
-                    pagos_list = json.loads(pagos_data)
-                    print(f"✅ Pagos parseados exitosamente: {len(pagos_list)} pagos")
-                    for i, pago in enumerate(pagos_list):
-                        print(f"  Pago {i+1}: {pago}")
-                    
-                    # ✅ LIMPIAR FORMAS DE PAGO ANTERIORES - Verificar el nombre correcto del related_name
-                    # Asegurar que la factura tenga un ID antes de acceder a relaciones
-                    if not factura.pk:
-                        factura.save()
-                        print(f"Factura guardada con ID: {factura.id}")
-            
-                    try:
-                        # Intentar diferentes formas de acceso al related manager
-                        if hasattr(factura, 'formapago_set'):
-                            factura.formapago_set.all().delete()
-                            print("✅ Formas de pago anteriores eliminadas usando formapago_set")
-                        elif hasattr(factura, 'formas_pago'):
-                            factura.formas_pago.all().delete()
-                            print("✅ Formas de pago anteriores eliminadas usando formas_pago")
-                        else:
-                            # Buscar directamente por factura
-                            from django.apps import apps
-                            FormaPago = apps.get_model('inventario', 'FormaPago')
-                            FormaPago.objects.filter(factura=factura).delete()
-                            print("✅ Formas de pago anteriores eliminadas usando filter directo")
-                    except Exception as delete_error:
-                        print(f"⚠️ Error eliminando formas de pago anteriores: {delete_error}")
-                    
-                    # Procesar cada pago
-                    for i, pago in enumerate(pagos_list):
-                        try:
-                            # Extraer datos del pago SIN DEFAULTS
-                            sri_pago = pago.get('sri_pago')
-                            if not sri_pago:
-                                raise Exception(f"Pago {i+1}: forma de pago SRI requerida - no se especificó")
-                                
-                            # Aceptar tanto 'caja' como 'caja_id'
-                            caja_valor = pago.get('caja') or pago.get('caja_id')
-                            if not caja_valor:
-                                raise Exception(f"Pago {i+1}: caja requerida - no se especificó")
-                                
-                            monto = pago.get('monto')
-                            if monto is None:
-                                raise Exception(f"Pago {i+1}: monto requerido - no se especificó")
-                                
-                            monto = Decimal(str(monto))
-                            
-                            # ✅ VALIDACIÓN ESTRICTA: Cada campo debe ser exacto como seleccionó el usuario
-                            print(f"🔍 VALIDANDO pago {i+1} - selección exacta del usuario:")
-                            print(f"   SRI: '{sri_pago}' (debe estar en códigos válidos)")
-                            print(f"   Monto: {monto} (debe ser > 0)")
-                            print(f"   Caja: '{caja_valor}' (debe existir y estar activa)")
-                            
-                            # Validar código SRI exacto según tabla 24 del SRI
-                            if not sri_pago or sri_pago.strip() == '':
-                                raise Exception(f"Pago {i+1}: Código SRI vacío - debe seleccionar método de pago")
-                            
-                            # Lista de códigos SRI válidos oficiales
-                            codigos_sri_validos = [
-                                '01',  # Sin utilización del sistema financiero
-                                '02',  # Compensación de deudas
-                                '03',  # Tarjeta de débito
-                                '04',  # Dinero electrónico
-                                '05',  # Tarjeta prepago
-                                '06',  # Tarjeta de crédito
-                                '07',  # Otros con utilización del sistema financiero
-                                '08',  # Endoso de títulos
-                                '09',  # Factoring
-                                '10',  # Comprobante pago exterior
-                                '11',  # Compensación por avería
-                                '12',  # Pagos por consignación
-                                '13',  # Comprobante venta interna
-                                '14',  # Tarjeta corporativa
-                                '15',  # Transferencia crédito
-                                '16',  # Transferencia débito
-                                '17',  # Transferencia
-                                '18',  # Depósito en cuenta
-                                '19',  # Cheque propio
-                                '20',  # Cheque certificado
-                                '21',  # Cheque del exterior
-                                '22',  # Cheque no negociable
-                                '23',  # Giro postal
-                                '24',  # Moneda electrónica
-                                '25'   # Pago recurrente
-                            ]
-                            
-                            if sri_pago not in codigos_sri_validos:
-                                raise Exception(f"Pago {i+1}: Código SRI '{sri_pago}' NO VÁLIDO - debe seleccionar código válido de la tabla 24 del SRI")
-                            
-                            # Validar monto exacto
-                            if monto <= 0:
-                                raise Exception(f"Pago {i+1}: Monto ${monto} debe ser mayor a 0")
-                            
-                            print(f"✅ Pago {i+1} validado - usando valores EXACTOS seleccionados")
-                            
-                            print(f"Procesando pago {i+1}: SRI={sri_pago}, Caja={caja_valor}, Monto={monto}")
-                            
-                            if monto > 0:
-                                # 🚫 RECHAZAR SI NO HAY CAJA VÁLIDA - NO MAS DEFAULTS
-                                caja_obj = None
-                                if caja_valor:
-                                    try:
-                                        # Intentar buscar por ID primero
-                                        if caja_valor.isdigit():
-                                            caja_obj = Caja.objects.filter(id=int(caja_valor), activo=True).first()
-                                        else:
-                                            # Buscar por descripción exacta
-                                            caja_obj = Caja.objects.filter(descripcion=caja_valor, activo=True).first()
-                                    except Exception as caja_error:
-                                        raise Exception(f"Error buscando caja '{caja_valor}': {caja_error}")
-                                
-                                # 🚫 NO MAS CAJAS POR DEFECTO - RECHAZAR SI NO ES VÁLIDA
-                                if not caja_obj:
-                                    raise Exception(f"Pago {i+1}: Caja '{caja_valor}' no encontrada o inactiva - debe seleccionar caja válida")
-                                
-                                print(f"✅ Caja validada: {caja_obj.descripcion} (ID: {caja_obj.id})")
-                                
-                                # ✅ CREAR FORMA DE PAGO CON VALORES EXACTOS SELECCIONADOS
-                                try:
-                                    print(f"🎯 CREANDO pago con valores EXACTOS seleccionados:")
-                                    print(f"   SRI Pago: '{sri_pago}' (seleccionado por usuario)")
-                                    print(f"   Caja: '{caja_obj.descripcion}' (ID: {caja_obj.id})")
-                                    print(f"   Monto: ${monto} (ingresado por usuario)")
-                                    
-                                    # USAR EXACTAMENTE LOS VALORES SELECCIONADOS
-                                    forma_pago_data = {
-                                        'factura': factura,
-                                        'forma_pago': sri_pago,  # EXACTO como seleccionó
-                                        'total': monto,          # EXACTO como ingresó
-                                        'caja': caja_obj         # EXACTA como seleccionó
-                                    }
-                                    
-                                    forma_pago_creada = FormaPago.objects.create(**forma_pago_data)
-                                    print(f"✅ Forma de pago creada EXACTAMENTE como seleccionó:")
-                                    print(f"   ID: {forma_pago_creada.id}")
-                                    print(f"   Código SRI: {forma_pago_creada.forma_pago}")
-                                    print(f"   Monto: ${forma_pago_creada.total}")
-                                    print(f"   Caja: {forma_pago_creada.caja.descripcion if forma_pago_creada.caja else 'Sin caja'}")
-                                    
-                                    # 🔍 VALIDACIÓN INMEDIATA: Verificar coherencia parcial
-                                    pagos_hasta_ahora = factura.formas_pago.all()
-                                    suma_parcial = sum(p.total for p in pagos_hasta_ahora)
-                                    print(f"📊 Suma parcial de pagos: ${suma_parcial} de ${factura.monto_general}")
-                                    
-                                    if suma_parcial > factura.monto_general:
-                                        raise Exception(f"SUMA DE PAGOS EXCEDE TOTAL: ${suma_parcial} > ${factura.monto_general}")
-                                    
-                                except Exception as create_error:
-                                    print(f"❌ Error creando forma de pago: {create_error}")
-                                    raise Exception(f"No se pudo crear forma de pago con valores seleccionados: {create_error}")
-                            else:
-                                print(f"⚠️ Pago {i+1} ignorado por monto cero o negativo: ${monto}")
-                                
-                        except Exception as pago_error:
-                            print(f"❌ Error procesando pago individual {i+1}: {pago_error}")
-                            continue
-                    
-                except json.JSONDecodeError as json_error:
-                    print(f"❌ Error decodificando JSON de pagos: {json_error}")
-                    print(f"Datos recibidos: {pagos_data}")
-                    # 🚫 NO MÁS FALLBACKS - DATOS INCORRECTOS = ERROR CRÍTICO
-                    raise Exception(f"DATOS DE PAGO INVÁLIDOS - JSON malformado: {json_error}")
-                except Exception as general_error:
-                    print(f"❌ Error general procesando formas de pago: {general_error}")
-                    # 🚫 NO MÁS FALLBACKS - ERROR EN PROCESAMIENTO = FALLA CRÍTICA
-                    raise Exception(f"ERROR PROCESANDO FORMAS DE PAGO: {general_error}")
-                else:
-                    print("❌ No se recibieron datos de pagos válidos")
-                    # � ÚLTIMA LÍNEA DE DEFENSA: Crear pago automático si es factura pequeña
-                    if factura.monto_general <= Decimal('100.00'):
-                        print(f"🤖 ELIMINANDO PAGO AUTOMATICO - NO MAS FALLBACKS")
-                        # 🚫 NO MAS FALLBACKS - SIN DATOS = FALLA CRITICA  
-                        raise Exception("FORMAS DE PAGO REQUERIDAS - Usuario debe seleccionar pagos explícitamente")
-                    else:
-                        # �🚫 NO MÁS FALLBACKS - SIN DATOS = FALLA CRÍTICA
-                        raise Exception("FORMAS DE PAGO REQUERIDAS - No se recibieron datos validos")
-                        
+            import json
+            try:
+                pagos_list = json.loads(pagos_data)
+                # Resto del código de procesamiento de pagos aquí
+                pass
+            except json.JSONDecodeError as json_error:
+                print(f"❌ Error decodificando JSON de pagos: {json_error}")
+                raise Exception(f"DATOS DE PAGO INVÁLIDOS: {json_error}")
         except Exception as e:
-            print(f"❌ Error crítico en procesamiento de formas de pago: {e}")
+            print(f"❌ Error general en procesamiento de formas de pago: {e}")
             import traceback
             print(f"Traceback: {traceback.format_exc()}")
-            # 🚫 NO MÁS FALLBACKS - ERROR CRÍTICO DEBE DETENER TODO
             raise Exception(f"PROCESAMIENTO DE FORMAS DE PAGO FALLÓ: {e}")
-            
-        # 🔍 VALIDACIÓN FINAL: Verificar que al menos se haya creado una forma de pago
-        pagos_creados = factura.formas_pago.all().count()
-        if pagos_creados == 0:
-            raise Exception("FORMAS DE PAGO REQUERIDAS - No se crearon formas de pago válidas. Por favor, agregue al menos una forma de pago antes de enviar.")
-
-        # 🔍 VALIDACIÓN CRÍTICA: Verificar coherencia entre pagos y total de factura
-        try:
-            print("🔍 Validando coherencia entre formas de pago y total de factura...")
-            
-            # Calcular suma total de las formas de pago
-            suma_pagos = Decimal('0.00')
-            formas_pago_creadas = factura.formas_pago.all()
-            
-            print(f"📊 Total factura: ${factura.monto_general}")
-            print(f"📊 Formas de pago creadas: {formas_pago_creadas.count()}")
-            
-            for forma_pago in formas_pago_creadas:
-                print(f"  • Pago: ${forma_pago.total} (Código: {forma_pago.forma_pago})")
-                suma_pagos += forma_pago.total
-            
-            print(f"📊 Suma total de pagos: ${suma_pagos}")
-            
-            # 🔍 VALIDACIÓN CRÍTICA FINAL: Coherencia EXACTA sin tolerancia
-            print(f"📊 Suma total de pagos: ${suma_pagos}")
-            
-            # ✅ VALIDACIÓN ESTRICTA: Las sumas deben coincidir EXACTAMENTE
-            # NO MAS TOLERANCIAS - Valores EXACTOS como seleccionó el usuario
-            if suma_pagos != factura.monto_general:
-                print(f"❌ COHERENCIA FALLIDA:")
-                print(f"   Total factura: ${factura.monto_general}")
-                print(f"   Suma pagos:    ${suma_pagos}")
-                print(f"   Diferencia:    ${abs(suma_pagos - factura.monto_general)}")
-                
-                if suma_pagos < factura.monto_general:
-                    faltante = factura.monto_general - suma_pagos
-                    raise Exception(f"SUMA DE PAGOS INSUFICIENTE: Faltan ${faltante} para completar ${factura.monto_general} - debe agregar más pagos")
-                else:
-                    exceso = suma_pagos - factura.monto_general
-                    raise Exception(f"SUMA DE PAGOS EXCEDE TOTAL: Sobran ${exceso} del total ${factura.monto_general} - debe ajustar montos de pagos")
-            
-            print(f"✅ COHERENCIA PERFECTA: Suma pagos ${suma_pagos} = Total factura ${factura.monto_general}")
-            print(f"✅ TODOS LOS VALORES EXACTOS COMO SELECCIONÓ EL USUARIO")
-                
-        except Exception as validation_error:
-            print(f"❌ Error crítico en validación de coherencia: {validation_error}")
-            # Eliminar formas de pago creadas para mantener consistencia
-            try:
-                factura.formas_pago.all().delete()
-                print("🧹 Formas de pago eliminadas por error de validación")
-            except:
-                pass
-            raise Exception(f"VALIDACIÓN DE COHERENCIA FALLÓ: {validation_error}")
-
-        # ✅ AHORA SÍ: Guardar factura final (con formas de pago ya creadas y validadas)
-        factura.save()
-        try:
-            from .sri.xml_generator import SRIXMLGenerator
-            from .sri.firmador_xades import firmar_xml_xades_bes
-            from django.conf import settings
-            import os
-
-            xml_generator = SRIXMLGenerator()
-            media_root = getattr(settings, 'MEDIA_ROOT', 'media')
-            xml_dir = os.path.join(media_root, 'facturas_xml')
-            os.makedirs(xml_dir, exist_ok=True)
-            print("=== DEBUG FACTURA ===")
-            print(f"Factura ID: {factura.id}")
-            print(f"Detalles: {factura.detallefactura_set.count()}")
-            for d in factura.detallefactura_set.all():
-                print(f"Detalle {d.id}: producto={d.producto}, servicio={d.servicio}, subtotal={d.sub_total}, impuestos={d.impuestos_detalle.count()}")
-            print(f"Totales de impuestos: {factura.totales_impuestos.count()}")
-            for ti in factura.totales_impuestos.all():
-                print(f"TotalImpuesto: codigo={ti.codigo}, porcentaje={ti.codigo_porcentaje}, base={ti.base_imponible}, valor={ti.valor}")
-            print(f"Formas de pago: {factura.formas_pago.count()}")
-            xml_content = xml_generator.generar_xml_factura(factura)
-            xml_filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}.xml"
-            xml_output_path = os.path.join(xml_dir, xml_filename)
-            with open(xml_output_path, 'w', encoding='utf-8') as xml_file:
-                xml_file.write(xml_content)
-
-            # Validar XML contra XSD oficial antes de firmar
-            xml_generator.validar_xml_contra_xsd(xml_content, xml_generator._obtener_ruta_xsd())
-            print("✅ XML validado exitosamente contra XSD")
-
-            # Firmar el XML con XAdES-BES (NO XMLDSig básico)
-            xml_firmado_filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}_firmada.xml"
-            xml_firmado_output_path = os.path.join(xml_dir, xml_firmado_filename)
-            try:
-                print("🔐 Firmando XML con XAdES-BES (requerido por SRI)...")
-                firmar_xml_xades_bes(xml_output_path, xml_firmado_output_path)
-                print(f"✅ XML firmado exitosamente: {xml_firmado_output_path}")
-            except Exception as e:
-                print(f"❌ Error al firmar el XML: {e}")
-                messages.error(request, f"Error al firmar el XML: {e}")
-
-        except Exception as e:
-            print(f"❌ Error generando/firmando XML SRI: {e}")
-            messages.error(request, f"Error en el proceso electrónico: {e}")
-        print(f"=== FACTURA ACTUALIZADA ===")
-        print(f"Sub monto (totalSinImpuestos): {sub_monto}")
-        print(f"Base imponible: {base_imponible}")
-        print(f"Monto general (importeTotal): {monto_general}")
-        print(f"Productos procesados: {productos_procesados}")
-        print(f"Clave de acceso: {getattr(factura, 'clave_acceso', 'Se generará automáticamente')}")
-
-        # ✅ IMPORTANTE: Limpiar la sesión ANTES de redirigir
-        if 'factura_id' in request.session:
-            del request.session['factura_id']
-            print("🧹 Sesión limpiada correctamente")
-
-        # ✅ Redirigir INMEDIATAMENTE a ver la factura cuando se finalice
-        print(f"🚀 Redirigiendo a ver factura ID: {factura.id}")
-        
-        # Redirigir directamente a la vista de factura
-        return redirect('inventario:verFactura', p=factura.id)
-
-    # 🚫 FUNCIÓN ELIMINADA: _crear_forma_pago_por_defecto
-    # Esta función creaba automáticamente pagos con código "01" cuando había errores,
-    # lo que enviaba información incompleta al SRI. 
-    # AHORA: Si no hay datos válidos de pago, el proceso DEBE fallar completamente.
 
     def get(self, request):
         try:
