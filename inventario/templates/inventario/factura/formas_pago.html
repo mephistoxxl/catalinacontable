@@ -151,6 +151,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const montoRecibido = montoInput.value;
         
         // Validaciones
+        const formaPagoSelect = document.getElementById('forma_pago');
+        const formaPago = formaPagoSelect.value;
+        
+        if (!formaPago) {
+            alert('Por favor seleccione una forma de pago');
+            return;
+        }
+        
         if (!caja) {
             alert('Por favor seleccione una caja');
             return;
@@ -167,8 +175,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Preparar datos
+        const formaPagoSelect = document.getElementById('forma_pago');
+        const formaPago = formaPagoSelect.value;
+        
         const formData = new FormData();
-        formData.append('forma_pago', 'efectivo');
+        formData.append('forma_pago', formaPago);
         formData.append('caja', caja);
         formData.append('monto_efectivo', montoRecibido);
         formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
