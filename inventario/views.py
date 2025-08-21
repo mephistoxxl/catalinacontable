@@ -1459,7 +1459,22 @@ def buscar_producto(request):
         producto = Producto.objects.filter(codigo__iexact=codigo).first()
         if producto:
             precio_base = float(producto.precio) if producto.precio else 0.0
-            iva_percent = float(producto.iva) if hasattr(producto, 'iva') else 0.12  # IVA por defecto 12%
+            
+            # Mapeo de códigos SRI a porcentaje real
+            MAPEO_IVA = {
+                '0': 0.00,  # Sin IVA
+                '5': 0.05,  # 5%
+                '2': 0.12,  # 12%
+                '10': 0.13, # 13%
+                '3': 0.14,  # 14%
+                '4': 0.15,  # 15%
+                '6': 0.00,  # Exento
+                '7': 0.00,  # Exento
+                '8': 0.08   # 8%
+            }
+            
+            iva_percent = MAPEO_IVA.get(producto.iva, 0.12)  # 12% por defecto
+            
             resultados.append({
                 'codigo': producto.codigo,
                 'nombre': producto.descripcion,
@@ -1483,10 +1498,29 @@ def buscar_producto(request):
         if not resultados:
             productos_similares = Producto.objects.filter(codigo__icontains=codigo)[:5]
             for p in productos_similares:
+                precio_base = float(p.precio) if p.precio else 0.0
+                
+                # Mapeo de códigos SRI a porcentaje real
+                MAPEO_IVA = {
+                    '0': 0.00,  # Sin IVA
+                    '5': 0.05,  # 5%
+                    '2': 0.12,  # 12%
+                    '10': 0.13, # 13%
+                    '3': 0.14,  # 14%
+                    '4': 0.15,  # 15%
+                    '6': 0.00,  # Exento
+                    '7': 0.00,  # Exento
+                    '8': 0.08   # 8%
+                }
+                
+                iva_percent = MAPEO_IVA.get(p.iva, 0.12)  # 12% por defecto
+                
                 resultados.append({
                     'codigo': p.codigo,
                     'nombre': p.descripcion,
-                    'precio': float(p.precio) if p.precio else 0.0,
+                    'precio': precio_base,
+                    'iva_percent': iva_percent,
+                    'precio_con_iva': precio_base * (1 + iva_percent),
                     'tipo': 'producto'
                 })
             servicios_similares = Servicio.objects.filter(codigo__icontains=codigo)[:5]
