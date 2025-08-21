@@ -4155,6 +4155,54 @@ def validar_facturador(request):
 
 # ✅ NUEVAS VISTAS PARA INTEGRACIÓN SRI COMPLETA
 @csrf_exempt
+def enviar_documento_sri(request, factura_id):
+    """Envía una factura al SRI y devuelve el estado de recepción."""
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False,
+            'message': 'Método no permitido'
+        }, status=405)
+
+    try:
+        from inventario.sri.integracion_django import SRIIntegration
+
+        factura = get_object_or_404(Factura, id=factura_id)
+
+        integration = SRIIntegration()
+        resultado = integration.enviar_factura(factura_id)
+
+        if resultado.get('success'):
+            return JsonResponse({
+                'success': True,
+                'message': 'Documento enviado correctamente al SRI',
+                'resultado': {
+                    'estado': resultado.get('estado'),
+                    'mensajes': resultado.get('mensajes', [])
+                }
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': resultado.get('message', 'Error al enviar documento'),
+                'resultado': {
+                    'estado': resultado.get('estado'),
+                    'mensajes': resultado.get('mensajes', [])
+                }
+            })
+
+    except Factura.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': f'No se encontró la factura con ID {factura_id}'
+        })
+    except Exception as e:
+        logger.error(f"Error en enviar_documento_sri: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'Error interno del servidor: {str(e)}'
+        })
+
+@csrf_exempt
 def autorizar_documento_sri(request, factura_id):
     """
     Vista para autorizar un documento electrónico en el SRI
