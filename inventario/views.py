@@ -1212,13 +1212,28 @@ class DetallesFactura(LoginRequiredMixin, View):
                 porcentaje_descuento = Decimal('0.00')
                 precio_sin_subsidio = None
 
+                # Mapeo de códigos SRI a porcentajes reales
+                MAPEO_IVA = {
+                    '0': Decimal('0.00'),  # Sin IVA
+                    '5': Decimal('0.05'),  # 5%
+                    '2': Decimal('0.12'),  # 12%
+                    '10': Decimal('0.13'), # 13%
+                    '3': Decimal('0.14'),  # 14%
+                    '4': Decimal('0.15'),  # 15%
+                    '6': Decimal('0.00'),  # Exento
+                    '7': Decimal('0.00'),  # Exento
+                    '8': Decimal('0.08')   # 8%
+                }
+
                 if producto:
                     precio_unitario = producto.precio
-                    # Si producto.iva es un ForeignKey a un modelo IVA:
-                    iva_percent = Decimal(str(producto.iva.valor_iva)) / 100 if hasattr(producto.iva, 'valor_iva') else Decimal(str(producto.iva)) / 100
+                    # Usar el mapeo de códigos SRI
+                    iva_code = str(producto.iva.iva if hasattr(producto.iva, 'iva') else producto.iva)
+                    iva_percent = MAPEO_IVA.get(iva_code, Decimal('0.12'))
                 elif servicio:
                     precio_unitario = servicio.precio1
-                    iva_percent = Decimal(str(servicio.iva.valor_iva)) / 100 if hasattr(servicio.iva, 'valor_iva') else Decimal(str(servicio.iva)) / 100
+                    iva_code = str(servicio.iva.iva if hasattr(servicio.iva, 'iva') else servicio.iva)
+                    iva_percent = MAPEO_IVA.get(iva_code, Decimal('0.12'))
                 else:
                     continue
 
