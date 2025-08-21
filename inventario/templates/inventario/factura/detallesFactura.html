@@ -622,7 +622,8 @@ function actualizarTotal() {
     // Autocompletar monto de efectivo si está visible
     const montoEfectivo = document.getElementById('monto-efectivo');
     if (montoEfectivo && document.getElementById('forma-efectivo').style.display !== 'none') {
-        montoEfectivo.value = total.toFixed(2);
+        const montoFaltante = Math.max(0, totalRedondeado - totalPagado);
+        montoEfectivo.value = montoFaltante.toFixed(2);
     }
 }
 
@@ -701,13 +702,28 @@ function validarFormulario() {
     console.log('🔍 Longitud de pagosEfectivo:', pagosEfectivo ? pagosEfectivo.length : 'undefined');
     
     if (!pagosEfectivo || pagosEfectivo.length === 0) {
-        // 🚫 NO MAS PAGOS AUTOMATICOS - Usuario debe agregar explícitamente
         alert('ERROR: Debe agregar al menos una forma de pago manualmente.\n\n' +
               'Pasos:\n' +
               '1. Haga clic en "Efectivo" en Formas de Pago\n' +
               '2. Seleccione una caja\n' +
               '3. Ingrese el monto\n' +
-              '4. Haga clic en "Agregar Pago" o presione Enter');
+              '4. Haga clic en "Confirmar Pago"');
+        return false;
+    }
+
+    // Verificar que la suma de pagos coincida exactamente con el total
+    const totalFactura = parseFloat(document.getElementById('total-formas-display').textContent);
+    const totalPagos = pagosEfectivo.reduce((sum, p) => sum + p.monto, 0);
+    
+    // Redondear a 2 decimales para comparación exacta
+    const totalFacturaRedondeado = Math.round(totalFactura * 100) / 100;
+    const totalPagosRedondeado = Math.round(totalPagos * 100) / 100;
+    
+    if (totalPagosRedondeado !== totalFacturaRedondeado) {
+        alert(`ERROR: La suma de pagos no coincide con el total de la factura.\n\n` +
+              `Total factura: $${totalFacturaRedondeado.toFixed(2)}\n` +
+              `Total pagos: $${totalPagosRedondeado.toFixed(2)}\n\n` +
+              `Por favor, asegúrese de que los pagos sumen exactamente el total de la factura.`);
         return false;
     }
     
@@ -814,6 +830,21 @@ function confirmarPagoEfectivo() {
     const monto = Math.round(parseFloat(montoStr) * 100) / 100;
     const sriPago = sriPagoSelect.value;
     const cajaId = cajaSelect.value;
+
+    // Obtener el total actual de la factura y el total ya pagado
+    const totalFactura = parseFloat(document.getElementById('total-formas-display').textContent);
+    const totalActualPagado = pagosEfectivo.reduce((sum, p) => sum + p.monto, 0);
+    
+    // Verificar que no se exceda el total
+    if (totalActualPagado + monto > totalFactura) {
+        const exceso = (totalActualPagado + monto - totalFactura).toFixed(2);
+        alert(`Error: La suma de pagos excedería el total de la factura por $${exceso}.\n\n` +
+              `Total factura: $${totalFactura.toFixed(2)}\n` +
+              `Ya pagado: $${totalActualPagado.toFixed(2)}\n` +
+              `Monto intentado: $${monto.toFixed(2)}\n\n` +
+              `El monto máximo que puede agregar es: $${(totalFactura - totalActualPagado).toFixed(2)}`);
+        return;
+    }
     
     if (!monto || monto <= 0) {
         alert('Debe ingresar un monto válido');
@@ -992,7 +1023,7 @@ function actualizarTablaPagosEfectivo() {
     });
 }
 
-// Función para actualizar el total pagado
+// Función para actualizar el total pagado y el monto pendiente
 function actualizarTotalPagado() {
     // Sumar todos los montos y redondear a 2 decimales
     totalPagado = pagosEfectivo.reduce((sum, pago) => {
@@ -1002,7 +1033,24 @@ function actualizarTotalPagado() {
     }, 0);
     // Redondear el total final a 2 decimales
     totalPagado = Math.round(totalPagado * 100) / 100;
-    console.log('Total pagado (redondeado a 2 decimales):', totalPagado.toFixed(2));
+    
+    // Obtener el total de la factura
+    const totalFactura = parseFloat(document.getElementById('total-formas-display').textContent);
+    const totalFacturaRedondeado = Math.round(totalFactura * 100) / 100;
+    
+    // Calcular monto pendiente
+    const montoPendiente = Math.max(0, totalFacturaRedondeado - totalPagado);
+    
+    // Actualizar el campo de monto si está visible
+    const montoEfectivo = document.getElementById('monto-efectivo');
+    if (montoEfectivo && document.getElementById('forma-efectivo').style.display !== 'none') {
+        montoEfectivo.value = montoPendiente.toFixed(2);
+    }
+    
+    console.log('💰 Resumen de pagos:');
+    console.log(`Total factura: $${totalFacturaRedondeado.toFixed(2)}`);
+    console.log(`Total pagado: $${totalPagado.toFixed(2)}`);
+    console.log(`Pendiente: $${montoPendiente.toFixed(2)}`);
 }
 
 // Event listeners
