@@ -18,6 +18,8 @@ load_dotenv()
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 # Forzar ambiente de SRI siempre a pruebas (solicitado)
 SRI_AMBIENTE = 'pruebas'
+# Tiempo de espera por defecto para los servicios del SRI (en segundos)
+SRI_TIMEOUT = int(os.environ.get('SRI_TIMEOUT', 30))
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

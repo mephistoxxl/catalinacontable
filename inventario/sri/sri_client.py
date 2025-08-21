@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 import requests
 from requests.exceptions import RequestException, Timeout, ConnectionError
+from django.conf import settings
 import zeep
 from zeep import Client
 from zeep.transports import Transport
@@ -32,16 +33,16 @@ class SRIClient:
     WSDL_RECEPCION_PRODUCCION = "https://cel.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline?wsdl"
     WSDL_AUTORIZACION_PRODUCCION = "https://cel.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl"
     
-    def __init__(self, ambiente='pruebas', timeout=30):
+    def __init__(self, ambiente='pruebas', timeout=None):
         """
         Inicializa el cliente SRI.
-        
+
         Args:
             ambiente (str): 'pruebas' o 'produccion'
-            timeout (int): Tiempo de espera para las peticiones en segundos
+            timeout (int, optional): Tiempo de espera para las peticiones en segundos
         """
         self.ambiente = ambiente
-        self.timeout = timeout
+        self.timeout = timeout if timeout is not None else getattr(settings, 'SRI_TIMEOUT', 30)
         
         # Configurar URLs según ambiente
         if ambiente == 'produccion':
@@ -52,7 +53,7 @@ class SRIClient:
             self.wsdl_autorizacion = self.WSDL_AUTORIZACION_PRUEBAS
         
         # Configurar transporte con timeout
-        transport = Transport(timeout=timeout)
+        transport = Transport(timeout=self.timeout)
         
         # Crear clientes SOAP
         try:
@@ -77,16 +78,28 @@ class SRIClient:
         try:
             # Codificar XML en base64
             xml_base64 = base64.b64encode(xml_content.encode('utf-8')).decode('utf-8')
-            
+
             # Llamar al servicio de recepción
-            response = self.cliente_recepcion.service.validarComprobante(xml_base64)
-            
+            try:
+                response = self.cliente_recepcion.service.validarComprobante(xml_base64)
+            except (Timeout, ConnectionError) as e:
+                logger.error(f"Error de conexión al enviar comprobante: {e}")
+                return {
+                    'estado': 'ERROR',
+                    'mensajes': [{
+                        'identificador': 'CONNECTION_ERROR',
+                        'mensaje': f'Error de conexión con el servicio SRI: {e}',
+                        'tipo': 'ERROR'
+                    }],
+                    'clave_acceso': clave_acceso
+                }
+
             # Procesar respuesta
             resultado = self._procesar_respuesta_recepcion(response)
-            
+
             logger.info(f"Comprobante enviado - Clave: {clave_acceso} - Estado: {resultado.get('estado')}")
             return resultado
-            
+
         except Fault as e:
             logger.error(f"Error SOAP al enviar comprobante: {e}")
             return {
@@ -122,14 +135,26 @@ class SRIClient:
         """
         try:
             # Llamar al servicio de autorización
-            response = self.cliente_autorizacion.service.autorizacionComprobante(clave_acceso)
-            
+            try:
+                response = self.cliente_autorizacion.service.autorizacionComprobante(clave_acceso)
+            except (Timeout, ConnectionError) as e:
+                logger.error(f"Error de conexión al consultar autorización: {e}")
+                return {
+                    'estado': 'ERROR',
+                    'mensajes': [{
+                        'identificador': 'CONNECTION_ERROR',
+                        'mensaje': f'Error de conexión con el servicio SRI: {e}',
+                        'tipo': 'ERROR'
+                    }],
+                    'clave_acceso': clave_acceso
+                }
+
             # Procesar respuesta
             resultado = self._procesar_respuesta_autorizacion(response)
-            
+
             logger.info(f"Consulta autorización - Clave: {clave_acceso} - Estado: {resultado.get('estado')}")
             return resultado
-            
+
         except Fault as e:
             logger.error(f"Error SOAP al consultar autorización: {e}")
             return {
