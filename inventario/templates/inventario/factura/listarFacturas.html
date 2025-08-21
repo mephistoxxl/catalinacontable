@@ -154,8 +154,13 @@
                                                                 <i class="fa fa-eye mr-2 text-blue-500"></i>
                                                                 <span>Editar/Ver Factura</span>
                                                             </a>
-                                                            {% if not fila.numero_autorizacion or not fila.fecha_autorizacion %}
-                                                                <button onclick="autorizarDocumento({{ fila.id }})" class="flex items-center w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 hover:text-green-900 border-none bg-transparent">
+                                                            {% if fila.estado_sri == 'RECIBIDA' %}
+                                                                <div class="flex items-center px-4 py-2 text-sm text-blue-600 bg-blue-50 cursor-not-allowed">
+                                                                    <i class="fa fa-paper-plane mr-2 text-blue-500"></i>
+                                                                    <span>Enviado (RECIBIDA)</span>
+                                                                </div>
+                                                            {% elif not fila.numero_autorizacion or not fila.fecha_autorizacion %}
+                                                                <button onclick="enviarDocumento({{ fila.id }})" class="flex items-center w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 hover:text-green-900 border-none bg-transparent">
                                                                     <i class="fa fa-certificate mr-2 text-green-500"></i>
                                                                     <span>🔐 Enviar al SRI</span>
                                                                 </button>
@@ -165,6 +170,10 @@
                                                                     <span>✅ Autorizada por SRI</span>
                                                                 </div>
                                                             {% endif %}
+                                                            <button onclick="consultarEstado({{ fila.id }})" class="flex items-center w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 hover:text-blue-900 border-none bg-transparent">
+                                                                <i class="fa fa-sync mr-2 text-blue-500"></i>
+                                                                <span>🔍 Consultar estado</span>
+                                                            </button>
                                                             <div class="border-t border-gray-100"></div>
                                                             <a href="/inventario/generarFactura/{{ fila.id }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                                                                 <i class="fa fa-file-csv mr-2 text-gray-500"></i>
@@ -270,16 +279,15 @@
         return cookieValue;
     }
 
-    // ✅ FUNCIÓN AUTORIZAR DOCUMENTO EN SRI (versión actualizada)
-    function autorizarDocumento(facturaId) {
-        // Mostrar loading
+    // ✅ FUNCIÓN ENVIAR DOCUMENTO AL SRI
+    function enviarDocumento(facturaId) {
         const loadingHtml = `
             <div id="loading-modal" class="fixed inset-0 z-50 overflow-y-auto" style="background-color: rgba(0, 0, 0, 0.5);">
                 <div class="flex items-center justify-center min-h-screen">
                     <div class="bg-white rounded-lg p-6 max-w-md mx-4">
                         <div class="text-center">
                             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                            <h3 class="text-lg font-medium text-gray-900 mb-2">Procesando en SRI...</h3>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">Enviando al SRI...</h3>
                             <p class="text-sm text-gray-500">Generando XML, firmando y enviando al SRI</p>
                         </div>
                     </div>
@@ -288,8 +296,7 @@
         `;
         document.body.insertAdjacentHTML('beforeend', loadingHtml);
 
-        // Enviar solicitud al SRI
-        fetch(`/inventario/sri/autorizar/${facturaId}/`, {
+        fetch(`/inventario/sri/enviar/${facturaId}/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': getCookie('csrftoken'),
@@ -298,42 +305,32 @@
         })
         .then(response => response.json())
         .then(data => {
-            // Quitar loading
             const loadingModal = document.getElementById('loading-modal');
             if (loadingModal) {
                 loadingModal.remove();
             }
 
-            // Mostrar resultado
             if (data.success) {
                 mostrarModal({
-                    titulo: '✅ Autorización Exitosa',
-                    mensaje: data.message,
-                    detalles: `
-                        <div class="mt-4 text-sm">
-                            <p><strong>Estado:</strong> ${data.resultado.estado || 'Procesado'}</p>
-                            ${data.resultado.numero_autorizacion ? `<p><strong>Autorización:</strong> ${data.resultado.numero_autorizacion}</p>` : ''}
-                            ${data.resultado.clave_acceso ? `<p><strong>Clave:</strong> ${data.resultado.clave_acceso}</p>` : ''}
-                        </div>
-                    `,
+                    titulo: '📨 Envío Exitoso',
+                    mensaje: `Estado: ${data.resultado.estado || ''}`,
+                    detalles: data.resultado.mensajes && data.resultado.mensajes.length ? `<pre class="mt-4 text-xs bg-gray-100 p-2 rounded">${JSON.stringify(data.resultado.mensajes, null, 2)}</pre>` : '',
                     tipo: 'success'
                 });
-                
-                // Recargar página después de 3 segundos
+
                 setTimeout(() => {
                     window.location.reload();
                 }, 3000);
             } else {
                 mostrarModal({
-                    titulo: '❌ Error en Autorización',
+                    titulo: '❌ Error en Envío',
                     mensaje: data.message,
-                    detalles: data.error_detalle ? `<pre class="mt-4 text-xs bg-gray-100 p-2 rounded">${JSON.stringify(data.error_detalle, null, 2)}</pre>` : '',
+                    detalles: data.resultado && data.resultado.mensajes ? `<pre class="mt-4 text-xs bg-gray-100 p-2 rounded">${JSON.stringify(data.resultado.mensajes, null, 2)}</pre>` : '',
                     tipo: 'error'
                 });
             }
         })
         .catch(error => {
-            // Quitar loading
             const loadingModal = document.getElementById('loading-modal');
             if (loadingModal) {
                 loadingModal.remove();
@@ -346,6 +343,37 @@
                 tipo: 'error'
             });
         });
+    }
+
+    // ✅ FUNCIÓN CONSULTAR ESTADO EN SRI
+    function consultarEstado(facturaId) {
+        fetch(`/inventario/sri/consultar/${facturaId}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const info = data.resultado || {};
+                    mostrarModal({
+                        titulo: '🔍 Estado del SRI',
+                        mensaje: `Estado: ${info.estado_sri || 'DESCONOCIDO'}`,
+                        detalles: info.mensaje_sri ? `<p class="mt-4 text-sm">${info.mensaje_sri}</p>` : '',
+                        tipo: 'info'
+                    });
+                } else {
+                    mostrarModal({
+                        titulo: '❌ Error en Consulta',
+                        mensaje: data.message,
+                        tipo: 'error'
+                    });
+                }
+            })
+            .catch(error => {
+                mostrarModal({
+                    titulo: '🔥 Error de Conexión',
+                    mensaje: 'No se pudo conectar con el servidor',
+                    detalles: `<p class="mt-2 text-sm text-gray-600">Error: ${error.message}</p>`,
+                    tipo: 'error'
+                });
+            });
     }
 
     // Función auxiliar para mostrar modales

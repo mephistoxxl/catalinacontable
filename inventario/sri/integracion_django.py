@@ -30,9 +30,86 @@ class SRIIntegration:
         except Exception:
             # Fallback a configuración de settings
             self.ambiente = getattr(settings, 'SRI_AMBIENTE', 'pruebas')
-        
+
         self.cliente = SRIClient(ambiente=self.ambiente)
-        
+
+    def enviar_factura(self, factura_id):
+        """Genera, firma y envía la factura al SRI.
+
+        Solo realiza el proceso de recepción del comprobante y
+        actualiza el estado de la factura con la respuesta obtenida
+        (p.ej. ``RECIBIDA`` o ``DEVUELTA``) sin consultar su
+        autorización posterior.
+
+        Args:
+            factura_id (int): ID de la factura en la base de datos.
+
+        Returns:
+            dict: Resultado del envío al SRI.
+        """
+        try:
+            factura = Factura.objects.get(id=factura_id)
+
+            # Si la factura ya está autorizada no se vuelve a enviar
+            if hasattr(factura, 'estado_sri') and factura.estado_sri in ('AUTORIZADA', 'AUTORIZADO'):
+                return {
+                    'success': True,
+                    'message': f'La factura ya está {factura.estado_sri} en el SRI',
+                    'estado': factura.estado_sri,
+                }
+
+            # Verificar que la factura esté en estado correcto
+            if hasattr(factura, 'estado') and factura.estado != 'PENDIENTE':
+                return {
+                    'success': False,
+                    'message': f'La factura debe estar en estado PENDIENTE. Estado actual: {factura.estado}'
+                }
+
+            # Asegurar que la factura tenga clave de acceso
+            if not factura.clave_acceso:
+                factura.save()
+                if not factura.clave_acceso:
+                    raise ValueError(f"No se pudo generar clave de acceso para factura {factura.id}")
+
+            clave_acceso = factura.clave_acceso
+
+            # Generar y firmar XML
+            xml_path = self.generar_xml_factura(factura)
+            xml_firmado_path = xml_path.replace('.xml', '_firmado.xml')
+            success = self._firmar_xml_xades_bes(xml_path, xml_firmado_path)
+            if not success:
+                raise Exception("Error al firmar XML con XAdES-BES")
+
+            with open(xml_firmado_path, 'r', encoding='utf-8') as f:
+                xml_firmado_content = f.read()
+
+            resultado = self.cliente.enviar_comprobante(xml_firmado_content, clave_acceso)
+
+            # Guardar estado de recepción (RECIBIDA/DEVUELTA)
+            self._actualizar_factura_con_resultado(factura, resultado, clave_acceso)
+
+            estado_recep = resultado.get('estado', 'ERROR')
+            mensajes_recep = resultado.get('mensajes', [])
+            return {
+                'success': estado_recep == 'RECIBIDA',
+                'message': 'Comprobante enviado correctamente' if estado_recep == 'RECIBIDA' else 'Error en recepción',
+                'estado': estado_recep,
+                'mensajes': mensajes_recep,
+                'resultado': resultado,
+            }
+
+        except Factura.DoesNotExist:
+            return {
+                'success': False,
+                'message': f'No se encontró la factura con ID {factura_id}'
+            }
+        except Exception as e:
+            logger.error(f"Error enviando factura {factura_id}: {e}")
+            return {
+                'success': False,
+                'message': str(e)
+            }
+
     def procesar_factura(self, factura_id):
         """
         Procesa una factura completa: genera XML, firma, envía al SRI y actualiza estado

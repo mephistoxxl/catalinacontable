@@ -124,6 +124,7 @@ urlpatterns = [
     path('buscar_empresa/', views.buscar_empresa, name='buscar_empresa'),
 
     # ✅ NUEVAS URLs PARA INTEGRACIÓN SRI COMPLETA
+    path('sri/enviar/<int:factura_id>/', views.enviar_documento_sri, name='enviar_documento_sri'),
     path('sri/autorizar/<int:factura_id>/', views.autorizar_documento_sri, name='autorizar_documento_sri'),
     path('sri/consultar/<int:factura_id>/', views.consultar_estado_sri, name='consultar_estado_sri'),
     path('sri/reenviar/<int:factura_id>/', views.reenviar_factura_sri, name='reenviar_factura_sri'),

@@ -401,13 +401,7 @@ function consultarEstadoSRI() {
     btn.disabled = true;
     
     // Hacer petición AJAX
-    fetch('{% url "inventario:consultar_estado_sri" factura.id %}', {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': '{{ csrf_token }}',
-            'Content-Type': 'application/json',
-        }
-    })
+    fetch('{% url "inventario:consultar_estado_sri" factura.id %}')
     .then(response => response.json())
     .then(data => {
         resultado.style.display = 'block';
