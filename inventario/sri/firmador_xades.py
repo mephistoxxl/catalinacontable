@@ -149,7 +149,7 @@ class SRIXAdESFirmador:
         
         # Reference al documento completo
         reference = etree.SubElement(signed_info, f"{{{ns_ds}}}Reference")
-        reference.set("URI", "")
+        reference.set("URI", "#comprobante")
         
         # Transforms
         transforms = etree.SubElement(reference, f"{{{ns_ds}}}Transforms")
