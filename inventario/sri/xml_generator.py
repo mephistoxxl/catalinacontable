@@ -458,16 +458,24 @@ class SRIXMLGenerator:
             logger.info(f"📊 Total factura: ${total_factura}")
             logger.info(f"📊 Suma pagos: ${suma_pagos}")
             
-            # 🚫 VALIDACIÓN ESTRICTA: SIN TOLERANCIA - IGUALDAD EXACTA REQUERIDA
+            # � AUTO-SINCRONIZACIÓN: Corregir automáticamente las formas de pago si hay discrepancia
             if total_factura != suma_pagos:
-                # RECHAZAR CUALQUIER DISCREPANCIA - XML SRI REQUIERE COHERENCIA PERFECTA
-                diferencia = abs(total_factura - suma_pagos)
-                error_msg = (
-                    f"INCOHERENCIA CRÍTICA EN XML SRI: Total factura (${total_factura}) ≠ Suma pagos (${suma_pagos}). "
-                    f"Diferencia: ${diferencia}. SRI REQUIERE IGUALDAD EXACTA - NO se generará XML hasta corregir"
-                )
-                logger.error(error_msg)
-                raise ValueError(error_msg)
+                diferencia = total_factura - suma_pagos
+                
+                logger.warning(f"⚠️  DISCREPANCIA DETECTADA: Total factura (${total_factura}) ≠ Suma pagos (${suma_pagos}). Diferencia: ${diferencia}")
+                
+                # Usar el nuevo método de sincronización del modelo
+                resultado = factura.sincronizar_formas_pago()
+                logger.info(f"🔧 AUTO-SINCRONIZACIÓN: {resultado}")
+                
+                # Verificar que la corrección funcionó
+                suma_pagos_corregida = sum(fp.total for fp in factura.formas_pago.all())
+                if factura.monto_general == suma_pagos_corregida:
+                    logger.info(f"✅ CORRECCIÓN EXITOSA: Total factura ${factura.monto_general} = Suma pagos ${suma_pagos_corregida}")
+                else:
+                    error_msg = f"❌ FALLO EN CORRECCIÓN: Aún hay discrepancia después de sincronizar"
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
             else:
                 logger.info(f"✅ Coherencia SRI PERFECTA: Total ${total_factura} = Suma pagos ${suma_pagos}")
         

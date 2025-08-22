@@ -897,18 +897,49 @@ class EditarCliente(LoginRequiredMixin, View):
 
 def obtener_datos_secuencia(request, secuencia_id):
     """
-    Busca la secuencia seleccionada por su ID y devuelve los datos formateados
+    Busca la secuencia seleccionada por su ID y devuelve los datos formateados.
+    Ahora calcula automáticamente el siguiente número de factura.
     """
     try:
         secuencia = Secuencia.objects.get(id=secuencia_id)
+        
+        # Obtener establecimiento y punto de emisión formateados
+        establecimiento_formatted = secuencia.get_establecimiento_formatted()
+        punto_emision_formatted = secuencia.get_punto_emision_formatted()
+        
+        # Buscar todas las facturas de este establecimiento y punto de emisión
+        facturas_existentes = Factura.objects.filter(
+            establecimiento=establecimiento_formatted,
+            punto_emision=punto_emision_formatted
+        ).values_list('secuencia', flat=True)
+        
+        # Convertir a enteros y encontrar el máximo
+        numeros_existentes = []
+        for seq in facturas_existentes:
+            try:
+                numeros_existentes.append(int(seq))
+            except (ValueError, TypeError):
+                continue
+        
+        # Calcular el siguiente número
+        if numeros_existentes:
+            siguiente_numero = max(numeros_existentes) + 1
+            print(f"🔍 DEBUG: Última factura encontrada: {max(numeros_existentes)}, siguiente: {siguiente_numero}")
+        else:
+            siguiente_numero = 1
+            print(f"🔍 DEBUG: No hay facturas previas, comenzando desde 1")
+        
+        # Formatear el siguiente número con ceros a la izquierda
+        siguiente_numero_formateado = f"{siguiente_numero:09d}"
+        
         return JsonResponse({
             'success': True,
             'data': {
                 'id': secuencia.id,
                 'descripcion': secuencia.descripcion,
-                'establecimiento': secuencia.get_establecimiento_formatted(),  # Formato: "001"
-                'punto_emision': secuencia.get_punto_emision_formatted(),      # Formato: "001"  
-                'secuencial': secuencia.get_secuencial_formatted(),             # Formato: "000000001"
+                'establecimiento': establecimiento_formatted,  # Formato: "001"
+                'punto_emision': punto_emision_formatted,      # Formato: "001"  
+                'secuencial': siguiente_numero_formateado,     # ✅ SIGUIENTE NÚMERO AUTO-CALCULADO
                 'tipo_documento': secuencia.tipo_documento,
                 'activo': secuencia.activo
             }
@@ -919,6 +950,7 @@ def obtener_datos_secuencia(request, secuencia_id):
             'error': 'Secuencia no encontrada'
         }, status=404)
     except Exception as e:
+        print(f"💥 DEBUG: Error en obtener_datos_secuencia: {str(e)}")
         return JsonResponse({
             'success': False,
             'error': f'Error interno: {str(e)}'

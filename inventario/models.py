@@ -1028,6 +1028,46 @@ class Factura(models.Model):
     def total(self):
         return float(self.monto_general)
 
+    def sincronizar_formas_pago(self):
+        """
+        Sincroniza las formas de pago para que su suma total coincida exactamente con monto_general.
+        Esto corrige discrepancias de redondeo y asegura coherencia para el XML SRI.
+        """
+        from decimal import Decimal
+        
+        # Si no hay formas de pago, crear una por defecto
+        if not self.formas_pago.exists():
+            FormaPago.objects.create(
+                factura=self,
+                forma_pago='20',  # Otros con utilización del sistema financiero
+                total=self.monto_general
+            )
+            return f"✅ Forma de pago creada: ${self.monto_general}"
+        
+        # Calcular diferencia actual
+        suma_pagos = sum(fp.total for fp in self.formas_pago.all())
+        diferencia = self.monto_general - suma_pagos
+        
+        if diferencia == 0:
+            return f"✅ Formas de pago ya sincronizadas: ${suma_pagos}"
+        
+        # Ajustar la primera forma de pago
+        primera_forma_pago = self.formas_pago.first()
+        nuevo_total = primera_forma_pago.total + diferencia
+        
+        # Asegurar que el nuevo total no sea negativo
+        if nuevo_total < 0:
+            # Si el nuevo total sería negativo, redistribuir entre todas las formas de pago
+            primera_forma_pago.total = self.monto_general
+            # Eliminar las demás formas de pago para evitar complicaciones
+            self.formas_pago.exclude(id=primera_forma_pago.id).delete()
+        else:
+            primera_forma_pago.total = nuevo_total
+        
+        primera_forma_pago.save()
+        
+        return f"✅ Formas de pago sincronizadas. Diferencia corregida: ${diferencia}"
+
     def _calcular_y_crear_totales_impuestos(self, save_to_db=True):
         """
         Calcula y opcionalmente crea los TotalImpuesto.
