@@ -234,6 +234,9 @@ class SRIClient:
             # Verificar si es string (no queremos iterar sobre caracteres)
             if isinstance(obj, (str, bytes)):
                 return False
+            # 🔧 FIX: No considerar los dict como iterables válidos para listas de elementos
+            if isinstance(obj, dict):
+                return False
             # Verificar si es iterable
             iter(obj)
             return True
