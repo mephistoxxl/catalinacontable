@@ -19,9 +19,10 @@ sys.path.append(str(Path(__file__).parent))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sistema.settings')
 django.setup()
 
-from inventario.models import Factura
+from inventario.models import Factura, FormaPago, Caja
 from inventario.sri.integracion_django import SRIIntegration
 from inventario.sri.xml_generator import SRIXMLGenerator
+from decimal import Decimal
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -42,7 +43,19 @@ def test_xml_valido_pasa():
             return False
             
         sri_integration = SRIIntegration()
-        
+
+        if not factura.formas_pago.exists():
+            caja = Caja.objects.filter(activo=True).first()
+            if not caja:
+                print("❌ No hay cajas activas")
+                return False
+            FormaPago.objects.create(
+                factura=factura,
+                forma_pago='01',
+                caja=caja,
+                total=factura.monto_general or Decimal('0.00')
+            )
+
         # Intentar generar XML (esto incluye validación automática)
         xml_path = sri_integration.generar_xml_factura(factura)
         print(f"✅ XML válido generado exitosamente: {xml_path}")
@@ -125,8 +138,20 @@ def test_generar_xml_factura_con_validacion():
         if not factura:
             print("❌ No hay facturas para probar")
             return False
-            
+
         sri_integration = SRIIntegration()
+
+        if not factura.formas_pago.exists():
+            caja = Caja.objects.filter(activo=True).first()
+            if not caja:
+                print("❌ No hay cajas activas")
+                return False
+            FormaPago.objects.create(
+                factura=factura,
+                forma_pago='01',
+                caja=caja,
+                total=factura.monto_general or Decimal('0.00')
+            )
         
         # Modificar temporalmente el método para generar XML inválido
         original_method = sri_integration.generar_xml_factura

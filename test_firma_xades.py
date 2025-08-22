@@ -13,7 +13,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sistema.settings')
 django.setup()
 
-from inventario.models import Factura, Opciones
+from inventario.models import Factura, Opciones, FormaPago, Caja
+from decimal import Decimal
 
 def verificar_configuracion_firma():
     """Verificar que la configuración de firma esté disponible"""
@@ -57,14 +58,26 @@ def test_firma_xades_bes():
     if not factura:
         print("❌ No hay facturas disponibles para test")
         return False
-    
+
     print(f"📄 Usando factura ID {factura.id} para test")
-    
+
     try:
         # Test 1: Crear XML temporal para test
         from inventario.sri.integracion_django import SRIIntegration
         integration = SRIIntegration()
-        
+
+        if not factura.formas_pago.exists():
+            caja = Caja.objects.filter(activo=True).first()
+            if not caja:
+                print("❌ No hay cajas activas")
+                return False
+            FormaPago.objects.create(
+                factura=factura,
+                forma_pago='01',
+                caja=caja,
+                total=factura.monto_general or Decimal('0.00')
+            )
+
         # Generar XML de test
         xml_path = f"/tmp/test_factura_{factura.id}.xml"
         xml_content = integration.generar_xml_factura(factura, validar_xsd=False)

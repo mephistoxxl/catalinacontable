@@ -185,37 +185,20 @@ class SRIXMLGenerator:
         """
         try:
             logger.info(f"Generando XML para factura {factura.id}")
-            
-            # ✅ CRÍTICO: Esperar a que las formas de pago estén guardadas
-            import time
-            max_intentos = 5
-            intentos = 0
-            
-            while intentos < max_intentos:
-                # Refrescar la factura desde la base de datos
-                factura.refresh_from_db()
-                
-                # Verificar si ya existen formas de pago
-                if factura.formas_pago.exists():
-                    logger.info(f"✅ Formas de pago encontradas en intento {intentos + 1}")
-                    break
-                
-                # Si no existen, esperar un poco y reintentar
-                logger.warning(f"⏳ Esperando formas de pago... intento {intentos + 1}/{max_intentos}")
-                time.sleep(0.5)  # Esperar 500ms
-                intentos += 1
-            
-            # Si después de todos los intentos no hay formas de pago, FALLAR COMPLETAMENTE
+
+            # ❗ Validar inmediatamente que existan formas de pago
+            factura.refresh_from_db()
             if not factura.formas_pago.exists():
                 error_msg = (
-                    f"❌ ERROR CRÍTICO: Factura {factura.id} no tiene formas de pago después de {max_intentos} intentos. "
-                    "TODAS las facturas DEBEN tener formas de pago completas antes de generar XML. "
-                    "Verifique que la vista guarde correctamente en el modelo FormaPago."
+                    f"❌ ERROR CRÍTICO: Factura {factura.id} no tiene formas de pago registradas. "
+                    "TODAS las facturas DEBEN registrar sus formas de pago antes de generar XML."
                 )
                 logger.error(error_msg)
                 raise ValueError(error_msg)
-            
-            logger.debug(f"Establecimiento: {factura.establecimiento}, Punto emisión: {factura.punto_emision}, Secuencial: {factura.secuencia}")
+
+            logger.debug(
+                f"Establecimiento: {factura.establecimiento}, Punto emisión: {factura.punto_emision}, Secuencial: {factura.secuencia}"
+            )
             
             # Obtener datos del emisor desde Opciones
             from inventario.models import Opciones
