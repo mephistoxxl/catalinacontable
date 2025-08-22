@@ -54,7 +54,7 @@ let numeroUsuarios = '{{ usuarios }}'
                 </div>
                 <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white p-3 rounded-md shadow-sm hover:shadow-md transition-shadow">
                     <i class="fa fa-dollar text-lg mb-1"></i>
-                    <div class="text-xl font-bold whitespace-nowrap">$ {{ ingresoTotal }}</div>
+                    <div class="text-xl font-bold whitespace-nowrap">$ {{ ingresoTotal|floatformat:2 }}</div>
                     <div class="text-xs">Ingreso total</div>
                 </div>
             </div>
