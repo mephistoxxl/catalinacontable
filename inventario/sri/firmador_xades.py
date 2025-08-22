@@ -279,7 +279,7 @@ class SRIXAdESFirmador:
                 signed_props_digest_b64 = base64.b64encode(signed_props_digest).decode('utf-8')
             
             # 3. Actualizar DigestValue del documento ANTES de firmar
-            digest_value_elem = signed_info.find(f".//{{{ns_ds}}}Reference[@URI='']/{{{ns_ds}}}DigestValue")
+            digest_value_elem = signed_info.find(f".//{{{ns_ds}}}Reference[@URI='#comprobante']/{{{ns_ds}}}DigestValue")
             if digest_value_elem is not None:
                 digest_value_elem.text = doc_digest_b64
             
