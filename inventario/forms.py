@@ -439,7 +439,6 @@ class EmitirFacturaFormulario(forms.Form):
         required=False,
         widget=forms.TextInput(attrs={
             'class': 'form-control', 
-            'readonly': 'readonly',
             'id': 'id_secuencia_valor'
         })
     )
