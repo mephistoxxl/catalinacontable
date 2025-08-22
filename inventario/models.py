@@ -1477,16 +1477,46 @@ class DetalleFactura(models.Model):
 
 # ------------------------------------------PROVEEDOR-----------------------------------
 class Proveedor(models.Model):
-    # id
-    identificacion_proveedor = models.CharField(max_length=12, unique=True)
-    razon_social_proveedor = models.CharField(max_length=40)
-    nombre_comercial_proveedor = models.CharField(max_length=40)
+    # ✅ ACTUALIZADO: Mismos campos que Cliente para consistencia
+    TIPO_IDENTIFICACION_CHOICES = [
+        ('04', 'RUC'),
+        ('05', 'Cédula'),
+        ('06', 'Pasaporte'),
+        ('07', 'Consumidor Final'),
+        ('08', 'Identificación del Exterior'),
+    ]
+    
+    tipoIdentificacion = models.CharField(max_length=2, choices=TIPO_IDENTIFICACION_CHOICES)
+    identificacion_proveedor = models.CharField(max_length=13, unique=True)  # ✅ Ampliado a 13
+    razon_social_proveedor = models.CharField(max_length=200)  # ✅ Ampliado a 200
+    nombre_comercial_proveedor = models.CharField(max_length=200, blank=True, null=True)  # ✅ Ampliado
     direccion = models.CharField(max_length=200)
-    nacimiento = models.DateField()
-    telefono = models.CharField(max_length=20)
-    telefono2 = models.CharField(max_length=20, null=True)
+    telefono = models.CharField(max_length=20, blank=True, null=True)
+    telefono2 = models.CharField(max_length=20, blank=True, null=True)
     correo = models.CharField(max_length=100)
-    correo2 = models.CharField(max_length=100, null=True)
+    correo2 = models.CharField(max_length=100, blank=True, null=True)
+    
+    # ✅ NUEVOS CAMPOS (copiados desde Cliente)
+    observaciones = models.CharField(max_length=300, blank=True, null=True)
+    convencional = models.CharField(max_length=100, blank=True, null=True)
+    nacimiento = models.DateField(blank=True, null=True)  # ✅ Ahora opcional
+    
+    # ✅ NUEVOS CAMPOS EMPRESARIALES
+    tipoVenta = models.CharField(max_length=2, choices=[
+        ('1', 'Local'),
+        ('2', 'Exportación'),
+    ], default='1')
+    
+    tipoRegimen = models.CharField(max_length=3, choices=[
+        ('1', 'General'),
+        ('2', 'Rimpe - Emprendedores'),
+        ('3', 'Rimpe - Negocios Populares'),
+    ], default='1')
+    
+    tipoProveedor = models.CharField(max_length=2, choices=[
+        ('1', 'Persona Natural'),
+        ('2', 'Sociedad'),
+    ], default='1')
 
     @classmethod
     def cedulasRegistradas(self):

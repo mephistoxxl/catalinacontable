@@ -489,47 +489,222 @@ class EmitirFacturaFormulario(forms.Form):
         return cleaned_data
 
 class ProveedorFormulario(forms.ModelForm):
-    tipoC = [('03', 'RUC'), ('01', 'Cédula'), ('02', 'Pasaporte')]
+    # ✅ ACTUALIZADO: Ahora usa las mismas opciones que Cliente
+    TIPO_IDENTIFICACION_CHOICES = [
+        ('04', 'RUC'),
+        ('05', 'Cédula'),
+        ('06', 'Pasaporte'),
+        ('07', 'Consumidor Final'),
+        ('08', 'Identificación del Exterior'),
+    ]
+    tipoV = [('1', 'Local'), ('2', 'Exportación')]
+    tipoR = [('1', 'General'), ('2', 'Rimpe - Emprendedores'), ('3', 'Rimpe - Negocios Populares')]
+    tipoPR = [('1', 'Persona Natural'), ('2', 'Sociedad')]
 
+    # ✅ NUEVO: Campo tipo identificación igual que Cliente
+    tipoIdentificacion = forms.ChoiceField(
+        label="Tipo de identificación",
+        choices=TIPO_IDENTIFICACION_CHOICES,
+        widget=forms.Select(attrs={
+            'placeholder': 'Tipo de identificación', 
+            'id': 'id_tipoIdentificacion', 
+            'class': 'form-control'
+        })
+    )
+    
+    # ✅ ACTUALIZADO: Campo identificación ampliado
+    identificacion_proveedor = forms.CharField(
+        label="Número de Identificación",
+        max_length=13,  # ✅ Ampliado de 12 a 13
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Ingrese el número de identificación',
+            'id': 'id_identificacion',
+            'class': 'form-control',
+            'pattern': '[0-9]*',
+            'inputmode': 'numeric'
+        })
+    )
+    
+    # ✅ ACTUALIZADO: Razón social ampliada
+    razon_social_proveedor = forms.CharField(
+        label="Razón Social",
+        max_length=200,  # ✅ Ampliado de 40 a 200
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Ingrese la razón social',
+            'id': 'id_razon_social',
+            'class': 'form-control'
+        })
+    )
+    
+    # ✅ ACTUALIZADO: Nombre comercial ampliado
+    nombre_comercial_proveedor = forms.CharField(
+        label="Nombre Comercial",
+        max_length=200,  # ✅ Ampliado de 40 a 200
+        required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Ingrese el nombre comercial',
+            'id': 'id_nombre_comercial',
+            'class': 'form-control'
+        })
+    )
+    
+    # Campo dirección ya estaba bien
+    direccion = forms.CharField(
+        label="Dirección",
+        max_length=200,
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Direccion del proveedor', 
+            'id': 'id_direccion', 
+            'class': 'form-control'
+        })
+    )
+    
+    # ✅ ACTUALIZADO: Fecha nacimiento ahora opcional
+    nacimiento = forms.DateField(
+        label="Fecha de Nacimiento",
+        required=False,  # ✅ Ahora es opcional
+        widget=forms.DateInput(attrs={
+            'id': 'id_nacimiento',
+            'class': 'form-control',
+            'type': 'date'
+        })
+    )
+    
+    # Campo teléfono ya estaba bien
+    telefono = forms.CharField(
+        label="Numero telefonico del proveedor",
+        max_length=20,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': 'El telefono del proveedor', 
+            'id': 'id_telefono', 
+            'class': 'form-control',
+            'pattern': '[0-9]*',
+            'inputmode': 'numeric'
+        })
+    )
+    
+    # Campo teléfono 2 ya estaba
     telefono2 = forms.CharField(
         required=False,
-        label='Segundo numero telefonico( Opcional )',
+        label='Segundo numero telefonico (Opcional)',
         widget=forms.TextInput(
             attrs={'placeholder': 'Inserte el telefono alternativo del proveedor',
                    'id': 'telefono2', 'class': 'form-control'}),
     )
+    
+    # Campo correo principal
+    correo = forms.CharField(
+        label="Correo electronico del proveedor",
+        max_length=100,
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Correo del proveedor', 
+            'id': 'id_correo', 
+            'class': 'form-control'
+        })
+    )
 
+    # Campo correo 2 ya estaba
     correo2 = forms.CharField(
         required=False,
-        label='Segundo correo electronico( Opcional )',
+        label='Segundo correo electronico (Opcional)',
         widget=forms.TextInput(
             attrs={'placeholder': 'Inserte el correo alternativo del proveedor',
                    'id': 'correo2', 'class': 'form-control'}),
     )
-
-    tipoCedula = forms.CharField(
-        label="Tipo de cédula",
-        max_length=2,
-        widget=forms.Select(choices=tipoC, attrs={'placeholder': 'Tipo de cédula',
-                                                'id': 'tipoCedula', 'class': 'form-control', 'style': 'min-width: 120px;'}
-                           )
+    
+    # ✅ NUEVOS CAMPOS (copiados desde ClienteFormulario)
+    observaciones = forms.CharField(
+        label="Observaciones (Opcional)",
+        max_length=300,
+        required=False,
+        widget=forms.Textarea(attrs={
+            'placeholder': 'Cualquier observacion adicional', 
+            'id': 'id_observaciones', 
+            'class': 'form-control',
+            'rows': 3
+        })
+    )
+    
+    convencional = forms.CharField(
+        label="Teléfono Convencional (Opcional)",
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Teléfono convencional', 
+            'id': 'id_convencional', 
+            'class': 'form-control'
+        })
+    )
+    
+    tipoVenta = forms.ChoiceField(
+        label="Tipo de venta",
+        choices=tipoV,
+        widget=forms.Select(attrs={
+            'placeholder': 'Tipo de venta', 
+            'id': 'id_tipoVenta', 
+            'class': 'form-control'
+        })
+    )
+    
+    tipoRegimen = forms.ChoiceField(
+        label="Tipo de regimen",
+        choices=tipoR,
+        widget=forms.Select(attrs={
+            'placeholder': 'Tipo de regimen', 
+            'id': 'id_tipoRegimen', 
+            'class': 'form-control'
+        })
+    )
+    
+    tipoProveedor = forms.ChoiceField(
+        label="Tipo de proveedor",
+        choices=tipoPR,
+        widget=forms.Select(attrs={
+            'placeholder': 'Tipo de proveedor', 
+            'id': 'id_tipoProveedor', 
+            'class': 'form-control'
+        })
     )
 
     class Meta:
         model = Proveedor
-        fields = ['tipoCedula', 'identificacion_proveedor', 'razon_social_proveedor', 'nombre_comercial_proveedor', 
-                 'direccion', 'nacimiento', 'telefono', 'correo', 'telefono2', 'correo2']
+        fields = [
+            'tipoIdentificacion',
+            'identificacion_proveedor', 
+            'razon_social_proveedor', 
+            'nombre_comercial_proveedor',
+            'direccion', 
+            'nacimiento', 
+            'telefono', 
+            'telefono2', 
+            'correo', 
+            'correo2',
+            'observaciones',
+            'convencional',
+            'tipoVenta',
+            'tipoRegimen',
+            'tipoProveedor'
+        ]
         labels = {
-            'identificacion_proveedor': 'Cedula del proveedor',
-            'razon_social_proveedor': 'Nombre del proveedor',
-            'nombre_comercial_proveedor': 'Apellido del proveedor',
-            'direccion': 'Direccion del proveedor',
+            'tipoIdentificacion': 'Tipo de Identificación',
+            'identificacion_proveedor': 'Identificación del proveedor',
+            'razon_social_proveedor': 'Razón Social del proveedor',
+            'nombre_comercial_proveedor': 'Nombre Comercial del proveedor',
+            'direccion': 'Dirección del proveedor',
+            'nacimiento': 'Fecha de Nacimiento',
             'telefono': 'Numero telefonico del proveedor',
-            'correo': 'Correo electronico del proveedor',
             'telefono2': 'Segundo numero telefonico',
-            'correo2': 'Segundo correo electronico'
+            'correo': 'Correo electronico del proveedor',
+            'correo2': 'Segundo correo electronico',
+            'observaciones': 'Observaciones',
+            'convencional': 'Teléfono Convencional',
+            'tipoVenta': 'Tipo de Venta',
+            'tipoRegimen': 'Tipo de Régimen',
+            'tipoProveedor': 'Tipo de Proveedor'
         }
         widgets = {
+            'tipoIdentificacion': forms.Select(attrs={'class': 'form-control', 'id': 'id_tipoIdentificacion'}),
             'identificacion_proveedor': forms.TextInput(attrs={'placeholder': 'Inserte la cedula de identidad del proveedor',
                                                              'id': 'identificacion_proveedor', 'class': 'form-control'}),
             'razon_social_proveedor': forms.TextInput(attrs={'placeholder': 'Inserte el primer o primeros nombres del proveedor',
@@ -538,13 +713,32 @@ class ProveedorFormulario(forms.ModelForm):
                                                                'placeholder': 'El apellido del proveedor'}),
             'direccion': forms.TextInput(attrs={'class': 'form-control', 'id': 'direccion',
                                               'placeholder': 'Direccion del proveedor'}),
-            'nacimiento': forms.DateInput(format=('%d-%m-%Y'), attrs={'id': 'nacimiento', 'class': 'form-control',
-                                                                     'type': 'date'}),
+            'nacimiento': forms.DateInput(attrs={'id': 'nacimiento', 'class': 'form-control',
+                                                'type': 'date'}),
             'telefono': forms.TextInput(attrs={'id': 'telefono', 'class': 'form-control',
                                              'placeholder': 'El telefono del proveedor'}),
             'correo': forms.TextInput(attrs={'placeholder': 'Correo del proveedor',
-                                           'id': 'correo', 'class': 'form-control'})
+                                           'id': 'correo', 'class': 'form-control'}),
+            'observaciones': forms.Textarea(attrs={'class': 'form-control', 'id': 'id_observaciones', 'rows': 3}),
+            'convencional': forms.TextInput(attrs={'class': 'form-control', 'id': 'id_convencional'}),
+            'tipoVenta': forms.Select(attrs={'class': 'form-control', 'id': 'id_tipoVenta'}),
+            'tipoRegimen': forms.Select(attrs={'class': 'form-control', 'id': 'id_tipoRegimen'}),
+            'tipoProveedor': forms.Select(attrs={'class': 'form-control', 'id': 'id_tipoProveedor'})
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tipo_identificacion = cleaned_data.get('tipoIdentificacion')
+        identificacion = cleaned_data.get('identificacion_proveedor')
+        
+        # ✅ NUEVA VALIDACIÓN: Misma que en Cliente
+        if tipo_identificacion == '07':
+            if identificacion != '9999999999999':
+                self.add_error('identificacion_proveedor', 'Para Consumidor Final, la identificación debe ser 9999999999999 (13 nueves).')
+        else:
+            if identificacion == '9999999999999':
+                self.add_error('identificacion_proveedor', 'La identificación 9999999999999 solo es válida para Consumidor Final.')
+        return cleaned_data
 
 
 class UsuarioFormulario(forms.Form):

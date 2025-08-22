@@ -2116,25 +2116,45 @@ class AgregarProveedor(LoginRequiredMixin, View):
         # Revisa si es valido:
 
         if form.is_valid():
-            # Procesa y asigna los datos con form.cleaned_data como se requiere
-
-            cedula = form.cleaned_data['cedula']
-            nombre = form.cleaned_data['nombre']
-            apellido = form.cleaned_data['apellido']
+            # ✅ ACTUALIZADO: Usar nombres de campos correctos del formulario actualizado
+            tipoIdentificacion = form.cleaned_data['tipoIdentificacion']
+            identificacion_proveedor = form.cleaned_data['identificacion_proveedor']
+            razon_social_proveedor = form.cleaned_data['razon_social_proveedor']
+            nombre_comercial_proveedor = form.cleaned_data['nombre_comercial_proveedor']
             direccion = form.cleaned_data['direccion']
-            nacimiento = form.cleaned_data['nacimiento']
-            telefono = form.cleaned_data['telefono']
+            nacimiento = form.cleaned_data.get('nacimiento')  # Opcional
+            telefono = form.cleaned_data.get('telefono')  # Opcional
             correo = form.cleaned_data['correo']
-            telefono2 = form.cleaned_data['telefono2']
-            correo2 = form.cleaned_data['correo2']
+            telefono2 = form.cleaned_data.get('telefono2')  # Opcional
+            correo2 = form.cleaned_data.get('correo2')  # Opcional
+            observaciones = form.cleaned_data.get('observaciones')  # Opcional
+            convencional = form.cleaned_data.get('convencional')  # Opcional
+            tipoVenta = form.cleaned_data['tipoVenta']
+            tipoRegimen = form.cleaned_data['tipoRegimen']
+            tipoProveedor = form.cleaned_data['tipoProveedor']
 
-            proveedor = Proveedor(cedula=cedula, nombre=nombre, apellido=apellido,
-                                  direccion=direccion, nacimiento=nacimiento, telefono=telefono,
-                                  correo=correo, telefono2=telefono2, correo2=correo2)
+            # ✅ ACTUALIZADO: Crear proveedor con campos correctos
+            proveedor = Proveedor(
+                tipoIdentificacion=tipoIdentificacion,
+                identificacion_proveedor=identificacion_proveedor,
+                razon_social_proveedor=razon_social_proveedor,
+                nombre_comercial_proveedor=nombre_comercial_proveedor,
+                direccion=direccion,
+                nacimiento=nacimiento,
+                telefono=telefono,
+                correo=correo,
+                telefono2=telefono2,
+                correo2=correo2,
+                observaciones=observaciones,
+                convencional=convencional,
+                tipoVenta=tipoVenta,
+                tipoRegimen=tipoRegimen,
+                tipoProveedor=tipoProveedor
+            )
             proveedor.save()
             form = ProveedorFormulario()
 
-            messages.success(request, 'Ingresado exitosamente bajo la ID %s.' % proveedor.id)
+            messages.success(request, 'Proveedor ingresado exitosamente con ID %s.' % proveedor.id)
             request.session['proveedorProcesado'] = 'agregado'
             return HttpResponseRedirect("/inventario/agregarProveedor")
         else:
@@ -2234,30 +2254,43 @@ class EditarProveedor(LoginRequiredMixin, View):
         # Revisa si es valido:
 
         if form.is_valid():
-            # Procesa y asigna los datos con form.cleaned_data como se requiere
-            cedula = form.cleaned_data['cedula']
-            nombre = form.cleaned_data['nombre']
-            apellido = form.cleaned_data['apellido']
+            # ✅ ACTUALIZADO: Usar nombres de campos correctos del formulario actualizado
+            tipoIdentificacion = form.cleaned_data['tipoIdentificacion']
+            identificacion_proveedor = form.cleaned_data['identificacion_proveedor']
+            razon_social_proveedor = form.cleaned_data['razon_social_proveedor']
+            nombre_comercial_proveedor = form.cleaned_data['nombre_comercial_proveedor']
             direccion = form.cleaned_data['direccion']
-            nacimiento = form.cleaned_data['nacimiento']
-            telefono = form.cleaned_data['telefono']
+            nacimiento = form.cleaned_data.get('nacimiento')  # Opcional
+            telefono = form.cleaned_data.get('telefono')  # Opcional
             correo = form.cleaned_data['correo']
-            telefono2 = form.cleaned_data['telefono2']
-            correo2 = form.cleaned_data['correo2']
+            telefono2 = form.cleaned_data.get('telefono2')  # Opcional
+            correo2 = form.cleaned_data.get('correo2')  # Opcional
+            observaciones = form.cleaned_data.get('observaciones')  # Opcional
+            convencional = form.cleaned_data.get('convencional')  # Opcional
+            tipoVenta = form.cleaned_data['tipoVenta']
+            tipoRegimen = form.cleaned_data['tipoRegimen']
+            tipoProveedor = form.cleaned_data['tipoProveedor']
 
-            proveedor.cedula = cedula
-            proveedor.nombre = nombre
-            proveedor.apellido = apellido
+            # ✅ ACTUALIZADO: Actualizar proveedor con campos correctos
+            proveedor.tipoIdentificacion = tipoIdentificacion
+            proveedor.identificacion_proveedor = identificacion_proveedor
+            proveedor.razon_social_proveedor = razon_social_proveedor
+            proveedor.nombre_comercial_proveedor = nombre_comercial_proveedor
             proveedor.direccion = direccion
             proveedor.nacimiento = nacimiento
             proveedor.telefono = telefono
             proveedor.correo = correo
             proveedor.telefono2 = telefono2
             proveedor.correo2 = correo2
+            proveedor.observaciones = observaciones
+            proveedor.convencional = convencional
+            proveedor.tipoVenta = tipoVenta
+            proveedor.tipoRegimen = tipoRegimen
+            proveedor.tipoProveedor = tipoProveedor
             proveedor.save()
             form = ProveedorFormulario(instance=proveedor)
 
-            messages.success(request, 'Actualizado exitosamente el proveedor de ID %s.' % p)
+            messages.success(request, 'Proveedor actualizado exitosamente (ID %s).' % p)
             request.session['proveedorProcesado'] = 'editado'
             return HttpResponseRedirect("/inventario/editarProveedor/%s" % proveedor.id)
         else:
@@ -2392,7 +2425,7 @@ class DetallesPedido(LoginRequiredMixin, View):
 
             from datetime import date
 
-            proveedor = Proveedor.objects.get(cedula=cedula)
+            proveedor = Proveedor.objects.get(identificacion_proveedor=cedula)
             iva = ivaActual('objeto')
             presente = False
             pedido = Pedido(proveedor=proveedor, fecha=date.today(), sub_monto=sub_monto, monto_general=monto_general,
@@ -3246,24 +3279,45 @@ class AgregarProveedor(LoginRequiredMixin, View):
         # Revisa si es valido:
 
         if form.is_valid():
-            # Procesa y asigna los datos con form.cleaned_data como se requiere
-            nombre = form.cleaned_data['nombre']
-            apellido = form.cleaned_data['apellido']
-            cedula = form.cleaned_data['cedula']
+            # ✅ ACTUALIZADO: Usar nombres de campos correctos del formulario actualizado
+            tipoIdentificacion = form.cleaned_data['tipoIdentificacion']
+            identificacion_proveedor = form.cleaned_data['identificacion_proveedor']
+            razon_social_proveedor = form.cleaned_data['razon_social_proveedor']
+            nombre_comercial_proveedor = form.cleaned_data['nombre_comercial_proveedor']
             direccion = form.cleaned_data['direccion']
-            telefono = form.cleaned_data['telefono']
+            nacimiento = form.cleaned_data.get('nacimiento')  # Opcional
+            telefono = form.cleaned_data.get('telefono')  # Opcional
             correo = form.cleaned_data['correo']
-            telefono_secundario = form.cleaned_data['telefono_secundario']
-            observaciones = form.cleaned_data['observaciones']
+            telefono2 = form.cleaned_data.get('telefono2')  # Opcional
+            correo2 = form.cleaned_data.get('correo2')  # Opcional
+            observaciones = form.cleaned_data.get('observaciones')  # Opcional
+            convencional = form.cleaned_data.get('convencional')  # Opcional
+            tipoVenta = form.cleaned_data['tipoVenta']
+            tipoRegimen = form.cleaned_data['tipoRegimen']
+            tipoProveedor = form.cleaned_data['tipoProveedor']
 
-            proveedor = Proveedor(nombre=nombre, apellido=apellido, cedula=cedula, direccion=direccion,
-                                  telefono=telefono,
-                                  correo=correo, telefono_secundario=telefono_secundario,
-                                  observaciones=observaciones)
+            # ✅ ACTUALIZADO: Crear proveedor con campos correctos
+            proveedor = Proveedor(
+                tipoIdentificacion=tipoIdentificacion,
+                identificacion_proveedor=identificacion_proveedor,
+                razon_social_proveedor=razon_social_proveedor,
+                nombre_comercial_proveedor=nombre_comercial_proveedor,
+                direccion=direccion,
+                nacimiento=nacimiento,
+                telefono=telefono,
+                correo=correo,
+                telefono2=telefono2,
+                correo2=correo2,
+                observaciones=observaciones,
+                convencional=convencional,
+                tipoVenta=tipoVenta,
+                tipoRegimen=tipoRegimen,
+                tipoProveedor=tipoProveedor
+            )
 
             proveedor.save()
             form = ProveedorFormulario()
-            messages.success(request, 'Ingresado exitosamente bajo la ID %s.' % proveedor.id)
+            messages.success(request, 'Proveedor ingresado exitosamente con ID %s.' % proveedor.id)
             request.session['proveedorProcesado'] = 'agregado'
             return HttpResponseRedirect("/inventario/agregarProveedor")
         else:
@@ -3357,32 +3411,47 @@ class EditarProveedor(LoginRequiredMixin, View):
 
     def post(self, request, p):
         # Crea una instancia del formulario y la llena con los datos:
-        form = ProveedorFormulario(request.POST)
+        proveedor = Proveedor.objects.get(id=p)
+        form = ProveedorFormulario(request.POST, instance=proveedor)
         # Revisa si es valido:
 
         if form.is_valid():
-            # Procesa y asigna los datos with form.cleaned_data como se requiere
-            nombre = form.cleaned_data['nombre']
-            apellido = form.cleaned_data['apellido']
-            cedula = form.cleaned_data['cedula']
+            # ✅ ACTUALIZADO: Usar nombres de campos correctos del formulario actualizado
+            tipoIdentificacion = form.cleaned_data['tipoIdentificacion']
+            identificacion_proveedor = form.cleaned_data['identificacion_proveedor']
+            razon_social_proveedor = form.cleaned_data['razon_social_proveedor']
+            nombre_comercial_proveedor = form.cleaned_data['nombre_comercial_proveedor']
             direccion = form.cleaned_data['direccion']
-            telefono = form.cleaned_data['telefono']
+            nacimiento = form.cleaned_data.get('nacimiento')  # Opcional
+            telefono = form.cleaned_data.get('telefono')  # Opcional
             correo = form.cleaned_data['correo']
-            telefono_secundario = form.cleaned_data['telefono_secundario']
-            observaciones = form.cleaned_data['observaciones']
+            telefono2 = form.cleaned_data.get('telefono2')  # Opcional
+            correo2 = form.cleaned_data.get('correo2')  # Opcional
+            observaciones = form.cleaned_data.get('observaciones')  # Opcional
+            convencional = form.cleaned_data.get('convencional')  # Opcional
+            tipoVenta = form.cleaned_data['tipoVenta']
+            tipoRegimen = form.cleaned_data['tipoRegimen']
+            tipoProveedor = form.cleaned_data['tipoProveedor']
 
-            proveedor = Proveedor.objects.get(id=p)
-            proveedor.nombre = nombre
-            proveedor.apellido = apellido
-            proveedor.cedula = cedula
+            # ✅ ACTUALIZADO: Actualizar proveedor con campos correctos
+            proveedor.tipoIdentificacion = tipoIdentificacion
+            proveedor.identificacion_proveedor = identificacion_proveedor
+            proveedor.razon_social_proveedor = razon_social_proveedor
+            proveedor.nombre_comercial_proveedor = nombre_comercial_proveedor
             proveedor.direccion = direccion
+            proveedor.nacimiento = nacimiento
             proveedor.telefono = telefono
             proveedor.correo = correo
-            proveedor.telefono_secundario = telefono_secundario
+            proveedor.telefono2 = telefono2
+            proveedor.correo2 = correo2
             proveedor.observaciones = observaciones
+            proveedor.convencional = convencional
+            proveedor.tipoVenta = tipoVenta
+            proveedor.tipoRegimen = tipoRegimen
+            proveedor.tipoProveedor = tipoProveedor
             proveedor.save()
 
-            messages.success(request, 'Proveedor editado exitosamente')
+            messages.success(request, 'Proveedor actualizado exitosamente')
             return HttpResponseRedirect("/inventario/editarProveedor/%s" % p)
 
         else:
@@ -3391,17 +3460,7 @@ class EditarProveedor(LoginRequiredMixin, View):
 
     def get(self, request, p):
         proveedor = Proveedor.objects.get(id=p)
-        form = ProveedorFormulario()
-
-        #Llena el formulario con los datos del proveedor
-        form['nombre'].field.widget.attrs['value'] = proveedor.nombre
-        form['apellido'].field.widget.attrs['value'] = proveedor.apellido
-        form['cedula'].field.widget.attrs['value'] = proveedor.cedula
-        form['direccion'].field.widget.attrs['value'] = proveedor.direccion
-        form['telefono'].field.widget.attrs['value'] = proveedor.telefono
-        form['correo'].field.widget.attrs['value'] = proveedor.correo
-        form['telefono_secundario'].field.widget.attrs['value'] = proveedor.telefono_secundario
-        form['observaciones'].field.widget.attrs['value'] = proveedor.observaciones
+        form = ProveedorFormulario(instance=proveedor)
 
         contexto = {'form': form, 'proveedor': proveedor}
         contexto = complementarContexto(contexto, request.user)

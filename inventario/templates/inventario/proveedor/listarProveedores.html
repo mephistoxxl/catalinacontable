@@ -58,8 +58,8 @@
                                     <thead class="bg-gray-50">
                                         <tr>
                                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cédula</th>
-                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre Completo</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Identificación</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Razón Social</th>
                                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teléfono</th>
                                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Correo</th>
                                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opciones</th>
@@ -69,8 +69,8 @@
                                         {% for fila in tabla %}
                                             <tr class="hover:bg-gray-50 transition-colors duration-150">
                                                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ fila.id }}</td>
-                                                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ fila.cedula }}</td>
-                                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ fila.nombre }} {{ fila.apellido }}</td>
+                                                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ fila.identificacion_proveedor }}</td>
+                                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ fila.razon_social_proveedor }}</td>
                                                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ fila.telefono }}</td>
                                                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ fila.correo }}</td>
                                                 <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
