@@ -48,6 +48,10 @@ class SRIIntegration:
         Returns:
             dict: Resultado del envío al SRI.
         """
+        estado_recep = None
+        estado_auth = None
+        raw_response = None
+
         try:
             factura = Factura.objects.get(id=factura_id)
 
@@ -61,6 +65,10 @@ class SRIIntegration:
 
             # Verificar que la factura esté en estado correcto
             if hasattr(factura, 'estado') and factura.estado != 'PENDIENTE':
+                logger.error(
+                    "Factura %s en estado inválido antes de envío - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                    factura.id, estado_recep, estado_auth, raw_response
+                )
                 return {
                     'success': False,
                     'message': f'La factura debe estar en estado PENDIENTE. Estado actual: {factura.estado}'
@@ -90,7 +98,15 @@ class SRIIntegration:
             self._actualizar_factura_con_resultado(factura, resultado, clave_acceso)
 
             estado_recep = resultado.get('estado', 'ERROR')
+            raw_response = resultado.get('raw_response')
             mensajes_recep = resultado.get('mensajes', [])
+
+            if estado_recep != 'RECIBIDA':
+                logger.error(
+                    "Error en recepción SRI - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                    estado_recep, estado_auth, raw_response
+                )
+
             return {
                 'success': estado_recep == 'RECIBIDA',
                 'message': 'Comprobante enviado correctamente' if estado_recep == 'RECIBIDA' else 'Error en recepción',
@@ -100,12 +116,20 @@ class SRIIntegration:
             }
 
         except Factura.DoesNotExist:
+            logger.error(
+                "Factura %s no encontrada - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                factura_id, estado_recep, estado_auth, raw_response
+            )
             return {
                 'success': False,
                 'message': f'No se encontró la factura con ID {factura_id}'
             }
         except Exception as e:
             logger.error(f"Error enviando factura {factura_id}: {e}")
+            logger.error(
+                "Estados SRI al error - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                estado_recep, estado_auth, raw_response
+            )
             return {
                 'success': False,
                 'message': str(e)
@@ -121,6 +145,10 @@ class SRIIntegration:
         Returns:
             dict: Resultado del procesamiento
         """
+        estado_recep = None
+        estado_auth = None
+        raw_response = None
+
         try:
             # Obtener factura
             factura = Factura.objects.get(id=factura_id)
@@ -143,6 +171,10 @@ class SRIIntegration:
 
             # Si fue RECHAZADA, no intentar enviar desde aquí (usar reenvío explícito)
             if hasattr(factura, 'estado_sri') and factura.estado_sri == 'RECHAZADA':
+                logger.error(
+                    "Factura %s rechazada previamente - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                    factura.id, estado_recep, estado_auth, raw_response
+                )
                 return {
                     'success': False,
                     'message': 'La factura fue RECHAZADA por el SRI. Use la opción de Reenviar para generar un nuevo intento.'
@@ -150,8 +182,11 @@ class SRIIntegration:
 
             # Si ya tiene clave_acceso y está RECIBIDA/PENDIENTE, solo consultar autorización sin reenviar
             if getattr(factura, 'clave_acceso', None) and hasattr(factura, 'estado_sri') and factura.estado_sri in ['RECIBIDA', 'PENDIENTE']:
+                estado_recep = factura.estado_sri
                 resultado_auth = self.cliente.consultar_autorizacion(factura.clave_acceso)
                 self._actualizar_factura_con_resultado(factura, resultado_auth, factura.clave_acceso)
+                estado_auth = resultado_auth.get('estado')
+                raw_response = resultado_auth.get('raw_response')
                 # 🔧 FIX CRÍTICO: Reconocer tanto AUTORIZADA como AUTORIZADO en consulta
                 if resultado_auth.get('estado') in ('AUTORIZADA', 'AUTORIZADO'):
                     self._generar_ride_autorizado(factura, resultado_auth)
@@ -161,6 +196,10 @@ class SRIIntegration:
                         'resultado': resultado_auth
                     }
                 else:
+                    logger.error(
+                        "Autorización pendiente o rechazada - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                        estado_recep, estado_auth, raw_response
+                    )
                     return {
                         'success': False,
                         'message': 'La factura aún no está autorizada. Intente consultar nuevamente en unos minutos.',
@@ -169,6 +208,10 @@ class SRIIntegration:
 
             # Verificar que la factura esté en estado adecuado (interno)
             if hasattr(factura, 'estado') and factura.estado != 'PENDIENTE':
+                logger.error(
+                    "Factura %s en estado interno inválido - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                    factura.id, estado_recep, estado_auth, raw_response
+                )
                 return {
                     'success': False,
                     'message': f'La factura debe estar en estado PENDIENTE. Estado actual: {factura.estado}'
@@ -207,22 +250,26 @@ class SRIIntegration:
                 xml_firmado_content = f.read()
             
             resultado = self.cliente.enviar_comprobante(xml_firmado_content, clave_acceso)
-            
+
             # Actualizar factura con resultado (sin cambiar la clave de acceso)
             self._actualizar_factura_con_resultado(factura, resultado, clave_acceso)
-            
+
+            estado_recep = resultado.get('estado', 'ERROR')
+            raw_response = resultado.get('raw_response')
+
             # Si fue recibido, solicitar autorización
-            if resultado.get('estado') == 'RECIBIDA':
+            if estado_recep == 'RECIBIDA':
                 resultado_auth = self.cliente.consultar_autorizacion(clave_acceso)
-                
+
                 # 🔧 FIX: SIEMPRE actualizar el estado tras consultar autorización
                 self._actualizar_factura_con_resultado(factura, resultado_auth, clave_acceso)
-                
+
                 estado_auth = resultado_auth.get('estado', '').upper()
+                raw_response = resultado_auth.get('raw_response')
                 if estado_auth in ('AUTORIZADA', 'AUTORIZADO'):
                     # Generar RIDE autorizado
                     self._generar_ride_autorizado(factura, resultado_auth)
-                    
+
                     return {
                         'success': True,
                         'message': 'Factura autorizada exitosamente',
@@ -232,6 +279,10 @@ class SRIIntegration:
                     # Estado pendiente - no es un error, solo necesita más tiempo
                     mensajes_auth = resultado_auth.get('mensajes', [])
                     mensaje_detalle = mensajes_auth[0].get('mensaje', 'El comprobante está pendiente de autorización') if mensajes_auth else 'El comprobante está pendiente de autorización'
+                    logger.error(
+                        "Autorización pendiente - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                        estado_recep, estado_auth, raw_response
+                    )
                     return {
                         'success': False,
                         'message': f"Pendiente de autorización: {mensaje_detalle}. Intente nuevamente en unos minutos.",
@@ -242,6 +293,10 @@ class SRIIntegration:
                     # Otros estados (NO_AUTORIZADA, ERROR, etc.)
                     mensajes_auth = resultado_auth.get('mensajes', [])
                     mensaje_detalle = mensajes_auth[0].get('mensaje', 'Error desconocido') if mensajes_auth else 'Error desconocido'
+                    logger.error(
+                        "Error en autorización - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                        estado_recep, estado_auth, raw_response
+                    )
                     return {
                         'success': False,
                         'message': f"Error en autorización: {mensaje_detalle}",
@@ -249,15 +304,19 @@ class SRIIntegration:
                     }
             else:
                 # El comprobante no fue recibido correctamente
-                estado_recep = resultado.get('estado', 'ERROR')
                 mensajes_recep = resultado.get('mensajes', [])
                 mensaje_detalle = mensajes_recep[0].get('mensaje', 'Error desconocido') if mensajes_recep else 'Error desconocido'
-                
+
                 if estado_recep == 'PENDIENTE':
                     message = f"Recepción pendiente: {mensaje_detalle}. Intente nuevamente en unos minutos."
                 else:
                     message = f"Error en recepción: {mensaje_detalle}"
-                
+
+                logger.error(
+                    "Error en recepción - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                    estado_recep, estado_auth, raw_response
+                )
+
                 return {
                     'success': False,
                     'message': message,
@@ -266,12 +325,20 @@ class SRIIntegration:
                 }
                 
         except Factura.DoesNotExist:
+            logger.error(
+                "Factura %s no encontrada - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                factura_id, estado_recep, estado_auth, raw_response
+            )
             return {
                 'success': False,
                 'message': f'No se encontró la factura con ID {factura_id}'
             }
         except Exception as e:
             logger.error(f"Error procesando factura {factura_id}: {str(e)}")
+            logger.error(
+                "Estados SRI al error - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                estado_recep, estado_auth, raw_response
+            )
             return {
                 'success': False,
                 'message': f'Error interno: {str(e)}'
@@ -699,16 +766,26 @@ class SRIIntegration:
         Returns:
             dict: Estado actual
         """
+        estado_recep = None
+        estado_auth = None
+        raw_response = None
+
         try:
             factura = Factura.objects.get(id=factura_id)
             
             if not factura.clave_acceso:
+                logger.error(
+                    "Consulta de estado sin clave - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                    estado_recep, estado_auth, raw_response
+                )
                 return {
                     'success': False,
                     'message': 'La factura no tiene clave de acceso'
                 }
             
             resultado = self.cliente.consultar_autorizacion(factura.clave_acceso)
+            estado_auth = resultado.get('estado', '').upper()
+            raw_response = resultado.get('raw_response')
             
             # 🔧 FIX: Actualizar estado SIEMPRE tras consultar
             self._actualizar_factura_con_resultado(factura, resultado, factura.clave_acceso)
@@ -737,6 +814,12 @@ class SRIIntegration:
                 message = f'Error en la consulta: {mensaje_detalle}'
                 success = False
             
+            if not success:
+                logger.error(
+                    "Consulta estado SRI fallo - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                    estado_recep, estado_auth, raw_response
+                )
+
             return {
                 'success': success,
                 'message': message,
@@ -745,11 +828,22 @@ class SRIIntegration:
             }
             
         except Factura.DoesNotExist:
+            logger.error(
+                "Factura %s no encontrada al consultar estado - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                factura_id, estado_recep, estado_auth, raw_response
+            )
             return {
                 'success': False,
                 'message': f'Factura con ID {factura_id} no encontrada'
             }
         except Exception as e:
+            logger.error(
+                "Error consultando estado de factura %s: %s", factura_id, e
+            )
+            logger.error(
+                "Estados SRI al error - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                estado_recep, estado_auth, raw_response
+            )
             return {
                 'success': False,
                 'message': str(e)
@@ -765,11 +859,19 @@ class SRIIntegration:
         Returns:
             dict: Resultado del reenvío
         """
+        estado_recep = None
+        estado_auth = None
+        raw_response = None
+
         try:
             factura = Factura.objects.get(id=factura_id)
             
             # Verificar que pueda ser reenviada
             if hasattr(factura, 'estado') and factura.estado not in ['RECHAZADO', 'ERROR']:
+                logger.error(
+                    "Reenvío no permitido - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                    estado_recep, estado_auth, raw_response
+                )
                 return {
                     'success': False,
                     'message': f'Solo se pueden reenviar facturas rechazadas o con error. Estado actual: {factura.estado}'
@@ -795,11 +897,20 @@ class SRIIntegration:
             return self.procesar_factura(factura_id)
             
         except Factura.DoesNotExist:
+            logger.error(
+                "Factura %s no encontrada para reenvío - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                factura_id, estado_recep, estado_auth, raw_response
+            )
             return {
                 'success': False,
                 'message': f'Factura con ID {factura_id} no encontrada'
             }
         except Exception as e:
+            logger.error(f"Error reenviando factura {factura_id}: {e}")
+            logger.error(
+                "Estados SRI al error - estado_recep=%s, estado_auth=%s, raw_response=%s",
+                estado_recep, estado_auth, raw_response
+            )
             return {
                 'success': False,
                 'message': str(e)
