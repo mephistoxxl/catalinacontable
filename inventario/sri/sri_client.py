@@ -333,9 +333,11 @@ class SRIClient:
                 })
                 estado_final = 'PENDIENTE'
             elif autorizaciones_data:
-                # Asegurar que autorizaciones sea iterable y manejar estructura dict
+                # Asegurar que autorizaciones sea iterable y manejar distintas estructuras
                 if isinstance(autorizaciones_data, dict) and 'autorizacion' in autorizaciones_data:
                     autorizaciones_items = autorizaciones_data['autorizacion']
+                elif hasattr(autorizaciones_data, 'autorizacion'):
+                    autorizaciones_items = getattr(autorizaciones_data, 'autorizacion')
                 else:
                     autorizaciones_items = autorizaciones_data
 
