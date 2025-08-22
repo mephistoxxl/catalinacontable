@@ -5,6 +5,7 @@ from datetime import datetime
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+from django.utils import timezone
 from inventario.models import Factura, DetalleFactura, Opciones
 from .sri_client import SRIClient
 from .xml_generator import SRIXMLGenerator
@@ -293,7 +294,7 @@ class SRIIntegration:
             xml_content = xml_generator.generar_xml_factura(factura)
             
             # Crear nombre de archivo único
-            xml_filename = f"factura_{factura.numero}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
+            xml_filename = f"factura_{factura.numero}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xml"
             xml_path = os.path.join(settings.MEDIA_ROOT, "facturas_xml", xml_filename)
             
             # Crear directorio si no existe
