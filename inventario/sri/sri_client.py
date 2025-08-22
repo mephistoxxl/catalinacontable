@@ -316,61 +316,94 @@ class SRIClient:
             
             autorizaciones = []
             mensajes = []
-            
-            # Verificar si existe el atributo autorizaciones
-            if hasattr(response, 'autorizaciones'):
-                if response.autorizaciones is None:
-                    # Caso específico: SRI responde con autorizaciones: None
-                    # Esto significa que el comprobante aún no está autorizado
-                    mensajes.append({
-                        'identificador': 'NO_AUTORIZADO',
-                        'mensaje': 'El comprobante no ha sido autorizado aún o no existe',
-                        'tipo': 'INFORMACION',
-                        'informacionAdicional': 'Respuesta del SRI indica autorizaciones: None'
-                    })
-                    estado_final = 'PENDIENTE'
-                elif response.autorizaciones:
-                    # Asegurar que autorizaciones sea iterable
-                    autorizaciones_list = response.autorizaciones if self._is_iterable_safe(response.autorizaciones) else [response.autorizaciones]
-                    
-                    for aut in autorizaciones_list:
-                        autorizacion = {
-                            'estado': getattr(aut, 'estado', 'ERROR'),
-                            'numeroAutorizacion': getattr(aut, 'numeroAutorizacion', ''),
-                            'fechaAutorizacion': getattr(aut, 'fechaAutorizacion', ''),
-                            'ambiente': getattr(aut, 'ambiente', ''),
-                            'comprobante': getattr(aut, 'comprobante', ''),
-                            'mensajes': []
-                        }
-                        
-                        if hasattr(aut, 'mensajes') and aut.mensajes:
-                            # Asegurar que mensajes sea iterable
-                            mensajes_aut = aut.mensajes if self._is_iterable_safe(aut.mensajes) else [aut.mensajes]
-                            
-                            for msg in mensajes_aut:
+
+            # Obtener dato de autorizaciones desde dict u objeto
+            if isinstance(response, dict):
+                autorizaciones_data = response.get('autorizaciones')
+            else:
+                autorizaciones_data = getattr(response, 'autorizaciones', None)
+
+            if autorizaciones_data is None:
+                # Caso específico: SRI responde con autorizaciones: None
+                mensajes.append({
+                    'identificador': 'NO_AUTORIZADO',
+                    'mensaje': 'El comprobante no ha sido autorizado aún o no existe',
+                    'tipo': 'INFORMACION',
+                    'informacionAdicional': 'Respuesta del SRI indica autorizaciones: None'
+                })
+                estado_final = 'PENDIENTE'
+            elif autorizaciones_data:
+                # Asegurar que autorizaciones sea iterable y manejar estructura dict
+                if isinstance(autorizaciones_data, dict) and 'autorizacion' in autorizaciones_data:
+                    autorizaciones_items = autorizaciones_data['autorizacion']
+                else:
+                    autorizaciones_items = autorizaciones_data
+
+                autorizaciones_list = autorizaciones_items if self._is_iterable_safe(autorizaciones_items) else [autorizaciones_items]
+
+                for aut in autorizaciones_list:
+                    if isinstance(aut, dict):
+                        estado = aut.get('estado', 'ERROR')
+                        numero = aut.get('numeroAutorizacion', '')
+                        fecha = aut.get('fechaAutorizacion', '')
+                        ambiente = aut.get('ambiente', '')
+                        comprobante = aut.get('comprobante', '')
+                        mensajes_aut = aut.get('mensajes')
+                    else:
+                        estado = getattr(aut, 'estado', 'ERROR')
+                        numero = getattr(aut, 'numeroAutorizacion', '')
+                        fecha = getattr(aut, 'fechaAutorizacion', '')
+                        ambiente = getattr(aut, 'ambiente', '')
+                        comprobante = getattr(aut, 'comprobante', '')
+                        mensajes_aut = getattr(aut, 'mensajes', None)
+
+                    autorizacion = {
+                        'estado': estado,
+                        'numeroAutorizacion': numero,
+                        'fechaAutorizacion': fecha,
+                        'ambiente': ambiente,
+                        'comprobante': comprobante,
+                        'mensajes': []
+                    }
+
+                    if mensajes_aut:
+                        mensajes_iter = mensajes_aut if self._is_iterable_safe(mensajes_aut) else [mensajes_aut]
+
+                        for msg in mensajes_iter:
+                            if isinstance(msg, dict):
+                                mensaje = {
+                                    'identificador': msg.get('identificador', ''),
+                                    'mensaje': msg.get('mensaje', ''),
+                                    'tipo': msg.get('tipo', ''),
+                                    'informacionAdicional': msg.get('informacionAdicional', '')
+                                }
+                            else:
                                 mensaje = {
                                     'identificador': getattr(msg, 'identificador', ''),
                                     'mensaje': getattr(msg, 'mensaje', ''),
                                     'tipo': getattr(msg, 'tipo', ''),
                                     'informacionAdicional': getattr(msg, 'informacionAdicional', '')
                                 }
-                                autorizacion['mensajes'].append(mensaje)
-                                mensajes.append(mensaje)
-                        
-                        autorizaciones.append(autorizacion)
-                    estado_final = autorizaciones[0]['estado'] if autorizaciones else 'ERROR'
-                else:
-                    # Caso donde autorizaciones existe pero está vacío
-                    estado_final = 'PENDIENTE'
+                            autorizacion['mensajes'].append(mensaje)
+                            mensajes.append(mensaje)
+
+                    autorizaciones.append(autorizacion)
+
+                estado_final = autorizaciones[0]['estado'] if autorizaciones else 'ERROR'
             else:
-                # Caso donde no existe el atributo autorizaciones
-                mensajes.append({
-                    'identificador': 'ESTRUCTURA_INVALIDA',
-                    'mensaje': 'Respuesta del SRI no contiene información de autorizaciones',
-                    'tipo': 'ERROR'
-                })
-                estado_final = 'ERROR'
-            
+                # Caso donde autorizaciones existe pero está vacío
+                estado_final = 'PENDIENTE'
+
+            if not autorizaciones_data:
+                # Si no se pudo procesar, registrar estructura inválida
+                if autorizaciones_data is None and not mensajes:
+                    mensajes.append({
+                        'identificador': 'ESTRUCTURA_INVALIDA',
+                        'mensaje': 'Respuesta del SRI no contiene información de autorizaciones',
+                        'tipo': 'ERROR'
+                    })
+                    estado_final = 'ERROR'
+
             return {
                 'estado': estado_final,
                 'autorizaciones': autorizaciones,
