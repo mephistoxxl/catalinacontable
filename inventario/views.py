@@ -1807,6 +1807,8 @@ class VerFactura(LoginRequiredMixin, View):
             xml_path = None
             try:
                 if opciones and detalles.exists():
+                    if not factura.formas_pago.exists():
+                        raise ValueError("Factura sin formas de pago; no se puede generar XML")
                     from .sri.xml_generator import SRIXMLGenerator
                     xml_generator = SRIXMLGenerator(ambiente=datos_factura['emisor'].get('tipo_ambiente', '1'))
                     media_root = getattr(settings, 'MEDIA_ROOT', 'media')

@@ -289,6 +289,12 @@ class SRIIntegration:
             str: Ruta del archivo XML generado
         """
         try:
+            # Asegurarse de que existan formas de pago antes de generar
+            if not factura.formas_pago.exists():
+                raise ValueError(
+                    f"Factura {factura.id} no tiene formas de pago registradas"
+                )
+
             # Generar XML
             xml_generator = SRIXMLGenerator()
             xml_content = xml_generator.generar_xml_factura(factura)

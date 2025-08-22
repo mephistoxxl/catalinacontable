@@ -21,8 +21,9 @@ sys.path.append(str(Path(__file__).parent))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sistema.settings')
 django.setup()
 
-from inventario.models import Factura, Cliente
+from inventario.models import Factura, Cliente, FormaPago, Caja
 from inventario.sri.integracion_django import SRIIntegration
+from decimal import Decimal
 import logging
 
 # Configurar logging para ver todos los detalles
@@ -55,7 +56,19 @@ def test_xsd_validation_enforcement():
             
         print(f"📋 Usando factura ID: {factura.id}")
         print(f"📊 Estado SRI actual: '{factura.estado_sri}'")
-        
+
+        if not factura.formas_pago.exists():
+            caja = Caja.objects.filter(activo=True).first()
+            if not caja:
+                print("❌ No hay cajas activas")
+                return False
+            FormaPago.objects.create(
+                factura=factura,
+                forma_pago='01',
+                caja=caja,
+                total=factura.monto_general or Decimal('0.00')
+            )
+
         # Crear integración SRI
         sri_integration = SRIIntegration()
         
