@@ -107,8 +107,8 @@ urlpatterns = [
     # Otros
     path('obtener_datos_secuencia/<int:secuencia_id>/', views.obtener_datos_secuencia, name='obtener_datos_secuencia'),
 
-    # Consultar RUC
-    path('consultar-ruc/', views.consultar_ruc, name='consultar_ruc'),
+    # Consultar identificación
+    path('consultar-identificacion/', views.consultar_identificacion, name='consultar_identificacion'),
 
     # Firma Electrónica
     path('configuracion/firma-electronica/', FirmaElectronicaView.as_view(), name='firma_electronica'),

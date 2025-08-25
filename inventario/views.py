@@ -43,7 +43,6 @@ from django.http import JsonResponse
 import json
 import logging
 from django.contrib import admin
-from services import consultar_ruc as servicio_consultar_ruc
 from .sri.ride_generator import RIDEGenerator
 import os
 from pathlib import Path
@@ -673,27 +672,29 @@ class AgregarCliente(LoginRequiredMixin, View):
 # NUEVA VISTA: Consulta RUC mediante API
 @csrf_exempt
 @require_http_methods(["GET"])
-def consultar_ruc(request):
-    """Vista para consultar información de RUC."""
+def consultar_identificacion(request):
+    """Vista para consultar información de cédula o RUC."""
     logger = logging.getLogger(__name__)
-    
+
     try:
-        # Obtener el RUC del request
-        ruc = request.GET.get('ruc', '')
-        logger.info(f"Recibida solicitud de consulta para RUC: {ruc}")
-        
-        if not ruc:
+        # Obtener la identificación del request
+        identificacion = request.GET.get('identificacion', '')
+        logger.info(
+            f"Recibida solicitud de consulta para identificación: {identificacion}"
+        )
+
+        if not identificacion:
             return JsonResponse({
                 'error': True,
-                'message': 'El RUC es requerido',
+                'message': 'La identificación es requerida',
                 'status_code': 400
             }, status=400)
-        
+
         # Importar el servicio
-        from services import consultar_ruc as servicio_consultar_ruc
-        
+        from services import consultar_identificacion as servicio_consultar_identificacion
+
         # Llamar al servicio
-        resultado = servicio_consultar_ruc(ruc)
+        resultado = servicio_consultar_identificacion(identificacion)
         logger.info(f"Resultado del servicio: {resultado}")
         
         # Obtener el status code del resultado o usar 200 por defecto
@@ -703,7 +704,9 @@ def consultar_ruc(request):
         return JsonResponse(resultado, status=status_code)
         
     except Exception as e:
-        logger.error(f"Error en la vista consultar_ruc: {str(e)}")
+        logger.error(
+            f"Error en la vista consultar_identificacion: {str(e)}"
+        )
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         return JsonResponse({
@@ -3991,8 +3994,8 @@ def buscar_empresa(request):
     if not ruc:
         return JsonResponse({'error': True, 'message': 'El RUC es requerido'}, status=400)
     try:
-        from services import consultar_ruc as servicio_consultar_ruc
-        resultado = servicio_consultar_ruc(ruc)
+        from services import consultar_identificacion as servicio_consultar_identificacion
+        resultado = servicio_consultar_identificacion(ruc)
         
         # Registrar los datos recibidos para depuración
         logger.info(f"Datos recibidos de la API: {resultado}")
