@@ -118,10 +118,15 @@ def consultar_identificacion(identificacion: str) -> Dict[str, Union[str, bool]]
         tipo_contribuyente = data.get('tipoContribuyente')
         logger.info(f"Tipo de contribuyente original: {tipo_contribuyente}")
 
-        # Mapear el tipo de contribuyente a los valores permitidos en el modelo
+        # Mapear el tipo de contribuyente a los valores permitidos en el modelo.
+        # Solo se aplica para consultas de RUC, ya que la API no entrega datos
+        # de régimen para consultas con cédula y en esos casos no se debe
+        # modificar el valor existente en el formulario.
         tipo_regimen_mapeado = None
-        if tipo_contribuyente:
-            tipo_regimen_mapeado = 'RIMPE' if 'RIMPE' in tipo_contribuyente.upper() else 'GENERAL'
+        if tipo_contribuyente and tipo_identificacion == 'RUC':
+            tipo_regimen_mapeado = (
+                'RIMPE' if 'RIMPE' in tipo_contribuyente.upper() else 'GENERAL'
+            )
 
         logger.info(f"Tipo de régimen mapeado: {tipo_regimen_mapeado}")
         
