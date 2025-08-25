@@ -4019,7 +4019,7 @@ def buscar_empresa(request):
         direccion = resultado.get('direccion', '')
         
         # Usar directamente los campos ya mapeados en services.py
-        tipo_regimen = resultado.get('tipo_regimen', 'GENERAL')
+        tipo_regimen = resultado.get('tipo_regimen')
         obligado_contabilidad = resultado.get('obligado_contabilidad', 'NO')
         
         # Registrar los valores que se enviarán al frontend
@@ -4042,9 +4042,10 @@ def buscar_empresa(request):
             'correo': resultado.get('email', ''),
             'telefono': resultado.get('telefono', ''),
             'obligado_contabilidad': obligado_contabilidad,
-            'tipo_regimen': tipo_regimen,
             'actividad_economica': resultado.get('actividad_economica', ''),
         }
+        if tipo_regimen:
+            respuesta['tipo_regimen'] = tipo_regimen
         
         logger.info(f"Respuesta JSON completa: {respuesta}")
         return JsonResponse(respuesta)
