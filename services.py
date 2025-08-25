@@ -109,17 +109,20 @@ def consultar_identificacion(identificacion: str) -> Dict[str, Union[str, bool]]
             )
         else:
             nombre_comercial = ''
-            direccion = data.get('direccionDomicilio', data.get('direccion', ''))
+            if tipo_identificacion == 'CEDULA':
+                direccion = data.get('calleDomicilio', data.get('direccion', ''))
+            else:
+                direccion = data.get('direccionDomicilio', data.get('direccion', ''))
 
         # Mapear la respuesta al formato esperado
-        tipo_contribuyente = data.get('tipoContribuyente', '')
+        tipo_contribuyente = data.get('tipoContribuyente')
         logger.info(f"Tipo de contribuyente original: {tipo_contribuyente}")
-        
+
         # Mapear el tipo de contribuyente a los valores permitidos en el modelo
-        tipo_regimen_mapeado = 'GENERAL'
-        if tipo_contribuyente and 'RIMPE' in tipo_contribuyente.upper():
-            tipo_regimen_mapeado = 'RIMPE'
-        
+        tipo_regimen_mapeado = None
+        if tipo_contribuyente:
+            tipo_regimen_mapeado = 'RIMPE' if 'RIMPE' in tipo_contribuyente.upper() else 'GENERAL'
+
         logger.info(f"Tipo de régimen mapeado: {tipo_regimen_mapeado}")
         
         # Mapear obligado a llevar contabilidad a SI/NO
@@ -143,13 +146,15 @@ def consultar_identificacion(identificacion: str) -> Dict[str, Union[str, bool]]
             'telefono': data.get('telefono', ''),
             'email': data.get('email', ''),
             'tipo_contribuyente': tipo_contribuyente,
-            'tipo_regimen': tipo_regimen_mapeado,
             'estado': data.get('estadoContribuyenteRuc', data.get('estado', '')),
             'obligado_contabilidad': obligado_mapeado,
             'actividad_economica': data.get('actividadEconomicaPrincipal', ''),
             'status_code': response.status_code,
             'tipo_identificacion': tipo_identificacion
         }
+
+        if tipo_regimen_mapeado:
+            resultado['tipo_regimen'] = tipo_regimen_mapeado
         
         logger.info(f"Resultado mapeado: {json.dumps(resultado, indent=2, ensure_ascii=False)}")
         return resultado
