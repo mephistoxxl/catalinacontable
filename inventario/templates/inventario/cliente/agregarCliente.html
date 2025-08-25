@@ -584,11 +584,16 @@
                 }
             }
             
-            // Establecer tipo de régimen
+            // Establecer tipo de régimen SOLO para RUC, NO para cédulas
             const tipoRegimenSelect = getElement('id_tipoRegimen');
-            if (tipoRegimenSelect && data.obligado_contabilidad) {
+            if (tipoRegimenSelect && data.obligado_contabilidad && tipo === '04') {
+                // SOLO para RUC: cambiar régimen basándose en obligado_contabilidad
                 const obligado = data.obligado_contabilidad.toUpperCase();
                 tipoRegimenSelect.value = obligado === 'SI' ? '1' : '2';
+                console.log(`RUC: Régimen establecido según obligado_contabilidad: ${obligado}`);
+            } else if (tipo === '05') {
+                // Para CÉDULA: NO modificar el régimen, mantener el valor actual
+                console.log('CÉDULA: Manteniendo régimen sin cambios');
             }
             
             // Tipo de venta por defecto
