@@ -17,29 +17,40 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-def validar_ruc(ruc: str) -> bool:
-    """Valida el formato del RUC."""
-    logger.debug(f"Iniciando validación de RUC: {ruc}")
-    if not ruc or not isinstance(ruc, str):
-        logger.error(f"RUC inválido: valor vacío o tipo incorrecto - {type(ruc)}")
-        return False
-    if not ruc.isdigit() or len(ruc) != 13:
-        logger.error(f"RUC inválido: formato incorrecto - longitud: {len(ruc)}, es dígito: {ruc.isdigit()}")
-        return False
-    logger.debug(f"RUC válido: {ruc}")
-    return True
+def validar_identificacion(identificacion: str) -> Optional[str]:
+    """Valida el formato de la identificación.
 
-def consultar_ruc(ruc: str) -> Dict[str, Union[str, bool]]:
+    Retorna el tipo de identificación (`'RUC'` o `'CEDULA'`) si es válida.
     """
-    Consulta RUC usando el API de Zampisoft
-    """
-    logger.info(f"Consultando RUC: {ruc}")
-    
-    # Validar el RUC
-    if not validar_ruc(ruc):
+    logger.debug(f"Iniciando validación de identificación: {identificacion}")
+    if not identificacion or not isinstance(identificacion, str):
+        logger.error(
+            f"Identificación inválida: valor vacío o tipo incorrecto - {type(identificacion)}"
+        )
+        return None
+    if not identificacion.isdigit():
+        logger.error("Identificación inválida: contiene caracteres no numéricos")
+        return None
+    if len(identificacion) == 13:
+        logger.debug("Identificación válida: RUC")
+        return "RUC"
+    if len(identificacion) == 10:
+        logger.debug("Identificación válida: CÉDULA")
+        return "CEDULA"
+    logger.error(
+        f"Identificación inválida: longitud {len(identificacion)} no permitida"
+    )
+    return None
+
+def consultar_identificacion(identificacion: str) -> Dict[str, Union[str, bool]]:
+    """Consulta información de RUC o cédula usando el API de Zampisoft."""
+    logger.info(f"Consultando identificación: {identificacion}")
+
+    tipo_identificacion = validar_identificacion(identificacion)
+    if not tipo_identificacion:
         return {
             'error': True,
-            'message': 'RUC inválido: debe tener 13 dígitos',
+            'message': 'Identificación inválida: debe tener 10 o 13 dígitos',
             'status_code': 400
         }
     
@@ -53,7 +64,7 @@ def consultar_ruc(ruc: str) -> Dict[str, Union[str, bool]]:
     try:
         # Configurar los parámetros
         params = {
-            "identificacion": ruc,
+            "identificacion": identificacion,
             "token": token
         }
         
@@ -91,13 +102,14 @@ def consultar_ruc(ruc: str) -> Dict[str, Union[str, bool]]:
         # Extraer dirección del primer establecimiento si existe
         direccion = ''
         establecimientos = data.get('establecimientos', [])
-        if establecimientos and len(establecimientos) > 0:
+        if tipo_identificacion == 'RUC' and establecimientos:
             direccion = establecimientos[0].get('direccionCompleta', '')
-        
-        # Extraer nombre comercial del primer establecimiento si existe
-        nombre_comercial = ''
-        if establecimientos and len(establecimientos) > 0:
-            nombre_comercial = establecimientos[0].get('nombreFantasiaComercial', '')
+            nombre_comercial = establecimientos[0].get(
+                'nombreFantasiaComercial', ''
+            )
+        else:
+            nombre_comercial = ''
+            direccion = data.get('direccionDomicilio', data.get('direccion', ''))
 
         # Mapear la respuesta al formato esperado
         tipo_contribuyente = data.get('tipoContribuyente', '')
@@ -116,20 +128,27 @@ def consultar_ruc(ruc: str) -> Dict[str, Union[str, bool]]:
         
         logger.info(f"Obligado a llevar contabilidad original: {obligado_contabilidad}, mapeado: {obligado_mapeado}")
         
+        razon_social = data.get('razonSocial', '')
+        if not razon_social:
+            nombres = data.get('nombres', data.get('nombre', ''))
+            apellidos = data.get('apellidos', data.get('apellido', ''))
+            razon_social = f"{nombres} {apellidos}".strip()
+
         resultado = {
             'error': api_error,
             'message': api_message,
-            'razon_social': data.get('razonSocial', ''),
-            'nombre_comercial': nombre_comercial,  # Ahora viene del establecimiento
-            'direccion': direccion,  # Ahora viene del establecimiento
+            'razon_social': razon_social,
+            'nombre_comercial': nombre_comercial,
+            'direccion': direccion,
             'telefono': data.get('telefono', ''),
             'email': data.get('email', ''),
             'tipo_contribuyente': tipo_contribuyente,
-            'tipo_regimen': tipo_regimen_mapeado,  # Valor mapeado para el modelo
-            'estado': data.get('estadoContribuyenteRuc', ''),
-            'obligado_contabilidad': obligado_mapeado,  # Valor mapeado para el modelo
-            'actividad_economica': data.get('actividadEconomicaPrincipal', ''),  # Campo adicional útil
-            'status_code': response.status_code
+            'tipo_regimen': tipo_regimen_mapeado,
+            'estado': data.get('estadoContribuyenteRuc', data.get('estado', '')),
+            'obligado_contabilidad': obligado_mapeado,
+            'actividad_economica': data.get('actividadEconomicaPrincipal', ''),
+            'status_code': response.status_code,
+            'tipo_identificacion': tipo_identificacion
         }
         
         logger.info(f"Resultado mapeado: {json.dumps(resultado, indent=2, ensure_ascii=False)}")
@@ -154,25 +173,22 @@ def consultar_ruc(ruc: str) -> Dict[str, Union[str, bool]]:
 
 
 # Las funciones de test siguen igual...
-def test_consulta_ruc():
-    """
-    Función de prueba para verificar la consulta RUC
-    Ejecutar desde Django shell: python manage.py shell
-    """
-    # RUC de prueba (puedes cambiar por uno que sepas que existe)
-    ruc_prueba = "1713959011001"
-    
+def test_consulta_identificacion():
+    """Función de prueba para verificar la consulta de identificaciones."""
+    # Identificación de prueba (puedes cambiar por una que sepas que existe)
+    identificacion_prueba = "1713959011001"
+
     print(f"\n{'='*60}")
-    print(f"PRUEBA DE CONSULTA RUC: {ruc_prueba}")
+    print(f"PRUEBA DE CONSULTA IDENTIFICACIÓN: {identificacion_prueba}")
     print(f"{'='*60}\n")
-    
-    # Validar RUC
-    es_valido = validar_ruc(ruc_prueba)
-    print(f"¿RUC válido?: {es_valido}")
-    
-    if es_valido:
+
+    # Validar identificación
+    tipo = validar_identificacion(identificacion_prueba)
+    print(f"Tipo de identificación: {tipo}")
+
+    if tipo:
         # Realizar consulta
-        resultado = consultar_ruc(ruc_prueba)
+        resultado = consultar_identificacion(identificacion_prueba)
         
         print("\nRESULTADO DE LA CONSULTA:")
         print("-" * 40)
