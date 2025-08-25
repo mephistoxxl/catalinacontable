@@ -32,7 +32,7 @@
             </div>
         {% endif %}
         
-        <!-- RUC Messages Area -->
+        <!-- Área de mensajes de identificación -->
         <div id="ruc-messages" class="hidden mb-6">
             <div class="bg-white rounded-lg shadow-md p-4 border-l-4">
                 <div class="flex items-center">
@@ -562,27 +562,32 @@
             const identificacion = identificacionInput.value.trim();
             const tipoIdentificacion = tipoIdentificacionSelect.value;
             
-            console.log('Tipo ID:', tipoIdentificacion, 'RUC:', identificacion);
-            
-            if (tipoIdentificacion === '04') {
-                if (identificacion.length === 13) {
+            console.log('Tipo ID:', tipoIdentificacion, 'Identificación:', identificacion);
+
+            if (tipoIdentificacion === '04' || tipoIdentificacion === '05') {
+                const longitudValida = (tipoIdentificacion === '04' && identificacion.length === 13) ||
+                                        (tipoIdentificacion === '05' && identificacion.length === 10);
+                if (longitudValida) {
                     consultaEnProgreso = true;
-                    consultarRUC(identificacion).finally(() => {
+                    consultarIdentificacion(identificacion, tipoIdentificacion).finally(() => {
                         consultaEnProgreso = false;
                     });
                 } else {
-                    showMessage('El RUC debe tener 13 dígitos', 'warning');
+                    const msg = tipoIdentificacion === '04'
+                        ? 'El RUC debe tener 13 dígitos'
+                        : 'La cédula debe tener 10 dígitos';
+                    showMessage(msg, 'warning');
                 }
             } else {
-                showMessage('Seleccione tipo de identificación RUC para consultar', 'warning');
+                showMessage('Seleccione tipo de identificación válido (cédula o RUC) para consultar', 'warning');
             }
         });
     });
-    
-    // Función principal para consultar RUC (adaptada para proveedor)
-    async function consultarRUC(ruc) {
-        console.log('Iniciando consulta de RUC:', ruc);
-        
+
+    // Función principal para consultar identificación (adaptada para proveedor)
+    async function consultarIdentificacion(identificacion, tipo) {
+        console.log('Iniciando consulta de identificación:', identificacion, 'tipo:', tipo);
+
         const loadingIndicator = getElement('loading-ruc');
         if (loadingIndicator) {
             loadingIndicator.classList.remove('hidden');
@@ -590,7 +595,7 @@
         hideMessage();
         
         try {
-            const response = await fetch(`/inventario/consultar-ruc/?ruc=${ruc}`, {
+            const response = await fetch(`/inventario/consultar-identificacion/?identificacion=${identificacion}&tipo=${tipo}`, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
@@ -607,7 +612,7 @@
             }
             
             if (data.error) {
-                showMessage(data.message || 'Error al consultar el RUC', 'warning');
+                showMessage(data.message || 'Error al consultar la identificación', 'warning');
                 limpiarCamposConsulta();
                 return;
             }
@@ -632,10 +637,10 @@
                 }
             });
             
-            // Establecer tipo de identificación a RUC
+            // Establecer tipo de identificación seleccionado
             const tipoIdentificacionSelect = getElement('id_tipoIdentificacion');
             if (tipoIdentificacionSelect) {
-                tipoIdentificacionSelect.value = '04';
+                tipoIdentificacionSelect.value = tipo;
             }
             
             // Establecer tipo de proveedor
@@ -671,14 +676,14 @@
                 observacionesField.value = observaciones.join(' | ');
             }
             
-            showMessage('Datos del RUC cargados exitosamente', 'success');
-            
+            showMessage('Datos de la identificación cargados exitosamente', 'success');
+
         } catch (error) {
             console.error('Error en la consulta:', error);
             if (loadingIndicator) {
                 loadingIndicator.classList.add('hidden');
             }
-            showMessage('Error de conexión al consultar el RUC', 'danger');
+            showMessage('Error de conexión al consultar la identificación', 'danger');
             limpiarCamposConsulta();
         }
     }
