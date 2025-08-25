@@ -674,35 +674,48 @@ class AgregarCliente(LoginRequiredMixin, View):
 @require_http_methods(["GET"])
 def consultar_identificacion(request):
     """Vista para consultar información de cédula o RUC."""
-    logger = logging.getLogger(__name__)
 
     try:
-        # Obtener la identificación del request
-        identificacion = request.GET.get('identificacion', '')
+        identificacion = request.GET.get('identificacion', '').strip()
+        tipo = request.GET.get('tipo', request.GET.get('tipoIdentificacion', '')).strip()
+
+        tipo_map = {'04': 'RUC', '05': 'CEDULA'}
+        tipo_mapeado = tipo_map.get(tipo)
+
         logger.info(
-            f"Recibida solicitud de consulta para identificación: {identificacion}"
+            f"Recibida solicitud de consulta para identificación: {identificacion}, tipo: {tipo}"
         )
 
-        if not identificacion:
+        if not identificacion or not identificacion.isdigit() or not tipo_mapeado:
             return JsonResponse({
                 'error': True,
-                'message': 'La identificación es requerida',
+                'message': 'Debe proporcionar una identificación numérica válida y tipo 04 o 05',
                 'status_code': 400
             }, status=400)
 
-        # Importar el servicio
+        if tipo == '04' and len(identificacion) != 13:
+            return JsonResponse({
+                'error': True,
+                'message': 'El RUC debe tener 13 dígitos',
+                'status_code': 400
+            }, status=400)
+
+        if tipo == '05' and len(identificacion) != 10:
+            return JsonResponse({
+                'error': True,
+                'message': 'La cédula debe tener 10 dígitos',
+                'status_code': 400
+            }, status=400)
+
         from services import consultar_identificacion as servicio_consultar_identificacion
 
-        # Llamar al servicio
         resultado = servicio_consultar_identificacion(identificacion)
+        resultado['tipo_identificacion'] = tipo_mapeado
         logger.info(f"Resultado del servicio: {resultado}")
-        
-        # Obtener el status code del resultado o usar 200 por defecto
+
         status_code = resultado.get('status_code', 200)
-        
-        # Devolver la respuesta
         return JsonResponse(resultado, status=status_code)
-        
+
     except Exception as e:
         logger.error(
             f"Error en la vista consultar_identificacion: {str(e)}"

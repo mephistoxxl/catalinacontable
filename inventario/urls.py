@@ -107,7 +107,7 @@ urlpatterns = [
     # Otros
     path('obtener_datos_secuencia/<int:secuencia_id>/', views.obtener_datos_secuencia, name='obtener_datos_secuencia'),
 
-    # Consultar identificación
+    # Consultar identificación (RUC o cédula)
     path('consultar-identificacion/', views.consultar_identificacion, name='consultar_identificacion'),
 
     # Firma Electrónica
