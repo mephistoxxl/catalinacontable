@@ -20,7 +20,7 @@
 
         <!-- Navigation Menu -->
         <nav class="flex-1 overflow-y-auto py-4">
-            <ul class="space-y-1 px-2">
+            <ul class="space-y-1 px-0">
 
                 <!-- Dashboard -->
                 <li>
@@ -30,312 +30,348 @@
                     </a>
                 </li>
 
-                <!-- Clientes -->
+                <!-- Empresa -->
                 <li>
-                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                    <a href="/inventario/configuracionGeneral" class="flex items-center px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black font-medium">
+                        <i class="fa fa-building mr-3 w-4 text-gray-600"></i>
+                        EMPRESA
+                    </a>
+                </li>
+
+                <!-- Ventas -->
+                <li>
+                    <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
                         <div class="flex items-center">
-                            <i class="fa fa-handshake-o mr-3 w-4 text-gray-600"></i>
-                            Clientes
+                            <i class="fa fa-line-chart mr-3 w-4 text-gray-600"></i>
+                            Ventas
                         </div>
                         <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
                     </button>
-                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1 ml-3">
-                        <li>
-                            <a href="/inventario/listarClientes" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
-                                Listar clientes
-                            </a>
+                    <ul class="dropdown-menu hidden pl-0 mt-1 space-y-1">
+                        <!-- Clientes -->
+                        <li class="w-full">
+                            <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                                <div class="flex items-center">
+                                    <i class="fa fa-handshake-o mr-3 w-4 text-gray-600"></i>
+                                    Clientes
+                                </div>
+                                <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                            </button>
+                            <ul class="dropdown-menu hidden pl-0 mt-1 space-y-1">
+                                <li class="w-full">
+                                    <a href="/inventario/listarClientes" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-list mr-3 w-4 text-gray-600"></i>
+                                        Listar clientes
+                                    </a>
+                                </li>
+                                <li class="w-full">
+                                    <a href="/inventario/agregarCliente" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-plus mr-3 w-4 text-gray-600"></i>
+                                        Agregar cliente
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
-                        <li>
-                            <a href="/inventario/agregarCliente" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
-                                Agregar cliente
-                            </a>
+
+                        <!-- Pedidos -->
+                        <li class="w-full">
+                            <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                                <div class="flex items-center">
+                                    <i class="fa fa-gift mr-3 w-4 text-gray-600"></i>
+                                    Pedidos
+                                </div>
+                                <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                            </button>
+                            <ul class="dropdown-menu hidden pl-0 mt-1 space-y-1">
+                                <li class="w-full">
+                                    <a href="/inventario/listarPedidos" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-list mr-3 w-4 text-gray-600"></i>
+                                        Listar pedidos
+                                    </a>
+                                </li>
+                                <li class="w-full">
+                                    <a href="/inventario/agregarPedido" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-plus mr-3 w-4 text-gray-600"></i>
+                                        Añadir pedido
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- Factura -->
+                        <li class="w-full">
+                            <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                                <div class="flex items-center">
+                                    <i class="fa fa-ticket mr-3 w-4 text-gray-600"></i>
+                                    Factura
+                                </div>
+                                <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                            </button>
+                            <ul class="dropdown-menu hidden pl-0 mt-1 space-y-1">
+                                <li class="w-full">
+                                    <a href="/inventario/listarFacturas" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-list mr-3 w-4 text-gray-600"></i>
+                                        Listar facturas
+                                    </a>
+                                </li>
+                                <li class="w-full">
+                                    <a href="{% url 'inventario:facturas_sri_problemas' %}" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-exclamation-triangle mr-3 w-4 text-red-600"></i>
+                                        <span class="text-red-600">Problemas SRI</span>
+                                    </a>
+                                </li>
+                                <li class="w-full">
+                                    <a href="/inventario/login_facturador/" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-money mr-3 w-4 text-gray-600"></i>
+                                        Emitir factura
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
                     </ul>
                 </li>
 
-                <!-- Productos -->
+                <!-- Compras -->
                 <li>
-                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                    <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
                         <div class="flex items-center">
-                            <i class="fa fa-shopping-basket mr-3 w-4 text-gray-600"></i>
-                            Producto
+                            <i class="fa fa-shopping-cart mr-3 w-4 text-gray-600"></i>
+                            Compras
                         </div>
                         <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
                     </button>
-                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1 ml-3">
+                    <ul class="dropdown-menu hidden pl-0 mt-1 space-y-1">
+                        <!-- Proveedores -->
                         <li>
-                            <a href="/inventario/listarProductos" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
-                                Listar productos
-                            </a>
-                        </li>
-                        <li>
-                            <a href="/inventario/agregarProducto" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
-                                Agregar producto
-                            </a>
-                        </li>
-                    </ul>
-                </li>
-
-                <!-- Proveedores -->
-                <li>
-                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
-                        <div class="flex items-center">
-                            <i class="fa fa-book mr-3 w-4 text-gray-600"></i>
-                            Proveedor
-                        </div>
-                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
-                    </button>
-                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1 ml-3">
-                        <li>
-                            <a href="/inventario/listarProveedores" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
-                                Listar proveedores
-                            </a>
-                        </li>
-                        <li>
-                            <a href="/inventario/agregarProveedor" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
-                                Agregar proveedor
-                            </a>
-                        </li>
-                    </ul>
-                </li>
-
-                <!-- Almacenes -->
-                <li>
-                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
-                        <div class="flex items-center">
-                            <i class="fa fa-building mr-3 w-4 text-gray-600"></i>
-                            Almacenes
-                        </div>
-                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
-                    </button>
-                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1 ml-3">
-                        <li>
-                            <a href="/inventario/almacenes/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
-                                Listar almacenes
-                            </a>
-                        </li>
-                    </ul>
-                </li>
-
-                <!-- Bancos -->
-                <li>
-                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
-                        <div class="flex items-center">
-                            <i class="fa fa-university mr-3 w-4 text-gray-600"></i>
-                            Bancos
-                        </div>
-                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
-                    </button>
-                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1 ml-3">
-                        <li>
-                            <a href="/inventario/bancos/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
-                                Listar bancos
-                            </a>
-                        </li>
-                        <li>
-                            <a href="/inventario/bancos/crear/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
-                                Crear banco
-                            </a>
-                        </li>
-                    </ul>
-                </li>
-
-                <!-- Cajas -->
-                <li>
-                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
-                        <div class="flex items-center">
-                            <i class="fa fa-money mr-3 w-4 text-gray-600"></i>
-                            Cajas
-                        </div>
-                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
-                    </button>
-                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1 ml-3">
-                        <li>
-                            <a href="/inventario/cajas/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
-                                Listar cajas
-                            </a>
-                        </li>
-                        <li>
-                            <a href="/inventario/cajas/agregar/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
-                                Agregar caja
-                            </a>
-                        </li>
-                    </ul>
-                </li>
-
-                <!-- Pedidos -->
-                <li>
-                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
-                        <div class="flex items-center">
-                            <i class="fa fa-gift mr-3 w-4 text-gray-600"></i>
-                            Pedido
-                        </div>
-                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
-                    </button>
-                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1 ml-3">
-                        <li>
-                            <a href="/inventario/listarPedidos" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
-                                Listar pedidos
-                            </a>
-                        </li>
-                        <li>
-                            <a href="/inventario/agregarPedido" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
-                                Añadir pedido
-                            </a>
-                        </li>
-                    </ul>
-                </li>
-
-                <!-- Factura -->
-                <li>
-                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
-                        <div class="flex items-center">
-                            <i class="fa fa-ticket mr-3 w-4 text-gray-600"></i>
-                            Factura
-                        </div>
-                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
-                    </button>
-                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1">
-                        <li>
-                            <a href="/inventario/listarFacturas" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
-                                Listar facturas
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{% url 'inventario:facturas_sri_problemas' %}" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-exclamation-triangle mr-3 w-3 text-red-600"></i>
-                                <span class="text-red-600">Problemas SRI</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="/inventario/login_facturador/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-money mr-3 w-3 text-gray-600"></i>
-                                Emitir factura
-                            </a>
-                        </li>
-                    </ul>
-                </li>
-
-                <!-- Servicios -->
-                <li>
-                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
-                        <div class="flex items-center">
-                            <i class="fa fa-wrench mr-3 w-4 text-gray-600"></i>
-                            Servicios
-                        </div>
-                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
-                    </button>
-                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1">
-                        <li>
-                            <a href="/inventario/listarServicios" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
-                                Listar servicios
-                            </a>
-                        </li>
-                        <li>
-                            <a href="/inventario/agregarServicio" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
-                                Agregar servicio
-                            </a>
-                        </li>
-                    </ul>
-                </li>
-
-                <!-- Facturadores -->
-                <li>
-                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
-                        <div class="flex items-center">
-                            <i class="fa fa-id-card mr-3 w-4 text-gray-600"></i>
-                            Facturadores
-                        </div>
-                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
-                    </button>
-                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1">
-                        <li>
-                            <a href="/inventario/facturadores/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
-                                Listar facturadores
-                            </a>
-                        </li>
-                        <li>
-                            <a href="/inventario/facturadores/crear/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
-                                Crear facturador
-                            </a>
-                        </li>
-                    </ul>
-                </li>
-
-                <!-- Usuarios -->
-                <li>
-                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
-                        <div class="flex items-center">
-                            <i class="fa fa-users mr-3 w-4 text-gray-600"></i>
-                            Usuarios
-                        </div>
-                        <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
-                    </button>
-                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1">
-                        <li>
-                            <a href="/inventario/crearUsuario" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-plus mr-3 w-3 text-gray-600"></i>
-                                Agregar usuario
-                            </a>
-                        </li>
-                        <li>
-                            <a href="/inventario/listarUsuarios" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-list mr-3 w-3 text-gray-600"></i>
-                                Listar usuarios
-                            </a>
+                            <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium bg-white">
+                                <div class="flex items-center">
+                                    <i class="fa fa-book mr-3 w-4 text-gray-600"></i>
+                                    Proveedores
+                                </div>
+                                <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                            </button>
+                            <ul class="dropdown-menu hidden pl-0 mt-1 space-y-1">
+                                <li>
+                                    <a href="/inventario/listarProveedores" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-list mr-3 w-4 text-gray-600"></i>
+                                        Listar proveedores
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/inventario/agregarProveedor" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-plus mr-3 w-4 text-gray-600"></i>
+                                        Agregar proveedor
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
                     </ul>
                 </li>
 
                 <!-- Opciones -->
                 <li>
-                    <button class="dropdown-btn flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
+                    <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
                         <div class="flex items-center">
                             <i class="fa fa-cog mr-3 w-4 text-gray-600"></i>
                             Opciones
                         </div>
                         <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
                     </button>
-                    <ul class="dropdown-menu hidden pl-4 mt-1 space-y-1">
+                    <ul class="dropdown-menu hidden pl-0 mt-1 space-y-1">
+                        <!-- Usuarios -->
                         <li>
-                            <a href="/inventario/importarBDD" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-upload mr-3 w-3 text-gray-600"></i>
+                            <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium bg-white">
+                                <div class="flex items-center">
+                                    <i class="fa fa-users mr-3 w-4 text-gray-600"></i>
+                                    Usuarios
+                                </div>
+                                <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                            </button>
+                            <ul class="dropdown-menu hidden pl-0 mt-1 space-y-1">
+                                <li>
+                                    <a href="/inventario/crearUsuario" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-plus mr-3 w-4 text-gray-600"></i>
+                                        Agregar usuario
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/inventario/listarUsuarios" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-list mr-3 w-4 text-gray-600"></i>
+                                        Listar usuarios
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- Productos -->
+                        <li>
+                            <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium bg-white">
+                                <div class="flex items-center">
+                                    <i class="fa fa-shopping-basket mr-3 w-4 text-gray-600"></i>
+                                    Productos
+                                </div>
+                                <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                            </button>
+                            <ul class="dropdown-menu hidden pl-0 mt-1 space-y-1">
+                                <li>
+                                    <a href="/inventario/listarProductos" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-list mr-3 w-4 text-gray-600"></i>
+                                        Listar productos
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/inventario/agregarProducto" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-plus mr-3 w-4 text-gray-600"></i>
+                                        Agregar producto
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- Servicios -->
+                        <li>
+                            <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium bg-white">
+                                <div class="flex items-center">
+                                    <i class="fa fa-wrench mr-3 w-4 text-gray-600"></i>
+                                    Servicios
+                                </div>
+                                <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                            </button>
+                            <ul class="dropdown-menu hidden pl-0 mt-1 space-y-1">
+                                <li>
+                                    <a href="/inventario/listarServicios" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-list mr-3 w-4 text-gray-600"></i>
+                                        Listar servicios
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/inventario/agregarServicio" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-plus mr-3 w-4 text-gray-600"></i>
+                                        Agregar servicio
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- Cajas -->
+                        <li>
+                            <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium bg-white">
+                                <div class="flex items-center">
+                                    <i class="fa fa-money mr-3 w-4 text-gray-600"></i>
+                                    Cajas
+                                </div>
+                                <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                            </button>
+                            <ul class="dropdown-menu hidden pl-0 mt-1 space-y-1">
+                                <li>
+                                    <a href="/inventario/cajas/" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-list mr-3 w-4 text-gray-600"></i>
+                                        Listar cajas
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/inventario/cajas/agregar/" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-plus mr-3 w-4 text-gray-600"></i>
+                                        Agregar caja
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- Bancos -->
+                        <li>
+                            <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium bg-white">
+                                <div class="flex items-center">
+                                    <i class="fa fa-university mr-3 w-4 text-gray-600"></i>
+                                    Bancos
+                                </div>
+                                <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                            </button>
+                            <ul class="dropdown-menu hidden pl-0 mt-1 space-y-1">
+                                <li>
+                                    <a href="/inventario/bancos/" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-list mr-3 w-4 text-gray-600"></i>
+                                        Listar bancos
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/inventario/bancos/crear/" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-plus mr-3 w-4 text-gray-600"></i>
+                                        Crear banco
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- Almacenes -->
+                        <li>
+                            <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium bg-white">
+                                <div class="flex items-center">
+                                    <i class="fa fa-building mr-3 w-4 text-gray-600"></i>
+                                    Almacenes
+                                </div>
+                                <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                            </button>
+                            <ul class="dropdown-menu hidden pl-0 mt-1 space-y-1">
+                                <li>
+                                    <a href="/inventario/almacenes/" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-list mr-3 w-4 text-gray-600"></i>
+                                        Listar almacenes
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- Facturadores -->
+                        <li>
+                            <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium bg-white">
+                                <div class="flex items-center">
+                                    <i class="fa fa-id-card mr-3 w-4 text-gray-600"></i>
+                                    Facturadores
+                                </div>
+                                <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
+                            </button>
+                            <ul class="dropdown-menu hidden pl-0 mt-1 space-y-1">
+                                <li>
+                                    <a href="/inventario/facturadores/" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-list mr-3 w-4 text-gray-600"></i>
+                                        Listar facturadores
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/inventario/facturadores/crear/" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                        <i class="fa fa-plus mr-3 w-4 text-gray-600"></i>
+                                        Crear facturador
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- Separador -->
+                        <li><hr class="border-gray-200 my-2"></li>
+
+                        <!-- Secuencias -->
+                        <li>
+                            <a href="/inventario/ListaSecuencias/" class="flex items-center px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-sort-numeric-asc mr-3 w-4 text-gray-600"></i>
+                                Secuencias
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/inventario/importarBDD" class="flex items-center px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-upload mr-3 w-4 text-gray-600"></i>
                                 Importar BDD
                             </a>
                         </li>
                         <li>
-                            <a href="/inventario/descargarBDD" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-download mr-3 w-3 text-gray-600"></i>
+                            <a href="/inventario/descargarBDD" class="flex items-center px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-download mr-3 w-4 text-gray-600"></i>
                                 Descargar BDD
                             </a>
                         </li>
                         <li>
-                            <a href="/inventario/configuracionGeneral" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-cog mr-3 w-3 text-gray-600"></i>
-                                Configuración general
-                            </a>
-                        </li>
-                        <li>
-                            <a href="/inventario/ListaSecuencias/" class="flex items-center px-4 py-4 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                <i class="fa fa-sort-numeric-asc mr-3 w-3 text-gray-600"></i>
+                            <a href="/inventario/ListaSecuencias/" class="flex items-center px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
+                                <i class="fa fa-sort-numeric-asc mr-3 w-4 text-gray-600"></i>
                                 Secuencias
                             </a>
                         </li>
@@ -366,9 +402,347 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/metisMenu/3.0.7/metisMenu.min.js"></script>
 
+<style>
+/* Make all dropdown buttons take exact sidebar content width */
+#sidebar .dropdown-btn {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    display: flex !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-sizing: border-box !important;
+}
+
+/* Make inner dropdown links/buttons also full-bleed and flat */
+/* Inner anchors: left aligned content with thin black border */
+#sidebar .dropdown-menu > li > a {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    display: flex !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 0.75rem; /* spacing between icon and text */
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #111827 !important; /* dark text by default */
+    border: none !important;
+    border-bottom: 1px solid #cbd5e1 !important; /* friendly light gray */
+    border-radius: 0 !important;
+    box-sizing: border-box !important;
+    text-decoration: none !important; /* Remove underline */
+}
+
+/* Nested dropdown triggers keep chevron on right */
+#sidebar .dropdown-menu > li > .dropdown-btn {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    box-sizing: border-box !important;
+}
+
+/* Flatten nested dropdown containers to avoid white card/shadow and indentation */
+#sidebar .dropdown-menu {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    list-style: none;
+    position: static !important;           /* override Bootstrap */
+    inset: auto !important;                /* clear any offsets */
+    width: 100% !important;                /* full width of parent */
+    min-width: 0 !important;               /* remove bootstrap 10rem */
+}
+
+#sidebar nav, #sidebar nav ul {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+}
+
+/* Top-level items: only bottom border */
+#sidebar nav > ul > li > a,
+#sidebar nav > ul > li > .dropdown-btn {
+    border: none !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+    border-radius: 0 !important;
+}
+
+/* Ensure top-level anchors span full width for border */
+#sidebar nav > ul > li > a {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Make list items full-width blocks */
+#sidebar li {
+    display: block;
+    width: 100%;
+}
+
+/* Hover: turn bottom border black */
+#sidebar nav > ul > li > a:hover,
+#sidebar nav > ul > li > .dropdown-btn:hover,
+#sidebar .dropdown-menu > li > a:hover {
+    border-bottom-color: #000 !important;
+}
+
+/* Persist black border when active/open */
+#sidebar .is-active,
+#sidebar .is-open {
+    border-bottom-color: #000 !important;
+}
+
+/* Make the whole box black on hover and keep it when active/open */
+#sidebar nav > ul > li > a:hover,
+#sidebar nav > ul > li > .dropdown-btn:hover,
+#sidebar .dropdown-menu > li > a:hover,
+#sidebar .dropdown-menu > li > .dropdown-btn:hover {
+    background: #000 !important;
+    color: #fff !important;
+    text-decoration: none !important;
+}
+
+#sidebar .is-active,
+#sidebar .is-open {
+    background: #000 !important;
+    color: #fff !important;
+    text-decoration: none !important;
+}
+
+/* Remove underline from ALL sidebar links in ALL states */
+#sidebar a,
+#sidebar a:hover,
+#sidebar a:focus,
+#sidebar a:active,
+#sidebar a:visited {
+    text-decoration: none !important;
+}
+
+/* Remove underline from buttons as well */
+#sidebar button,
+#sidebar button:hover,
+#sidebar button:focus,
+#sidebar button:active {
+    text-decoration: none !important;
+}
+
+/* HIGH SPECIFICITY: Force opened triggers to stay black */
+#sidebar .dropdown-menu > li > .dropdown-btn.is-open,
+#sidebar nav > ul > li > .dropdown-btn.is-open {
+    background: #000 !important;
+    color: #fff !important;
+    border-bottom-color: #000 !important;
+}
+
+/* Ensure icons/spans turn white too */
+#sidebar nav > ul > li > a:hover i,
+#sidebar nav > ul > li > .dropdown-btn:hover i,
+#sidebar .dropdown-menu > li > a:hover i,
+#sidebar .dropdown-menu > li > .dropdown-btn:hover i,
+#sidebar .is-active > i,
+#sidebar .is-open > i,
+#sidebar .is-active > span,
+#sidebar .is-open > span {
+    color: #fff !important;
+}
+
+/* Force all icon colors to white on hover */
+#sidebar nav > ul > li > a:hover .fa,
+#sidebar nav > ul > li > .dropdown-btn:hover .fa,
+#sidebar .dropdown-menu > li > a:hover .fa,
+#sidebar .dropdown-menu > li > .dropdown-btn:hover .fa,
+#sidebar .is-active .fa,
+#sidebar .is-open .fa {
+    color: #fff !important;
+}
+
+/* Force text colors to white on hover */
+#sidebar nav > ul > li > a:hover,
+#sidebar nav > ul > li > .dropdown-btn:hover,
+#sidebar .dropdown-menu > li > a:hover,
+#sidebar .dropdown-menu > li > .dropdown-btn:hover {
+    color: #fff !important;
+}
+
+#sidebar .is-active,
+#sidebar .is-open {
+    color: #fff !important;
+}
+
+/* Force ALL text content to white on hover - more specific selectors */
+#sidebar nav > ul > li > a:hover *,
+#sidebar nav > ul > li > .dropdown-btn:hover *,
+#sidebar .dropdown-menu > li > a:hover *,
+#sidebar .dropdown-menu > li > .dropdown-btn:hover *,
+#sidebar .is-active *,
+#sidebar .is-open * {
+    color: #fff !important;
+}
+
+/* Force div and span text to white on hover */
+#sidebar nav > ul > li > a:hover div,
+#sidebar nav > ul > li > .dropdown-btn:hover div,
+#sidebar .dropdown-menu > li > a:hover div,
+#sidebar .dropdown-menu > li > .dropdown-btn:hover div,
+#sidebar nav > ul > li > a:hover span,
+#sidebar nav > ul > li > .dropdown-btn:hover span,
+#sidebar .dropdown-menu > li > a:hover span,
+#sidebar .dropdown-menu > li > .dropdown-btn:hover span {
+    color: #fff !important;
+}
+
+/* HIGH SPECIFICITY: Icons and text in opened triggers */
+#sidebar .dropdown-menu > li > .dropdown-btn.is-open i,
+#sidebar .dropdown-menu > li > .dropdown-btn.is-open div,
+#sidebar .dropdown-menu > li > .dropdown-btn.is-open div i,
+#sidebar nav > ul > li > .dropdown-btn.is-open i,
+#sidebar nav > ul > li > .dropdown-btn.is-open div,
+#sidebar nav > ul > li > .dropdown-btn.is-open div i {
+    color: #fff !important;
+}
+
+/* Keep submenu area default; only the active item stays black */
+#sidebar .dropdown-btn.is-open + .dropdown-menu {
+    background: transparent !important;
+}
+#sidebar .dropdown-btn.is-open + .dropdown-menu > li > a {
+    color: #111827 !important;
+    border-bottom-color: #cbd5e1 !important;
+}
+#sidebar .dropdown-btn.is-open + .dropdown-menu > li > a.is-active {
+    background: #000 !important;
+    color: #fff !important;
+    border-bottom-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+/* Force opened trigger buttons to stay black with high specificity */
+#sidebar .dropdown-btn.is-open {
+    background: #000 !important;
+    color: #fff !important;
+}
+#sidebar .dropdown-btn.is-open div,
+#sidebar .dropdown-btn.is-open i {
+    color: #fff !important;
+}
+
+/* Override any conflicting styles that might turn triggers white */
+#sidebar .dropdown-menu > li > .dropdown-btn.is-open:not(:hover),
+#sidebar nav > ul > li > .dropdown-btn.is-open:not(:hover) {
+    background: #000 !important;
+    color: #fff !important;
+}
+
+/* MAXIMUM SPECIFICITY: Force all text to white on hover */
+#sidebar a:hover,
+#sidebar button:hover,
+#sidebar .dropdown-btn:hover,
+#sidebar .is-active,
+#sidebar .is-open {
+    color: #ffffff !important;
+    background: #000000 !important;
+}
+
+/* Force ALL child elements to white text on hover */
+#sidebar a:hover *,
+#sidebar button:hover *,
+#sidebar .dropdown-btn:hover *,
+#sidebar .is-active *,
+#sidebar .is-open * {
+    color: #ffffff !important;
+}
+
+/* Specific text nodes forcing */
+#sidebar .dropdown-menu > li > a:hover,
+#sidebar .dropdown-menu > li > .dropdown-btn:hover {
+    color: #ffffff !important;
+    background: #000000 !important;
+}
+
+#sidebar .dropdown-menu > li > a:hover *,
+#sidebar .dropdown-menu > li > .dropdown-btn:hover * {
+    color: #ffffff !important;
+}
+
+/* THIRD LEVEL LINKS: Nested submenu items (like "Listar clientes") */
+#sidebar .dropdown-menu .dropdown-menu > li > a:hover {
+    color: #ffffff !important;
+    background: #000000 !important;
+}
+
+#sidebar .dropdown-menu .dropdown-menu > li > a:hover *,
+#sidebar .dropdown-menu .dropdown-menu > li > a:hover i,
+#sidebar .dropdown-menu .dropdown-menu > li > a:hover .fa {
+    color: #ffffff !important;
+}
+
+/* Force third level link text and icons to white on hover */
+#sidebar .dropdown-menu .dropdown-menu > li > a:hover {
+    text-decoration: none !important;
+}
+
+/* Ensure deep nested elements get white text */
+#sidebar ul ul li a:hover,
+#sidebar ul ul li a:hover *,
+#sidebar ul ul li a:hover i,
+#sidebar ul ul li a:hover .fa {
+    color: #ffffff !important;
+    background: #000000 !important;
+}
+</style>
+
 <script>
 // Initialize dropdown functionality
 $(document).ready(function() {
+    // Small delay to ensure DOM is fully loaded
+    setTimeout(function() {
+        // Reinitialize dropdown functionality for nested dropdowns
+    $('.dropdown-btn').off('click').on('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const dropdown = $(this).next('.dropdown-menu');
+            const icon = $(this).find('.fa-chevron-down');
+            
+            // Check if this is a nested dropdown
+            const isNestedDropdown = $(this).closest('.dropdown-menu').length > 0;
+            
+            if (!isNestedDropdown) {
+                // Close other top-level dropdowns
+        $('.dropdown-menu').not(dropdown).not(dropdown.find('.dropdown-menu')).slideUp(200);
+        $('.fa-chevron-down').not(icon).not(dropdown.find('.fa-chevron-down')).removeClass('rotate-180');
+        $('.dropdown-btn').not(this).removeClass('is-open');
+            } else {
+                // For nested dropdowns, only close sibling nested dropdowns
+                const parentDropdown = $(this).closest('.dropdown-menu');
+        parentDropdown.find('.dropdown-menu').not(dropdown).slideUp(200);
+        parentDropdown.find('.fa-chevron-down').not(icon).removeClass('rotate-180');
+        parentDropdown.find('.dropdown-btn').not(this).removeClass('is-open');
+            }
+            
+            // Toggle current dropdown
+            dropdown.slideToggle(200);
+            icon.toggleClass('rotate-180');
+        $(this).toggleClass('is-open');
+        });
+    }, 100);
     // Mobile sidebar variables
     const sidebar = $('#sidebar');
     const mobileMenuButton = $('#mobile-menu-button');
@@ -419,28 +793,17 @@ $(document).ready(function() {
         }
     });
     
-    // Toggle dropdown menus
-    $('.dropdown-btn').on('click', function(e) {
-        e.preventDefault();
-        const dropdown = $(this).next('.dropdown-menu');
-        const icon = $(this).find('.fa-chevron-down');
-        
-        // Close other dropdowns
-        $('.dropdown-menu').not(dropdown).slideUp(200);
-        $('.fa-chevron-down').not(icon).removeClass('rotate-180');
-        
-        // Toggle current dropdown
-        dropdown.slideToggle(200);
-        icon.toggleClass('rotate-180');
-    });
+    // (Removed duplicate toggle handler to avoid double is-open toggling)
     
     // Close dropdowns when clicking outside (but not when clicking mobile menu)
     $(document).on('click', function(e) {
         if (!$(e.target).closest('.dropdown-btn').length && 
             !$(e.target).closest('#mobile-menu-button').length &&
-            !$(e.target).closest('.fa-bars').length) {
+            !$(e.target).closest('.fa-bars').length &&
+            !$(e.target).closest('.dropdown-menu').length) {
             $('.dropdown-menu').slideUp(200);
             $('.fa-chevron-down').removeClass('rotate-180');
+            $('.dropdown-btn').removeClass('is-open');
         }
     });
     
@@ -453,5 +816,23 @@ $(document).ready(function() {
     if (!$('style:contains("rotate-180")').length) {
         $('<style>.rotate-180 { transform: rotate(180deg); }</style>').appendTo('head');
     }
+
+    // Mark current page as active and open its parents
+    const currentPath = window.location.pathname;
+    $('#sidebar a[href="' + currentPath + '"]').each(function() {
+        $(this).addClass('is-active');
+        const parentDropdown = $(this).closest('.dropdown-menu');
+        parentDropdown.removeClass('hidden').show();
+        const trigger = parentDropdown.prev('.dropdown-btn');
+        trigger.addClass('is-open');
+        trigger.find('.fa-chevron-down').addClass('rotate-180');
+        // If nested deeper, open all ancestors
+        parentDropdown.parents('.dropdown-menu').each(function() {
+            $(this).removeClass('hidden').show();
+            const t = $(this).prev('.dropdown-btn');
+            t.addClass('is-open');
+            t.find('.fa-chevron-down').addClass('rotate-180');
+        });
+    });
 });
 </script>

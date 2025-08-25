@@ -55,7 +55,7 @@
                     <div class="row">
                         <!-- Table Section -->
                         <div class="col-lg-12">
-                            <div class="overflow-x-auto">
+                            <div class="overflow-x-auto relative">
                                 <div class="flex justify-between items-center mb-3">
                                     <h3 class="text-base font-semibold text-gray-800">Facturas Registradas</h3>
                                     <span class="text-sm text-gray-600">Total: {{ tabla|length }} facturas</span>
@@ -148,46 +148,46 @@
                                                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">${{ fila.monto_general|sub:fila.sub_monto|floatformat:2 }}</span>
                                                 {% endfor %}
                                             </td>
-                                            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                                                <div class="relative inline-block text-left" id="dropdown-{{ forloop.counter }}">
+                                            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium relative">
+                                                <div class="relative inline-block text-left" id="dropdown-{{ forloop.counter }}" style="z-index: 1000;">
                                                     <button type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-2.5 py-1.5 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="toggleDropdown('{{ forloop.counter }}')">
                                                         Acciones
                                                         <i class="fa fa-chevron-down ml-1 -mr-0.5 h-3 w-3"></i>
                                                     </button>
                                                     
-                                                    <div class="origin-top-right absolute right-0 mt-1 w-48 rounded-md shadow-xl bg-white ring-1 ring-black ring-opacity-5 hidden z-[9999]" id="dropdown-menu-{{ forloop.counter }}">
+                                                    <div class="origin-top-right absolute right-0 mt-1 w-56 rounded-md shadow-2xl bg-white ring-1 ring-black ring-opacity-10 hidden z-[10000] border border-gray-200" id="dropdown-menu-{{ forloop.counter }}" style="box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
                                                         <div class="py-2">
-                                                            <a href="/inventario/verFactura/{{ fila.id }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
-                                                                <i class="fa fa-eye mr-2 text-blue-500"></i>
+                                                            <a href="/inventario/verFactura/{{ fila.id }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-150">
+                                                                <i class="fa fa-eye mr-3 text-blue-500 w-4 text-center"></i>
                                                                 <span>Editar/Ver Factura</span>
                                                             </a>
                                                             {% if fila.estado_sri == 'RECIBIDA' %}
                                                                 <div class="flex items-center px-4 py-2 text-sm text-blue-600 bg-blue-50 cursor-not-allowed">
-                                                                    <i class="fa fa-paper-plane mr-2 text-blue-500"></i>
+                                                                    <i class="fa fa-paper-plane mr-3 text-blue-500 w-4 text-center"></i>
                                                                     <span>Enviado (RECIBIDA)</span>
                                                                 </div>
                                                             {% elif not fila.numero_autorizacion or not fila.fecha_autorizacion %}
-                                                                <button onclick="enviarDocumento({{ fila.id }})" class="flex items-center w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 hover:text-green-900 border-none bg-transparent">
-                                                                    <i class="fa fa-certificate mr-2 text-green-500"></i>
+                                                                <button onclick="enviarDocumento({{ fila.id }})" class="flex items-center w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 hover:text-green-900 border-none bg-transparent transition-colors duration-150">
+                                                                    <i class="fa fa-certificate mr-3 text-green-500 w-4 text-center"></i>
                                                                     <span>🔐 Enviar al SRI</span>
                                                                 </button>
                                                             {% else %}
                                                                 <div class="flex items-center px-4 py-2 text-sm text-green-600 bg-green-50 cursor-not-allowed">
-                                                                    <i class="fa fa-check-circle mr-2 text-green-500"></i>
+                                                                    <i class="fa fa-check-circle mr-3 text-green-500 w-4 text-center"></i>
                                                                     <span>✅ Autorizada por SRI</span>
                                                                 </div>
                                                             {% endif %}
-                                                            <button onclick="consultarEstado({{ fila.id }})" class="flex items-center w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 hover:text-blue-900 border-none bg-transparent">
-                                                                <i class="fa fa-sync mr-2 text-blue-500"></i>
+                                                            <button onclick="consultarEstado({{ fila.id }})" class="flex items-center w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 hover:text-blue-900 border-none bg-transparent transition-colors duration-150">
+                                                                <i class="fa fa-sync mr-3 text-blue-500 w-4 text-center"></i>
                                                                 <span>🔍 Consultar estado</span>
                                                             </button>
-                                                            <div class="border-t border-gray-100"></div>
-                                                            <a href="/inventario/generarFactura/{{ fila.id }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
-                                                                <i class="fa fa-file-csv mr-2 text-gray-500"></i>
+                                                            <div class="border-t border-gray-200 my-1"></div>
+                                                            <a href="/inventario/generarFactura/{{ fila.id }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-150">
+                                                                <i class="fa fa-file-csv mr-3 text-gray-500 w-4 text-center"></i>
                                                                 <span>Generar reporte (CSV)</span>
                                                             </a>
-                                                            <a href="/inventario/generarFacturaPDF/{{ fila.id }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
-                                                                <i class="fa fa-file-pdf mr-2 text-red-500"></i>
+                                                            <a href="/inventario/generarFacturaPDF/{{ fila.id }}" class="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors duration-150">
+                                                                <i class="fa fa-file-pdf mr-3 text-red-500 w-4 text-center"></i>
                                                                 <span>Generar reporte (PDF)</span>
                                                             </a>
                                                         </div>
@@ -209,7 +209,7 @@
 
 <script>
     function toggleDropdown(counter) {
-        console.log('Abriendo dropdown:', counter); // Debug
+        console.log('Abriendo dropdown:', counter);
         
         const dropdown = document.getElementById('dropdown-menu-' + counter);
         const allDropdowns = document.querySelectorAll('[id^="dropdown-menu-"]');
@@ -218,55 +218,110 @@
         allDropdowns.forEach(d => {
             if (d !== dropdown) {
                 d.classList.add('hidden');
-                d.style.position = '';
-                d.style.top = '';
-                d.style.left = '';
-                d.style.right = '';
+                resetDropdownPosition(d);
             }
         });
         
         // Toggle el dropdown actual
         if (dropdown) {
+            const wasHidden = dropdown.classList.contains('hidden');
             dropdown.classList.toggle('hidden');
-            console.log('Dropdown visibility:', !dropdown.classList.contains('hidden')); // Debug
+            console.log('Dropdown visibility:', !dropdown.classList.contains('hidden'));
             
-            // Ajustar posición en móviles
-            if (window.innerWidth < 768 && !dropdown.classList.contains('hidden')) {
-                const button = event.target.closest('button');
-                if (button) {
-                    const rect = button.getBoundingClientRect();
-                    dropdown.style.position = 'fixed';
-                    dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
-                    dropdown.style.left = 'auto';
-                    dropdown.style.right = '10px';
-                    dropdown.style.zIndex = '9999';
-                }
+            if (!wasHidden) {
+                // El dropdown se está ocultando, resetear posición
+                resetDropdownPosition(dropdown);
+            } else {
+                // El dropdown se está mostrando, ajustar posición
+                setTimeout(() => positionDropdown(dropdown, event.target.closest('button')), 10);
             }
         } else {
             console.error('No se encontró dropdown-menu-' + counter);
         }
     }
 
+    function positionDropdown(dropdown, button) {
+        if (!dropdown || !button) return;
+        
+        const rect = dropdown.getBoundingClientRect();
+        const buttonRect = button.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+        const tableContainer = button.closest('.overflow-x-auto') || button.closest('table');
+        
+        // Si el dropdown se sale por la derecha
+        if (rect.right > viewportWidth - 20) {
+            dropdown.classList.remove('right-0');
+            dropdown.classList.add('left-0');
+        }
+        
+        // Si el dropdown se sale por abajo
+        if (rect.bottom > viewportHeight - 20) {
+            dropdown.classList.remove('mt-1');
+            dropdown.classList.add('bottom-full', 'mb-1');
+        }
+        
+        // En dispositivos móviles o si se sale del contenedor
+        if (window.innerWidth < 768 || (tableContainer && rect.bottom > tableContainer.getBoundingClientRect().bottom)) {
+            dropdown.style.position = 'fixed';
+            dropdown.style.top = Math.min(
+                buttonRect.bottom + 5, 
+                viewportHeight - rect.height - 20
+            ) + 'px';
+            dropdown.style.left = 'auto';
+            dropdown.style.right = window.innerWidth < 768 ? '10px' : 
+                Math.max(10, viewportWidth - buttonRect.right) + 'px';
+            dropdown.style.maxWidth = window.innerWidth < 768 ? 'calc(100vw - 20px)' : '280px';
+            dropdown.style.zIndex = '10001';
+        }
+    }
+
+    function resetDropdownPosition(dropdown) {
+        dropdown.classList.remove('left-0', 'bottom-full', 'mb-1');
+        dropdown.classList.add('right-0', 'mt-1');
+        dropdown.style.position = '';
+        dropdown.style.top = '';
+        dropdown.style.left = '';
+        dropdown.style.right = '';
+        dropdown.style.maxWidth = '';
+        dropdown.style.zIndex = '';
+    }
+
     document.addEventListener('click', function(event) {
         if (!event.target.closest('.relative')) {
             document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
                 d.classList.add('hidden');
-                d.style.position = '';
-                d.style.top = '';
-                d.style.left = '';
-                d.style.right = '';
+                resetDropdownPosition(d);
             });
         }
+    });
+    
+    // Cerrar dropdowns al hacer scroll y reposicionar si es necesario
+    let scrollTimeout;
+    window.addEventListener('scroll', function() {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+            document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
+                if (!d.classList.contains('hidden')) {
+                    d.classList.add('hidden');
+                    resetDropdownPosition(d);
+                }
+            });
+        }, 10);
     });
     
     // Resetear posición al cambiar tamaño de ventana
     window.addEventListener('resize', function() {
         document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
-            d.classList.add('hidden');
-            d.style.position = '';
-            d.style.top = '';
-            d.style.left = '';
-            d.style.right = '';
+            if (!d.classList.contains('hidden')) {
+                const button = d.closest('td').querySelector('button[onclick*="toggleDropdown"]');
+                if (button) {
+                    setTimeout(() => positionDropdown(d, button), 50);
+                } else {
+                    d.classList.add('hidden');
+                    resetDropdownPosition(d);
+                }
+            }
         });
     });
 
