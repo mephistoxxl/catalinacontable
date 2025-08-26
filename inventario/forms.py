@@ -384,10 +384,21 @@ class EmitirFacturaFormulario(forms.Form):
             max_length=100,
             required=False,  # Se llenará automáticamente
             widget=forms.TextInput(attrs={
-                'class': 'form-control', 
-                'placeholder': 'Nombre completo del cliente', 
-                'readonly': 'readonly', 
+                'class': 'form-control',
+                'placeholder': 'Nombre completo del cliente',
+                'readonly': 'readonly',
                 'id': 'id_nombre_cliente'
+            })
+        )
+
+        # Campo para el correo del cliente
+        self.fields['correo_cliente'] = forms.EmailField(
+            label="Correo del Cliente",
+            required=True,
+            widget=forms.EmailInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Correo del cliente',
+                'id': 'id_correo_cliente'
             })
         )
 
@@ -476,7 +487,7 @@ class EmitirFacturaFormulario(forms.Form):
         
         if not cliente_id and not cliente_select and not identificacion:
             raise forms.ValidationError("Debe seleccionar un cliente.")
-        
+
         # Validar fechas
         fecha_emision = cleaned_data.get('fecha_emision')
         fecha_vencimiento = cleaned_data.get('fecha_vencimiento')
@@ -484,7 +495,12 @@ class EmitirFacturaFormulario(forms.Form):
         if fecha_emision and fecha_vencimiento:
             if fecha_vencimiento < fecha_emision:
                 raise forms.ValidationError("La fecha de vencimiento no puede ser anterior a la fecha de emisión.")
-        
+
+        # Validar correo del cliente
+        correo = cleaned_data.get('correo_cliente')
+        if not correo:
+            raise forms.ValidationError("El correo del cliente es obligatorio.")
+
         return cleaned_data
 
 class ProveedorFormulario(forms.ModelForm):
