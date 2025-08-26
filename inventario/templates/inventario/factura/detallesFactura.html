@@ -395,14 +395,27 @@ fetch(`/inventario/buscar_producto/?q=${encodeURIComponent(codigo)}`)
         return response.json();
     })
     .then(data => {
+        console.log('🔍 DATOS RECIBIDOS DEL SERVIDOR:', data);
         if (data.length > 0) {
             let producto = data[0];
+            console.log('📦 PRODUCTO SELECCIONADO:', producto);
+            console.log('💰 Precio:', producto.precio);
+            console.log('📊 IVA Percent:', producto.iva_percent);
+            console.log('💲 Precio con IVA:', producto.precio_con_iva);
+            
             let tipo = producto.tipo === 'servicio' ? 'Servicio' : 'Producto';
             document.getElementById('producto').value = `${producto.nombre} (${tipo})`;
             document.getElementById('producto').dataset.precio = producto.precio;
             document.getElementById('producto').dataset.ivaPercent = producto.iva_percent || '0.12';
             document.getElementById('producto').dataset.precioCiva = producto.precio_con_iva;
             document.getElementById('producto').dataset.codigo = producto.codigo;
+            
+            // DEBUG: Mostrar valores almacenados
+            console.log('✅ DATOS GUARDADOS EN ELEMENTO:');
+            console.log('   precio:', document.getElementById('producto').dataset.precio);
+            console.log('   ivaPercent:', document.getElementById('producto').dataset.ivaPercent);
+            console.log('   precioCiva:', document.getElementById('producto').dataset.precioCiva);
+            
             limpiarMensajesError();
         } else {
             alert('Producto o servicio no encontrado.');
@@ -458,14 +471,37 @@ function agregarProducto() {
 
     let subtotal = (cantidad * precio);
 
-    // Calcular precios con IVA
+    // ✅ CORREGIDO: Usar mismo algoritmo que Django backend para exactitud
     let ivaPercent = parseFloat(document.getElementById('producto').dataset.ivaPercent || '0.12');
+    
+    console.log('🔢 INICIANDO CÁLCULO JAVASCRIPT:');
+    console.log('   Precio base:', precio);
+    console.log('   IVA percent:', ivaPercent);
+    console.log('   Cantidad:', cantidad);
+    
+    // Paso 1: Calcular precio unitario con IVA (igual que Django)
     let precioConIva = precio * (1 + ivaPercent);
+    console.log('   Precio con IVA (antes redondeo):', precioConIva);
+    
+    // Paso 2: Calcular total con IVA multiplicando cantidad
     let totalConIva = cantidad * precioConIva;
-
-    // Redondear a 2 decimales
+    console.log('   Total con IVA (antes redondeo):', totalConIva);
+    
+    // Paso 3: Redondear cada valor paso a paso (igual que Django ROUND_HALF_UP)
     precioConIva = Math.round(precioConIva * 100) / 100;
     totalConIva = Math.round(totalConIva * 100) / 100;
+    
+    console.log('✅ RESULTADO FINAL JAVASCRIPT:');
+    console.log('   Precio con IVA (redondeado):', precioConIva);
+    console.log('   Total con IVA (redondeado):', totalConIva);
+    
+    console.log('🔢 Cálculo JavaScript:', {
+        precio_base: precio,
+        iva_percent: ivaPercent,
+        precio_con_iva: precioConIva,
+        cantidad: cantidad,
+        total_con_iva: totalConIva
+    });
     
     // Agregar al array de productos
     const productoData = {
@@ -603,10 +639,22 @@ function actualizarCamposOcultos() {
 
 // ✅ FUNCIÓN EXISTENTE MODIFICADA: Ahora también actualiza formas de pago
 function actualizarTotal() {
-    // Calcular total con IVA
-    const totalConIva = productosAgregados.reduce((sum, producto) => sum + producto.totalConIva, 0);
-    // Redondear a 2 decimales
+    // Calcular total con IVA sumando todos los productos
+    const totalConIva = productosAgregados.reduce((sum, producto) => sum + parseFloat(producto.totalConIva || 0), 0);
+    
+    // Redondear a 2 decimales (igual que Django)
     const totalRedondeado = Math.round(totalConIva * 100) / 100;
+    
+    console.log('📊 JavaScript actualizarTotal():', {
+        productos_count: productosAgregados.length,
+        total_sin_redondeo: totalConIva,
+        total_redondeado: totalRedondeado,
+        productos_detalle: productosAgregados.map(p => ({
+            nombre: p.nombre,
+            cantidad: p.cantidad,
+            totalConIva: p.totalConIva
+        }))
+    });
     
     // Actualizar totales en la interfaz
     document.getElementById('total-general').textContent = `${totalRedondeado.toFixed(2)}`;
