@@ -1345,7 +1345,9 @@ class DetallesFactura(LoginRequiredMixin, View):
                 if iva_percent > 0:
                     base_imponible += subtotal
                     total_iva += valor_iva
-                    monto_general += total
+                # El total de la factura debe incluir todos los productos y servicios,
+                # sin importar si tienen o no IVA asociado
+                monto_general += total
 
                 print(f"✅ Producto procesado: {codigo} - Cantidad: {cantidad} - Precio unitario: {precio_unitario} - Subtotal: {subtotal} - IVA: {valor_iva} - Total: {total}")
                 productos_procesados += 1
