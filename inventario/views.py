@@ -980,28 +980,62 @@ def obtener_datos_secuencia(request, secuencia_id):
 
 def buscar_cliente(request):
     """
-    Función para buscar clientes por identificación
+    Busca un cliente por identificación.
+    Si no existe en la base de datos consulta la API externa y crea el registro.
     """
     try:
-        query = request.GET.get('q', '')
-        clientes = Cliente.objects.filter(identificacion__icontains=query)[:5]
-        resultados = []
-        
-        for cliente in clientes:
+        identificacion = request.GET.get('q', '').strip()
+        if not identificacion:
+            return JsonResponse({'error': True, 'message': 'Debe proporcionar una identificación'}, status=400)
+
+        cliente = Cliente.objects.filter(identificacion=identificacion).first()
+        if cliente:
             nombre_completo = cliente.razon_social
             if cliente.nombre_comercial:
                 nombre_completo += f" {cliente.nombre_comercial}"
-            
-            resultados.append({
+            return JsonResponse({
                 'id': cliente.id,
-                'nombre': f"{cliente.identificacion} - {nombre_completo}"
+                'identificacion': cliente.identificacion,
+                'razon_social': cliente.razon_social,
+                'nombre_comercial': cliente.nombre_comercial or ''
             })
-        
-        return JsonResponse(resultados, safe=False)
-        
+
+        # Consultar API externa
+        from services import consultar_identificacion as servicio_consultar_identificacion
+        resultado = servicio_consultar_identificacion(identificacion)
+        if resultado.get('error'):
+            return JsonResponse({'error': True, 'message': resultado.get('message', 'No encontrado')}, status=404)
+
+        tipo_ident = resultado.get('tipo_identificacion', '')
+        tipoIdentificacion = '04' if tipo_ident == 'RUC' else '05'
+        tipoCliente = '2' if tipo_ident == 'RUC' else '1'
+        tipo_regimen = resultado.get('tipo_regimen', '')
+        tipoRegimen = '1' if tipo_regimen != 'RIMPE' else '2'
+
+        cliente = Cliente.objects.create(
+            tipoIdentificacion=tipoIdentificacion,
+            identificacion=identificacion,
+            razon_social=resultado.get('razon_social', ''),
+            nombre_comercial=resultado.get('nombre_comercial', ''),
+            direccion=resultado.get('direccion', ''),
+            telefono=resultado.get('telefono', ''),
+            correo=resultado.get('email', ''),
+            observaciones='',
+            convencional='',
+            tipoVenta='1',
+            tipoRegimen=tipoRegimen,
+            tipoCliente=tipoCliente
+        )
+        return JsonResponse({
+            'id': cliente.id,
+            'identificacion': cliente.identificacion,
+            'razon_social': cliente.razon_social,
+            'nombre_comercial': cliente.nombre_comercial or ''
+        })
+
     except Exception as e:
         print(f"❌ Error en buscar_cliente: {e}")
-        return JsonResponse([], safe=False)
+        return JsonResponse({'error': True, 'message': 'Error interno'}, status=500)
 # ===== VISTA EMITIR FACTURA CORREGIDA =====
 class EmitirFactura(LoginRequiredMixin, View):
     login_url = '/inventario/login'

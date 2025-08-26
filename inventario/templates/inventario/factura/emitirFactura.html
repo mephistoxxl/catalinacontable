@@ -270,23 +270,20 @@ function buscarCliente() {
     fetch(`/inventario/buscar_cliente/?q=${cedula}`)
         .then(response => response.json())
         .then(data => {
-            if (data.length > 0) {
-                const cliente = data[0];
+            if (data.error) {
+                alert(data.message || 'Cliente no encontrado.');
                 const nombreCliente = document.getElementById('id_nombre_cliente');
                 const clienteId = document.getElementById('cliente_id');
-                
-                // Mostrar el nombre completo del cliente
-                if (nombreCliente) nombreCliente.value = cliente.nombre;
-                // Guardar el ID del cliente en el campo oculto
-                if (clienteId) clienteId.value = cliente.id;
-            } else {
-                alert('Cliente no encontrado.');
-                const nombreCliente = document.getElementById('id_nombre_cliente');
-                const clienteId = document.getElementById('cliente_id');
-                
                 if (nombreCliente) nombreCliente.value = '';
                 if (clienteId) clienteId.value = '';
+                return;
             }
+
+            const nombreCliente = document.getElementById('id_nombre_cliente');
+            const clienteId = document.getElementById('cliente_id');
+            const nombreCompleto = data.nombre_comercial ? `${data.razon_social} ${data.nombre_comercial}` : data.razon_social;
+            if (nombreCliente) nombreCliente.value = nombreCompleto;
+            if (clienteId) clienteId.value = data.id;
         })
         .catch(error => {
             console.error('Error al buscar cliente:', error);
