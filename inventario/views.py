@@ -997,7 +997,8 @@ def buscar_cliente(request):
                 'id': cliente.id,
                 'identificacion': cliente.identificacion,
                 'razon_social': cliente.razon_social,
-                'nombre_comercial': cliente.nombre_comercial or ''
+                'nombre_comercial': cliente.nombre_comercial or '',
+                'correo': cliente.correo or ''
             })
 
         # Consultar API externa
@@ -1030,7 +1031,8 @@ def buscar_cliente(request):
             'id': cliente.id,
             'identificacion': cliente.identificacion,
             'razon_social': cliente.razon_social,
-            'nombre_comercial': cliente.nombre_comercial or ''
+            'nombre_comercial': cliente.nombre_comercial or '',
+            'correo': cliente.correo or ''
         })
 
     except Exception as e:
@@ -1119,6 +1121,13 @@ class EmitirFactura(LoginRequiredMixin, View):
                 raise ValueError("No se seleccionó un cliente válido.")
                 
             cliente = get_object_or_404(Cliente, pk=cliente_id)
+
+            # Actualizar correo del cliente
+            correo_cliente = request.POST.get('correo_cliente', '').strip()
+            if not correo_cliente:
+                raise ValueError("El correo del cliente es obligatorio.")
+            cliente.correo = correo_cliente
+            cliente.save()
 
             # Recuperar datos del almacén
             almacen_id = request.POST.get('almacen')
