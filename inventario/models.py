@@ -767,28 +767,32 @@ class Factura(models.Model):
     def calcular_totales(self):
         """Método para calcular automáticamente los totales de la factura"""
         from django.db.models import Sum
-        
+        from decimal import Decimal, ROUND_HALF_UP
+
         # Verificar si la factura tiene un ID antes de acceder a relaciones
         if not self.pk:
-            self.total_descuento = 0
-            self.sub_monto = 0
-            self.monto_general = round(0 + self.propina, 2)
+            self.total_descuento = Decimal('0.00')
+            self.sub_monto = Decimal('0.00')
+            self.monto_general = (Decimal('0.00') + (self.propina or Decimal('0.00'))).quantize(
+                Decimal('0.01'), rounding=ROUND_HALF_UP
+            )
             return
-        
+
         # Sumar todos los descuentos de los detalles
         descuentos_detalles = self.detallefactura_set.aggregate(
             total_desc=Sum('descuento')
-        )['total_desc'] or 0
-        
-        # Actualizar el total_descuento de la factura
-        self.total_descuento = descuentos_detalles
-        
-        # Recalcular subtotales
-        self.sub_monto = sum(detalle.sub_total for detalle in self.detallefactura_set.all())
-        # Asegurar que monto_general también se redondee a 2 decimales
-        # Asumiendo que monto_general se calcula en base a sub_monto y otros campos (impuestos, etc.)
-        # Si el cálculo de monto_general es más complejo y se hace en otro lugar, este redondeo podría necesitar ajustarse.
-        self.monto_general = round(self.sub_monto - self.total_descuento + self.propina, 2) # Esto es una suposición de cómo se calcula monto_general, puede que necesite ajustarse.
+        )['total_desc'] or Decimal('0.00')
+
+        # Actualizar el total_descuento de la factura con redondeo
+        self.total_descuento = descuentos_detalles.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+        # Recalcular subtotales con redondeo
+        subtotal_acumulado = sum(detalle.sub_total for detalle in self.detallefactura_set.all())
+        self.sub_monto = Decimal(subtotal_acumulado).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+        # Calcular monto general con redondeo consistente
+        base_total = self.sub_monto - self.total_descuento + (self.propina or Decimal('0.00'))
+        self.monto_general = base_total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
     # ✅ MÉTODO SAVE() ÚNICO Y CONSOLIDADO - REEMPLAZA AMBOS DUPLICADOS
     def save(self, *args, **kwargs):
@@ -821,7 +825,9 @@ class Factura(models.Model):
         # Actualizar monto_general con el total de impuestos calculado
         # Asegurarse de que sub_monto y propina estén actualizados antes de este cálculo
         self.calcular_totales() # Asegura que sub_monto, total_descuento y propina estén correctos
-        self.monto_general = (self.sub_monto + total_impuestos_calculado + (self.propina or Decimal('0.00'))).quantize(Decimal('0.01'))
+        self.monto_general = (
+            self.sub_monto + total_impuestos_calculado + (self.propina or Decimal('0.00'))
+        ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
         try:
             self.full_clean()  # Ejecuta todas las validaciones del modelo

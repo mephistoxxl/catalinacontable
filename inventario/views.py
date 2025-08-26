@@ -1475,7 +1475,11 @@ class DetallesFactura(LoginRequiredMixin, View):
                     caja=caja
                 )
                 suma_pagos += monto
-            
+
+            # Recalcular totales de la factura para evitar diferencias por redondeo
+            factura.save()
+            factura.refresh_from_db()
+
             # Normalizar tanto la suma como el total de la factura a 2 decimales
             suma_pagos = suma_pagos.quantize(PRECISION_DOS_DECIMALES, rounding=ROUND_HALF_UP)
             monto_factura = factura.monto_general.quantize(PRECISION_DOS_DECIMALES, rounding=ROUND_HALF_UP)
