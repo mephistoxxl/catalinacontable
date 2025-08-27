@@ -15,13 +15,14 @@
     textarea,
     select {
         width: 100% !important;
-        padding: 8px 12px !important;
+        padding: 4px 8px !important; /* ✅ PADDING REDUCIDO */
         border: 0.5px solid #d1d5db !important; /* ✅ BORDE MÁS FINO */
-        border-radius: 6px !important;
-        font-size: 14px !important;
+        border-radius: 4px !important; /* ✅ BORDER RADIUS REDUCIDO */
+        font-size: 13px !important; /* ✅ FUENTE MÁS PEQUEÑA */
         background-color: #ffffff !important;
         transition: all 0.2s ease !important;
         box-shadow: none !important;
+        height: 30px !important; /* ✅ ALTURA FIJA COMPACTA */
     }
 
     /* Estados focus - bordes aún más sutiles */
@@ -76,12 +77,19 @@
 
     /* Espaciado compacto */
     .space-y-3 > * + * {
-        margin-top: 0.75rem !important;
+        margin-top: 0.5rem !important; /* ✅ MARGEN REDUCIDO */
     }
 
     /* Labels más compactos */
     label {
-        margin-bottom: 4px !important;
+        margin-bottom: 2px !important; /* ✅ MARGEN INFERIOR REDUCIDO */
+        font-size: 12px !important; /* ✅ FUENTE DE LABEL MÁS PEQUEÑA */
+    }
+
+    /* Descripción de ayuda más compacta */
+    .text-xs {
+        font-size: 10px !important; /* ✅ TEXTO DE AYUDA MÁS PEQUEÑO */
+        margin-top: 2px !important;
     }
 
     /* Estados disabled más sutiles */
@@ -95,28 +103,28 @@
     }
 </style>
 
-<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4" style="padding-top: 0px; padding-bottom: 20px;">
-    <div class="max-w-6xl mx-auto">
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-2" style="min-height: auto; padding-top: 0px; padding-bottom: 10px;">
+    <div class="max-w-5xl mx-auto">
 
         <!-- Messages Section -->
         {% if messages %}
-            <div class="mb-6">
+            <div class="mb-3">
                 {% for message in messages %}
-                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}">
+                    <div class="bg-white rounded-lg shadow-md p-3 border-l-4 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
                                 {% if message.tags == 'success' %}
-                                    <i class="fa fa-check-circle text-green-500 text-lg"></i>
+                                    <i class="fa fa-check-circle text-green-500 text-sm"></i>
                                 {% elif message.tags == 'error' %}
-                                    <i class="fa fa-exclamation-circle text-red-500 text-lg"></i>
+                                    <i class="fa fa-exclamation-circle text-red-500 text-sm"></i>
                                 {% elif message.tags == 'warning' %}
-                                    <i class="fa fa-exclamation-triangle text-yellow-500 text-lg"></i>
+                                    <i class="fa fa-exclamation-triangle text-yellow-500 text-sm"></i>
                                 {% else %}
-                                    <i class="fa fa-info-circle text-blue-500 text-lg"></i>
+                                    <i class="fa fa-info-circle text-blue-500 text-sm"></i>
                                 {% endif %}
                             </div>
                             <div class="ml-3">
-                                <p class="text-sm font-medium {% if message.tags == 'success' %}text-green-800{% elif message.tags == 'error' %}text-red-800{% elif message.tags == 'warning' %}text-yellow-800{% else %}text-blue-800{% endif %}">
+                                <p class="text-xs font-medium {% if message.tags == 'success' %}text-green-800{% elif message.tags == 'error' %}text-red-800{% elif message.tags == 'warning' %}text-yellow-800{% else %}text-blue-800{% endif %}">
                                     {{ message }}
                                 </p>
                             </div>
@@ -127,17 +135,17 @@
         {% endif %}
 
         <!-- Header Section -->
-        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 mb-0 rounded-lg mt-0">
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 mb-3 rounded-lg mt-4">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     {% if editar %}
-                        <i class="fa fa-edit text-white text-lg"></i>
+                        <i class="fa fa-edit text-white text-sm"></i>
                     {% else %}
-                        <i class="fa fa-plus-circle text-white text-lg"></i>
+                        <i class="fa fa-plus-circle text-white text-sm"></i>
                     {% endif %}
                 </div>
                 <div class="ml-3">
-                    <h2 class="text-lg font-semibold text-white">
+                    <h2 class="text-sm font-semibold text-white">
                         {% if editar %}
                             Editar Producto
                         {% else %}
@@ -150,27 +158,26 @@
         </div>
 
         <!-- Main Form -->
-        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden mt-2">
-            <form role="form" method="POST" onsubmit="return validarTodo('producto')" class="p-4">
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+            <form role="form" method="POST" onsubmit="return validarTodo('producto')" class="p-3">
                 {% csrf_token %}
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Columna Izquierda -->
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <!-- Columna 1 -->
                     <div class="space-y-3">
                         <!-- Código -->
                         <div class="group">
                             <label for="codigo" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-barcode text-gray-500 mr-1"></i>
+                                <i class="fa fa-barcode text-gray-500 mr-1 text-xs"></i>
                                 {{ form.codigo.label }}
-                                <span class="text-green-600 text-xs font-normal">(Autogenerado)</span>
+                                <span class="text-green-600 text-xs font-normal">(Auto)</span>
                             </label>
                             {{ form.codigo }}
-                            <p class="text-xs text-gray-500 mt-1">Código único del producto (formato: P00000001)</p>
                         </div>
 
                         <!-- Descripción -->
                         <div class="group">
                             <label for="descripcion" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-tag text-gray-500 mr-1"></i>
+                                <i class="fa fa-tag text-gray-500 mr-1 text-xs"></i>
                                 {{ form.descripcion.label }}
                                 <span class="text-red-500">*</span>
                             </label>
@@ -180,7 +187,7 @@
                         <!-- Código de Barras -->
                         <div class="group">
                             <label for="codigo_barras" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-qrcode text-gray-500 mr-1"></i>
+                                <i class="fa fa-qrcode text-gray-500 mr-1 text-xs"></i>
                                 {{ form.codigo_barras.label }}
                             </label>
                             {{ form.codigo_barras }}
@@ -189,28 +196,19 @@
                         <!-- Categoría -->
                         <div class="group">
                             <label for="categoria" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-folder text-gray-500 mr-1"></i>
+                                <i class="fa fa-folder text-gray-500 mr-1 text-xs"></i>
                                 {{ form.categoria.label }}
                             </label>
                             {{ form.categoria }}
                         </div>
-
-                        <!-- Disponible -->
-                        <div class="group">
-                            <label for="disponible" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-boxes text-gray-500 mr-1"></i>
-                                {{ form.disponible.label }}
-                            </label>
-                            {{ form.disponible }}
-                        </div>
                     </div>
 
-                    <!-- Columna Derecha -->
+                    <!-- Columna 2 -->
                     <div class="space-y-3">
                         <!-- Precio -->
                         <div class="group">
                             <label for="precio" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-dollar-sign text-gray-500 mr-1"></i>
+                                <i class="fa fa-dollar-sign text-gray-500 mr-1 text-xs"></i>
                                 {{ form.precio.label }}
                             </label>
                             {{ form.precio }}
@@ -219,7 +217,7 @@
                         <!-- Precio 2 -->
                         <div class="group">
                             <label for="precio2" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-dollar-sign text-gray-500 mr-1"></i>
+                                <i class="fa fa-dollar-sign text-gray-500 mr-1 text-xs"></i>
                                 {{ form.precio2.label }}
                             </label>
                             {{ form.precio2 }}
@@ -228,16 +226,28 @@
                         <!-- Costo Actual -->
                         <div class="group">
                             <label for="costo_actual" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-calculator text-gray-500 mr-1"></i>
+                                <i class="fa fa-calculator text-gray-500 mr-1 text-xs"></i>
                                 {{ form.costo_actual.label }}
                             </label>
                             {{ form.costo_actual }}
                         </div>
 
+                        <!-- Disponible -->
+                        <div class="group">
+                            <label for="disponible" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fa fa-boxes text-gray-500 mr-1 text-xs"></i>
+                                {{ form.disponible.label }}
+                            </label>
+                            {{ form.disponible }}
+                        </div>
+                    </div>
+
+                    <!-- Columna 3 -->
+                    <div class="space-y-3">
                         <!-- IVA -->
                         <div class="group">
                             <label for="iva" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-percentage text-gray-500 mr-1"></i>
+                                <i class="fa fa-percentage text-gray-500 mr-1 text-xs"></i>
                                 {{ form.iva.label }}
                             </label>
                             {{ form.iva }}
@@ -246,7 +256,7 @@
                         <!-- Precio IVA 1 -->
                         <div class="group">
                             <label for="precio_iva1" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-calculator text-gray-500 mr-1"></i>
+                                <i class="fa fa-calculator text-gray-500 mr-1 text-xs"></i>
                                 {{ form.precio_iva1.label }}
                             </label>
                             {{ form.precio_iva1 }}
@@ -255,7 +265,7 @@
                         <!-- Precio IVA 2 -->
                         <div class="group">
                             <label for="precio_iva2" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-calculator text-gray-500 mr-1"></i>
+                                <i class="fa fa-calculator text-gray-500 mr-1 text-xs"></i>
                                 {{ form.precio_iva2.label }}
                             </label>
                             {{ form.precio_iva2 }}
@@ -264,18 +274,18 @@
                 </div>
 
                 <!-- Botones de Acción -->
-                <div class="mt-6 flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                    <button type="submit" class="inline-flex items-center px-5 py-2.5 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 transition-all duration-200 shadow-sm">
-                        <i class="fa fa-save mr-2 text-sm"></i>
+                <div class="mt-4 flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 pt-3 border-t border-gray-200">
+                    <button type="submit" class="inline-flex items-center justify-center px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 transition-all duration-200 shadow-sm">
+                        <i class="fa fa-save mr-2 text-xs"></i>
                         {% if editar %}
-                            <span>Actualizar Producto</span>
+                            <span>Actualizar</span>
                         {% else %}
-                            <span>Guardar Producto</span>
+                            <span>Guardar</span>
                         {% endif %}
                     </button>
-                    <a href="{% url 'inventario:listarProductos' %}" class="inline-flex items-center px-5 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-all duration-200 border border-gray-300">
-                        <i class="fa fa-arrow-left mr-2 text-sm"></i>
-                        <span>Volver a Lista</span>
+                    <a href="{% url 'inventario:listarProductos' %}" class="inline-flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-all duration-200 border border-gray-300">
+                        <i class="fa fa-arrow-left mr-2 text-xs"></i>
+                        <span>Volver</span>
                     </a>
                 </div>
             </form>

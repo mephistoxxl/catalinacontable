@@ -2,122 +2,126 @@
 {% load static %}
 
 {% block content %}
-<!-- ✅ ESTILOS PERSONALIZADOS PARA INPUTS COMPACTOS Y FINOS -->
 <style>
-    /* Inputs de texto, email, password, number, etc. */
-    input[type="text"], 
-    input[type="email"], 
-    input[type="password"], 
-    input[type="number"], 
-    input[type="tel"], 
-    input[type="url"],
-    input[type="date"],
-    input[type="datetime-local"],
-    textarea,
-    select {
-        width: 100% !important;
-        padding: 8px 12px !important;
-        border: 0.5px solid #d1d5db !important; /* ✅ BORDE MÁS FINO */
-        border-radius: 6px !important;
-        font-size: 14px !important;
-        background-color: #ffffff !important;
-        transition: all 0.2s ease !important;
-        box-shadow: none !important;
-    }
+/* ✅ ESTILOS COMPACTOS MEJORADOS PARA INPUTS */
+input[type="text"], 
+input[type="email"], 
+input[type="password"], 
+input[type="number"], 
+input[type="tel"], 
+input[type="url"],
+input[type="date"],
+input[type="datetime-local"],
+textarea,
+select {
+    width: 100% !important;
+    padding: 3px 7px !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 4px !important;
+    font-size: 13px !important;
+    background-color: #ffffff !important;
+    transition: all 0.15s ease !important;
+    box-shadow: none !important;
+    height: 28px !important;
+    line-height: 1.3 !important;
+}
 
-    /* Estados focus - bordes aún más sutiles */
-    input[type="text"]:focus, 
-    input[type="email"]:focus, 
-    input[type="password"]:focus, 
-    input[type="number"]:focus, 
-    input[type="tel"]:focus, 
-    input[type="url"]:focus,
-    input[type="date"]:focus,
-    input[type="datetime-local"]:focus,
-    textarea:focus,
-    select:focus {
-        outline: none !important;
-        border-color: #60a5fa !important; /* ✅ AZUL MÁS SUAVE */
-        box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.08) !important; /* ✅ SOMBRA MÁS SUTIL */
-    }
+/* Estados focus */
+input[type="text"]:focus, 
+input[type="email"]:focus, 
+input[type="password"]:focus, 
+input[type="number"]:focus, 
+input[type="tel"]:focus, 
+input[type="url"]:focus,
+input[type="date"]:focus,
+input[type="datetime-local"]:focus,
+textarea:focus,
+select:focus {
+    outline: none !important;
+    border-color: #60a5fa !important;
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.1) !important;
+}
 
-    /* Estados hover - interacción sutil */
-    input[type="text"]:hover, 
-    input[type="email"]:hover, 
-    input[type="password"]:hover, 
-    input[type="number"]:hover, 
-    input[type="tel"]:hover, 
-    input[type="url"]:hover,
-    input[type="date"]:hover,
-    input[type="datetime-local"]:hover,
-    textarea:hover,
-    select:hover {
-        border-color: #9ca3af !important; /* ✅ GRIS MÁS SUAVE AL HOVER */
-    }
+/* Estados hover */
+input[type="text"]:hover, 
+input[type="email"]:hover, 
+input[type="password"]:hover, 
+input[type="number"]:hover, 
+input[type="tel"]:hover, 
+input[type="url"]:hover,
+input[type="date"]:hover,
+input[type="datetime-local"]:hover,
+textarea:hover,
+select:hover {
+    border-color: #9ca3af !important;
+}
 
-    /* Selects específicos */
-    select {
-        background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"></polyline></svg>') !important;
-        background-repeat: no-repeat !important;
-        background-position: right 8px center !important;
-        background-size: 16px !important;
-        padding-right: 40px !important;
-        appearance: none !important;
-        -webkit-appearance: none !important;
-        -moz-appearance: none !important;
-    }
+/* Selects específicos */
+select {
+    background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"></polyline></svg>') !important;
+    background-repeat: no-repeat !important;
+    background-position: right 6px center !important;
+    background-size: 14px !important;
+    padding-right: 28px !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+}
 
-    /* Checkboxes y radios */
-    input[type="checkbox"],
-    input[type="radio"] {
-        width: auto !important;
-        margin-right: 8px !important;
-        accent-color: #60a5fa !important; /* ✅ AZUL MÁS SUAVE */
-    }
+/* Checkboxes y radios */
+input[type="checkbox"],
+input[type="radio"] {
+    width: auto !important;
+    margin-right: 6px !important;
+    accent-color: #60a5fa !important;
+}
 
-    /* Espaciado compacto */
-    .space-y-3 > * + * {
-        margin-top: 0.75rem !important;
-    }
+/* Espaciado equilibrado */
+.space-y-3 > * + * {
+    margin-top: 0.5rem !important;
+}
 
-    /* Labels más compactos */
-    label {
-        margin-bottom: 4px !important;
-    }
+/* Labels equilibrados */
+label {
+    margin-bottom: 2px !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    color: #374151 !important;
+}
 
-    /* Estados disabled más sutiles */
-    input:disabled,
-    select:disabled,
-    textarea:disabled {
-        background-color: #f9fafb !important;
-        border-color: #e5e7eb !important;
-        color: #9ca3af !important;
-        cursor: not-allowed !important;
-    }
+/* Estados disabled */
+input:disabled,
+select:disabled,
+textarea:disabled {
+    background-color: #f9fafb !important;
+    border-color: #e5e7eb !important;
+    color: #9ca3af !important;
+    cursor: not-allowed !important;
+}
 </style>
 
-<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4" style="padding-top: 0px; padding-bottom: 20px;">
-    <div class="max-w-6xl mx-auto">
+<div class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-2" style="padding-top: 4px; padding-bottom: 12px;">
+    <div class="max-w-5xl mx-auto">
 
         <!-- Messages Section -->
         {% if messages %}
-            <div class="mb-6">
+            <div class="mb-4">
                 {% for message in messages %}
-                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}">
+                    <div class="bg-white rounded-lg shadow-md p-2 border-l-4 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
                                 {% if message.tags == 'success' %}
-                                    <i class="fa fa-check-circle text-green-500 text-lg"></i>
+                                    <i class="fa fa-check-circle text-green-500 text-sm"></i>
                                 {% elif message.tags == 'error' %}
-                                    <i class="fa fa-exclamation-circle text-red-500 text-lg"></i>
+                                    <i class="fa fa-exclamation-circle text-red-500 text-sm"></i>
                                 {% elif message.tags == 'warning' %}
-                                    <i class="fa fa-exclamation-triangle text-yellow-500 text-lg"></i>
+                                    <i class="fa fa-exclamation-triangle text-yellow-500 text-sm"></i>
                                 {% else %}
-                                    <i class="fa fa-info-circle text-blue-500 text-lg"></i>
+                                    <i class="fa fa-info-circle text-blue-500 text-sm"></i>
                                 {% endif %}
                             </div>
-                            <div class="ml-3">
-                                <p class="text-sm font-medium {% if message.tags == 'success' %}text-green-800{% elif message.tags == 'error' %}text-red-800{% elif message.tags == 'warning' %}text-yellow-800{% else %}text-blue-800{% endif %}">
+                            <div class="ml-2">
+                                <p class="text-xs font-medium {% if message.tags == 'success' %}text-green-800{% elif message.tags == 'error' %}text-red-800{% elif message.tags == 'warning' %}text-yellow-800{% else %}text-blue-800{% endif %}">
                                     {{ message }}
                                 </p>
                             </div>
@@ -129,15 +133,15 @@
 
         <!-- Error Messages Section -->
         {% if form.errors %}
-            <div class="mb-6">
-                <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-red-500 bg-red-50">
+            <div class="mb-4">
+                <div class="bg-white rounded-lg shadow-md p-2 border-l-4 border-red-500 bg-red-50">
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
-                            <i class="fa fa-exclamation-circle text-red-500 text-lg"></i>
+                            <i class="fa fa-exclamation-circle text-red-500 text-sm"></i>
                         </div>
-                        <div class="ml-3">
-                            <h3 class="text-sm font-medium text-red-800">Errores en el formulario</h3>
-                            <div class="mt-2 text-sm text-red-700">
+                        <div class="ml-2">
+                            <h3 class="text-xs font-medium text-red-800">Errores en el formulario</h3>
+                            <div class="mt-1 text-xs text-red-700">
                                 <ul class="list-disc list-inside space-y-1">
                                     {% for field, errors in form.errors.items %}
                                         {% for error in errors %}
@@ -153,13 +157,13 @@
         {% endif %}
 
         <!-- Header Section -->
-        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 mb-0 rounded-lg mt-0">
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-1.5 mb-0 rounded-lg mt-0">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <i class="fa fa-cash-register text-white text-lg"></i>
+                    <i class="fa fa-plus-circle text-blue-400 text-sm"></i>
                 </div>
-                <div class="ml-3">
-                    <h2 class="text-lg font-semibold text-white">Crear Nueva Caja</h2>
+                <div class="ml-2">
+                    <h2 class="text-sm font-semibold text-white">Crear Nueva Caja</h2>
                     <p class="text-gray-300 text-xs">Complete todos los campos requeridos</p>
                 </div>
             </div>
@@ -167,14 +171,14 @@
 
         <!-- Main Form -->
         <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden mt-2">
-            <form role="form" method="POST" class="p-4">
+            <form role="form" method="POST" class="p-3">
                 {% csrf_token %}
                 
-                <div class="grid grid-cols-1 gap-6">
+                <div class="space-y-3">
                     <!-- Descripción -->
                     <div class="group">
                         <label for="{{ form.descripcion.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">
-                            <i class="fa fa-tag text-gray-500 mr-1"></i>
+                            <i class="fa fa-tag text-blue-500 mr-1" style="font-size: 8px;"></i>
                             {{ form.descripcion.label }}
                             <span class="text-red-500">*</span>
                         </label>
@@ -190,8 +194,9 @@
                             <div class="flex items-center h-5">
                                 {{ form.activo }}
                             </div>
-                            <div class="ml-3 text-sm">
-                                <label for="{{ form.activo.id_for_label }}" class="font-medium text-gray-700 cursor-pointer text-xs">
+                            <div class="ml-2 text-sm">
+                                <label for="{{ form.activo.id_for_label }}" class="font-medium text-gray-700 cursor-pointer text-sm">
+                                    <i class="fa fa-toggle-on text-green-500 mr-1" style="font-size: 10px;"></i>
                                     {{ form.activo.label }}
                                 </label>
                             </div>
@@ -203,13 +208,13 @@
                 </div>
 
                 <!-- Botones de Acción -->
-                <div class="mt-6 flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                    <a href="{% url 'inventario:listarCajas' %}" class="inline-flex items-center px-5 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-all duration-200 border border-gray-300">
-                        <i class="fa fa-times mr-2 text-sm"></i>
+                <div class="mt-4 flex justify-end space-x-2 pt-3 border-t border-gray-200">
+                    <a href="{% url 'inventario:listarCajas' %}" class="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-gray-500 to-gray-600 text-white text-xs font-medium rounded-lg hover:from-gray-600 hover:to-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-all duration-200 shadow-sm">
+                        <i class="fa fa-times mr-1" style="font-size: 8px;"></i>
                         <span>Cancelar</span>
                     </a>
-                    <button type="submit" class="inline-flex items-center px-5 py-2.5 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 transition-all duration-200 shadow-sm">
-                        <i class="fa fa-save mr-2 text-sm"></i>
+                    <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs font-medium rounded-lg hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 transition-all duration-200 shadow-sm">
+                        <i class="fa fa-save mr-1" style="font-size: 8px;"></i>
                         <span>Guardar Caja</span>
                     </button>
                 </div>
@@ -217,6 +222,9 @@
         </div>
     </div>
 </div>
+
+<!-- Footer Spacing -->
+<div style="margin-bottom: 40px;"></div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {

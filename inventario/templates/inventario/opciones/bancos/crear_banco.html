@@ -2,32 +2,126 @@
 {% load static %}
 
 {% block content %}
-<!-- NO MODIFICAR ---------------------------------->
-{% load static %}
-<!-- FIN DE JAVASCRIPT ------------------------------------>
+<style>
+/* ✅ ESTILOS COMPACTOS MEJORADOS PARA INPUTS */
+input[type="text"], 
+input[type="email"], 
+input[type="password"], 
+input[type="number"], 
+input[type="tel"], 
+input[type="url"],
+input[type="date"],
+input[type="datetime-local"],
+textarea,
+select {
+    width: 100% !important;
+    padding: 3px 7px !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 4px !important;
+    font-size: 13px !important;
+    background-color: #ffffff !important;
+    transition: all 0.15s ease !important;
+    box-shadow: none !important;
+    height: 28px !important;
+    line-height: 1.3 !important;
+}
 
-<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4" style="padding-top: 0px; padding-bottom: 20px;">
-    <div class="max-w-6xl mx-auto">
+/* Estados focus */
+input[type="text"]:focus, 
+input[type="email"]:focus, 
+input[type="password"]:focus, 
+input[type="number"]:focus, 
+input[type="tel"]:focus, 
+input[type="url"]:focus,
+input[type="date"]:focus,
+input[type="datetime-local"]:focus,
+textarea:focus,
+select:focus {
+    outline: none !important;
+    border-color: #60a5fa !important;
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.1) !important;
+}
+
+/* Estados hover */
+input[type="text"]:hover, 
+input[type="email"]:hover, 
+input[type="password"]:hover, 
+input[type="number"]:hover, 
+input[type="tel"]:hover, 
+input[type="url"]:hover,
+input[type="date"]:hover,
+input[type="datetime-local"]:hover,
+textarea:hover,
+select:hover {
+    border-color: #9ca3af !important;
+}
+
+/* Selects específicos */
+select {
+    background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"></polyline></svg>') !important;
+    background-repeat: no-repeat !important;
+    background-position: right 6px center !important;
+    background-size: 14px !important;
+    padding-right: 28px !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+}
+
+/* Checkboxes y radios */
+input[type="checkbox"],
+input[type="radio"] {
+    width: auto !important;
+    margin-right: 6px !important;
+    accent-color: #60a5fa !important;
+}
+
+/* Espaciado equilibrado */
+.space-y-3 > * + * {
+    margin-top: 0.5rem !important;
+}
+
+/* Labels equilibrados */
+label {
+    margin-bottom: 2px !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    color: #374151 !important;
+}
+
+/* Estados disabled */
+input:disabled,
+select:disabled,
+textarea:disabled {
+    background-color: #f9fafb !important;
+    border-color: #e5e7eb !important;
+    color: #9ca3af !important;
+    cursor: not-allowed !important;
+}
+</style>
+
+<div class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-2" style="padding-top: 4px; padding-bottom: 12px;">
+    <div class="max-w-5xl mx-auto">
 
         <!-- Messages Section -->
         {% if messages %}
-            <div class="mb-6">
+            <div class="mb-4">
                 {% for message in messages %}
-                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}">
+                    <div class="bg-white rounded-lg shadow-md p-2 border-l-4 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
                                 {% if message.tags == 'success' %}
-                                    <i class="fas fa-check-circle text-green-500 text-xl"></i>
+                                    <i class="fas fa-check-circle text-green-500 text-sm"></i>
                                 {% elif message.tags == 'error' %}
-                                    <i class="fas fa-exclamation-circle text-red-500 text-xl"></i>
+                                    <i class="fas fa-exclamation-circle text-red-500 text-sm"></i>
                                 {% elif message.tags == 'warning' %}
-                                    <i class="fas fa-exclamation-triangle text-yellow-500 text-xl"></i>
+                                    <i class="fas fa-exclamation-triangle text-yellow-500 text-sm"></i>
                                 {% else %}
-                                    <i class="fas fa-info-circle text-blue-500 text-xl"></i>
+                                    <i class="fas fa-info-circle text-blue-500 text-sm"></i>
                                 {% endif %}
                             </div>
-                            <div class="ml-3">
-                                <p class="text-sm font-medium {% if message.tags == 'success' %}text-green-800{% elif message.tags == 'error' %}text-red-800{% elif message.tags == 'warning' %}text-yellow-800{% else %}text-blue-800{% endif %}">
+                            <div class="ml-2">
+                                <p class="text-xs font-medium {% if message.tags == 'success' %}text-green-800{% elif message.tags == 'error' %}text-red-800{% elif message.tags == 'warning' %}text-yellow-800{% else %}text-blue-800{% endif %}">
                                     {{ message }}
                                 </p>
                             </div>
@@ -38,102 +132,108 @@
         {% endif %}
                 
         <!-- Header Section -->
-        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-8 py-3 mb-0 rounded-lg mt-0">
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-1.5 mb-0 rounded-lg mt-0">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <i class="fas fa-university text-white text-xl"></i>
+                    <i class="fas fa-plus-circle text-blue-400 text-sm"></i>
                 </div>
-                <div class="ml-3">
-                    <h2 class="text-lg font-semibold text-white">Crear Nueva Cuenta Bancaria</h2>
+                <div class="ml-2">
+                    <h2 class="text-sm font-semibold text-white">Crear Nueva Cuenta Bancaria</h2>
                     <p class="text-gray-300 text-xs">Complete los datos para registrar una nueva cuenta bancaria</p>
                 </div>
             </div>
         </div>
 
         <!-- Form Section -->
-        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
-            <div class="p-8">
-                <form method="post" class="space-y-6">
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden mt-2">
+            <div class="p-3">
+                <form method="post" class="space-y-3">
                     {% csrf_token %}
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                         <!-- Banco -->
                         <div>
-                            <label for="{{ form.banco.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                <i class="fas fa-building mr-1"></i>Banco
+                            <label for="{{ form.banco.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fas fa-building text-blue-500 mr-1" style="font-size: 8px;"></i>{{ form.banco.label }}
+                                <span class="text-red-500">*</span>
                             </label>
                             {{ form.banco }}
                             {% if form.banco.errors %}
-                                <p class="mt-1 text-sm text-red-600">{{ form.banco.errors.0 }}</p>
+                                <p class="text-xs text-red-600 mt-1">{{ form.banco.errors.0 }}</p>
                             {% endif %}
                         </div>
 
                         <!-- Titular -->
                         <div>
-                            <label for="{{ form.titular.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                <i class="fas fa-user mr-1"></i>Titular de la Cuenta
+                            <label for="{{ form.titular.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fas fa-user text-green-500 mr-1" style="font-size: 8px;"></i>{{ form.titular.label }}
+                                <span class="text-red-500">*</span>
                             </label>
                             {{ form.titular }}
                             {% if form.titular.errors %}
-                                <p class="mt-1 text-sm text-red-600">{{ form.titular.errors.0 }}</p>
+                                <p class="text-xs text-red-600 mt-1">{{ form.titular.errors.0 }}</p>
                             {% endif %}
                         </div>
 
                         <!-- Número de Cuenta -->
                         <div>
-                            <label for="{{ form.numero_cuenta.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                <i class="fas fa-credit-card mr-1"></i>Número de Cuenta
+                            <label for="{{ form.numero_cuenta.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fas fa-credit-card text-purple-500 mr-1" style="font-size: 8px;"></i>{{ form.numero_cuenta.label }}
+                                <span class="text-red-500">*</span>
                             </label>
                             {{ form.numero_cuenta }}
                             {% if form.numero_cuenta.errors %}
-                                <p class="mt-1 text-sm text-red-600">{{ form.numero_cuenta.errors.0 }}</p>
+                                <p class="text-xs text-red-600 mt-1">{{ form.numero_cuenta.errors.0 }}</p>
                             {% endif %}
                         </div>
 
                         <!-- Tipo de Cuenta -->
                         <div>
-                            <label for="{{ form.tipo_cuenta.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                <i class="fas fa-list-alt mr-1"></i>Tipo de Cuenta
+                            <label for="{{ form.tipo_cuenta.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fas fa-list-alt text-orange-500 mr-1" style="font-size: 8px;"></i>{{ form.tipo_cuenta.label }}
+                                <span class="text-red-500">*</span>
                             </label>
                             {{ form.tipo_cuenta }}
                             {% if form.tipo_cuenta.errors %}
-                                <p class="mt-1 text-sm text-red-600">{{ form.tipo_cuenta.errors.0 }}</p>
+                                <p class="text-xs text-red-600 mt-1">{{ form.tipo_cuenta.errors.0 }}</p>
                             {% endif %}
                         </div>
 
                         <!-- Saldo Inicial -->
                         <div>
-                            <label for="{{ form.saldo_inicial.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                <i class="fas fa-dollar-sign mr-1"></i>Saldo Inicial
+                            <label for="{{ form.saldo_inicial.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fas fa-dollar-sign text-yellow-500 mr-1" style="font-size: 8px;"></i>{{ form.saldo_inicial.label }}
                             </label>
                             {{ form.saldo_inicial }}
                             {% if form.saldo_inicial.errors %}
-                                <p class="mt-1 text-sm text-red-600">{{ form.saldo_inicial.errors.0 }}</p>
+                                <p class="text-xs text-red-600 mt-1">{{ form.saldo_inicial.errors.0 }}</p>
                             {% endif %}
                         </div>
 
                         <!-- Estado -->
                         <div>
-                            <label for="{{ form.activo.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                <i class="fas fa-toggle-on mr-1"></i>Estado
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">
+                                <i class="fas fa-toggle-on text-green-500 mr-1" style="font-size: 8px;"></i>Estado
                             </label>
-                            <div class="flex items-center">
-                                <label class="form-check-label mr-2" for="{{ form.activo.id_for_label }}">Activo</label>
+                            <div class="flex items-center pt-1">
                                 {{ form.activo }}
+                                <label class="ml-2 text-sm font-medium text-gray-700 cursor-pointer" for="{{ form.activo.id_for_label }}">Activo</label>
                             </div>
                             {% if form.activo.errors %}
-                                <p class="mt-1 text-sm text-red-600">{{ form.activo.errors.0 }}</p>
+                                <p class="text-xs text-red-600 mt-1">{{ form.activo.errors.0 }}</p>
                             {% endif %}
                         </div>
                     </div>
 
                     <!-- Form Actions -->
-                    <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                        <a href="{% url 'inventario:listar_bancos' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                            <i class="fas fa-times mr-2"></i>Cancelar
+                    <div class="mt-4 flex justify-end space-x-2 pt-3 border-t border-gray-200">
+                        <a href="{% url 'inventario:listar_bancos' %}" class="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-medium rounded-lg hover:from-red-600 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 transition-all duration-200 shadow-sm no-underline">
+                            <i class="fas fa-times mr-1" style="font-size: 8px;"></i>
+                            <span>Cancelar</span>
                         </a>
-                        <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-700">
-                            <i class="fas fa-save mr-2"></i>Guardar Cuenta
+                        <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-gray-800 to-gray-900 text-white text-xs font-medium rounded-lg hover:from-gray-900 hover:to-black focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 transition-all duration-200 shadow-sm">
+                            <i class="fas fa-save mr-1" style="font-size: 8px;"></i>
+                            <span>Guardar Cuenta</span>
                         </button>
                     </div>
                 </form>
@@ -142,13 +242,24 @@
     </div>
 </div>
 
+<!-- Footer Spacing -->
+<div style="margin-bottom: 40px;"></div>
+
 <script>
-    // Mejorar la apariencia de los select y inputs
     document.addEventListener('DOMContentLoaded', function() {
-        const inputs = document.querySelectorAll('input, select');
+        // Aplicar clases de Tailwind a los inputs del formulario
+        const inputs = document.querySelectorAll('input[type="text"], input[type="email"], input[type="number"], textarea, select');
         inputs.forEach(input => {
-            input.classList.add('mt-1', 'block', 'w-full', 'rounded-md', 'border-gray-300', 'shadow-sm', 'focus:border-indigo-500', 'focus:ring-indigo-500', 'sm:text-sm');
+            if (!input.classList.contains('form-check-input')) {
+                input.className = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm';
+            }
         });
+        
+        // Checkbox styling
+        const checkbox = document.querySelector('input[type="checkbox"]');
+        if (checkbox) {
+            checkbox.className = 'focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded';
+        }
     });
 </script>
 {% endblock %}
