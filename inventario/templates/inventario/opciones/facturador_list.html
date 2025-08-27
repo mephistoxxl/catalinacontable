@@ -1,8 +1,27 @@
 {% extends "inventario/comun/base.html" %}
 
 {% block content %}
+<style>
+/* Estilos compactos reutilizados */
+.compact-table { font-size: 12px; }
+.compact-table th { padding: 8px 8px !important; font-size: 11px !important; font-weight: 600 !important; }
+.compact-table td { padding: 8px 8px !important; font-size: 12px !important; }
+
+.dropdown-compact { width: 144px !important; font-size: 11px !important; }
+.dropdown-compact button { padding: 4px 8px !important; font-size: 11px !important; }
+.dropdown-compact .dropdown-item { padding: 6px 12px !important; font-size: 11px !important; }
+.dropdown-compact i { font-size: 8px !important; }
+.dropdown-compact .action-icon { font-size: 18px !important; width: 20px; min-width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.dropdown-panel { overflow: visible !important; max-height: none !important; }
+/* Quitar espacio con el footer en esta página */
+footer { margin-top: 0 !important; padding-top: 0 !important; }
+/* Remover margen inferior del último bloque de contenido */
+.max-w-5xl > :last-child, .max-w-6xl > :last-child { margin-bottom: 0 !important; }
+/* Asegurar que links de acciones no tengan subrayado */
+.no-underline, .no-underline:hover { text-decoration: none !important; }
+</style>
 <div class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4" style="padding-top: 0px; padding-bottom: 0px;">
-    <div class="max-w-6xl mx-auto">
+    <div class="max-w-5xl mx-auto">
         <!-- Mensajes (si los hay) -->
         {% if messages %}
             <div class="mb-6">
@@ -32,7 +51,7 @@
         {% endif %}
 
         <!-- Header Section -->
-        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 mb-0 rounded-lg mt-0">
+    <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 mb-0 rounded-lg mt-3">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <i class="fas fa-user-tie text-white text-xl"></i>
@@ -57,7 +76,7 @@
                                     <i class="fa fa-plus mr-2"></i> Agregar Nuevo Facturador
                                 </a>
                             </div>
-                            <table class="min-w-full divide-y divide-gray-200">
+                            <table class="min-w-full divide-y divide-gray-200 compact-table">
                                 <thead class="bg-gray-50">
                                     <tr>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
@@ -85,18 +104,21 @@
                                             {% endif %}
                                         </td>
                                         <td class="px-4 py-3 text-center text-sm font-medium">
-                                            <div class="relative inline-block text-left" id="dropdown-{{ forloop.counter }}">
-                                                <button type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-2.5 py-1.5 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="toggleDropdown('{{ forloop.counter }}')">
+                                            <div class="relative inline-block text-left dropdown-compact" id="dropdown-{{ forloop.counter }}">
+                                                <button type="button" class="inline-flex justify-center items-center w-24 rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="toggleDropdown('{{ forloop.counter }}')">
                                                     Acciones
-                                                    <i class="fas fa-chevron-down ml-1 -mr-0.5 h-3 w-3"></i>
+                                                    <i class="fa fa-chevron-down ml-2" style="font-size: 10px;"></i>
                                                 </button>
-                                                <div class="origin-top-right absolute right-0 mt-1 w-36 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 hidden z-[9999]" id="dropdown-menu-{{ forloop.counter }}">
-                                                    <div class="py-1">
-                                                        <a href="{% url 'inventario:editar_facturador' facturador.id %}" class="block px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100">
-                                                            <i class="fa fa-pencil mr-1"></i>Editar
+                                                <div class="origin-top-right absolute right-0 mt-1 w-44 rounded-md shadow-2xl bg-white ring-1 ring-black ring-opacity-10 hidden z-[999999] dropdown-panel" id="dropdown-menu-{{ forloop.counter }}" style="position: fixed !important;">
+                                                    <div class="py-2">
+                                                        <a href="{% url 'inventario:editar_facturador' facturador.id %}" class="dropdown-item flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900 no-underline" style="text-decoration: none !important;">
+                                                            <i class="fa fa-pencil mr-3 text-blue-500 action-icon"></i>
+                                                            <span style="text-decoration: none !important; font-size: 12px; font-weight: 500;">Editar</span>
                                                         </a>
-                                                        <a href="{% url 'inventario:eliminar_facturador' facturador.id %}" class="block px-3 py-1.5 text-xs text-red-700 hover:bg-red-50">
-                                                            <i class="fa fa-trash mr-1"></i>Eliminar
+                                                        <div class="border-t border-gray-100 my-2"></div>
+                                                        <a href="{% url 'inventario:eliminar_facturador' facturador.id %}" class="dropdown-item flex items-center px-4 py-2 text-xs text-red-700 hover:bg-red-50 hover:text-red-900 no-underline" style="text-decoration: none !important;" onclick="return confirm('¿Estás seguro de eliminar este facturador?');">
+                                                            <i class="fa fa-trash mr-3 text-red-500 action-icon"></i>
+                                                            <span style="text-decoration: none !important; font-size: 12px; font-weight: 500;">Eliminar</span>
                                                         </a>
                                                     </div>
                                                 </div>
@@ -120,69 +142,45 @@
     </div>
 </div>
 <script>
+    // Dropdown de acciones con overlay fijo (mismo comportamiento que bancos/almacenes)
     function toggleDropdown(counter) {
+        event.stopPropagation();
+
         const dropdown = document.getElementById('dropdown-menu-' + counter);
+        const button = event.target.closest('button');
         const allDropdowns = document.querySelectorAll('[id^="dropdown-menu-"]');
-        allDropdowns.forEach(d => {
-            if (d !== dropdown) {
-                d.classList.add('hidden');
-                d.style.position = '';
-                d.style.top = '';
-                d.style.left = '';
-                d.style.right = '';
+
+        const isCurrentlyOpen = !dropdown.classList.contains('hidden');
+
+        allDropdowns.forEach(d => d.classList.add('hidden'));
+
+        if (!isCurrentlyOpen && dropdown && button) {
+            dropdown.classList.remove('hidden');
+
+            const rect = button.getBoundingClientRect();
+
+            dropdown.style.position = 'fixed';
+            dropdown.style.top = (rect.bottom + 2) + 'px';
+            dropdown.style.right = (window.innerWidth - rect.right) + 'px';
+            dropdown.style.left = 'auto';
+            dropdown.style.zIndex = '999999';
+
+            const dropdownHeight = dropdown.offsetHeight || 120;
+            const spaceBelow = window.innerHeight - rect.bottom - 2;
+            if (spaceBelow < dropdownHeight && rect.top > dropdownHeight) {
+                dropdown.style.top = (rect.top - dropdownHeight - 2) + 'px';
             }
-        });
-        dropdown.classList.toggle('hidden');
-        
-        if (!dropdown.classList.contains('hidden')) {
-            if (window.innerWidth < 768) {
-                const button = document.querySelector(`[onclick="toggleDropdown('${counter}')"]`);
-                if (button) {
-                    const rect = button.getBoundingClientRect();
-                    dropdown.style.position = 'fixed';
-                    dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
-                    dropdown.style.left = 'auto';
-                    dropdown.style.right = '10px';
-                    dropdown.style.zIndex = '9999';
-                }
-            } else {
-                dropdown.style.position = '';
-                dropdown.style.top = '';
-                dropdown.style.left = '';
-                dropdown.style.right = '';
-                dropdown.style.zIndex = '';
-            }
-        } else {
-            dropdown.style.position = '';
-            dropdown.style.top = '';
-            dropdown.style.left = '';
-            dropdown.style.right = '';
-            dropdown.style.zIndex = '';
         }
     }
+
     document.addEventListener('click', function(event) {
-        if (!event.target.closest('.relative')) {
-            document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
-                d.classList.add('hidden');
-                d.style.position = '';
-                d.style.top = '';
-                d.style.left = '';
-                d.style.right = '';
-                d.style.zIndex = '';
-            });
+        if (!event.target.closest('.dropdown-compact')) {
+            document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => d.classList.add('hidden'));
         }
     });
 
-    // Reset dropdown positions on window resize
     window.addEventListener('resize', function() {
-        document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
-            d.classList.add('hidden');
-            d.style.position = '';
-            d.style.top = '';
-            d.style.left = '';
-            d.style.right = '';
-            d.style.zIndex = '';
-        });
+        document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => d.classList.add('hidden'));
     });
 </script>
 {% endblock %}

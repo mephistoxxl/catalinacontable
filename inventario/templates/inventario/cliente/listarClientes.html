@@ -119,9 +119,16 @@
         padding: 6px 12px !important;
         font-size: 12px !important;
     }
+
+    /* Iconos de acción y encabezado consistentes */
+    .action-icon { font-size: 14px !important; width: 16px !important; height: 16px !important; line-height: 16px !important; text-align: center !important; display: inline-block !important; }
+    .form-header-icon { font-size: 16px !important; }
+
+    /* Panel de dropdown como overlay fijo */
+    .dropdown-panel { position: fixed; width: 11rem; background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); z-index: 9999; }
 </style>
 
-<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-2" style="min-height: auto; padding-top: 0px; padding-bottom: 10px;">
+<div class="bg-gray-50 p-3" style="padding-top: 8px; padding-bottom: 12px;">
     <div class="max-w-5xl mx-auto">
 
         <!-- Messages Section -->
@@ -153,20 +160,20 @@
         {% endif %}
                 
         <!-- Header Section -->
-        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 mb-3 rounded-lg mt-4">
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 mb-0 rounded-lg mt-0">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <i class="fa fa-users text-white text-sm"></i>
+                    <i class="fa fa-users text-white form-header-icon"></i>
                 </div>
                 <div class="ml-3">
-                    <h2 class="text-sm font-semibold text-white">Listar Clientes</h2>
-                    <p class="text-gray-300 text-xs">Verifique los clientes agregados al sistema</p>
+                    <h2 class="text-base font-semibold text-white">Listar Clientes</h2>
+                    <p class="text-gray-300 text-[11px]">Verifique los clientes agregados al sistema</p>
                 </div>
             </div>
         </div>
 
         <!-- Main Content -->
-        <div class="bg-white rounded-lg shadow-lg border border-gray-200 relative">
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 relative overflow-hidden mt-2">
             <div class="p-3">
                 <div class="relative">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 space-y-2 sm:space-y-0">
@@ -196,24 +203,23 @@
                                         <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.correo|default:"-" }}</td>
                                         <td class="px-3 py-2 whitespace-nowrap text-xs font-medium">
                                             <div class="relative inline-block text-left" id="dropdown-{{ forloop.counter }}">
-                                                <button type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-2 py-1 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="toggleDropdown('{{ forloop.counter }}')">
+                                                <button type="button" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-2 py-1 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="toggleDropdown(this,'{{ forloop.counter }}')">
                                                     Acciones
                                                     <i class="fa fa-chevron-down ml-1 -mr-0.5 h-3 w-3"></i>
                                                 </button>
-                                                
-                                                <div class="origin-top-right absolute right-0 mt-1 w-40 rounded-md shadow-xl bg-white ring-1 ring-black ring-opacity-5 hidden z-[9999]" id="dropdown-menu-{{ forloop.counter }}">
+                                                <div class="dropdown-panel hidden" id="dropdown-panel-{{ forloop.counter }}">
                                                     <div class="py-1">
                                                         <a href="/inventario/editarCliente/{{ fila.id }}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900">
-                                                            <i class="fa fa-edit mr-2 text-blue-500 text-xs"></i>
+                                                            <i class="fa fa-edit mr-2 text-blue-500 action-icon"></i>
                                                             <span>Editar</span>
                                                         </a>
                                                         <a href="/inventario/editarCliente/{{ fila.id }}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900">
-                                                            <i class="fa fa-eye mr-2 text-green-500 text-xs"></i>
+                                                            <i class="fa fa-eye mr-2 text-green-500 action-icon"></i>
                                                             <span>Ver</span>
                                                         </a>
                                                         <div class="border-t border-gray-100"></div>
                                                         <button onclick="abrir_modal_eliminacion('{% url 'inventario:eliminar' 'cliente' fila.id %}')" class="flex items-center w-full text-left px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 hover:text-red-900">
-                                                            <i class="fa fa-trash mr-2 text-red-500 text-xs"></i>
+                                                            <i class="fa fa-trash mr-2 text-red-500 action-icon"></i>
                                                             <span>Eliminar</span>
                                                         </button>
                                                     </div>
@@ -448,61 +454,38 @@
     }
 
     // ✅ RESTO DE FUNCIONES EXISTENTES
-    function toggleDropdown(counter) {
-        console.log('Abriendo dropdown:', counter); // Debug
-        
-        const dropdown = document.getElementById('dropdown-menu-' + counter);
-        const allDropdowns = document.querySelectorAll('[id^="dropdown-menu-"]');
-        
-        // Cerrar todos los otros dropdowns
-        allDropdowns.forEach(d => {
-            if (d !== dropdown) {
-                d.classList.add('hidden');
-            }
-        });
-        
-        // Toggle el dropdown actual
-        if (dropdown) {
-            dropdown.classList.toggle('hidden');
-            console.log('Dropdown visibility:', !dropdown.classList.contains('hidden')); // Debug
-            
-            // Ajustar posición del dropdown en móviles
-            if (window.innerWidth < 768) {
-                const button = event.target;
-                const rect = button.getBoundingClientRect();
-                dropdown.style.position = 'fixed';
-                dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
-                dropdown.style.left = 'auto';
-                dropdown.style.right = '10px';
-                dropdown.style.zIndex = '9999';
-            }
-        } else {
-            console.error('No se encontró dropdown-menu-' + counter);
-        }
+    function closeAllDropdowns() {
+        document.querySelectorAll('[id^="dropdown-panel-"]').forEach(d => d.classList.add('hidden'));
     }
-
+    function toggleDropdown(btn, key) {
+        const panel = document.getElementById('dropdown-panel-' + key);
+        if (!panel) return;
+        // Cerrar otros
+        document.querySelectorAll('[id^="dropdown-panel-"]').forEach(d => { if (d !== panel) d.classList.add('hidden'); });
+        // Mostrar para medir
+        panel.classList.remove('hidden');
+        panel.style.visibility = 'hidden';
+        const rect = btn.getBoundingClientRect();
+        const panelWidth = panel.offsetWidth || 176;
+        const panelHeight = panel.offsetHeight || 120;
+        let left = Math.min(rect.right - panelWidth, window.innerWidth - panelWidth - 8);
+        if (left < 8) left = 8;
+        let top = rect.bottom + 4;
+        if (top + panelHeight > window.innerHeight - 8) {
+            top = Math.max(8, rect.top - panelHeight - 4);
+        }
+        panel.style.left = left + 'px';
+        panel.style.top = top + 'px';
+        panel.style.visibility = 'visible';
+    }
     document.addEventListener('click', function(event) {
-        if (!event.target.closest('.relative')) {
-            document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
-                d.classList.add('hidden');
-                d.style.position = '';
-                d.style.top = '';
-                d.style.left = '';
-                d.style.right = '';
-            });
+        const isButton = event.target.closest('button');
+        const isPanel = event.target.closest('[id^="dropdown-panel-"]');
+        if (!isButton && !isPanel) {
+            closeAllDropdowns();
         }
     });
-    
-    // Resetear posición al cambiar tamaño de ventana
-    window.addEventListener('resize', function() {
-        document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
-            d.classList.add('hidden');
-            d.style.position = '';
-            d.style.top = '';
-            d.style.left = '';
-            d.style.right = '';
-        });
-    });
+    window.addEventListener('resize', closeAllDropdowns);
 
     // ✅ NUEVA FUNCIÓN MODERNIZADA SIN JQUERY
     function abrir_modal_eliminacion(url) {
@@ -522,9 +505,7 @@
         if (modal) {
             modal.classList.remove('hidden');
             // Cerrar dropdown si está abierto
-            document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
-                d.classList.add('hidden');
-            });
+            closeAllDropdowns();
         } else {
             console.error('No se encontró el modal modalEliminacion');
         }

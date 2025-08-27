@@ -1,100 +1,113 @@
 {% extends "inventario/comun/base.html" %}
 
 {% block content %}
-<div class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4" style="padding-top: 0px; padding-bottom: 0px;">
-    <div class="max-w-6xl mx-auto">
+<style>
+  /* Compact table paddings */
+  .compact-table th, .compact-table td { padding: 8px 10px !important; }
+  .compact-table { font-size: 13px !important; }
+  /* Standard small action icons */
+  .action-icon { font-size: 14px !important; width: 16px !important; height: 16px !important; line-height: 16px !important; text-align: center !important; display: inline-block !important; }
+  /* Dropdown panel (fixed overlay) */
+  .dropdown-panel { position: fixed; width: 11rem; background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); z-index: 9999; }
+  .form-header-icon { font-size: 16px !important; }
+</style>
+
+<div class="bg-gray-50 p-3" style="padding-top: 8px; padding-bottom: 12px;">
+    <div class="max-w-5xl mx-auto">
         <!-- Header Section -->
-        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 mb-0 rounded-lg mt-0">
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 mb-0 rounded-lg mt-0">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <i class="fas fa-list-ol text'NAME': os.path.join(BASE_DIR, 'BDD.sqlite3')-white text-xl"></i>
+                    <i class="fas fa-list-ol text-white form-header-icon"></i>
                 </div>
                 <div class="ml-3">
-                    <h2 class="text-lg font-semibold text-white">Gestión de Secuencias</h2>
-                    <p class="text-gray-300 text-xs">Visualice todas las secuencias registradas</p>
+                    <h2 class="text-base font-semibold text-white">Gestión de Secuencias</h2>
+                    <p class="text-gray-300 text-[11px]">Visualice todas las secuencias registradas</p>
                 </div>
             </div>
         </div>
 
         <!-- Main Content -->
-        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden mt-4">
-            <div class="p-0">
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden mt-2">
+            <div class="p-3">
                 <div class="row">
                     <div class="col-lg-12">
                         <div class="overflow-x-auto">
-                            <div class="flex justify-between items-center mb-1">
-                                <h3 class="text-base font-semibold text-gray-800">Secuencias Registradas</h3>
-                                <span class="text-sm text-gray-600">Total: {{ secuencias|length }} secuencias</span>
-                                <a href="/inventario/secuencias/crear/" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-900 hover:bg-gray-800 ml-2">
-                                    <i class="fa fa-plus mr-2"></i> Agregar Nueva Secuencia
-                                </a>
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="text-sm font-semibold text-gray-800">Secuencias Registradas</h3>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs text-gray-600">Total: {{ secuencias|length }} secuencias</span>
+                                    <a href="/inventario/secuencias/crear/" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-lg shadow-sm text-white bg-gray-900 hover:bg-gray-800">
+                                        <i class="fa fa-plus mr-2 action-icon"></i> Agregar
+                                    </a>
+                                </div>
                             </div>
-                            <table class="min-w-full divide-y divide-gray-200">
+                            <table class="min-w-full divide-y divide-gray-200 compact-table">
                                 <thead class="bg-gray-50">
                                     <tr>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de Documento</th>
-                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Secuencial</th>
-                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Establecimiento</th>
-                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Punto Emisión</th>
-                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Activo</th>
-                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">IVA</th>
-                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Fiscal</th>
-                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Doc. Electrónico</th>
-                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                                        <th class="px-3 py-2 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">ID</th>
+                                        <th class="px-3 py-2 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Descripción</th>
+                                        <th class="px-3 py-2 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Tipo de Documento</th>
+                                        <th class="px-3 py-2 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Secuencial</th>
+                                        <th class="px-3 py-2 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Establecimiento</th>
+                                        <th class="px-3 py-2 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Punto Emisión</th>
+                                        <th class="px-3 py-2 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Activo</th>
+                                        <th class="px-3 py-2 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">IVA</th>
+                                        <th class="px-3 py-2 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Fiscal</th>
+                                        <th class="px-3 py-2 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Doc. Electrónico</th>
+                                        <th class="px-3 py-2 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
                                     {% for secuencia in secuencias %}
                                     <tr class="hover:bg-gray-50 transition-colors duration-150">
-                                        <td class="px-4 py-3 text-sm text-gray-900 font-mono">{{ secuencia.id }}</td>
-                                        <td class="px-4 py-3 text-sm text-gray-900">{{ secuencia.descripcion }}</td>
-                                        <td class="px-4 py-3 text-sm text-gray-900">{{ secuencia.tipo_documento }}</td>
-                                        <td class="px-4 py-3 text-right text-sm text-gray-900 font-semibold">{{ secuencia.secuencial }}</td>
-                                        <td class="px-4 py-3 text-right text-sm text-gray-900 font-mono">{{ secuencia.establecimiento }}</td>
-                                        <td class="px-4 py-3 text-right text-sm text-gray-900 font-mono">{{ secuencia.punto_emision }}</td>
-                                        <td class="px-4 py-3 text-center text-sm">
+                                        <td class="px-3 py-2 text-xs text-gray-900 font-mono">{{ secuencia.id }}</td>
+                                        <td class="px-3 py-2 text-xs text-gray-900">{{ secuencia.descripcion }}</td>
+                                        <td class="px-3 py-2 text-xs text-gray-900">{{ secuencia.tipo_documento }}</td>
+                                        <td class="px-3 py-2 text-right text-xs text-gray-900 font-semibold">{{ secuencia.secuencial }}</td>
+                                        <td class="px-3 py-2 text-right text-xs text-gray-900 font-mono">{{ secuencia.establecimiento }}</td>
+                                        <td class="px-3 py-2 text-right text-xs text-gray-900 font-mono">{{ secuencia.punto_emision }}</td>
+                                        <td class="px-3 py-2 text-center text-xs">
                                             {% if secuencia.activo %}
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Sí</span>
                                             {% else %}
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">No</span>
                                             {% endif %}
                                         </td>
-                                        <td class="px-4 py-3 text-center text-sm">
+                                        <td class="px-3 py-2 text-center text-xs">
                                             {% if secuencia.iva %}
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Sí</span>
                                             {% else %}
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">No</span>
                                             {% endif %}
                                         </td>
-                                        <td class="px-4 py-3 text-center text-sm">
+                                        <td class="px-3 py-2 text-center text-xs">
                                             {% if secuencia.fiscal %}
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Sí</span>
                                             {% else %}
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">No</span>
                                             {% endif %}
                                         </td>
-                                        <td class="px-4 py-3 text-center text-sm">
+                                        <td class="px-3 py-2 text-center text-xs">
                                             {% if secuencia.documento_electronico %}
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">Sí</span>
                                             {% else %}
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">No</span>
                                             {% endif %}
                                         </td>
-                                        <td class="px-4 py-3 text-center text-sm font-medium">
+                                        <td class="px-3 py-2 text-center text-xs font-medium">
                                             <div class="relative inline-block text-left" id="dropdown-{{ forloop.counter }}">
-                                                <button type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-2.5 py-1.5 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="toggleDropdown('{{ forloop.counter }}')">
+                                                <button type="button" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-2.5 py-1.5 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="toggleDropdown(this, '{{ forloop.counter }}')">
                                                     Acciones
                                                     <i class="fas fa-chevron-down ml-1 -mr-0.5 h-3 w-3"></i>
                                                 </button>
-                                                <div class="origin-top-right absolute right-0 mt-2 w-36 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 hidden z-[9999]" id="dropdown-menu-{{ forloop.counter }}">
+                                                <div class="dropdown-panel hidden" id="dropdown-panel-{{ forloop.counter }}">
                                                     <div class="py-1">
-                                                        <a href="{% url 'inventario:editar_secuencia' secuencia.id %}" class="block px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100">
-                                                            <i class="fa fa-pencil mr-1"></i>Editar
+                                                        <a href="{% url 'inventario:editar_secuencia' secuencia.id %}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100">
+                                                            <i class="fa fa-pencil mr-2 action-icon"></i><span>Editar</span>
                                                         </a>
-                                                        <a href="{% url 'inventario:eliminar_secuencia' secuencia.id %}" class="block px-3 py-1.5 text-xs text-red-700 hover:bg-red-50">
-                                                            <i class="fa fa-trash mr-1"></i>Eliminar
+                                                        <a href="{% url 'inventario:eliminar_secuencia' secuencia.id %}" class="flex items-center px-3 py-1.5 text-xs text-red-700 hover:bg-red-50">
+                                                            <i class="fa fa-trash mr-2 action-icon"></i><span>Eliminar</span>
                                                         </a>
                                                     </div>
                                                 </div>
@@ -112,20 +125,35 @@
     </div>
 </div>
 <script>
-    function toggleDropdown(counter) {
-        const dropdown = document.getElementById('dropdown-menu-' + counter);
-        const allDropdowns = document.querySelectorAll('[id^="dropdown-menu-"]');
-        allDropdowns.forEach(d => {
-            if (d !== dropdown) d.classList.add('hidden');
-        });
-        dropdown.classList.toggle('hidden');
+    function closeAllDropdowns() {
+        document.querySelectorAll('[id^="dropdown-panel-"]').forEach(d => d.classList.add('hidden'));
     }
-    document.addEventListener('click', function(event) {
-        if (!event.target.closest('.relative')) {
-            document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
-                d.classList.add('hidden');
-            });
+    function toggleDropdown(btn, key) {
+        const panel = document.getElementById('dropdown-panel-' + key);
+        if (!panel) return;
+        // Close others first
+        document.querySelectorAll('[id^="dropdown-panel-"]').forEach(d => { if (d !== panel) d.classList.add('hidden'); });
+        // Show to measure
+        panel.classList.remove('hidden');
+        panel.style.visibility = 'hidden';
+        const rect = btn.getBoundingClientRect();
+        const panelWidth = panel.offsetWidth || 176; // ~11rem fallback
+        const panelHeight = panel.offsetHeight || 72;
+        let left = Math.min(rect.right - panelWidth, window.innerWidth - panelWidth - 8);
+        if (left < 8) left = 8;
+        let top = rect.bottom + 4;
+        if (top + panelHeight > window.innerHeight - 8) {
+            top = Math.max(8, rect.top - panelHeight - 4);
         }
+        panel.style.left = left + 'px';
+        panel.style.top = top + 'px';
+        panel.style.visibility = 'visible';
+    }
+    document.addEventListener('click', function (e) {
+        const isButton = e.target.closest('button');
+        const isPanel = e.target.closest('[id^="dropdown-panel-"]');
+        if (!isButton && !isPanel) closeAllDropdowns();
     });
+    window.addEventListener('resize', closeAllDropdowns);
 </script>
 {% endblock %}

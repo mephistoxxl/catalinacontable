@@ -3183,8 +3183,10 @@ class CrearFacturador(LoginRequiredMixin, View):
 class ListarFacturadores(View):
     def get(self, request):
         facturadores = Facturador.objects.all()
+        contexto = {'facturadores': facturadores}
+        contexto = complementarContexto(contexto, request.user)
         # Asegúrate de que la plantilla esté en la ruta correcta
-        return render(request, 'inventario/opciones/facturador_list.html', {'facturadores': facturadores})
+        return render(request, 'inventario/opciones/facturador_list.html', contexto)
 
 # Editar Facturador
 class EditarFacturador(View):
@@ -3193,10 +3195,12 @@ class EditarFacturador(View):
         facturador = get_object_or_404(Facturador, id=id)
         # Crea el formulario con los datos existentes
         form = FacturadorForm(instance=facturador)
-        return render(request, 'inventario/opciones/editar_facturador.html', {
+        contexto = {
             'form': form,
             'facturador': facturador
-        })
+        }
+        contexto = complementarContexto(contexto, request.user)
+        return render(request, 'inventario/opciones/editar_facturador.html', contexto)
 
     def post(self, request, id):
         # Recupera el facturador o lanza 404 si no existe
@@ -3220,10 +3224,12 @@ class EditarFacturador(View):
             print(form.errors)
             messages.error(request, 'Revise los datos proporcionados. Hay errores en el formulario.')
             # Reenvía el formulario con los errores al usuario
-            return render(request, 'inventario/opciones/editar_facturador.html', {
+            contexto = {
                 'form': form,
                 'facturador': facturador
-            })
+            }
+            contexto = complementarContexto(contexto, request.user)
+            return render(request, 'inventario/opciones/editar_facturador.html', contexto)
 
 # Eliminar Facturador
 class EliminarFacturador(View):
@@ -3274,21 +3280,31 @@ class LoginFacturador(View):
 
 #Para agregar los almacénes
 def gestion_almacenes(request):
+    """Gestión de Almacenes: asegura contexto con datos de usuario para el header."""
     if request.method == 'POST':
         form = AlmacenForm(request.POST)
         if form.is_valid():
             form.save()
             messages.success(request, "Almacén agregado exitosamente.")
             return redirect('inventario:gestion_almacenes')
-  # Asegúrate de que el nombre de la URL es correcto
-    else:
-        form = AlmacenForm()
 
+        # Si hay errores, re-renderizar con contexto completo (incluye usuario)
+        almacenes = Almacen.objects.all()
+        context = {
+            'form': form,
+            'almacenes': almacenes,
+        }
+        context = complementarContexto(context, request.user)
+        return render(request, 'inventario/opciones/almacenes.html', context)
+
+    # GET
+    form = AlmacenForm()
     almacenes = Almacen.objects.all()
     context = {
         'form': form,
         'almacenes': almacenes,
     }
+    context = complementarContexto(context, request.user)
     return render(request, 'inventario/opciones/almacenes.html', context)
 
 
@@ -3308,6 +3324,7 @@ def editar_almacen(request, id):
         'edit_mode': True,
         'almacen': almacen,
     }
+    context = complementarContexto(context, request.user)
     return render(request, 'inventario/opciones/almacenes_form.html', context)
 
 def eliminar_almacen(request, id):
