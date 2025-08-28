@@ -346,6 +346,66 @@ class ClienteFormulario(forms.ModelForm):
                 self.add_error('identificacion', 'La identificación 9999999999999 solo es válida para Consumidor Final.')
         return cleaned_data
 
+class EmitirPedidoFormulario(forms.Form):
+    """
+    Formulario inicial para emitir un pedido a proveedor.
+    La vista espera dos campos:
+    - proveedor: identificación del proveedor (ChoiceField)
+    - productos: cantidad de filas a generar en el formset de detalles (IntegerField)
+    """
+
+    def __init__(self, *args, **kwargs):
+        cedulas = kwargs.pop('cedulas', [])  # Lista de pares [identificacion, etiqueta]
+        super().__init__(*args, **kwargs)
+
+        self.fields['proveedor'] = forms.ChoiceField(
+            label="Seleccione Proveedor",
+            choices=[(c[0], c[1]) for c in cedulas],
+            widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_proveedor_select'})
+        )
+
+        self.fields['productos'] = forms.IntegerField(
+            label="Número de productos",
+            min_value=1,
+            initial=1,
+            widget=forms.NumberInput(attrs={'class': 'form-control', 'id': 'id_productos', 'min': '1'})
+        )
+
+    def clean_productos(self):
+        productos = self.cleaned_data.get('productos')
+        # Limitar a un rango razonable para evitar cargas excesivas
+        if productos is None or productos < 1 or productos > 50:
+            raise forms.ValidationError('Debe ingresar entre 1 y 50 productos.')
+        return productos
+
+class DetallesPedidoFormulario(forms.Form):
+    """
+    Formulario para cada línea del detalle del pedido.
+    La vista consume los campos:
+    - descripcion: Producto seleccionado (se usa .descripcion internamente)
+    - cantidad: cantidad de productos
+    - valor_subtotal: subtotal sin IVA para esa línea
+    """
+
+    descripcion = MisProductos(
+        queryset=Producto.objects.all().order_by('descripcion'),
+        label='Producto',
+        widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_producto'})
+    )
+    cantidad = forms.IntegerField(
+        label='Cantidad',
+        min_value=1,
+        initial=1,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'id': 'id_cantidad', 'min': '1'})
+    )
+    valor_subtotal = forms.DecimalField(
+        label='Subtotal',
+        min_value=Decimal('0.00'),
+        max_digits=20,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'id': 'id_subtotal', 'step': '0.01', 'min': '0'})
+    )
+
 class EmitirFacturaFormulario(forms.Form):
     def __init__(self, *args, **kwargs):
         cedulas = kwargs.pop('cedulas', [])

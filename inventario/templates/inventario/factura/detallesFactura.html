@@ -2,6 +2,9 @@
 
 {% block content %}
 <style>
+/* Compact helpers */
+.form-header-icon { font-size: 16px !important; }
+.label-icon { font-size: 12px !important; width: 14px !important; height: 14px !important; line-height: 14px !important; display: inline-block !important; text-align: center !important; }
 /* Estilos compactos para inputs y elementos del formulario */
 input[type="text"], input[type="number"], input[type="date"], select, textarea {
     width: 100%;
@@ -62,15 +65,15 @@ table th {
 }
 </style>
 
-<div class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-3" style="padding-top: 0px; padding-bottom: 0px;">
-    <div class="max-w-7xl mx-auto">
+<div class="bg-gray-50 p-3" style="padding-top: 6px; padding-bottom: 10px;">
+    <div class="max-w-5xl mx-auto">
         <!-- Header Section - Compacto -->
-        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-2 mb-3 rounded-md">
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 mb-1 rounded-lg">
             <div class="flex items-center">
-                <i class="fas fa-list-alt text-white text-lg mr-2"></i>
+                <i class="fas fa-list-alt text-white form-header-icon mr-2"></i>
                 <div>
                     <h2 class="text-base font-semibold text-white">Detalles de la Factura</h2>
-                    <p class="text-gray-300 text-xs hidden sm:block">Agregue productos y configure el pago</p>
+                    <p class="text-gray-300 text-[11px] hidden sm:block">Agregue productos y configure el pago</p>
                 </div>
             </div>
         </div>
@@ -120,7 +123,7 @@ table th {
                     <!-- Sección para agregar productos - Compacta -->
                     <div class="bg-gray-50 rounded-md p-3 border border-gray-200">
                         <div class="flex items-center mb-3">
-                            <i class="fas fa-plus-circle text-blue-600 text-base mr-2"></i>
+                            <i class="fas fa-plus-circle text-blue-600 label-icon mr-2"></i>
                             <h5 class="text-sm font-medium text-gray-800">Agregar Producto</h5>
                         </div>
                         
@@ -184,7 +187,7 @@ table th {
                         <div class="bg-gradient-to-r from-green-600 to-green-700 px-3 py-2">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center">
-                                    <i class="fas fa-money-bill-wave text-white text-base mr-2"></i>
+                                    <i class="fas fa-money-bill-wave text-white label-icon mr-2"></i>
                                     <h5 class="text-white font-medium text-sm">Formas de Pago</h5>
                                 </div>
                                 <div class="bg-green-800 px-2 py-1 rounded-full">
@@ -361,8 +364,8 @@ table th {
             </div>
         </div>
         
-        <!-- Espaciado adicional para evitar que el footer tape el contenido -->
-        <div class="h-24"></div>
+    <!-- Espaciado mínimo para el footer -->
+    <div class="h-3"></div>
     </div>
 </div>
 

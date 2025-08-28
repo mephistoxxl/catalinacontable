@@ -1,86 +1,167 @@
 {% extends "inventario/comun/base.html" %}
 
 {% block content %}
-                <article class="content responsive-tables-page">
-                    <div class="title-block">
-                        <h1 class="title"> Listar pedidos </h1>
-                        <p class="title-description"> Verifique los pedidos agregados </p>
-                    </div>
-                    <section class="section">
-                        <div class="row">
-                            <div class="col-md-12">
-                            {% if messages %}
-                            {% for message in messages %}
-         <div class="card card-primary">
-            <div class="card-header"> 
-                <div class="header-block">
-                    <em class="fa fa-check"></em>
-                        <p class="title">{{ message }}</p>
-                    </div>
-                </div>
-         </div>
-         {% endfor %}
-        {%endif%}                            
-                            <div class="col-md-12">
-                                <div class="card">
-                                    <div class="card-block">
-                                        <div class="card-title-block">
-                                            <h3 class="title">Pedidos</h3>
-                                        </div>
-                                        <section class="example">
-                                            <div class="table-responsive">
-                                                <table id="example2" class="table table-striped table-bordered table-hover">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>Item</th>
-                                                            <th>ID de proveedor</th>
-                                                            <th>Fecha</th>
-                                                            <th>Sub-Total</th>
-                                                            <th>Total</th>
-                                                            <th>IVA</th>
-                                                            <th>Recibido</th>
-                                                            <th>Opciones</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {% for fila in tabla %}
-                                                        <tr>
-                                                            <td>{{ fila.id}}</td>
-                                                            <td>{{ fila.proveedor.cedula }}</td>
-                                                            <td>{{ fila.fecha }}</td>
-                                                            <td>{{ fila.sub_monto }}</td>
-                                                            <td>{{ fila.monto_general }}</td>
-                                                            <td>{{ fila.iva.valor_iva }}</td>
-                                                            {% if fila.presente == 1%}
-                                                            <td align="center" style="color: green;"> <em class="fa fa-check"></em> </td>
-                                                            {% else %}
-                                                             <td align="center" style="color: red;"><em class="fa fa-ban"></em></td>
-                                                             {% endif %}
-                                                            <td>
 
-                                                <div class="btn-group">
-                                                    
-                                                <button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><i class="fa fa-wrench"></i></button>
+<!-- ✅ ESTILOS COMPACTOS Y DROPDOWN OVERLAY (aislados a Pedidos) -->
+<style>
+    .form-header-icon { font-size: 16px !important; }
+    .action-icon { font-size: 14px !important; width: 16px !important; height: 16px !important; line-height: 16px !important; text-align: center !important; display: inline-block !important; }
+    .tabla-compacta th { padding: 8px 12px !important; font-size: 11px !important; font-weight: 600 !important; }
+    .tabla-compacta td { padding: 6px 12px !important; font-size: 12px !important; }
+    .pedido-dropdown-wrapper .dropdown-panel { position: fixed; width: 11rem; background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); z-index: 9999; }
+    @media (max-width: 768px) { .tabla-compacta th, .tabla-compacta td { padding: 4px 8px !important; font-size: 11px !important; } }
+</style>
 
-                                                <div class="dropdown-menu">
-                                                    <a class="dropdown-item" href="/inventario/verPedido/{{ fila.id}}">Ver pedido</a>
-                                                    <div class="dropdown-divider"></div>
-                                                    <a class="dropdown-item" href="/inventario/generarPedido/{{ fila.id}}">Generar reporte(CSV)</a>
-                                                    <div class="dropdown-divider"></div>
-                                                    <a class="dropdown-item" href="/inventario/generarPedidoPDF/{{ fila.id}}">Generar reporte(PDF)</a>
-                                                    </div>
-                                                     </div>
-                                                            </td>
-                                                        </tr>
-                                                        {% endfor %}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </section>
-                                    </div>
-                                </div>
+<div class="bg-gray-50 p-3" style="padding-top: 8px; padding-bottom: 12px;">
+    <div class="max-w-5xl mx-auto">
+
+        <!-- Messages Section -->
+        {% if messages %}
+            <div class="mb-3">
+                {% for message in messages %}
+                    <div class="bg-white rounded-lg shadow-md p-3 border-l-4 border-green-500 bg-green-50">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fa fa-check-circle text-green-500 text-sm"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-xs font-medium text-green-800">{{ message }}</p>
                             </div>
                         </div>
-                    </section>
-                </article>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+                
+        <!-- Header Section -->
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 mb-0 rounded-lg mt-0">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fa fa-shopping-cart text-white form-header-icon"></i>
+                </div>
+                <div class="ml-3">
+                    <h2 class="text-base font-semibold text-white">Listar Pedidos</h2>
+                    <p class="text-gray-300 text-[11px]">Verifique los pedidos agregados</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 relative overflow-hidden mt-2">
+            <div class="p-3">
+                <div class="relative">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 space-y-2 sm:space-y-0">
+                        <h3 class="text-sm font-semibold text-gray-800">Pedidos</h3>
+                        <span class="text-xs text-gray-600">Total: {{ tabla|length }} pedidos</span>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 tabla-compacta">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID de proveedor</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sub-Total</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IVA</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recibido</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for fila in tabla %}
+                                <tr class="hover:bg-gray-50 transition-colors duration-150">
+                                    <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.id }}</td>
+                                    <td class="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">{{ fila.proveedor.cedula }}</td>
+                                    <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.fecha }}</td>
+                                    <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.sub_monto }}</td>
+                                    <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.monto_general }}</td>
+                                    <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.iva.valor_iva }}</td>
+                                    <td class="px-3 py-2 whitespace-nowrap text-xs">
+                                        {% if fila.presente == 1 %}
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                <i class="fa fa-check mr-1 text-xs"></i> Sí
+                                            </span>
+                                        {% else %}
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                <i class="fa fa-ban mr-1 text-xs"></i> No
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-3 py-2 whitespace-nowrap text-xs font-medium">
+                                        <div class="relative inline-block text-left pedido-dropdown-wrapper">
+                                            <button type="button" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-2 py-1 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="pedidosToggleDropdown(this,'{{ forloop.counter }}')">
+                                                Acciones
+                                                <i class="fa fa-chevron-down ml-1 -mr-0.5 h-3 w-3"></i>
+                                            </button>
+                                            <div class="dropdown-panel hidden" id="pedidos-dropdown-panel-{{ forloop.counter }}">
+                                                <div class="py-1">
+                                                    <a href="/inventario/verPedido/{{ fila.id}}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                                        <i class="fa fa-eye mr-2 text-blue-500 action-icon"></i>
+                                                        <span>Ver pedido</span>
+                                                    </a>
+                                                    <a href="/inventario/generarPedido/{{ fila.id}}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                                        <i class="fa fa-file-text-o mr-2 text-gray-500 action-icon"></i>
+                                                        <span>CSV</span>
+                                                    </a>
+                                                    <a href="/inventario/generarPedidoPDF/{{ fila.id}}" class="flex items-center px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 hover:text-red-700">
+                                                        <i class="fa fa-file-pdf-o mr-2 text-red-500 action-icon"></i>
+                                                        <span>PDF</span>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ✅ Dropdown overlay fijo con colisiones, toggle real y ámbito solo Pedidos
+    function pedidosCloseAllDropdowns() {
+        document.querySelectorAll('[id^="pedidos-dropdown-panel-"]').forEach(d => d.classList.add('hidden'));
+    }
+    function pedidosToggleDropdown(btn, key) {
+        const panel = document.getElementById('pedidos-dropdown-panel-' + key);
+        if (!panel) return;
+        const isOpen = !panel.classList.contains('hidden');
+        if (isOpen) {
+            panel.classList.add('hidden');
+            return;
+        }
+        document.querySelectorAll('[id^="pedidos-dropdown-panel-"]').forEach(d => { if (d !== panel) d.classList.add('hidden'); });
+        panel.classList.remove('hidden');
+        panel.style.visibility = 'hidden';
+        const rect = btn.getBoundingClientRect();
+        const panelWidth = panel.offsetWidth || 176;
+        const panelHeight = panel.offsetHeight || 120;
+        let left = Math.min(rect.right - panelWidth, window.innerWidth - panelWidth - 8);
+        if (left < 8) left = 8;
+        let top = rect.bottom + 4;
+        if (top + panelHeight > window.innerHeight - 8) {
+            top = Math.max(8, rect.top - panelHeight - 4);
+        }
+        panel.style.left = left + 'px';
+        panel.style.top = top + 'px';
+        panel.style.visibility = 'visible';
+    }
+    // Cerrar solo si el click ocurre fuera del wrapper/panel de pedidos (no toca el header)
+    document.addEventListener('click', function(event) {
+        const insideWrapper = event.target.closest('.pedido-dropdown-wrapper');
+        const isPanel = event.target.closest('[id^="pedidos-dropdown-panel-"]');
+        if (!insideWrapper && !isPanel) {
+            pedidosCloseAllDropdowns();
+        }
+    });
+    window.addEventListener('resize', pedidosCloseAllDropdowns);
+</script>
+
 {% endblock %}

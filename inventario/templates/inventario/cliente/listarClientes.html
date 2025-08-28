@@ -124,8 +124,8 @@
     .action-icon { font-size: 14px !important; width: 16px !important; height: 16px !important; line-height: 16px !important; text-align: center !important; display: inline-block !important; }
     .form-header-icon { font-size: 16px !important; }
 
-    /* Panel de dropdown como overlay fijo */
-    .dropdown-panel { position: fixed; width: 11rem; background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); z-index: 9999; }
+    /* Panel de dropdown como overlay fijo (solo para la tabla de clientes) */
+    .cliente-dropdown-wrapper .dropdown-panel { position: fixed; width: 11rem; background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); z-index: 9999; }
 </style>
 
 <div class="bg-gray-50 p-3" style="padding-top: 8px; padding-bottom: 12px;">
@@ -202,12 +202,12 @@
                                         <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.telefono|default:"-" }}</td>
                                         <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.correo|default:"-" }}</td>
                                         <td class="px-3 py-2 whitespace-nowrap text-xs font-medium">
-                                            <div class="relative inline-block text-left" id="dropdown-{{ forloop.counter }}">
-                                                <button type="button" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-2 py-1 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="toggleDropdown(this,'{{ forloop.counter }}')">
+                                            <div class="relative inline-block text-left cliente-dropdown-wrapper" id="dropdown-{{ forloop.counter }}">
+                                                <button type="button" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-2 py-1 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="clientesToggleDropdown(this,'{{ forloop.counter }}')">
                                                     Acciones
                                                     <i class="fa fa-chevron-down ml-1 -mr-0.5 h-3 w-3"></i>
                                                 </button>
-                                                <div class="dropdown-panel hidden" id="dropdown-panel-{{ forloop.counter }}">
+                                                <div class="dropdown-panel hidden" id="clientes-dropdown-panel-{{ forloop.counter }}">
                                                     <div class="py-1">
                                                         <a href="/inventario/editarCliente/{{ fila.id }}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                                                             <i class="fa fa-edit mr-2 text-blue-500 action-icon"></i>
@@ -454,15 +454,21 @@
     }
 
     // ✅ RESTO DE FUNCIONES EXISTENTES
-    function closeAllDropdowns() {
-        document.querySelectorAll('[id^="dropdown-panel-"]').forEach(d => d.classList.add('hidden'));
+    function clientesCloseAllDropdowns() {
+        document.querySelectorAll('[id^="clientes-dropdown-panel-"]').forEach(d => d.classList.add('hidden'));
     }
-    function toggleDropdown(btn, key) {
-        const panel = document.getElementById('dropdown-panel-' + key);
+    function clientesToggleDropdown(btn, key) {
+        const panel = document.getElementById('clientes-dropdown-panel-' + key);
         if (!panel) return;
+        // Si ya está visible, ocultar y salir (toggle real)
+        const isOpen = !panel.classList.contains('hidden');
+        if (isOpen) {
+            panel.classList.add('hidden');
+            return;
+        }
         // Cerrar otros
-        document.querySelectorAll('[id^="dropdown-panel-"]').forEach(d => { if (d !== panel) d.classList.add('hidden'); });
-        // Mostrar para medir
+        document.querySelectorAll('[id^="clientes-dropdown-panel-"]').forEach(d => { if (d !== panel) d.classList.add('hidden'); });
+        // Mostrar para medir y posicionar
         panel.classList.remove('hidden');
         panel.style.visibility = 'hidden';
         const rect = btn.getBoundingClientRect();
@@ -478,14 +484,15 @@
         panel.style.top = top + 'px';
         panel.style.visibility = 'visible';
     }
+    // Cerrar al hacer clic fuera del contenedor del dropdown o del propio panel
     document.addEventListener('click', function(event) {
-        const isButton = event.target.closest('button');
-        const isPanel = event.target.closest('[id^="dropdown-panel-"]');
-        if (!isButton && !isPanel) {
-            closeAllDropdowns();
+        const insideWrapper = event.target.closest('.cliente-dropdown-wrapper');
+        const isPanel = event.target.closest('[id^="clientes-dropdown-panel-"]');
+        if (!insideWrapper && !isPanel) {
+        clientesCloseAllDropdowns();
         }
     });
-    window.addEventListener('resize', closeAllDropdowns);
+    window.addEventListener('resize', clientesCloseAllDropdowns);
 
     // ✅ NUEVA FUNCIÓN MODERNIZADA SIN JQUERY
     function abrir_modal_eliminacion(url) {
@@ -504,8 +511,8 @@
         const modal = document.getElementById('modalEliminacion');
         if (modal) {
             modal.classList.remove('hidden');
-            // Cerrar dropdown si está abierto
-            closeAllDropdowns();
+            // Cerrar dropdown si está abierto (clientes)
+            clientesCloseAllDropdowns();
         } else {
             console.error('No se encontró el modal modalEliminacion');
         }

@@ -1,28 +1,34 @@
 {% extends "inventario/comun/base.html" %}
 
 {% block content %}
-<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4" style="padding-top: 0px; padding-bottom: 20px;">
-    <div class="max-w-6xl mx-auto">
+<style>
+    /* Compact helpers */
+    .form-header-icon { font-size: 16px !important; }
+    .label-icon { font-size: 12px !important; width: 14px !important; height: 14px !important; line-height: 14px !important; display: inline-block !important; text-align: center !important; }
+</style>
+
+<div class="bg-gray-50 p-2" style="padding-top: 6px; padding-bottom: 8px;">
+    <div class="max-w-6xl mx-auto" style="max-width: 68rem;">
 
         <!-- Messages Section -->
         {% if messages %}
-            <div class="mb-6">
+            <div class="mb-2">
                 {% for message in messages %}
-                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}">
+                    <div class="bg-white rounded-lg shadow-md p-2 border-l-4 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
                                 {% if message.tags == 'success' %}
-                                    <i class="fa fa-check-circle text-green-500 text-lg"></i>
+                                    <i class="fa fa-check-circle text-green-500 text-sm"></i>
                                 {% elif message.tags == 'error' %}
-                                    <i class="fa fa-exclamation-circle text-red-500 text-lg"></i>
+                                    <i class="fa fa-exclamation-circle text-red-500 text-sm"></i>
                                 {% elif message.tags == 'warning' %}
-                                    <i class="fa fa-exclamation-triangle text-yellow-500 text-lg"></i>
+                                    <i class="fa fa-exclamation-triangle text-yellow-500 text-sm"></i>
                                 {% else %}
-                                    <i class="fa fa-info-circle text-blue-500 text-lg"></i>
+                                    <i class="fa fa-info-circle text-blue-500 text-sm"></i>
                                 {% endif %}
                             </div>
                             <div class="ml-3">
-                                <p class="text-sm font-medium {% if message.tags == 'success' %}text-green-800{% elif message.tags == 'error' %}text-red-800{% elif message.tags == 'warning' %}text-yellow-800{% else %}text-blue-800{% endif %}">
+                                <p class="text-[11px] font-medium {% if message.tags == 'success' %}text-green-800{% elif message.tags == 'error' %}text-red-800{% elif message.tags == 'warning' %}text-yellow-800{% else %}text-blue-800{% endif %}">
                                     {{ message }}
                                 </p>
                             </div>
@@ -33,53 +39,53 @@
         {% endif %}
         
         <!-- Área de mensajes de identificación -->
-        <div id="ruc-messages" class="hidden mb-6">
-            <div class="bg-white rounded-lg shadow-md p-4 border-l-4">
+        <div id="ruc-messages" class="hidden mb-2">
+            <div class="bg-white rounded-lg shadow-md p-2 border-l-4">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
-                        <i class="fa fa-info-circle text-lg"></i>
+                        <i class="fa fa-info-circle text-sm"></i>
                     </div>
                     <div class="ml-3">
-                        <p class="text-sm font-medium" id="ruc-message-text"></p>
+                        <p class="text-[11px] font-medium" id="ruc-message-text"></p>
                     </div>
                 </div>
             </div>
         </div>
                 
         <!-- Header Section -->
-        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 mb-0 rounded-lg mt-0">
+    <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-1.5 mb-0 rounded-lg mt-0">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     {% if editar %}
-                        <i class="fa fa-edit text-white text-lg"></i>
+                        <i class="fa fa-edit text-white form-header-icon"></i>
                     {% else %}
-                        <i class="fa fa-truck text-white text-lg"></i>
+                        <i class="fa fa-truck text-white form-header-icon"></i>
                     {% endif %}
                 </div>
                 <div class="ml-3">
-                    <h2 class="text-lg font-semibold text-white">
+                    <h2 class="text-sm font-semibold text-white">
                         {% if editar %}
                             Editar Proveedor
                         {% else %}
                             Agregar Proveedor
                         {% endif %}
                     </h2>
-                    <p class="text-gray-300 text-xs">Complete todos los campos requeridos</p>
+                    <p class="text-gray-300 text-[11px]">Complete todos los campos requeridos</p>
                 </div>
             </div>
         </div>
 
         <!-- Main Form -->
-        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden mt-2">
-            <form role="form" method="POST" onsubmit="return validarTodo('proveedor')" class="p-4">
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden mt-1">
+            <form role="form" method="POST" onsubmit="return validarTodo('proveedor')" class="p-2">
                 {% csrf_token %}
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-2">
                     <!-- Columna Izquierda -->
-                    <div class="space-y-3">
+                    <div class="space-y-1">
                         <!-- Tipo de Identificación -->
                         <div class="group">
                             <label for="id_tipoIdentificacion" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-id-card text-gray-500 mr-1"></i>
+                                <i class="fa fa-id-card text-gray-500 mr-1 label-icon"></i>
                                 {{ form.tipoIdentificacion.label }}
                             </label>
                             <div class="relative">
@@ -90,7 +96,7 @@
                         <!-- Identificación con botón de búsqueda -->
                         <div class="group">
                             <label for="id_identificacion" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-hashtag text-gray-500 mr-1"></i>
+                                <i class="fa fa-hashtag text-gray-500 mr-1 label-icon"></i>
                                 {{ form.identificacion_proveedor.label }}
                                 <span id="loading-ruc" class="hidden ml-2">
                                     <i class="fa fa-spinner fa-spin text-gray-500"></i>
@@ -111,7 +117,7 @@
                         <!-- Razón Social -->
                         <div class="group">
                             <label for="id_razon_social" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-building text-gray-500 mr-1"></i>
+                                <i class="fa fa-building text-gray-500 mr-1 label-icon"></i>
                                 {{ form.razon_social_proveedor.label }}
                                 <span class="text-red-500">*</span>
                             </label>
@@ -121,7 +127,7 @@
                         <!-- Nombre Comercial -->
                         <div class="group">
                             <label for="id_nombre_comercial" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-store text-gray-500 mr-1"></i>
+                                <i class="fa fa-store text-gray-500 mr-1 label-icon"></i>
                                 {{ form.nombre_comercial_proveedor.label }}
                             </label>
                             {{ form.nombre_comercial_proveedor }}
@@ -130,7 +136,7 @@
                         <!-- Dirección -->
                         <div class="group">
                             <label for="id_direccion" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-map-marker text-gray-500 mr-1"></i>
+                                <i class="fa fa-map-marker text-gray-500 mr-1 label-icon"></i>
                                 {{ form.direccion.label }}
                                 <span class="text-red-500">*</span>
                             </label>
@@ -140,7 +146,7 @@
                         <!-- Teléfono -->
                         <div class="group">
                             <label for="id_telefono" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-phone text-gray-500 mr-1"></i>
+                                <i class="fa fa-phone text-gray-500 mr-1 label-icon"></i>
                                 {{ form.telefono.label }}
                             </label>
                             {{ form.telefono }}
@@ -149,7 +155,7 @@
                         <!-- Fecha de Nacimiento -->
                         <div class="group">
                             <label for="id_nacimiento" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-calendar text-gray-500 mr-1"></i>
+                                <i class="fa fa-calendar text-gray-500 mr-1 label-icon"></i>
                                 {{ form.nacimiento.label }}
                             </label>
                             {{ form.nacimiento }}
@@ -157,11 +163,11 @@
                     </div>
 
                     <!-- Columna Derecha -->
-                    <div class="space-y-3">
+                    <div class="space-y-1">
                         <!-- Correo -->
                         <div class="group">
                             <label for="id_correo" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-envelope text-gray-500 mr-1"></i>
+                                <i class="fa fa-envelope text-gray-500 mr-1 label-icon"></i>
                                 {{ form.correo.label }}
                                 <span class="text-red-500">*</span>
                             </label>
@@ -171,7 +177,7 @@
                         <!-- Observaciones -->
                         <div class="group">
                             <label for="id_observaciones" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-sticky-note text-gray-500 mr-1"></i>
+                                <i class="fa fa-sticky-note text-gray-500 mr-1 label-icon"></i>
                                 {{ form.observaciones.label }}
                             </label>
                             {{ form.observaciones }}
@@ -180,7 +186,7 @@
                         <!-- Tipo de Venta -->
                         <div class="group">
                             <label for="id_tipoVenta" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-shopping-cart text-gray-500 mr-1"></i>
+                                <i class="fa fa-shopping-cart text-gray-500 mr-1 label-icon"></i>
                                 {{ form.tipoVenta.label }}
                             </label>
                             {{ form.tipoVenta }}
@@ -189,7 +195,7 @@
                         <!-- Tipo de Régimen -->
                         <div class="group">
                             <label for="id_tipoRegimen" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-university text-gray-500 mr-1"></i>
+                                <i class="fa fa-university text-gray-500 mr-1 label-icon"></i>
                                 {{ form.tipoRegimen.label }}
                             </label>
                             {{ form.tipoRegimen }}
@@ -198,7 +204,7 @@
                         <!-- Tipo de Proveedor -->
                         <div class="group">
                             <label for="id_tipoProveedor" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-users text-gray-500 mr-1"></i>
+                                <i class="fa fa-users text-gray-500 mr-1 label-icon"></i>
                                 {{ form.tipoProveedor.label }}
                             </label>
                             {{ form.tipoProveedor }}
@@ -207,7 +213,7 @@
                         <!-- Convencional -->
                         <div class="group">
                             <label for="id_convencional" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-phone-alt text-gray-500 mr-1"></i>
+                                <i class="fa fa-phone-alt text-gray-500 mr-1 label-icon"></i>
                                 {{ form.convencional.label }}
                             </label>
                             {{ form.convencional }}
@@ -216,19 +222,19 @@
                 </div>
 
                 <!-- Campos Opcionales -->
-                <div class="mt-6 pt-6 border-t border-gray-200">
-                    <div class="flex items-center mb-4">
+                <div class="mt-2 pt-2 border-t border-gray-200">
+                    <div class="flex items-center mb-2">
                         <input type="checkbox" class="form-checkbox h-4 w-4 text-blue-600 transition duration-150 ease-in-out" 
                                onchange="toggleCamposOpcionales(this)" id="mostrar_opcionales">
                         <span class="ml-2 text-sm text-gray-700">Mostrar campos opcionales (teléfonos y correos adicionales)</span>
                     </div>
                     
                     <!-- Campos Opcionales (Ocultos por defecto) -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" style="display: none;" id="campos_opcionales">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-2" style="display: none;" id="campos_opcionales">
                         <!-- Teléfono 2 -->
                         <div class="group">
                             <label for="telefono2" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-phone text-gray-500 mr-1"></i>
+                                <i class="fa fa-phone text-gray-500 mr-1 label-icon"></i>
                                 {{ form.telefono2.label }}
                             </label>
                             {{ form.telefono2 }}
@@ -237,7 +243,7 @@
                         <!-- Correo 2 -->
                         <div class="group">
                             <label for="correo2" class="block text-xs font-semibold text-gray-700 mb-1">
-                                <i class="fa fa-envelope text-gray-500 mr-1"></i>
+                                <i class="fa fa-envelope text-gray-500 mr-1 label-icon"></i>
                                 {{ form.correo2.label }}
                             </label>
                             {{ form.correo2 }}
@@ -246,12 +252,12 @@
                 </div>
 
                 <!-- Botones de Acción -->
-                <div class="flex flex-col sm:flex-row justify-center items-center space-y-2 sm:space-y-0 sm:space-x-3 mt-8 pt-6 border-t border-gray-200 mb-8">
-                    <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-all duration-200">
+                <div class="flex flex-col sm:flex-row justify-center items-center space-y-2 sm:space-y-0 sm:space-x-3 mt-2 pt-2 border-t border-gray-200 mb-1">
+                    <button type="submit" class="w-full sm:w-auto px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-all duration-200">
                         <i class="fa fa-save mr-2"></i>
                         {% if editar %}Actualizar{% else %}Guardar{% endif %} Proveedor
                     </button>
-                    <button type="button" onclick="limpiarFormulario()" class="w-full sm:w-auto px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 transition-all duration-200">
+                    <button type="button" onclick="limpiarFormulario()" class="w-full sm:w-auto px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 transition-all duration-200">
                         <i class="fa fa-eraser mr-2"></i>
                         Limpiar Formulario
                     </button>
@@ -263,7 +269,7 @@
 
 <!-- ✅ ESTILOS PERSONALIZADOS PARA INPUTS COMPACTOS Y FINOS -->
 <style>
-    /* Inputs de texto, email, password, number, etc. */
+    /* Inputs de texto, email, password, number, etc. (densos) */
     input[type="text"], 
     input[type="email"], 
     input[type="password"], 
@@ -275,13 +281,15 @@
     textarea,
     select {
         width: 100% !important;
-        padding: 8px 12px !important;
+        padding: 3px 7px !important;
         border: 0.5px solid #d1d5db !important; /* ✅ BORDE MÁS FINO */
-        border-radius: 6px !important;
-        font-size: 14px !important;
+        border-radius: 4px !important;
+        font-size: 12px !important;
         background-color: #ffffff !important;
-        transition: all 0.2s ease !important;
+        transition: all 0.15s ease !important;
         box-shadow: none !important;
+        height: 26px !important;
+        line-height: 1.2 !important;
     }
 
     /* Estados focus - bordes aún más sutiles */
@@ -318,9 +326,9 @@
     select {
         background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"></polyline></svg>') !important;
         background-repeat: no-repeat !important;
-        background-position: right 8px center !important;
-        background-size: 16px !important;
-        padding-right: 40px !important;
+    background-position: right 6px center !important;
+    background-size: 14px !important;
+    padding-right: 28px !important;
         appearance: none !important;
         -webkit-appearance: none !important;
         -moz-appearance: none !important;
@@ -336,12 +344,13 @@
 
     /* Espaciado compacto */
     .space-y-3 > * + * {
-        margin-top: 0.75rem !important;
+        margin-top: 0.35rem !important;
     }
 
     /* Labels más compactos */
     label {
-        margin-bottom: 4px !important;
+        margin-bottom: 2px !important;
+        font-size: 11px !important;
     }
 
     /* Estados disabled más sutiles */
@@ -357,7 +366,7 @@
     /* Textarea específico */
     textarea {
         resize: vertical !important;
-        min-height: 80px !important;
+        min-height: 64px !important;
     }
 
     /* Override para campos con error */
