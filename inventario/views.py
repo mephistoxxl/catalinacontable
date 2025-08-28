@@ -1522,17 +1522,23 @@ class DetallesFactura(LoginRequiredMixin, View):
                 except InvalidOperation:
                     raise Exception("Monto de pago inválido")
                 
-                # Obtener la caja (acepta tanto 'caja' como 'caja_id')
-                caja_id = pago.get('caja') or pago.get('caja_id')
-                if not caja_id:
-                    raise Exception("Caja no especificada para el pago")
-                
-                try:
-                    caja = Caja.objects.get(id=caja_id, activo=True)
-                except Caja.DoesNotExist:
-                    raise Exception(f"Caja {caja_id} no existe o está inactiva")
-                
-                # Crear forma de pago con monto normalizado
+                # Obtener tipo de pago para manejar depósitos sin caja
+                tipo_pago = str(pago.get('tipo', '')).lower()
+                caja = None
+                if tipo_pago != 'deposito':
+                    # Obtener la caja (acepta tanto 'caja' como 'caja_id')
+                    caja_id = pago.get('caja') or pago.get('caja_id')
+                    if not caja_id:
+                        raise Exception("Caja no especificada para el pago")
+
+                    try:
+                        caja = Caja.objects.get(id=caja_id, activo=True)
+                    except Caja.DoesNotExist:
+                        raise Exception(f"Caja {caja_id} no existe o está inactiva")
+                else:
+                    logger.info("   Pago de tipo 'deposito' - omitiendo validación de caja")
+
+                # Crear forma de pago con monto normalizado (caja puede ser None)
                 forma_pago_obj = FormaPago.objects.create(
                     factura=factura,
                     forma_pago=sri_pago,
