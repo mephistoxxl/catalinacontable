@@ -1611,7 +1611,7 @@ class DetallesFactura(LoginRequiredMixin, View):
                                 CampoAdicional.objects.update_or_create(
                                     factura=factura,
                                     nombre='Banco Depósito',
-                                    defaults={'valor': str(banco.banco), 'orden': 6}
+                                    defaults={'valor': str(banco.banco), 'orden': 5},
                                 )
                             except Banco.DoesNotExist:
                                 pass
@@ -1619,13 +1619,7 @@ class DetallesFactura(LoginRequiredMixin, View):
                             CampoAdicional.objects.update_or_create(
                                 factura=factura,
                                 nombre='Comprobante Depósito',
-                                defaults={'valor': comprobante_dep, 'orden': 7}
-                            )
-                        if comprobante_tarjeta:
-                            CampoAdicional.objects.update_or_create(
-                                factura=factura,
-                                nombre='Comprobante Tarjeta',
-                                defaults={'valor': comprobante_tarjeta, 'orden': 5}
+                                defaults={'valor': comprobante_dep, 'orden': 6},
                             )
                 except Exception as _e:
                     logger.warning(f"No se pudieron guardar datos adicionales del cheque: {_e}")
