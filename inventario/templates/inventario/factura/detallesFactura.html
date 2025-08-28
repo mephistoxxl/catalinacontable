@@ -63,9 +63,19 @@ table th {
     text-transform: uppercase;
     letter-spacing: 0.025em;
 }
+
+/* Ocultar spinners nativos en el input de cantidad (ya tenemos +/-) */
+.cantidad-input::-webkit-outer-spin-button,
+.cantidad-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.cantidad-input {
+    -moz-appearance: textfield;
+}
 </style>
 
-<div class="bg-gray-50 p-3" style="padding-top: 6px; padding-bottom: 10px;">
+<div class="bg-gray-50 p-3" style="padding-top: 6px; padding-bottom: 64px;">
     <div class="max-w-5xl mx-auto">
         <!-- Header Section - Compacto -->
         <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 mb-1 rounded-lg">
@@ -232,14 +242,9 @@ table th {
                                             <div>
                                                 <label for="sri-pago-select" class="block text-xs font-medium text-gray-700 mb-1">SRI Pago:</label>
                                                 <select class="w-full" id="sri-pago-select" onchange="mostrarCampoMonto()">
-                                                    <option value="01">Sin Utilización Del Sistema Financiero</option>
-                                                    <option value="15">Compensación De Deudas</option>
-                                                    <option value="16">Tarjeta De Débito</option>
-                                                    <option value="17">Dinero Electrónico</option>
-                                                    <option value="18">Tarjeta Prepago</option>
-                                                    <option value="19">Tarjeta De Crédito</option>
-                                                    <option value="20">Otros Con Utilización Del Sistema Financiero</option>
-                                                    <option value="21">Endoso De Títulos</option>
+                                                    {% for code, label in formas_pago_sri %}
+                                                        <option value="{{ code }}" {% if code == '01' %}selected{% endif %}>{{ label }}</option>
+                                                    {% endfor %}
                                                 </select>
                                             </div>
                                             <div>
@@ -298,7 +303,47 @@ table th {
 
                                     <!-- Las otras secciones (cheque, tarjeta, depósito) - Compactas -->
                                     <div id="forma-cheque" class="forma-pago-detalle p-3 bg-gray-50 rounded-md border border-gray-200 hidden">
-                                        <p class="text-gray-600 text-xs">Funcionalidad de cheque en desarrollo</p>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">SRI Pago:</label>
+                                                <select id="cheque-sri" class="w-full">
+                                                    {% for code, label in formas_pago_sri %}
+                                                        <option value="{{ code }}" {% if code == '20' %}selected{% endif %}>{{ label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Caja:</label>
+                                                <select id="cheque-caja" class="w-full">
+                                                    <option value="">Seleccionar caja...</option>
+                                                    {% for caja in cajas %}
+                                                    <option value="{{ caja.id }}">{{ caja.descripcion }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Bancos:</label>
+                                                <select id="cheque-banco" class="w-full">
+                                                    <option value="">Seleccionar banco...</option>
+                                                    {% for nombre in bancos_lista_nombres %}
+                                                        <option value="{{ nombre }}">{{ nombre }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Vence:</label>
+                                                <input id="cheque-vence" type="date" class="w-full" value="{{ now|date:'Y-m-d' }}">
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="block text-xs font-medium text-gray-700 mb-1">Comprobante:</label>
+                                            <input id="cheque-comprobante" type="text" class="w-full" placeholder="Número de cheque o referencia" />
+                                        </div>
+                                        <div>
+                                            <button type="button" class="inline-flex items-center px-3 py-2 rounded-md text-white bg-green-600 hover:bg-green-700" onclick="confirmarPagoCheque()">
+                                                <i class="fa fa-check mr-1"></i> Confirmar Cheque
+                                            </button>
+                                        </div>
                                     </div>
                                     <div id="forma-tarjeta" class="forma-pago-detalle p-3 bg-gray-50 rounded-md border border-gray-200 hidden">
                                         <p class="text-gray-600 text-xs">Funcionalidad de tarjeta en desarrollo</p>
@@ -364,8 +409,45 @@ table th {
             </div>
         </div>
         
-    <!-- Espaciado mínimo para el footer -->
-    <div class="h-3"></div>
+        <!-- Espaciado adicional para separar del footer del sitio -->
+        <div class="h-20 md:h-24"></div>
+    </div>
+</div>
+
+<!-- Modal de selección de productos/servicios -->
+<div id="modal-lista-productos" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1050;">
+    <div style="background:#fff; width:95%; max-width:980px; max-height:85vh; overflow:hidden; border-radius:6px; box-shadow:0 10px 25px rgba(0,0,0,.2); margin:40px auto;">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid #e5e7eb;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <i class="fa fa-list-alt" aria-hidden="true"></i>
+                <strong>Seleccionar producto o servicio</strong>
+            </div>
+            <button type="button" id="modal-btn-cerrar" class="btn btn-light"><i class="fa fa-times"></i></button>
+        </div>
+        <div style="padding:10px 12px; border-bottom:1px solid #e5e7eb; display:flex; gap:8px; align-items:center;">
+            <label style="margin:0; font-size:.85rem;">Buscar:</label>
+            <input id="modal-buscar-input" type="text" placeholder="Código (parcial o completo)" style="flex:1; min-width:160px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px;">
+            <button type="button" id="modal-buscar-btn" class="btn btn-primary"><i class="fa fa-search"></i></button>
+        </div>
+        <div class="table-responsive" style="max-height:65vh; overflow:auto;">
+            <table class="table table-sm table-striped table-hover" style="margin:0;">
+                <thead class="thead-light">
+                    <tr>
+                        <th style="width:40px;">✓</th>
+                        <th style="width:140px;">Código</th>
+                        <th>Descripción</th>
+                        <th style="width:110px;" class="text-right">Precio</th>
+                        <th style="width:110px;" class="text-right">Precio c/IVA</th>
+                    </tr>
+                </thead>
+                <tbody id="modal-lista-tbody"></tbody>
+            </table>
+        </div>
+        <div id="modal-lista-vacio" style="display:none; padding:16px; color:#64748b;">Sin resultados.</div>
+    </div>
+    <!-- loader simple -->
+    <div id="modal-loader" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center;">
+        <div class="spinner-border" role="status"><span class="sr-only">Cargando…</span></div>
     </div>
 </div>
 
@@ -382,13 +464,95 @@ let pagosEfectivo = [];
 let totalPagado = 0;
 
 // ✅ FUNCIONES EXISTENTES (SIN TOCAR - SOLO COPIADAS TAL COMO ESTÁN)
+
+// --- Modal listado productos/servicios ---
+function abrirModalProductos() {
+    const modal = document.getElementById('modal-lista-productos');
+    if (!modal) return;
+    modal.style.display = 'block';
+    cargarProductosModal(); // cargar primeros N
+}
+
+function cerrarModalProductos() {
+    const modal = document.getElementById('modal-lista-productos');
+    if (!modal) return;
+    modal.style.display = 'none';
+}
+
+function setLoaderModal(on) {
+    const loader = document.getElementById('modal-loader');
+    if (loader) loader.style.display = on ? 'flex' : 'none';
+}
+
+function cargarProductosModal(q) {
+    setLoaderModal(true);
+    const url = q && q.trim()
+        ? `/inventario/buscar_producto/?q=${encodeURIComponent(q.trim())}`
+        : `/inventario/buscar_producto/?all=1`;
+    fetch(url)
+        .then(r => r.json())
+        .then(lista => {
+            renderProductosModal(Array.isArray(lista) ? lista : []);
+        })
+        .catch(() => renderProductosModal([]))
+        .finally(() => setLoaderModal(false));
+}
+
+function renderProductosModal(lista) {
+    const tbody = document.getElementById('modal-lista-tbody');
+    const vacio = document.getElementById('modal-lista-vacio');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (!lista || lista.length === 0) {
+        if (vacio) vacio.style.display = 'block';
+        return;
+    }
+    if (vacio) vacio.style.display = 'none';
+
+    lista.forEach(item => {
+        const tr = document.createElement('tr');
+        const precio = Number(item.precio || 0);
+        const iva = Number(item.iva_percent || 0);
+        const precioConIva = Number(item.precio_con_iva || (precio * (1 + iva)));
+        tr.innerHTML = `
+            <td class="text-center"><button type=\"button\" class=\"btn btn-success btn-sm\"><i class=\"fa fa-check\"></i></button></td>
+            <td>${item.codigo || ''}</td>
+            <td>${(item.nombre || '').replace(/</g,'&lt;')}</td>
+            <td class="text-right">${precio.toFixed(2)}</td>
+            <td class="text-right">${precioConIva.toFixed(2)}</td>
+        `;
+        tr.querySelector('button').addEventListener('click', () => seleccionarProductoDesdeModal(item));
+        tbody.appendChild(tr);
+    });
+}
+
+function seleccionarProductoDesdeModal(item) {
+    try {
+        const inputCodigo = document.getElementById('codigo_producto');
+        const inputNombre = document.getElementById('producto');
+        if (!inputCodigo || !inputNombre) return;
+        inputCodigo.value = item.codigo || '';
+        inputNombre.value = item.nombre || '';
+        inputNombre.dataset.precio = String(item.precio || 0);
+        inputNombre.dataset.codigo = item.codigo || '';
+        inputNombre.dataset.ivaPercent = String(item.iva_percent != null ? item.iva_percent : 0.12);
+        cerrarModalProductos();
+        if (typeof agregarProducto === 'function') {
+            agregarProducto();
+        }
+    } catch (e) {
+        console.error('Error al seleccionar producto desde modal', e);
+    }
+}
+
 function buscarProducto() {
     const codigo = document.getElementById('codigo_producto').value.trim();
     
-    if (!codigo) {
-        alert('Por favor, ingrese un código de producto.');
-        return;
-    }
+        if (!codigo) {
+                // Abrir modal con listado cuando el código está vacío
+                abrirModalProductos();
+                return;
+        }
 
 fetch(`/inventario/buscar_producto/?q=${encodeURIComponent(codigo)}`)
     .then(response => {
@@ -554,7 +718,13 @@ function agregarFilaTabla(producto) {
     nuevaFila.innerHTML = `
         <td>${producto.codigo}</td>
         <td>${producto.nombre}</td>
-        <td>${producto.cantidad}</td>
+        <td class="cantidad">
+            <div class="inline-flex items-center gap-1">
+                <button type="button" class="px-2 py-1 border rounded qty-btn" data-action="minus" aria-label="Disminuir">-</button>
+                <input type="number" min="1" step="1" value="${producto.cantidad}" class="w-16 text-center border rounded cantidad-input" />
+                <button type="button" class="px-2 py-1 border rounded qty-btn" data-action="plus" aria-label="Aumentar">+</button>
+            </div>
+        </td>
         <td>
             <div>Base: $${producto.precio.toFixed(2)}</div>
             <div class="text-xs text-gray-500">IVA ${ivaPorcentaje}%: $${ivaValor}</div>
@@ -573,6 +743,30 @@ function agregarFilaTabla(producto) {
     `;
     
     tabla.appendChild(nuevaFila);
+
+    // Hook eventos de cantidad
+    const inputCantidad = nuevaFila.querySelector('.cantidad-input');
+    const btns = nuevaFila.querySelectorAll('.qty-btn');
+    if (inputCantidad) {
+        inputCantidad.addEventListener('change', () => {
+            const val = parseInt(inputCantidad.value, 10);
+            const nueva = isNaN(val) || val < 1 ? 1 : val;
+            inputCantidad.value = nueva;
+            actualizarCantidad(producto.id, nueva);
+        });
+        inputCantidad.addEventListener('input', () => {
+            // Si el usuario borra, no recalculamos hasta change, pero clamp si negativo
+            if (inputCantidad.value === '') return;
+            const val = parseInt(inputCantidad.value, 10);
+            if (isNaN(val) || val < 1) inputCantidad.value = 1;
+        });
+    }
+    btns.forEach(b => b.addEventListener('click', () => {
+        let current = parseInt(inputCantidad.value, 10) || 1;
+        if (b.dataset.action === 'plus') current += 1; else current = Math.max(1, current - 1);
+        inputCantidad.value = current;
+        actualizarCantidad(producto.id, current);
+    }));
     
     // Asegurar que los botones permanezcan visibles
     const btnEnviar = document.getElementById('btnEnviar');
@@ -580,6 +774,33 @@ function agregarFilaTabla(producto) {
     
     if (btnEnviar) btnEnviar.style.display = 'inline-block';
     if (btnCancelar) btnCancelar.style.display = 'inline-block';
+}
+
+// Actualizar cantidad y recálculos
+function actualizarCantidad(productoId, nuevaCantidad) {
+    // Buscar el producto y actualizar campos derivados
+    const idx = productosAgregados.findIndex(p => p.id === productoId);
+    if (idx === -1) return;
+    const p = productosAgregados[idx];
+    const cantidad = Math.max(1, parseInt(nuevaCantidad, 10) || 1);
+    p.cantidad = cantidad;
+    p.subtotal = p.precio * cantidad;
+    p.totalConIva = Math.round((p.precioConIva * cantidad) * 100) / 100;
+    // Actualizar UI de la fila
+    const fila = document.querySelector(`tr[data-producto-id="${productoId}"]`);
+    if (fila) {
+        const tdSubtotal = fila.querySelector('td.subtotal');
+        if (tdSubtotal) {
+            tdSubtotal.innerHTML = `
+                <div>Base: $${p.subtotal.toFixed(2)}</div>
+                <div class="text-xs text-gray-500">IVA: $${(p.totalConIva - p.subtotal).toFixed(2)}</div>
+                <div class="font-bold">Total: $${p.totalConIva.toFixed(2)}</div>
+            `;
+        }
+    }
+    // Rehacer ocultos y totales
+    actualizarCamposOcultos();
+    actualizarTotal();
 }
 
 function eliminarProducto(productoId) {
@@ -945,6 +1166,43 @@ function confirmarPagoEfectivo() {
     console.log('✅ Pago en efectivo confirmado:', pago);
 }
 
+// NUEVO: Confirmar pago con cheque
+function confirmarPagoCheque() {
+    // Monto obligado: igual al pendiente para este MVP
+    const totalFactura = parseFloat(document.getElementById('total-formas-display').textContent);
+    const yaPagado = pagosEfectivo.reduce((s, p) => s + p.monto, 0);
+    const pendiente = Math.max(0, Math.round((totalFactura - yaPagado) * 100) / 100);
+
+    const sri = document.getElementById('cheque-sri').value || '20';
+    const cajaSel = document.getElementById('cheque-caja');
+    const bancoSel = document.getElementById('cheque-banco');
+    const vence = document.getElementById('cheque-vence').value;
+    const comprobante = (document.getElementById('cheque-comprobante').value || '').trim();
+
+    if (!cajaSel.value) { alert('Seleccione una caja.'); return; }
+    if (!bancoSel.value) { alert('Seleccione un banco.'); return; }
+    if (!vence) { alert('Seleccione fecha de vencimiento.'); return; }
+    if (!comprobante) { alert('Ingrese el comprobante del cheque.'); return; }
+    if (pendiente <= 0) { alert('No hay saldo pendiente.'); return; }
+
+    const pago = {
+        id: Date.now(),
+        tipo: 'cheque',
+        sri_pago: sri,
+        monto: pendiente,
+        caja: cajaSel.value,
+        caja_descripcion: cajaSel.options[cajaSel.selectedIndex].text,
+        banco: bancoSel.value,
+        banco_descripcion: bancoSel.options[bancoSel.selectedIndex].text,
+        vence: vence,
+        comprobante: comprobante
+    };
+
+    pagosEfectivo.push(pago);
+    actualizarTablaPagosEfectivo();
+    actualizarTotalPagado();
+    alert('Cheque registrado.');
+}
 // Función para cambiar entre formas de pago
 function cambiarFormaPago(forma) {
     // Ocultar todas las formas de pago con transición suave
@@ -1062,14 +1320,27 @@ function actualizarTablaPagosEfectivo() {
     
     pagosEfectivo.forEach(pago => {
         const fila = document.createElement('tr');
-        fila.innerHTML = `
-            <td>
-                <strong>Efectivo</strong><br>
-                <small class="text-muted">Caja: ${pago.caja_descripcion || 'No especificada'}</small><br>
-                <small class="text-muted">SRI: ${pago.sri_pago_descripcion || 'Sin especificar'}</small>
-            </td>
-            <td><strong>$${pago.monto.toFixed(2)}</strong></td>
-        `;
+        if (pago.tipo === 'cheque') {
+            fila.innerHTML = `
+                <td>
+                    <strong>Cheque</strong><br>
+                    <small class="text-muted">Banco: ${pago.banco_descripcion}</small><br>
+                    <small class="text-muted">Caja: ${pago.caja_descripcion}</small><br>
+                    <small class="text-muted">Vence: ${pago.vence}</small><br>
+                    <small class="text-muted">Comp.: ${pago.comprobante}</small>
+                </td>
+                <td><strong>$${Number(pago.monto).toFixed(2)}</strong></td>
+            `;
+        } else {
+            fila.innerHTML = `
+                <td>
+                    <strong>Efectivo</strong><br>
+                    <small class="text-muted">Caja: ${pago.caja_descripcion || 'No especificada'}</small><br>
+                    <small class="text-muted">SRI: ${pago.sri_pago_descripcion || 'Sin especificar'}</small>
+                </td>
+                <td><strong>$${Number(pago.monto).toFixed(2)}</strong></td>
+            `;
+        }
         tbody.appendChild(fila);
     });
 }
@@ -1178,6 +1449,18 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log('✅ Formulario inicializado: TODO LIMPIO, nada seleccionado');
     }, 100);
+
+    // --- wiring modal ---
+    const btnCerrar = document.getElementById('modal-btn-cerrar');
+    if (btnCerrar) btnCerrar.addEventListener('click', cerrarModalProductos);
+    const modal = document.getElementById('modal-lista-productos');
+    if (modal) {
+        modal.addEventListener('click', (e) => { if (e.target === modal) cerrarModalProductos(); });
+    }
+    const modalBuscarBtn = document.getElementById('modal-buscar-btn');
+    const modalBuscarInput = document.getElementById('modal-buscar-input');
+    if (modalBuscarBtn) modalBuscarBtn.addEventListener('click', () => cargarProductosModal(modalBuscarInput.value));
+    if (modalBuscarInput) modalBuscarInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); cargarProductosModal(modalBuscarInput.value); }});
 });
 </script>
 

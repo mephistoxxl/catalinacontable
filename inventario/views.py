@@ -23,6 +23,7 @@ from .forms import SecuenciaFormulario
 #modelos
 from .models import *
 from .models import FormaPago  # Importación explícita para evitar errores de scope
+from .models import Banco, CampoAdicional  # Para pagos con cheque y guardar datos adicionales
 #formularios dinamicos
 from django.forms import formset_factory
 #funciones personalizadas
@@ -1532,7 +1533,7 @@ class DetallesFactura(LoginRequiredMixin, View):
                     raise Exception(f"Caja {caja_id} no existe o está inactiva")
                 
                 # Crear forma de pago con monto normalizado
-                FormaPago.objects.create(
+                forma_pago_obj = FormaPago.objects.create(
                     factura=factura,
                     forma_pago=sri_pago,
                     total=monto,
@@ -1540,6 +1541,50 @@ class DetallesFactura(LoginRequiredMixin, View):
                 )
                 suma_pagos += monto
                 logger.info(f"   ✅ Pago registrado. Total acumulado: {suma_pagos}")
+
+                # Si es cheque, guardar datos complementarios como campos adicionales de la factura
+                try:
+                    if str(sri_pago) == '20' or str(pago.get('tipo', '')).lower() == 'cheque':
+                        banco_val = pago.get('banco') or pago.get('banco_id')
+                        comprobante = (pago.get('comprobante') or '').strip()
+                        vence = (pago.get('vence') or '').strip()
+
+                        # Banco (acepta ID o nombre directamente)
+                        if banco_val:
+                            banco_nombre = None
+                            # Si es un número, intentar buscar por ID
+                            try:
+                                if str(banco_val).isdigit():
+                                    banco = Banco.objects.get(id=int(banco_val))
+                                    banco_nombre = str(banco.banco)
+                                else:
+                                    banco_nombre = str(banco_val)
+                            except Banco.DoesNotExist:
+                                banco_nombre = str(banco_val)
+
+                            if banco_nombre:
+                                CampoAdicional.objects.update_or_create(
+                                    factura=factura,
+                                    nombre='Banco Cheque',
+                                    defaults={'valor': banco_nombre, 'orden': 1}
+                                )
+
+                        # Comprobante
+                        if comprobante:
+                            CampoAdicional.objects.update_or_create(
+                                factura=factura,
+                                nombre='Comprobante Cheque',
+                                defaults={'valor': comprobante, 'orden': 2}
+                            )
+                        # Vence (fecha)
+                        if vence:
+                            CampoAdicional.objects.update_or_create(
+                                factura=factura,
+                                nombre='Vence Cheque',
+                                defaults={'valor': vence, 'orden': 3}
+                            )
+                except Exception as _e:
+                    logger.warning(f"No se pudieron guardar datos adicionales del cheque: {_e}")
 
             logger.info(f"💰 SUMA TOTAL DE PAGOS: {suma_pagos}")
 
@@ -1600,9 +1645,26 @@ class DetallesFactura(LoginRequiredMixin, View):
                 messages.error(request, 'No se encontró la factura. Por favor, cree una nueva factura.')
                 return redirect('inventario:emitirFactura')
             
+            # ✅ Formas de pago SRI desde el modelo (evitar hardcode)
+            formas_pago_sri = getattr(FormaPago, 'FORMAS_PAGO_CHOICES', [])
+
+            # ✅ Lista de bancos: nombres únicos desde DB + fallback estático (por si la BD aún no tiene todos)
+            try:
+                bancos_db = set(Banco.bancos_disponibles()) if hasattr(Banco, 'bancos_disponibles') else set(Banco.objects.values_list('banco', flat=True))
+            except Exception:
+                bancos_db = set()
+
+            bancos_fallback = {
+                'Pichincha', 'Produbanco', 'Pacifico', 'Machala', 'Guayaquil', 'Banecuador',
+                'Internacional', 'Procredit', 'Austro', 'Bolivariano', 'Loja', 'Amazonas', 'Ruminahui'
+            }
+            lista_bancos = sorted({*(bancos_db or set()), *bancos_fallback})
+
             contexto = {
-                'cajas': cajas_activas,  # ✅ ENVIAR cajas al template
-                'factura': factura,      # ✅ ENVIAR factura al template
+                'cajas': cajas_activas,
+                'factura': factura,
+                'formas_pago_sri': formas_pago_sri,
+                'bancos_lista_nombres': lista_bancos,
             }
             contexto = complementarContexto(contexto, request.user)
             return render(request, 'inventario/factura/detallesFactura.html', contexto)
@@ -1630,7 +1692,56 @@ def buscar_producto(request):
     """
     try:
         codigo = request.GET.get('q', '').strip()
+        listar_todos = request.GET.get('all') in ('1', 'true', 'True')
         print(f"🔍 Buscando producto o servicio con código: '{codigo}'")
+
+        # Si no hay código y se solicita listado general, devolver primeros N
+        if not codigo and listar_todos:
+            resultados = []
+            # Limitar resultados para evitar respuestas muy grandes
+            LIMITE = 100
+
+            # Mapeo de códigos SRI a porcentaje real
+            MAPEO_IVA = {
+                '0': 0.00,
+                '5': 0.05,
+                '2': 0.12,
+                '10': 0.13,
+                '3': 0.14,
+                '4': 0.15,
+                '9': 0.16,
+                '6': 0.00,
+                '7': 0.00,
+                '8': 0.08,
+            }
+
+            for p in Producto.objects.all().order_by('codigo')[:LIMITE]:
+                precio_base = float(p.precio) if p.precio else 0.0
+                iva_percent = MAPEO_IVA.get(p.iva, 0.12)
+                resultados.append({
+                    'codigo': p.codigo,
+                    'nombre': getattr(p, 'descripcion', '') or getattr(p, 'nombre', ''),
+                    'precio': precio_base,
+                    'iva_percent': iva_percent,
+                    'precio_con_iva': precio_base * (1 + iva_percent),
+                    'tipo': 'producto',
+                })
+
+            for s in Servicio.objects.all().order_by('codigo')[:LIMITE]:
+                precio_base = float(getattr(s, 'precio1', 0) or 0.0)
+                # Servicios: si no hay IVA definido, usar 0.12 por defecto
+                iva_code = str(getattr(s, 'iva', '') or '2')
+                iva_percent = MAPEO_IVA.get(iva_code, 0.12)
+                resultados.append({
+                    'codigo': s.codigo,
+                    'nombre': getattr(s, 'descripcion', '') or getattr(s, 'nombre', ''),
+                    'precio': precio_base,
+                    'iva_percent': iva_percent,
+                    'precio_con_iva': precio_base * (1 + iva_percent),
+                    'tipo': 'servicio',
+                })
+
+            return JsonResponse(resultados, safe=False)
 
         if not codigo:
             print("❌ Código vacío")
@@ -1712,7 +1823,10 @@ def buscar_producto(request):
 
         # Si no hay exactos, buscar parciales
         if not resultados:
-            productos_similares = Producto.objects.filter(codigo__icontains=codigo)[:5]
+            from django.db.models import Q
+            productos_similares = Producto.objects.filter(
+                Q(codigo__icontains=codigo) | Q(descripcion__icontains=codigo)
+            )[:30]
             for p in productos_similares:
                 precio_base = float(p.precio) if p.precio else 0.0
                 
@@ -1740,12 +1854,31 @@ def buscar_producto(request):
                     'precio_con_iva': precio_base * (1 + iva_percent),
                     'tipo': 'producto'
                 })
-            servicios_similares = Servicio.objects.filter(codigo__icontains=codigo)[:5]
+            servicios_similares = Servicio.objects.filter(
+                Q(codigo__icontains=codigo) | Q(descripcion__icontains=codigo) | Q(nombre__icontains=codigo)
+            )[:30]
             for s in servicios_similares:
+                precio_base = float(getattr(s, 'precio1', 0) or 0.0)
+                iva_code = str(getattr(s, 'iva', '') or '2')
+                MAPEO_IVA = {
+                    '0': 0.00,
+                    '5': 0.05,
+                    '2': 0.12,
+                    '10': 0.13,
+                    '3': 0.14,
+                    '4': 0.15,
+                    '9': 0.16,
+                    '6': 0.00,
+                    '7': 0.00,
+                    '8': 0.08
+                }
+                iva_percent = MAPEO_IVA.get(iva_code, 0.12)
                 resultados.append({
                     'codigo': s.codigo,
-                    'nombre': s.nombre,
-                    'precio': float(s.precio1) if s.precio1 else 0.0,
+                    'nombre': getattr(s, 'descripcion', '') or getattr(s, 'nombre', ''),
+                    'precio': precio_base,
+                    'iva_percent': iva_percent,
+                    'precio_con_iva': precio_base * (1 + iva_percent),
                     'tipo': 'servicio'
                 })
 
