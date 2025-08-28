@@ -346,10 +346,76 @@ table th {
                                         </div>
                                     </div>
                                     <div id="forma-tarjeta" class="forma-pago-detalle p-3 bg-gray-50 rounded-md border border-gray-200 hidden">
-                                        <p class="text-gray-600 text-xs">Funcionalidad de tarjeta en desarrollo</p>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">SRI Pago:</label>
+                                                <select id="tarjeta-sri" class="w-full">
+                                                    {% for code, label in formas_pago_sri %}
+                                                        <option value="{{ code }}" {% if code == '19' %}selected{% endif %}>{{ label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Caja:</label>
+                                                <select id="tarjeta-caja" class="w-full">
+                                                    <option value="">Seleccionar caja...</option>
+                                                    {% for caja in cajas %}
+                                                    <option value="{{ caja.id }}">{{ caja.descripcion }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Tarjeta:</label>
+                                                <select id="tarjeta-tipo" class="w-full">
+                                                    <option value="VISA">VISA</option>
+                                                    <option value="MASTERCARD">MASTERCARD</option>
+                                                    <option value="DINERS">DINERS</option>
+                                                    <option value="DISCOVER">DISCOVER</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Comprobante:</label>
+                                                <input id="tarjeta-comprobante" type="text" class="w-full" placeholder="Número de voucher o referencia" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <button type="button" class="inline-flex items-center px-3 py-2 rounded-md text-white bg-green-600 hover:bg-green-700" onclick="confirmarPagoTarjeta()">
+                                                <i class="fa fa-check mr-1"></i> Confirmar Tarjeta
+                                            </button>
+                                        </div>
                                     </div>
                                     <div id="forma-deposito" class="forma-pago-detalle p-3 bg-gray-50 rounded-md border border-gray-200 hidden">
-                                        <p class="text-gray-600 text-xs">Funcionalidad de depósito en desarrollo</p>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">SRI Pago:</label>
+                                                <select id="deposito-sri" class="w-full">
+                                                    {% for code, label in formas_pago_sri %}
+                                                        <option value="{{ code }}" {% if code == '20' %}selected{% endif %}>{{ label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Bancos:</label>
+                                                <select id="deposito-banco" class="w-full">
+                                                    <option value="">Seleccionar banco...</option>
+                                                    {% for b in bancos_db %}
+                                                        <option value="{{ b.id }}">{{ b.banco }}</option>
+                                                    {% endfor %}
+                                                    {% if not bancos_db %}
+                                                        <option value="" disabled>No hay bancos activos</option>
+                                                    {% endif %}
+                                                </select>
+                                            </div>
+                                            <div class="md:col-span-2">
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Comprobante:</label>
+                                                <input id="deposito-comprobante" type="text" class="w-full" placeholder="Número de comprobante o referencia" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <button type="button" class="inline-flex items-center px-3 py-2 rounded-md text-white bg-green-600 hover:bg-green-700" onclick="confirmarPagoDeposito()">
+                                                <i class="fa fa-check mr-1"></i> Confirmar Depósito
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1203,6 +1269,67 @@ function confirmarPagoCheque() {
     actualizarTotalPagado();
     alert('Cheque registrado.');
 }
+// NUEVO: Confirmar pago con tarjeta de crédito
+function confirmarPagoTarjeta() {
+    const totalFactura = parseFloat(document.getElementById('total-formas-display').textContent);
+    const yaPagado = pagosEfectivo.reduce((s, p) => s + p.monto, 0);
+    const pendiente = Math.max(0, Math.round((totalFactura - yaPagado) * 100) / 100);
+
+    const sri = document.getElementById('tarjeta-sri').value || '19';
+    const cajaSel = document.getElementById('tarjeta-caja');
+    const tipoSel = document.getElementById('tarjeta-tipo');
+    const comprobante = (document.getElementById('tarjeta-comprobante').value || '').trim();
+
+    if (!cajaSel.value) { alert('Seleccione una caja.'); return; }
+    if (!tipoSel.value) { alert('Seleccione el tipo de tarjeta.'); return; }
+    if (!comprobante) { alert('Ingrese el comprobante del voucher.'); return; }
+    if (pendiente <= 0) { alert('No hay saldo pendiente.'); return; }
+
+    const pago = {
+        id: Date.now(),
+        tipo: 'tarjeta',
+        sri_pago: sri,
+        monto: pendiente,
+        caja: cajaSel.value,
+        caja_descripcion: cajaSel.options[cajaSel.selectedIndex].text,
+        tarjeta_tipo: tipoSel.value,
+        comprobante: comprobante
+    };
+
+    pagosEfectivo.push(pago);
+    actualizarTablaPagosEfectivo();
+    actualizarTotalPagado();
+    alert('Pago con tarjeta registrado.');
+}
+// NUEVO: Confirmar pago con depósito
+function confirmarPagoDeposito() {
+    const totalFactura = parseFloat(document.getElementById('total-formas-display').textContent);
+    const yaPagado = pagosEfectivo.reduce((s, p) => s + p.monto, 0);
+    const pendiente = Math.max(0, Math.round((totalFactura - yaPagado) * 100) / 100);
+
+    const sri = document.getElementById('deposito-sri').value || '20';
+    const bancoSel = document.getElementById('deposito-banco');
+    const comprobante = (document.getElementById('deposito-comprobante').value || '').trim();
+
+    if (!bancoSel.value) { alert('Seleccione un banco.'); return; }
+    if (!comprobante) { alert('Ingrese el comprobante del depósito.'); return; }
+    if (pendiente <= 0) { alert('No hay saldo pendiente.'); return; }
+
+    const pago = {
+        id: Date.now(),
+        tipo: 'deposito',
+        sri_pago: sri,
+        monto: pendiente,
+        banco: bancoSel.value,
+        banco_descripcion: bancoSel.options[bancoSel.selectedIndex].text,
+        comprobante: comprobante
+    };
+
+    pagosEfectivo.push(pago);
+    actualizarTablaPagosEfectivo();
+    actualizarTotalPagado();
+    alert('Depósito registrado.');
+}
 // Función para cambiar entre formas de pago
 function cambiarFormaPago(forma) {
     // Ocultar todas las formas de pago con transición suave
@@ -1320,13 +1447,32 @@ function actualizarTablaPagosEfectivo() {
     
     pagosEfectivo.forEach(pago => {
         const fila = document.createElement('tr');
-        if (pago.tipo === 'cheque') {
+    if (pago.tipo === 'cheque') {
             fila.innerHTML = `
                 <td>
                     <strong>Cheque</strong><br>
                     <small class="text-muted">Banco: ${pago.banco_descripcion}</small><br>
                     <small class="text-muted">Caja: ${pago.caja_descripcion}</small><br>
                     <small class="text-muted">Vence: ${pago.vence}</small><br>
+                    <small class="text-muted">Comp.: ${pago.comprobante}</small>
+                </td>
+                <td><strong>$${Number(pago.monto).toFixed(2)}</strong></td>
+            `;
+        } else if (pago.tipo === 'tarjeta') {
+            fila.innerHTML = `
+                <td>
+                    <strong>Tarjeta</strong><br>
+                    <small class="text-muted">Tipo: ${pago.tarjeta_tipo}</small><br>
+                    <small class="text-muted">Caja: ${pago.caja_descripcion}</small><br>
+                    <small class="text-muted">Comp.: ${pago.comprobante}</small>
+                </td>
+                <td><strong>$${Number(pago.monto).toFixed(2)}</strong></td>
+            `;
+        } else if (pago.tipo === 'deposito') {
+            fila.innerHTML = `
+                <td>
+                    <strong>Depósito</strong><br>
+                    <small class="text-muted">Banco: ${pago.banco_descripcion}</small><br>
                     <small class="text-muted">Comp.: ${pago.comprobante}</small>
                 </td>
                 <td><strong>$${Number(pago.monto).toFixed(2)}</strong></td>

@@ -1542,7 +1542,7 @@ class DetallesFactura(LoginRequiredMixin, View):
                 suma_pagos += monto
                 logger.info(f"   ✅ Pago registrado. Total acumulado: {suma_pagos}")
 
-                # Si es cheque, guardar datos complementarios como campos adicionales de la factura
+                # Si es cheque o tarjeta, guardar datos complementarios como campos adicionales de la factura
                 try:
                     if str(sri_pago) == '20' or str(pago.get('tipo', '')).lower() == 'cheque':
                         banco_val = pago.get('banco') or pago.get('banco_id')
@@ -1582,6 +1582,44 @@ class DetallesFactura(LoginRequiredMixin, View):
                                 factura=factura,
                                 nombre='Vence Cheque',
                                 defaults={'valor': vence, 'orden': 3}
+                            )
+                    # Tarjeta de crédito (código 19) u objeto con tipo 'tarjeta'
+                    if str(sri_pago) == '19' or str(pago.get('tipo', '')).lower() == 'tarjeta':
+                        tarjeta_tipo = (pago.get('tarjeta_tipo') or '').strip()
+                        comprobante_tarjeta = (pago.get('comprobante') or '').strip()
+
+                        if tarjeta_tipo:
+                            CampoAdicional.objects.update_or_create(
+                                factura=factura,
+                                nombre='Tarjeta',
+                                defaults={'valor': tarjeta_tipo, 'orden': 4}
+                            )
+                    # Depósito (tratado como 20 con banco y comprobante)
+                    if str(pago.get('tipo', '')).lower() == 'deposito':
+                        banco_id = pago.get('banco')
+                        comprobante_dep = (pago.get('comprobante') or '').strip()
+
+                        if banco_id:
+                            try:
+                                banco = Banco.objects.get(id=banco_id)
+                                CampoAdicional.objects.update_or_create(
+                                    factura=factura,
+                                    nombre='Banco Depósito',
+                                    defaults={'valor': str(banco.banco), 'orden': 6}
+                                )
+                            except Banco.DoesNotExist:
+                                pass
+                        if comprobante_dep:
+                            CampoAdicional.objects.update_or_create(
+                                factura=factura,
+                                nombre='Comprobante Depósito',
+                                defaults={'valor': comprobante_dep, 'orden': 7}
+                            )
+                        if comprobante_tarjeta:
+                            CampoAdicional.objects.update_or_create(
+                                factura=factura,
+                                nombre='Comprobante Tarjeta',
+                                defaults={'valor': comprobante_tarjeta, 'orden': 5}
                             )
                 except Exception as _e:
                     logger.warning(f"No se pudieron guardar datos adicionales del cheque: {_e}")
@@ -1665,6 +1703,7 @@ class DetallesFactura(LoginRequiredMixin, View):
                 'factura': factura,
                 'formas_pago_sri': formas_pago_sri,
                 'bancos_lista_nombres': lista_bancos,
+                'bancos_db': Banco.get_activos() if hasattr(Banco, 'get_activos') else Banco.objects.filter(activo=True).order_by('banco')
             }
             contexto = complementarContexto(contexto, request.user)
             return render(request, 'inventario/factura/detallesFactura.html', contexto)
