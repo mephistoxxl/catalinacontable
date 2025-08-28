@@ -1937,7 +1937,9 @@ class FormaPago(models.Model):
         'Caja',
         on_delete=models.PROTECT,
         related_name='formas_pago',
-        verbose_name="Caja"
+        verbose_name="Caja",
+        blank=True,
+        null=True,
     )
     
     # ✅ OBLIGATORIO: Total pagado con esta forma
