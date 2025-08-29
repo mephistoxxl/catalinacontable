@@ -1548,9 +1548,9 @@ class DetallesFactura(LoginRequiredMixin, View):
                 suma_pagos += monto
                 logger.info(f"   ✅ Pago registrado. Total acumulado: {suma_pagos}")
 
-                # Si es cheque o tarjeta, guardar datos complementarios como campos adicionales de la factura
+                # Guardar datos complementarios de cheque, tarjeta o depósito como campos adicionales de la factura
                 try:
-                    if str(sri_pago) == '20' or str(pago.get('tipo', '')).lower() == 'cheque':
+                    if str(pago.get('tipo', '')).lower() == 'cheque':
                         banco_val = pago.get('banco') or pago.get('banco_id')
                         comprobante = (pago.get('comprobante') or '').strip()
                         vence = (pago.get('vence') or '').strip()
@@ -1600,7 +1600,7 @@ class DetallesFactura(LoginRequiredMixin, View):
                                 nombre='Tarjeta',
                                 defaults={'valor': tarjeta_tipo, 'orden': 4}
                             )
-                    # Depósito (tratado como 20 con banco y comprobante)
+                    # Depósito con banco y comprobante
                     if str(pago.get('tipo', '')).lower() == 'deposito':
                         banco_id = pago.get('banco')
                         comprobante_dep = (pago.get('comprobante') or '').strip()
