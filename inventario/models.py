@@ -2,7 +2,13 @@ from django.db import models
 from decimal import Decimal, ROUND_HALF_UP
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
-from django.core.validators import MinValueValidator, MaxValueValidator, MinLengthValidator, MaxLengthValidator
+from django.core.validators import (
+    MinValueValidator,
+    MaxValueValidator,
+    MinLengthValidator,
+    MaxLengthValidator,
+    RegexValidator,
+)
 import logging
 # MODELOS
 
@@ -15,6 +21,12 @@ class Usuario(AbstractUser):
     first_name = models.CharField(max_length=40)
     last_name = models.CharField(max_length=60)
     nivel = models.IntegerField(null=True)
+    empresas = models.ManyToManyField(
+        'Empresa',
+        through='UsuarioEmpresa',
+        related_name='usuarios',
+        blank=True,
+    )
 
     @classmethod
     def numeroRegistrados(self):
@@ -27,8 +39,29 @@ class Usuario(AbstractUser):
         elif tipo == 'usuario':
             return int(self.objects.filter(is_superuser=False).count())
 
-from django.core.validators import RegexValidator  # ← AGREGAR ESTA LÍNEA
 from django.core.exceptions import ValidationError  # ← Y ESTA TAMBIÉN
+
+
+class Empresa(models.Model):
+    ruc = models.CharField(
+        max_length=13,
+        unique=True,
+        validators=[RegexValidator(r'^\d{13}$', 'El RUC debe tener exactamente 13 dígitos')],
+    )
+    razon_social = models.CharField(max_length=300)
+
+    def __str__(self):
+        return f"{self.razon_social} ({self.ruc})"
+
+
+class UsuarioEmpresa(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('usuario', 'empresa')
+
+
 class Opciones(models.Model):
     # INFORMACIÓN BÁSICA EMPRESA
     identificacion = models.CharField(
