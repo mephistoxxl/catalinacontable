@@ -4417,7 +4417,7 @@ class FormasPagoView(LoginRequiredMixin, View):
         contexto = {
             'factura': factura,
             'cajas': cajas,
-            'formas_pago_sri': formas_pago_sri,
+            'formas_pago': formas_pago_sri,
             'primera_caja': primera_caja,
             'total': factura.monto_general or factura.sub_monto or 0,
         }
