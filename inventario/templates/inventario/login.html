@@ -124,6 +124,27 @@
                                 option.textContent = emp.razon_social;
                                 empresaSelect.appendChild(option);
                             });
+
+                            if (data.empresas.length === 1) {
+                                empresaSelect.disabled = true;
+                                empresaSelect.options[0].selected = true;
+
+                                let hiddenInput = document.getElementById('empresa_hidden');
+                                if (!hiddenInput) {
+                                    hiddenInput = document.createElement('input');
+                                    hiddenInput.type = 'hidden';
+                                    hiddenInput.name = empresaSelect.name;
+                                    hiddenInput.id = 'empresa_hidden';
+                                    empresaSelect.form.appendChild(hiddenInput);
+                                }
+                                hiddenInput.value = data.empresas[0].id;
+                            } else {
+                                empresaSelect.disabled = data.empresas.length === 0;
+                                const hiddenInput = document.getElementById('empresa_hidden');
+                                if (hiddenInput) {
+                                    hiddenInput.remove();
+                                }
+                            }
                         });
                 });
             }
