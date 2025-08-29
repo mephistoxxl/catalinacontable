@@ -721,23 +721,21 @@ class RIDEGenerator:
         return "NORMAL" if tipo_emision == "1" else "CONTINGENCIA"
     
     def _obtener_descripcion_forma_pago(self, codigo_sri):
-        """
-        Mapear códigos SRI de forma de pago a descripciones legibles
-        según tabla 24 del SRI
-        """
-        descripciones = {
-            '01': 'Sin utilización del sistema financiero',
-            '15': 'Compensación de deudas',
-            '16': 'Tarjeta de débito',
-            '17': 'Dinero electrónico',
-            '18': 'Tarjeta prepago',
-            '19': 'Tarjeta de crédito',
-            '20': 'Otros con utilización del sistema financiero',
-            '21': 'Endoso de títulos',
-        }
+        """Obtiene la descripción oficial de la forma de pago.
 
+        La información se toma directamente de ``FormaPago.FORMAS_PAGO_CHOICES``
+        (tabla 24 del SRI) para evitar mantener mapas duplicados o
+        desactualizados.
+        """
+        # Importar aquí para evitar problemas de importación antes de que
+        # Django esté configurado
+        from inventario.models import FormaPago
+
+        descripciones = dict(FormaPago.FORMAS_PAGO_CHOICES)
         descripcion = descripciones.get(codigo_sri)
         if descripcion is None:
-            logger.warning(f"Código de forma de pago no contemplado: {codigo_sri}")
-            return f"Forma de pago {codigo_sri}"
+            logger.warning(
+                f"Código de forma de pago no contemplado: {codigo_sri}"
+            )
+            return codigo_sri
         return descripcion
