@@ -8,6 +8,7 @@ app_name = "inventario"
 urlpatterns = [
     # Login y Panel
     path('login', views.Login.as_view(), name='login'),
+    path('seleccionar_empresa/', views.SeleccionarEmpresa.as_view(), name='seleccionar_empresa'),
     path('panel', views.Panel.as_view(), name='panel'),
     path('salir', views.Salir.as_view(), name='salir'),
     path('perfil/<str:modo>/<int:p>', views.Perfil.as_view(), name='perfil'),

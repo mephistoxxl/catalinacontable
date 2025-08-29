@@ -77,6 +77,11 @@ class Login(View):
             logeado = authenticate(request, username=usuario, password=clave)
             if logeado is not None:
                 login(request, logeado)
+                empresas = logeado.empresas.all()
+                if empresas.count() > 1:
+                    return HttpResponseRedirect('/inventario/seleccionar_empresa/')
+                elif empresas.count() == 1:
+                    request.session['empresa_activa'] = empresas.first().id
                 #Si el login es correcto lo redirige al panel del sistema:
                 return HttpResponseRedirect('/inventario/panel')
             else:
@@ -94,6 +99,32 @@ class Login(View):
 
 
 #Fin de vista---------------------------------------------------------------------#
+
+
+#Selección de empresa tras el login-----------------------------------------------#
+class SeleccionarEmpresa(LoginRequiredMixin, View):
+    login_url = '/inventario/login'
+    redirect_field_name = None
+
+    def get(self, request):
+        empresas = request.user.empresas.all()
+        if empresas.count() <= 1:
+            if empresas.exists():
+                request.session['empresa_activa'] = empresas.first().id
+            return HttpResponseRedirect('/inventario/panel')
+        return render(request, 'inventario/seleccionar_empresa.html', {'empresas': empresas})
+
+    def post(self, request):
+        empresa_id = request.POST.get('empresa_id')
+        if empresa_id and request.user.empresas.filter(id=empresa_id).exists():
+            request.session['empresa_activa'] = int(empresa_id)
+            return HttpResponseRedirect('/inventario/panel')
+        empresas = request.user.empresas.all()
+        contexto = {'empresas': empresas, 'error': 'Seleccione una empresa válida'}
+        return render(request, 'inventario/seleccionar_empresa.html', contexto)
+
+
+#Fin de selección de empresa------------------------------------------------------#
 
 
 #Panel de inicio y vista principal------------------------------------------------#

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+{% load static %}
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Seleccionar empresa</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-white h-screen flex items-center justify-center p-2 overflow-hidden">
+    <div class="w-full max-w-sm">
+        <div class="w-full border-t border-l border-r border-black rounded-t-3xl p-4 text-center bg-black">
+            <img src="{% static 'inventario/assets/logo/logo2.png' %}" alt="Logo" class="mx-auto h-28 w-auto">
+            <h2 class="mt-2 text-xl font-bold text-white">ALP FACT</h2>
+            <p class="text-sm text-gray-300">Seleccione la empresa con la que desea trabajar</p>
+        </div>
+        <div class="bg-white rounded-b-3xl shadow-xl p-4">
+            {% if error %}
+            <p class="text-red-500 text-sm mb-2">{{ error }}</p>
+            {% endif %}
+            <form method="POST" class="space-y-6">
+                {% csrf_token %}
+                <div>
+                    <label for="empresa_id" class="block text-xs font-medium text-gray-700 mb-1">
+                        <i class="fas fa-building mr-1 text-gray-500"></i>
+                        Empresa
+                    </label>
+                    <select name="empresa_id" id="empresa_id" class="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent transition duration-200 text-sm">
+                        {% for empresa in empresas %}
+                        <option value="{{ empresa.id }}">{{ empresa.razon_social }} - {{ empresa.ruc }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition duration-200 transform hover:scale-105 text-sm rounded-xl">
+                    Continuar
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
