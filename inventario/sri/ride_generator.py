@@ -727,30 +727,17 @@ class RIDEGenerator:
         """
         descripciones = {
             '01': 'Sin utilización del sistema financiero',
-            '02': 'Compensación de deudas',
-            '03': 'Tarjeta de débito',
-            '04': 'Dinero electrónico',
-            '05': 'Tarjeta prepago',
-            '06': 'Tarjeta de crédito',
-            '07': 'Otros con utilización del sistema financiero',
-            '08': 'Endoso de títulos',
-            '09': 'Factoring',
-            '10': 'Comprobante pago exterior',
-            '11': 'Compensación por avería',
-            '12': 'Pagos por consignación',
-            '13': 'Comprobante venta interna',
-            '14': 'Tarjeta corporativa',
-            '15': 'Transferencia crédito',
-            '16': 'Transferencia débito',
-            '17': 'Transferencia',
-            '18': 'Depósito en cuenta',
-            '19': 'Cheque propio',
-            '20': 'Cheque certificado',
-            '21': 'Cheque del exterior',
-            '22': 'Cheque no negociable',
-            '23': 'Giro postal',
-            '24': 'Moneda electrónica',
-            '25': 'Pago recurrente'
+            '15': 'Compensación de deudas',
+            '16': 'Tarjeta de débito',
+            '17': 'Dinero electrónico',
+            '18': 'Tarjeta prepago',
+            '19': 'Tarjeta de crédito',
+            '20': 'Otros con utilización del sistema financiero',
+            '21': 'Endoso de títulos',
         }
-        
-        return descripciones.get(codigo_sri, f"Forma de pago {codigo_sri}")
+
+        descripcion = descripciones.get(codigo_sri)
+        if descripcion is None:
+            logger.warning(f"Código de forma de pago no contemplado: {codigo_sri}")
+            return f"Forma de pago {codigo_sri}"
+        return descripcion
