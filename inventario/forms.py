@@ -1,7 +1,7 @@
 import datetime
 from decimal import Decimal
 from django import forms
-from .models import Producto, Cliente, Proveedor, Usuario, Opciones, Secuencia, Facturador, Almacen, FormaPago, Banco, Caja
+from .models import Producto, Cliente, Proveedor, Usuario, Opciones, Secuencia, Facturador, Almacen, FormaPago, Banco, Caja, Empresa
 from django.forms import ModelChoiceField
 from django.core.exceptions import ValidationError
 
@@ -18,25 +18,35 @@ class MisDisponibles(ModelChoiceField):
         return "%s" % obj.disponible
 
 class LoginFormulario(forms.Form):
-    username = forms.CharField(label="Tu nombre de usuario",
-            widget=forms.TextInput(attrs={
+    identificacion = forms.CharField(
+        label="Identificación",
+        widget=forms.TextInput(attrs={
             'placeholder': 'Cédula o RUC',
             'class': 'form-control underlined',
             'type': 'text',
-            'id': 'user',
+            'id': 'identificacion',
             'maxlength': '13',
             'pattern': '[0-9]*',
             'inputmode': 'numeric'
         })
     )
 
-    def clean_username(self):
-        username = self.cleaned_data.get('username')
-        if not username.isdigit():
-            raise ValidationError('El nombre de usuario solo debe contener números.')
-        return username
-    password = forms.CharField(label="Contraseña",widget=forms.PasswordInput(attrs={'placeholder': 'Contraseña',
-        'class': 'form-control underlined', 'type':'password','id':'password'}))
+    empresa = forms.ModelChoiceField(
+        label="Empresa",
+        queryset=Empresa.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-control underlined', 'id': 'empresa'})
+    )
+
+    password = forms.CharField(
+        label="Contraseña",
+        widget=forms.PasswordInput(attrs={'placeholder': 'Contraseña', 'class': 'form-control underlined', 'id': 'password'})
+    )
+
+    def clean_identificacion(self):
+        identificacion = self.cleaned_data.get('identificacion')
+        if not identificacion.isdigit():
+            raise ValidationError('La identificación solo debe contener números.')
+        return identificacion
 
 
 class ProductoFormulario(forms.ModelForm):
@@ -819,24 +829,18 @@ class ProveedorFormulario(forms.ModelForm):
 class UsuarioFormulario(forms.Form):
     niveles =  [ ('1','Administrador'),('0','Usuario') ]
 
-    username = forms.CharField(
-        label = "Nombre de usuario",
-        max_length=50,
-        widget = forms.TextInput(attrs={'placeholder': 'Inserte un nombre de usuario',
-        'id':'username','class':'form-control','value':''} ),
+    identificacion = forms.CharField(
+        label = "Identificación",
+        max_length=13,
+        widget = forms.TextInput(attrs={'placeholder': 'Cédula o RUC',
+        'id':'identificacion','class':'form-control','value':'','pattern':'[0-9]*','inputmode':'numeric'} ),
         )
 
-    first_name = forms.CharField(
-        label = 'Nombre',
-        max_length =100,
-        widget = forms.TextInput(attrs={'placeholder': 'Inserte un nombre',
-        'id':'first_name','class':'form-control','value':''}),
-        )
-
-    last_name = forms.CharField(
-        label = 'Apellido',
-        max_length = 100,
-        widget = forms.TextInput(attrs={'class':'form-control','id':'last_name','placeholder':'Inserte un apellido','value':''}),
+    nombre_completo = forms.CharField(
+        label = 'Nombre completo',
+        max_length =150,
+        widget = forms.TextInput(attrs={'placeholder': 'Inserte nombre y apellido',
+        'id':'nombre_completo','class':'form-control','value':''}),
         )
 
     email = forms.CharField(
@@ -855,27 +859,28 @@ class UsuarioFormulario(forms.Form):
         )
         )
 
+    empresa = forms.ModelChoiceField(
+        label="Empresa",
+        queryset=Empresa.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'id':'empresa','class':'form-control'})
+    )
+
 class NuevoUsuarioFormulario(forms.Form):
     niveles =  [ ('1','Administrador'),('0','Usuario') ]
 
-    username = forms.CharField(
-        label = "Nombre de usuario",
-        max_length=50,
-        widget = forms.TextInput(attrs={'placeholder': 'Inserte un nombre de usuario',
-        'id':'username','class':'form-control','value':''} ),
+    identificacion = forms.CharField(
+        label = "Identificación",
+        max_length=13,
+        widget = forms.TextInput(attrs={'placeholder': 'Cédula o RUC',
+        'id':'identificacion','class':'form-control','value':'','pattern':'[0-9]*','inputmode':'numeric'} ),
         )
 
-    first_name = forms.CharField(
-        label = 'Nombre',
-        max_length =100,
-        widget = forms.TextInput(attrs={'placeholder': 'Inserte un nombre',
-        'id':'first_name','class':'form-control','value':''}),
-        )
-
-    last_name = forms.CharField(
-        label = 'Apellido',
-        max_length = 100,
-        widget = forms.TextInput(attrs={'class':'form-control','id':'last_name','placeholder':'Inserte un apellido','value':''}),
+    nombre_completo = forms.CharField(
+        label = 'Nombre completo',
+        max_length =150,
+        widget = forms.TextInput(attrs={'placeholder': 'Inserte nombre y apellido',
+        'id':'nombre_completo','class':'form-control','value':''}),
         )
 
     email = forms.CharField(
@@ -906,6 +911,12 @@ class NuevoUsuarioFormulario(forms.Form):
         'id':'level','class':'form-control','value':''}
         )
         )
+
+    empresa = forms.ModelChoiceField(
+        label="Empresa",
+        queryset=Empresa.objects.all(),
+        widget=forms.Select(attrs={'id':'empresa','class':'form-control'})
+    )
 
 
 class ClaveFormulario(forms.Form):

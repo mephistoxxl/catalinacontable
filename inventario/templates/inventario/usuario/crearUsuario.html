@@ -125,40 +125,40 @@ select:disabled {
 			<form role="form" method="POST" onsubmit="return validarTodo('usuario')">
 				{% csrf_token %}
 				<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-					<div class="space-y-2">
-						<div>
-							<label for="{{ form.username.name }}" class="block text-xs font-medium text-gray-800 mb-1">
-								<i class="fas fa-user text-blue-600 mr-1 text-xs"></i>{{form.username.label}}
-							</label>
-							{{form.username}}
-						</div>
-						<div>
-							<label for="{{ form.first_name.name }}" class="block text-xs font-medium text-gray-800 mb-1">
-								<i class="fas fa-id-badge text-blue-600 mr-1 text-xs"></i>{{form.first_name.label}}
-							</label>
-							{{form.first_name}}
-						</div>
-						<div>
-							<label for="{{ form.last_name.name }}" class="block text-xs font-medium text-gray-800 mb-1">
-								<i class="fas fa-id-badge text-blue-600 mr-1 text-xs"></i>{{form.last_name.label}}
-							</label>
-							{{form.last_name}}
-						</div>
-					</div>
-					<div class="space-y-2">
-						<div>
-							<label for="{{ form.email.name }}" class="block text-xs font-medium text-gray-800 mb-1">
-								<i class="fas fa-envelope text-green-600 mr-1 text-xs"></i>{{form.email.label}}
-							</label>
-							{{form.email}}
-						</div>
-						<div>
-							<label for="{{ form.level.name }}" class="block text-xs font-medium text-gray-800 mb-1">
-								<i class="fas fa-shield-alt text-purple-600 mr-1 text-xs"></i>{{form.level.label}}
-							</label>
-							{{form.level}}
-						</div>
-					</div>
+                                        <div class="space-y-2">
+                                                <div>
+                                                        <label for="{{ form.identificacion.name }}" class="block text-xs font-medium text-gray-800 mb-1">
+                                                                <i class="fas fa-user text-blue-600 mr-1 text-xs"></i>{{form.identificacion.label}}
+                                                        </label>
+                                                        {{form.identificacion}}
+                                                </div>
+                                                <div>
+                                                        <label for="{{ form.nombre_completo.name }}" class="block text-xs font-medium text-gray-800 mb-1">
+                                                                <i class="fas fa-id-badge text-blue-600 mr-1 text-xs"></i>{{form.nombre_completo.label}}
+                                                        </label>
+                                                        {{form.nombre_completo}}
+                                                </div>
+                                        </div>
+                                        <div class="space-y-2">
+                                                <div>
+                                                        <label for="{{ form.email.name }}" class="block text-xs font-medium text-gray-800 mb-1">
+                                                                <i class="fas fa-envelope text-green-600 mr-1 text-xs"></i>{{form.email.label}}
+                                                        </label>
+                                                        {{form.email}}
+                                                </div>
+                                                <div>
+                                                        <label for="{{ form.level.name }}" class="block text-xs font-medium text-gray-800 mb-1">
+                                                                <i class="fas fa-shield-alt text-purple-600 mr-1 text-xs"></i>{{form.level.label}}
+                                                        </label>
+                                                        {{form.level}}
+                                                </div>
+                                                <div>
+                                                        <label for="{{ form.empresa.name }}" class="block text-xs font-medium text-gray-800 mb-1">
+                                                                <i class="fas fa-building text-purple-600 mr-1 text-xs"></i>{{form.empresa.label}}
+                                                        </label>
+                                                        {{form.empresa}}
+                                                </div>
+                                        </div>
 					<div class="space-y-2">
 						<div>
 							<label for="{{ form.password.name }}" class="block text-xs font-medium text-gray-800 mb-1">

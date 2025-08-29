@@ -70,31 +70,23 @@ class Login(View):
         form = LoginFormulario(request.POST)
         # Revisa si es valido:
         if form.is_valid():
-            # Procesa y asigna los datos con form.cleaned_data como se requiere
-            usuario = form.cleaned_data['username']
+            identificacion = form.cleaned_data['identificacion']
             clave = form.cleaned_data['password']
-            # Se verifica que el usuario y su clave existan
-            logeado = authenticate(request, username=usuario, password=clave)
-            if logeado is not None:
+            empresa = form.cleaned_data['empresa']
+            logeado = authenticate(request, username=identificacion, password=clave)
+            if logeado is not None and logeado.empresas.filter(id=empresa.id).exists():
                 login(request, logeado)
-                empresas = logeado.empresas.all()
-                if empresas.count() > 1:
-                    return HttpResponseRedirect('/inventario/seleccionar_empresa/')
-                elif empresas.count() == 1:
-                    request.session['empresa_activa'] = empresas.first().id
-                #Si el login es correcto lo redirige al panel del sistema:
+                request.session['empresa_activa'] = empresa.id
                 return HttpResponseRedirect('/inventario/panel')
             else:
-                #De lo contrario lanzara el mismo formulario
                 return render(request, 'inventario/login.html', {'form': form})
-
+        
     # Si se llega por GET crearemos un formulario en blanco
     def get(self, request):
         if request.user.is_authenticated == True:
             return HttpResponseRedirect('/inventario/panel')
 
         form = LoginFormulario()
-        #Envia al usuario el formulario para que lo llene
         return render(request, 'inventario/login.html', {'form': form})
 
 
@@ -125,6 +117,18 @@ class SeleccionarEmpresa(LoginRequiredMixin, View):
 
 
 #Fin de selección de empresa------------------------------------------------------#
+
+
+# API para obtener empresas de un usuario por identificación
+class EmpresasPorUsuario(View):
+    def get(self, request, identificacion):
+        try:
+            usuario = Usuario.objects.get(username=identificacion)
+            empresas = usuario.empresas.all()
+            data = [{'id': e.id, 'razon_social': e.razon_social} for e in empresas]
+        except Usuario.DoesNotExist:
+            data = []
+        return JsonResponse({'empresas': data})
 
 
 #Panel de inicio y vista principal------------------------------------------------#
@@ -222,9 +226,8 @@ class Perfil(LoginRequiredMixin, View):
 
             #Me pregunto si habia una manera mas facil de hacer esto, solo necesitaba hacer que el formulario-
             #-apareciera lleno de una vez, pero arrojaba User already exists y no pasaba de form.is_valid()
-            form['username'].field.widget.attrs['value'] = perf.username
-            form['first_name'].field.widget.attrs['value'] = perf.first_name
-            form['last_name'].field.widget.attrs['value'] = perf.last_name
+            form['identificacion'].field.widget.attrs['value'] = perf.username
+            form['nombre_completo'].field.widget.attrs['value'] = perf.first_name
             form['email'].field.widget.attrs['value'] = perf.email
             form['level'].field.widget.attrs['value'] = perf.nivel
 
@@ -286,15 +289,18 @@ class Perfil(LoginRequiredMixin, View):
                     perf.nivel = level
                     perf.is_superuser = level
 
-                username = form.cleaned_data['username']
-                first_name = form.cleaned_data['first_name']
-                last_name = form.cleaned_data['last_name']
+                identificacion = form.cleaned_data['identificacion']
+                nombre_completo = form.cleaned_data['nombre_completo']
                 email = form.cleaned_data['email']
+                empresa = form.cleaned_data['empresa']
 
-                perf.username = username
-                perf.first_name = first_name
-                perf.last_name = last_name
+                perf.username = identificacion
+                perf.first_name = nombre_completo
+                perf.last_name = ''
                 perf.email = email
+                if empresa:
+                    perf.empresas.clear()
+                    perf.empresas.add(empresa)
 
                 perf.save()
 
@@ -2975,13 +2981,13 @@ class CrearUsuario(LoginRequiredMixin, View):
     def post(self, request):
         form = NuevoUsuarioFormulario(request.POST)
         if form.is_valid():
-            username = form.cleaned_data['username']
-            first_name = form.cleaned_data['first_name']
-            last_name = form.cleaned_data['last_name']
+            identificacion = form.cleaned_data['identificacion']
+            nombre_completo = form.cleaned_data['nombre_completo']
             email = form.cleaned_data['email']
             password = form.cleaned_data['password']
             rep_password = form.cleaned_data['rep_password']
             level = form.cleaned_data['level']
+            empresa = form.cleaned_data['empresa']
 
             error = 0
 
@@ -2992,12 +2998,12 @@ class CrearUsuario(LoginRequiredMixin, View):
                 error = 1
                 messages.error(request, 'La clave y su repeticion tienen que coincidir')
 
-            if usuarioExiste(Usuario, 'username', username) is False:
+            if usuarioExiste(Usuario, 'username', identificacion) is False:
                 pass
 
             else:
                 error = 1
-                messages.error(request, "El nombre de usuario '%s' ya existe. eliga otro!" % username)
+                messages.error(request, "La identificación '%s' ya existe. eliga otra!" % identificacion)
 
             if usuarioExiste(Usuario, 'email', email) is False:
                 pass
@@ -3008,16 +3014,17 @@ class CrearUsuario(LoginRequiredMixin, View):
 
             if (error == 0):
                 if level == '0':
-                    nuevoUsuario = Usuario.objects.create_user(username=username, password=password, email=email)
+                    nuevoUsuario = Usuario.objects.create_user(username=identificacion, password=password, email=email)
                     nivel = 0
                 elif level == '1':
-                    nuevoUsuario = Usuario.objects.create_superuser(username=username, password=password, email=email)
+                    nuevoUsuario = Usuario.objects.create_superuser(username=identificacion, password=password, email=email)
                     nivel = 1
 
-                nuevoUsuario.first_name = first_name
-                nuevoUsuario.last_name = last_name
+                nuevoUsuario.first_name = nombre_completo
+                nuevoUsuario.last_name = ''
                 nuevoUsuario.nivel = nivel
                 nuevoUsuario.save()
+                UsuarioEmpresa.objects.create(usuario=nuevoUsuario, empresa=empresa)
 
                 messages.success(request, 'Usuario creado exitosamente')
                 return HttpResponseRedirect('/inventario/crearUsuario')
