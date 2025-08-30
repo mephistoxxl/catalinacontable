@@ -34,6 +34,7 @@ class LoginFormulario(forms.Form):
     empresa = forms.ModelChoiceField(
         label="Empresa",
         queryset=Empresa.objects.all(),
+        required=False,
         widget=forms.Select(attrs={'class': 'form-control underlined', 'id': 'empresa'})
     )
 
