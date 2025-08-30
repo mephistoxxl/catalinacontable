@@ -80,6 +80,8 @@ class Login(View):
                 return HttpResponseRedirect('/inventario/panel')
             else:
                 return render(request, 'inventario/login.html', {'form': form})
+        # Si el formulario no es válido, se vuelve a mostrar con errores
+        return render(request, 'inventario/login.html', {'form': form})
         
     # Si se llega por GET crearemos un formulario en blanco
     def get(self, request):
