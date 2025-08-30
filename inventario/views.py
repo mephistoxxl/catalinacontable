@@ -72,14 +72,26 @@ class Login(View):
         if form.is_valid():
             identificacion = form.cleaned_data['identificacion']
             clave = form.cleaned_data['password']
-            empresa = form.cleaned_data['empresa']
+            empresa = form.cleaned_data.get('empresa')
             logeado = authenticate(request, username=identificacion, password=clave)
-            if logeado is not None and logeado.empresas.filter(id=empresa.id).exists():
-                login(request, logeado)
-                request.session['empresa_activa'] = empresa.id
-                return HttpResponseRedirect('/inventario/panel')
-            else:
-                return render(request, 'inventario/login.html', {'form': form})
+
+            if logeado is not None:
+                if empresa and logeado.empresas.filter(id=empresa.id).exists():
+                    login(request, logeado)
+                    request.session['empresa_activa'] = empresa.id
+                    return HttpResponseRedirect('/inventario/panel')
+
+                if not empresa:
+                    empresas_usuario = logeado.empresas.all()
+                    if empresas_usuario.count() == 1:
+                        empresa = empresas_usuario.first()
+                        login(request, logeado)
+                        request.session['empresa_activa'] = empresa.id
+                        return HttpResponseRedirect('/inventario/panel')
+
+                form.add_error('empresa', 'Seleccione una empresa válida')
+
+            return render(request, 'inventario/login.html', {'form': form})
         # Si el formulario no es válido, se vuelve a mostrar con errores
         return render(request, 'inventario/login.html', {'form': form})
         
