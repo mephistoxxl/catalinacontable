@@ -492,6 +492,18 @@ class AgregarProducto(LoginRequiredMixin, View):
     def post(self, request):
         form = ProductoFormulario(request.POST)
         if form.is_valid():
+            # Obtener la empresa activa desde la sesión
+            empresa_id = request.session.get("empresa_activa")
+            if not empresa_id:
+                messages.error(request, "No hay una empresa activa seleccionada.")
+                return render(request, 'inventario/producto/agregarProducto.html', {'form': form})
+
+            try:
+                empresa = Empresa.objects.get(id=empresa_id)
+            except Empresa.DoesNotExist:
+                messages.error(request, "La empresa seleccionada no existe.")
+                return render(request, 'inventario/producto/agregarProducto.html', {'form': form})
+
             codigo = form.cleaned_data['codigo']
             codigo_barras = form.cleaned_data['codigo_barras']
             descripcion = form.cleaned_data['descripcion']
@@ -518,7 +530,8 @@ class AgregarProducto(LoginRequiredMixin, View):
                 iva=iva,
                 costo_actual=costo_actual,
                 precio_iva1=precio_iva1,
-                precio_iva2=precio_iva2
+                precio_iva2=precio_iva2,
+                empresa=empresa,
             )
             prod.save()
 
