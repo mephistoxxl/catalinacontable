@@ -45,8 +45,11 @@ def firmar_xml_xades_experimental(xml_path, xml_firmado_path):
     import hashlib
     from datetime import datetime
     
-    opciones = Opciones.objects.first()
-    if not opciones or not opciones.firma_electronica or not opciones.password_firma:
+    opciones = Opciones.objects.filter(
+        firma_electronica__isnull=False,
+        password_firma__isnull=False,
+    ).first()
+    if not opciones:
         raise Exception('Firma electrónica o contraseña no configuradas en Opciones')
     
     with open(opciones.firma_electronica.path, 'rb') as f:

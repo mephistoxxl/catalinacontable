@@ -33,7 +33,10 @@ class PDFFirmador:
     def _cargar_configuracion(self):
         """Carga la configuración de firma electrónica desde Opciones."""
         try:
-            self.opciones = Opciones.objects.first()
+            self.opciones = Opciones.objects.filter(
+                firma_electronica__isnull=False,
+                password_firma__isnull=False,
+            ).first()
             if not self.opciones:
                 raise Exception("No se encontró configuración de Opciones")
         except Exception as e:
