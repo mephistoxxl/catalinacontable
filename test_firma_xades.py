@@ -7,6 +7,7 @@ import os
 import sys
 import django
 from lxml import etree
+from tempfile import gettempdir
 
 # Configurar Django
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -79,7 +80,8 @@ def test_firma_xades_bes():
             )
 
         # Generar XML de test
-        xml_path = f"/tmp/test_factura_{factura.id}.xml"
+        tmp_dir = gettempdir()
+        xml_path = os.path.join(tmp_dir, f"test_factura_{factura.id}.xml")
         xml_content = integration.generar_xml_factura(factura, validar_xsd=False)
         
         with open(xml_path, 'w', encoding='utf-8') as f:
