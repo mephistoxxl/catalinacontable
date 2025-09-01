@@ -3,7 +3,7 @@ from django.contrib.auth.hashers import check_password
 from django.shortcuts import render, get_object_or_404, redirect
 
 # para redirigir a otras paginas
-from django.http import HttpResponseRedirect, HttpResponse, FileResponse, JsonResponse
+from django.http import HttpResponseRedirect, HttpResponse, FileResponse, JsonResponse, HttpResponseForbidden
 from urllib3 import request
 #el formulario de login
 from .forms import *
@@ -417,9 +417,12 @@ class Eliminar(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request, modo, p):
+        empresa_id = request.session.get("empresa_activa")
+        if not request.user.empresas.filter(id=empresa_id).exists():
+            return HttpResponseForbidden()
 
         if modo == 'producto':
-            prod = Producto.objects.get(id=p)
+            prod = get_object_or_404(Producto, id=p, empresa_id=empresa_id)
             prod.delete()
             messages.success(request, 'Producto de ID %s borrado exitosamente.' % p)
             return HttpResponseRedirect("/inventario/listarProductos")
@@ -645,6 +648,10 @@ class EditarProducto(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request, p):
+        empresa_id = request.session.get("empresa_activa")
+        if not request.user.empresas.filter(id=empresa_id).exists():
+            return HttpResponseForbidden()
+
         # Crea una instancia del formulario y la llena con los datos:
         form = ProductoFormulario(request.POST)
         # Revisa si es valido:
@@ -661,8 +668,8 @@ class EditarProducto(LoginRequiredMixin, View):
             costo_actual = form.cleaned_data['costo_actual']
 
             # Obtener el producto a editar
-            prod = Producto.objects.get(id=p)
-            
+            prod = get_object_or_404(Producto, id=p, empresa_id=empresa_id)
+
             # ✅ ACTUALIZAR TODOS LOS CAMPOS
             prod.codigo = codigo
             prod.codigo_barras = codigo_barras
@@ -673,7 +680,7 @@ class EditarProducto(LoginRequiredMixin, View):
             prod.disponible = disponible
             prod.iva = iva  # ✅ ESTO ES LO QUE FALTABA!
             prod.costo_actual = costo_actual
-            
+
             # ✅ RECALCULAR PRECIOS CON IVA USANDO EL MÉTODO save() DEL MODELO
             # El modelo ya tiene la lógica para calcular precio_iva1 y precio_iva2
             prod.save()  # Esto ejecutará automáticamente el cálculo de IVA
@@ -687,7 +694,11 @@ class EditarProducto(LoginRequiredMixin, View):
             return render(request, 'inventario/producto/agregarProducto.html', {'form': form})
 
     def get(self, request, p):
-        prod = Producto.objects.get(id=p)
+        empresa_id = request.session.get("empresa_activa")
+        if not request.user.empresas.filter(id=empresa_id).exists():
+            return HttpResponseForbidden()
+
+        prod = get_object_or_404(Producto, id=p, empresa_id=empresa_id)
         form = ProductoFormulario(instance=prod)
         # Envia al usuario el formulario para que lo llene
         contexto = {'form': form, 'modo': request.session.get('productoProcesado'), 'editar': True}
