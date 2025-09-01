@@ -939,13 +939,16 @@ class Factura(models.Model):
             # Usar RUC por defecto para pruebas (NO usar en producción)
             ruc_emisor = "1707181374001"
         
-        # ✅ CORREGIDO: Ambiente dinámico (1 dígito)
+        # ✅ Ambiente desde configuración (1 dígito)
         # 1 = Pruebas, 2 = Producción
         try:
-            tipo_ambiente = "1"  # Por defecto pruebas
-            # TODO: Agregar campo ambiente en modelo Opciones para producción
-        except:
-            tipo_ambiente = "1"  # Fallback a pruebas
+            opciones = Opciones.objects.first()
+            if opciones and opciones.tipo_ambiente in ['1', '2']:
+                tipo_ambiente = opciones.tipo_ambiente
+            else:
+                tipo_ambiente = "1"
+        except Exception:
+            tipo_ambiente = "1"
         
         # ✅ Serie (6 dígitos) - establecimiento + punto emisión
         serie = f"{self.establecimiento.zfill(3)}{self.punto_emision.zfill(3)}"

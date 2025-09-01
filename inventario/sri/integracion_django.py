@@ -26,11 +26,9 @@ class SRIIntegration:
             if opciones and opciones.tipo_ambiente:
                 self.ambiente = 'produccion' if opciones.tipo_ambiente == '2' else 'pruebas'
             else:
-                # Fallback a configuración de settings
-                self.ambiente = getattr(settings, 'SRI_AMBIENTE', 'pruebas')
+                self.ambiente = 'pruebas'
         except Exception:
-            # Fallback a configuración de settings
-            self.ambiente = getattr(settings, 'SRI_AMBIENTE', 'pruebas')
+            self.ambiente = 'pruebas'
 
         self.cliente = SRIClient(ambiente=self.ambiente)
 
@@ -513,14 +511,12 @@ class SRIIntegration:
         # 🔄 SINCRONIZAR con Opciones.tipo_ambiente
         try:
             opciones = Opciones.objects.first()
-            if opciones and opciones.tipo_ambiente:
+            if opciones and opciones.tipo_ambiente in ['1', '2']:
                 ambiente = opciones.tipo_ambiente
             else:
-                # Fallback a ambiente actual
-                ambiente = '1' if self.ambiente == 'pruebas' else '2'
+                ambiente = '1'
         except Exception:
-            # Fallback a ambiente actual
-            ambiente = '1' if self.ambiente == 'pruebas' else '2'
+            ambiente = '1'
         serie = f"{factura.establecimiento}{factura.punto_emision}"
         
         # Usar el campo correcto para la secuencia
