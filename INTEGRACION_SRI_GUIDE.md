@@ -37,11 +37,11 @@ pip install lxml>=4.9.3
 
 ### 1. Configuración Django
 
+El ambiente (pruebas/producción) se define desde el formulario de Firma Electrónica y se almacena en `Opciones.tipo_ambiente`.
 Agregar en `settings.py`:
 
 ```python
 # Configuración SRI
-SRI_AMBIENTE = 'pruebas'  # 'pruebas' o 'produccion'
 SRI_TIMEOUT = 30  # segundos
 
 # URLs de los servicios SRI
