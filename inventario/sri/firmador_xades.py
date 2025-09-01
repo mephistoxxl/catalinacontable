@@ -16,9 +16,14 @@ class SRIXAdESFirmador:
     """Firmador XAdES-BES sencillo respaldado por la librería endesive."""
 
     def __init__(self):
-        self.opciones = Opciones.objects.first()
-        if not self.opciones or not self.opciones.firma_electronica or not self.opciones.password_firma:
-            raise XAdESError("Firma electrónica o contraseña no configuradas en Opciones")
+        self.opciones = Opciones.objects.filter(
+            firma_electronica__isnull=False,
+            password_firma__isnull=False,
+        ).first()
+        if not self.opciones:
+            raise XAdESError(
+                "Firma electrónica o contraseña no configuradas en Opciones"
+            )
 
     def firmar_xml_xades_bes(self, xml_path: str, xml_firmado_path: str) -> bool:
         """Firma un XML usando XAdES-BES y guarda el resultado."""
@@ -36,11 +41,18 @@ def firmar_xml_con_endesive(xml_path: str, xml_firmado_path: str) -> bool:
     try:
         from endesive.xml import xades
     except ImportError as e:
-        logger.error("endesive no está disponible para XAdES: %s", e)
-        raise XAdESError("Librería endesive no disponible")
+        msg = (
+            "Librería endesive no disponible. "
+            "Instale con `pip install endesive>=2.17.0`"
+        )
+        logger.error("%s: %s", msg, e)
+        raise XAdESError(msg)
 
-    opciones = Opciones.objects.first()
-    if not opciones or not opciones.firma_electronica or not opciones.password_firma:
+    opciones = Opciones.objects.filter(
+        firma_electronica__isnull=False,
+        password_firma__isnull=False,
+    ).first()
+    if not opciones:
         raise XAdESError("Firma electrónica o contraseña no configuradas")
 
     with open(xml_path, "rb") as f:

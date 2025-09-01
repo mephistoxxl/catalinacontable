@@ -33,7 +33,10 @@ class PDFFirmador:
     def _cargar_configuracion(self):
         """Carga la configuración de firma electrónica desde Opciones."""
         try:
-            self.opciones = Opciones.objects.first()
+            self.opciones = Opciones.objects.filter(
+                firma_electronica__isnull=False,
+                password_firma__isnull=False,
+            ).first()
             if not self.opciones:
                 raise Exception("No se encontró configuración de Opciones")
         except Exception as e:
@@ -82,7 +85,11 @@ class PDFFirmador:
                 from endesive.pdf import cms
                 logger.info("Usando endesive para firmar PDF")
             except ImportError as e:
-                logger.warning(f"endesive no está disponible: {e}. Copiando PDF sin firmar...")
+                logger.warning(
+                    "endesive no está disponible: %s. "
+                    "Instale con `pip install endesive>=2.17.0`. Copiando PDF sin firmar...",
+                    e,
+                )
                 import shutil
                 shutil.copy2(pdf_path, pdf_firmado_path)
                 return pdf_firmado_path
