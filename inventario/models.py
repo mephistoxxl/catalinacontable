@@ -454,8 +454,8 @@ class Producto(models.Model):
         'Empresa',
         on_delete=models.CASCADE,
         related_name='productos',
-        null=True,
-        blank=True,
+        null=False,
+        blank=False,
     )
     codigo = models.CharField(max_length=20, unique = True)
     codigo_barras = models.CharField(max_length=100)
@@ -592,8 +592,8 @@ class Cliente(models.Model):
         'Empresa',
         on_delete=models.CASCADE,
         related_name='clientes',
-        null=True,
-        blank=True,
+        null=False,
+        blank=False,
     )
     tipoIdentificacion = models.CharField(max_length=2, choices=TIPO_IDENTIFICACION_CHOICES)
     identificacion = models.CharField(max_length=13, unique=True)
@@ -653,8 +653,8 @@ class Factura(models.Model):
         'Empresa',
         on_delete=models.CASCADE,
         related_name='facturas',
-        null=True,
-        blank=True,
+        null=False,
+        blank=False,
     )
     # Relación con el cliente usando su identificación
     cliente = models.ForeignKey('Cliente', to_field='identificacion', on_delete=models.CASCADE)
