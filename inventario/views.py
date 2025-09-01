@@ -2043,8 +2043,13 @@ class ListarFacturas(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
+        empresa_id = request.session.get("empresa_activa")
+        if empresa_id is None:
+            messages.error(request, 'No se ha seleccionado una empresa válida')
+            return HttpResponseRedirect('/inventario/panel')
+
         #Lista de productos de la BDD
-        facturas = Factura.objects.all()
+        facturas = Factura.objects.filter(empresa_id=empresa_id)
         
         # La sincronización automática con el SRI ha sido deshabilitada para mejorar el rendimiento
         # Solo se ejecutará cuando el usuario haga clic en "Autorizar documento" o similar
