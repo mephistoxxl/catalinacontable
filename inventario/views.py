@@ -72,25 +72,67 @@ class Login(View):
         if form.is_valid():
             identificacion = form.cleaned_data['identificacion']
             clave = form.cleaned_data['password']
-            empresa = form.cleaned_data.get('empresa')
+            # Intentar obtener empresa desde POST directamente (select o hidden),
+            # ya que el queryset del formulario puede estar vacío inicialmente
+            empresa = None
+            empresa_id = request.POST.get('empresa') or request.POST.get('empresa_hidden')
+            if empresa_id and str(empresa_id).isdigit():
+                try:
+                    empresa = Empresa.objects.get(id=int(empresa_id))
+                except Empresa.DoesNotExist:
+                    empresa = None
             logeado = authenticate(request, username=identificacion, password=clave)
 
             if logeado is not None:
+                # 1) Empresa enviada explícitamente y válida
                 if empresa and logeado.empresas.filter(id=empresa.id).exists():
                     login(request, logeado)
                     request.session['empresa_activa'] = empresa.id
                     return HttpResponseRedirect('/inventario/panel')
-
-                if not empresa:
-                    empresas_usuario = logeado.empresas.all()
-                    if empresas_usuario.count() == 1:
-                        empresa = empresas_usuario.first()
+                # Primer inicio con empresa indicada: si el usuario no tiene empresas aún, vincularlo
+                if empresa and logeado.empresas.count() == 0:
+                    try:
+                        UsuarioEmpresa.objects.get_or_create(usuario=logeado, empresa=empresa)
                         login(request, logeado)
                         request.session['empresa_activa'] = empresa.id
                         return HttpResponseRedirect('/inventario/panel')
+                    except Exception:
+                        pass
 
-                form.add_error('empresa', 'Seleccione una empresa válida')
+                # 2) Intentar auto-detección por RUC (13 dígitos)
+                if not empresa and len(identificacion) == 13 and identificacion.isdigit():
+                    try:
+                        emp_ruc = Empresa.objects.get(ruc=identificacion)
+                        if logeado.empresas.filter(id=emp_ruc.id).exists():
+                            login(request, logeado)
+                            request.session['empresa_activa'] = emp_ruc.id
+                            return HttpResponseRedirect('/inventario/panel')
+                        # Primer inicio: si el usuario no tiene empresas, vincular a esta
+                        if logeado.empresas.count() == 0:
+                            UsuarioEmpresa.objects.get_or_create(usuario=logeado, empresa=emp_ruc)
+                            login(request, logeado)
+                            request.session['empresa_activa'] = emp_ruc.id
+                            return HttpResponseRedirect('/inventario/panel')
+                    except Empresa.DoesNotExist:
+                        pass
 
+                # 3) Resolver por cantidad de empresas asociadas
+                empresas_usuario = logeado.empresas.all()
+                if empresas_usuario.count() == 1:
+                    unica = empresas_usuario.first()
+                    login(request, logeado)
+                    request.session['empresa_activa'] = unica.id
+                    return HttpResponseRedirect('/inventario/panel')
+                elif empresas_usuario.count() > 1:
+                    login(request, logeado)
+                    return HttpResponseRedirect('/inventario/seleccionar_empresa/')
+
+                # 4) Si llega aquí, requiere selección explícita
+                messages.error(request, 'Seleccione una empresa válida para continuar')
+                return render(request, 'inventario/login.html', {'form': form})
+
+            # Credenciales inválidas
+            messages.error(request, 'Usuario o contraseña incorrectos')
             return render(request, 'inventario/login.html', {'form': form})
         # Si el formulario no es válido, se vuelve a mostrar con errores
         return render(request, 'inventario/login.html', {'form': form})
@@ -345,18 +387,15 @@ class Perfil(LoginRequiredMixin, View):
                 #else:
                 #error = 1
                 #messages.error(request,"La clave nueva no puede ser identica a la actual")
-
+                        # Caso 3: Usuario pertenece a una o más empresas
                 usuario = Usuario.objects.get(id=p)
 
                 if clave_nueva == repetir_clave:
                     pass
                 else:
                     error = 1
-                    messages.error(request, "La clave nueva y su repeticion tienen que coincidir")
-
-                #else:
                 #error = 1
-                #messages.error(request,"La clave de acceso actual que ha insertado es incorrecta")
+                # Si el formulario no es válido, se vuelve a mostrar con errores
 
                 if (error == 0):
                     messages.success(request, 'La clave se ha cambiado correctamente!')

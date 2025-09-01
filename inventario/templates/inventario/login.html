@@ -20,6 +20,18 @@
 
         <!-- Login Card -->
         <div class="bg-white rounded-b-3xl shadow-xl p-4">
+            {% if messages %}
+            <div class="space-y-2 mb-2">
+                {% for message in messages %}
+                    <div class="text-sm px-3 py-2 rounded border
+                        {% if message.tags == 'error' %}bg-red-50 border-red-200 text-red-700{% endif %}
+                        {% if message.tags == 'warning' %}bg-yellow-50 border-yellow-200 text-yellow-800{% endif %}
+                        {% if message.tags == 'success' %}bg-green-50 border-green-200 text-green-700{% endif %}
+                        {% if message.tags == 'info' %}bg-blue-50 border-blue-200 text-blue-700{% endif %}
+                    ">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
             <form id="login-form" method="POST" class="space-y-6">
                 {% csrf_token %}
                 
