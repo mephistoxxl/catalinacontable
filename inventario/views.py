@@ -717,8 +717,14 @@ class ListarClientes(LoginRequiredMixin, View):
 
     def get(self, request):
         from django.db import models
-        #Saca una lista de todos los clientes de la BDD
-        clientes = Cliente.objects.all()
+        # Obtiene la empresa activa desde la sesión
+        empresa_id = request.session.get("empresa_activa")
+        if empresa_id is None:
+            messages.error(request, 'No se ha seleccionado una empresa válida')
+            return HttpResponseRedirect('/inventario/panel')
+
+        # Saca una lista de todos los clientes de la BDD asociados a la empresa
+        clientes = Cliente.objects.filter(empresa_id=empresa_id)
         contexto = {'tabla': clientes}
         contexto = complementarContexto(contexto, request.user)
 
