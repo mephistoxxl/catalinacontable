@@ -1224,6 +1224,20 @@ class EmitirFactura(LoginRequiredMixin, View):
                     del request.session['facturador_nombre']
                 return redirect('inventario:login_facturador')
 
+            # Recuperar empresa activa desde la sesión
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id:
+                messages.error(request, 'No se ha seleccionado una empresa válida.')
+                return redirect('inventario:panel')
+            try:
+                empresa = Empresa.objects.get(id=empresa_id)
+            except Empresa.DoesNotExist:
+                messages.error(request, 'La empresa seleccionada no existe.')
+                return redirect('inventario:panel')
+            if not request.user.empresas.filter(id=empresa.id).exists():
+                messages.error(request, 'No tiene acceso a la empresa seleccionada.')
+                return redirect('inventario:panel')
+
             # Recuperar datos del cliente
             cliente_id = request.POST.get('cliente_id')
             if not cliente_id:
@@ -1274,6 +1288,7 @@ class EmitirFactura(LoginRequiredMixin, View):
 
             # ✅ CREAR FACTURA CON FACTURADOR ASIGNADO
             factura = Factura(
+                empresa=empresa,
                 cliente=cliente,
                 almacen=almacen,
                 facturador=facturador,  # ✅ AGREGAR EL FACTURADOR
