@@ -466,8 +466,13 @@ class ListarProductos(LoginRequiredMixin, View):
     def get(self, request):
         from django.db import models
 
+        empresa_id = request.session.get("empresa_activa")
+        if empresa_id is None:
+            messages.error(request, 'No se ha seleccionado una empresa válida')
+            return HttpResponseRedirect('/inventario/panel')
+
         #Lista de productos de la BDD
-        productos = Producto.objects.all()
+        productos = Producto.objects.filter(empresa_id=empresa_id)
 
         contexto = {'tabla': productos}
 
