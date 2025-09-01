@@ -14,6 +14,7 @@ from inventario.models import (
     Producto,
     Banco,
     CampoAdicional,
+    Empresa,
 )
 
 
@@ -25,6 +26,10 @@ class DepositoSinCamposChequeTest(TestCase):
             username="usuario", password="pass", email="user@example.com"
         )
 
+        self.empresa = Empresa.objects.create(
+            ruc="1234567890123",
+            razon_social="Empresa Prueba",
+        )
         self.cliente = Cliente.objects.create(
             tipoIdentificacion="05",
             identificacion="0102030405",
@@ -34,11 +39,12 @@ class DepositoSinCamposChequeTest(TestCase):
             tipoVenta="1",
             tipoRegimen="1",
             tipoCliente="1",
+            empresa=self.empresa,
         )
         self.facturador = Facturador.objects.create(
-            nombres="Facturador", correo="facturador@example.com"
+            nombres="Facturador", correo="facturador@example.com", empresa=self.empresa
         )
-        self.almacen = Almacen.objects.create(descripcion="Principal")
+        self.almacen = Almacen.objects.create(descripcion="Principal", empresa=self.empresa)
         self.producto = Producto.objects.create(
             codigo="P1",
             codigo_barras="123",
@@ -48,12 +54,14 @@ class DepositoSinCamposChequeTest(TestCase):
             categoria="1",
             iva="0",
             costo_actual=Decimal("5.00"),
+            empresa=self.empresa,
         )
         self.banco = Banco.objects.create(
             banco="Banco Test",
             titular="Titular",
             numero_cuenta="123456",
             fecha_apertura=date.today(),
+            empresa=self.empresa,
         )
         self.factura = Factura.objects.create(
             cliente=self.cliente,
@@ -66,6 +74,7 @@ class DepositoSinCamposChequeTest(TestCase):
             secuencia="000000001",
             identificacion_cliente=self.cliente.identificacion,
             nombre_cliente=self.cliente.razon_social,
+            empresa=self.empresa,
         )
 
     def _add_session(self, request):
