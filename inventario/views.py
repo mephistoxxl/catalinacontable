@@ -1896,6 +1896,13 @@ def buscar_producto(request):
     Busca productos y servicios por código exacto o parcial.
     """
     try:
+        empresa_id = request.session.get("empresa_activa")
+        if empresa_id is None:
+            return JsonResponse({'error': 'Empresa no seleccionada'}, status=400)
+
+        if not request.user.is_authenticated or not request.user.empresas.filter(id=empresa_id).exists():
+            return HttpResponseForbidden("Usuario no autorizado")
+
         codigo = request.GET.get('q', '').strip()
         listar_todos = request.GET.get('all') in ('1', 'true', 'True')
         print(f"🔍 Buscando producto o servicio con código: '{codigo}'")
@@ -1920,7 +1927,7 @@ def buscar_producto(request):
                 '8': 0.08,
             }
 
-            for p in Producto.objects.all().order_by('codigo')[:LIMITE]:
+            for p in Producto.objects.filter(empresa_id=empresa_id).order_by('codigo')[:LIMITE]:
                 precio_base = float(p.precio) if p.precio else 0.0
                 iva_percent = MAPEO_IVA.get(p.iva, 0.12)
                 resultados.append({
@@ -1932,7 +1939,7 @@ def buscar_producto(request):
                     'tipo': 'producto',
                 })
 
-            for s in Servicio.objects.all().order_by('codigo')[:LIMITE]:
+            for s in Servicio.objects.filter(empresa_id=empresa_id).order_by('codigo')[:LIMITE]:
                 precio_base = float(getattr(s, 'precio1', 0) or 0.0)
                 # Servicios: si no hay IVA definido, usar 0.12 por defecto
                 iva_code = str(getattr(s, 'iva', '') or '2')
@@ -1955,7 +1962,7 @@ def buscar_producto(request):
         resultados = []
 
         # Buscar producto exacto
-        producto = Producto.objects.filter(codigo__iexact=codigo).first()
+        producto = Producto.objects.filter(empresa_id=empresa_id, codigo__iexact=codigo).first()
         if producto:
             precio_base = float(producto.precio) if producto.precio else 0.0
             
@@ -1985,7 +1992,7 @@ def buscar_producto(request):
             })
 
         # Buscar servicio exacto
-        servicio = Servicio.objects.filter(codigo__iexact=codigo).first()
+        servicio = Servicio.objects.filter(empresa_id=empresa_id, codigo__iexact=codigo).first()
         print(f"🔍 Query servicio: Servicio.objects.filter(codigo__iexact='{codigo}').first()")
         print(f"🔍 Servicio encontrado: {servicio}")
         
@@ -2030,7 +2037,8 @@ def buscar_producto(request):
         if not resultados:
             from django.db.models import Q
             productos_similares = Producto.objects.filter(
-                Q(codigo__icontains=codigo) | Q(descripcion__icontains=codigo)
+                Q(codigo__icontains=codigo) | Q(descripcion__icontains=codigo),
+                empresa_id=empresa_id
             )[:30]
             for p in productos_similares:
                 precio_base = float(p.precio) if p.precio else 0.0
@@ -2060,7 +2068,8 @@ def buscar_producto(request):
                     'tipo': 'producto'
                 })
             servicios_similares = Servicio.objects.filter(
-                Q(codigo__icontains=codigo) | Q(descripcion__icontains=codigo) | Q(nombre__icontains=codigo)
+                Q(codigo__icontains=codigo) | Q(descripcion__icontains=codigo) | Q(nombre__icontains=codigo),
+                empresa_id=empresa_id
             )[:30]
             for s in servicios_similares:
                 precio_base = float(getattr(s, 'precio1', 0) or 0.0)
