@@ -605,12 +605,17 @@ class ExportarProductos(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request):
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id:
+            messages.error(request, 'No se ha seleccionado una empresa.')
+            return redirect('inventario:exportarProductos')
+
         form = ExportarProductosFormulario(request.POST)
         if form.is_valid():
             request.session['productosExportados'] = True
 
             #Se obtienen las entradas de producto en formato JSON
-            data = serializers.serialize("json", Producto.objects.all())
+            data = serializers.serialize("json", Producto.objects.filter(empresa_id=empresa_id))
             fs = FileSystemStorage('inventario/tmp/')
 
             #Se utiliza la variable fs para acceder a la carpeta con mas facilidad
