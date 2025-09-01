@@ -399,7 +399,7 @@ class DetallesPedidoFormulario(forms.Form):
     """
 
     descripcion = MisProductos(
-        queryset=Producto.objects.all().order_by('descripcion'),
+        queryset=Producto.objects.none(),
         label='Producto',
         widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_producto'})
     )
@@ -416,6 +416,14 @@ class DetallesPedidoFormulario(forms.Form):
         decimal_places=2,
         widget=forms.NumberInput(attrs={'class': 'form-control', 'id': 'id_subtotal', 'step': '0.01', 'min': '0'})
     )
+
+    def __init__(self, *args, **kwargs):
+        empresa_id = kwargs.pop('empresa_id', None)
+        super().__init__(*args, **kwargs)
+        if empresa_id is not None:
+            self.fields['descripcion'].queryset = Producto.objects.filter(
+                empresa_id=empresa_id
+            ).order_by('descripcion')
 
 class EmitirFacturaFormulario(forms.Form):
     def __init__(self, *args, **kwargs):

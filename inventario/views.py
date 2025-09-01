@@ -2916,7 +2916,12 @@ class DetallesPedido(LoginRequiredMixin, View):
     def get(self, request):
         cedula = request.session.get('id_proveedor')
         productos = request.session.get('form_details')
-        PedidoFormulario = formset_factory(DetallesPedidoFormulario, extra=productos)
+        empresa_id = request.session.get('empresa_activa')
+        PedidoFormulario = formset_factory(
+            DetallesPedidoFormulario,
+            extra=productos,
+            form_kwargs={'empresa_id': empresa_id}
+        )
         formset = PedidoFormulario()
         contexto = {'formset': formset}
         contexto = complementarContexto(contexto, request.user)
@@ -2927,7 +2932,12 @@ class DetallesPedido(LoginRequiredMixin, View):
         cedula = request.session.get('id_proveedor')
         productos = request.session.get('form_details')
 
-        PedidoFormulario = formset_factory(DetallesPedidoFormulario, extra=productos)
+        empresa_id = request.session.get('empresa_activa')
+        PedidoFormulario = formset_factory(
+            DetallesPedidoFormulario,
+            extra=productos,
+            form_kwargs={'empresa_id': empresa_id}
+        )
 
         inicial = {
             'descripcion': '',
