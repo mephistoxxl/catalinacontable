@@ -109,12 +109,10 @@
                     }
                 });
 
-                identInput.addEventListener('input', function() {
-                    this.value = this.value.replace(/\D/g, '');
-                });
-
-                identInput.addEventListener('blur', function() {
-                    fetch(`/inventario/api/empresas/${identInput.value}/`)
+                const cargarEmpresas = () => {
+                    const ident = identInput.value.trim();
+                    if (!ident) return;
+                    fetch(`/inventario/api/empresas/${ident}/`)
                         .then(response => response.json())
                         .then(data => {
                             empresaSelect.innerHTML = '';
@@ -146,7 +144,16 @@
                                 }
                             }
                         });
+                };
+
+                identInput.addEventListener('input', function() {
+                    this.value = this.value.replace(/\D/g, '');
+                    if (this.value.length === 10 || this.value.length === 13) {
+                        cargarEmpresas();
+                    }
                 });
+
+                identInput.addEventListener('blur', cargarEmpresas);
             }
         });
     </script>
