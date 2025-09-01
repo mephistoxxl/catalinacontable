@@ -3001,7 +3001,12 @@ class CrearUsuario(LoginRequiredMixin, View):
             password = form.cleaned_data['password']
             rep_password = form.cleaned_data['rep_password']
             level = form.cleaned_data['level']
-            empresa = form.cleaned_data['empresa']
+            empresa_id = request.session.get('empresa_activa')
+            try:
+                empresa = Empresa.objects.get(id=empresa_id)
+            except Empresa.DoesNotExist:
+                messages.error(request, 'No se ha seleccionado una empresa válida')
+                return HttpResponseRedirect('/inventario/crearUsuario')
 
             error = 0
 
