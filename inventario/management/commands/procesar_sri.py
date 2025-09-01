@@ -1,9 +1,5 @@
-import os
-import sys
 import logging
-from datetime import datetime
 from django.core.management.base import BaseCommand
-from django.conf import settings
 from inventario.sri.integracion_django import SRIIntegration
 from inventario.models import Factura
 
@@ -29,21 +25,12 @@ class Command(BaseCommand):
             help='Solo consultar estado sin reenviar'
         )
         parser.add_argument(
-            '--ambiente',
-            choices=['pruebas', 'produccion'],
-            default='pruebas',
-            help='Ambiente SRI a utilizar'
-        )
-        parser.add_argument(
             '--diagnostico',
             action='store_true',
             help='Verificar disponibilidad de servicios SRI'
         )
 
     def handle(self, *args, **options):
-        # Configurar ambiente
-        settings.SRI_AMBIENTE = options['ambiente']
-        
         # Diagnóstico de servicios
         if options['diagnostico']:
             self.diagnosticar_servicios()
@@ -67,11 +54,10 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('=== DIAGNÓSTICO SRI ==='))
         
         try:
-            from inventario.sri.sri_client import SRIClient
-            cliente = SRIClient(ambiente=settings.SRI_AMBIENTE)
-            estado = cliente.verificar_servicio()
-            
-            self.stdout.write(f"Ambiente: {settings.SRI_AMBIENTE}")
+            integration = SRIIntegration()
+            estado = integration.cliente.verificar_servicio()
+
+            self.stdout.write(f"Ambiente: {integration.ambiente}")
             self.stdout.write(f"Servicio Recepción: {'✅ Disponible' if estado['recepcion']['disponible'] else '❌ No disponible'}")
             self.stdout.write(f"Servicio Autorización: {'✅ Disponible' if estado['autorizacion']['disponible'] else '❌ No disponible'}")
             

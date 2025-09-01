@@ -16,8 +16,6 @@ load_dotenv()
 
 # Seguridad y configuración sensible desde .env
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
-# Forzar ambiente de SRI siempre a pruebas (solicitado)
-SRI_AMBIENTE = 'pruebas'
 # Tiempo de espera por defecto para los servicios del SRI (en segundos)
 SRI_TIMEOUT = int(os.environ.get('SRI_TIMEOUT', 30))
 
