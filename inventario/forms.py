@@ -913,11 +913,6 @@ class NuevoUsuarioFormulario(forms.Form):
         )
         )
 
-    empresa = forms.ModelChoiceField(
-        label="Empresa",
-        queryset=Empresa.objects.all(),
-        widget=forms.Select(attrs={'id':'empresa','class':'form-control'})
-    )
 
 
 class ClaveFormulario(forms.Form):
