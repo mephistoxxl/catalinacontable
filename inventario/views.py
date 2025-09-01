@@ -24,6 +24,7 @@ from .forms import SecuenciaFormulario
 from .models import *
 from .models import FormaPago  # Importación explícita para evitar errores de scope
 from .models import Banco, CampoAdicional  # Para pagos con cheque y guardar datos adicionales
+from .models import Empresa  # Acceder a la empresa activa
 #formularios dinamicos
 from django.forms import formset_factory
 #funciones personalizadas
@@ -1112,11 +1113,15 @@ def buscar_cliente(request):
     Si no existe en la base de datos consulta la API externa y crea el registro.
     """
     try:
+        empresa_id = request.session.get("empresa_activa")
+        if not empresa_id:
+            return JsonResponse({'error': True, 'message': 'No se ha seleccionado una empresa válida'}, status=400)
+
         identificacion = request.GET.get('q', '').strip()
         if not identificacion:
             return JsonResponse({'error': True, 'message': 'Debe proporcionar una identificación'}, status=400)
 
-        cliente = Cliente.objects.filter(identificacion=identificacion).first()
+        cliente = Cliente.objects.filter(identificacion=identificacion, empresa_id=empresa_id).first()
         if cliente:
             nombre_completo = cliente.razon_social
             if cliente.nombre_comercial:
@@ -1141,6 +1146,8 @@ def buscar_cliente(request):
         tipo_regimen = resultado.get('tipo_regimen', '')
         tipoRegimen = '1' if tipo_regimen != 'RIMPE' else '2'
 
+        empresa = Empresa.objects.get(pk=empresa_id)
+
         cliente = Cliente.objects.create(
             tipoIdentificacion=tipoIdentificacion,
             identificacion=identificacion,
@@ -1153,7 +1160,8 @@ def buscar_cliente(request):
             convencional='',
             tipoVenta='1',
             tipoRegimen=tipoRegimen,
-            tipoCliente=tipoCliente
+            tipoCliente=tipoCliente,
+            empresa=empresa
         )
         return JsonResponse({
             'id': cliente.id,
