@@ -4480,7 +4480,10 @@ class ListarServicios(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
-        servicios = Servicio.objects.all().order_by('-fecha_creacion')
+        empresa_id = request.session.get("empresa_activa")
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return HttpResponseForbidden("No tienes acceso a esta empresa")
+        servicios = Servicio.objects.filter(empresa_id=empresa_id).order_by('-fecha_creacion')
         contexto = {'servicios': servicios}
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/servicios/listarServicios.html', contexto)
@@ -4492,6 +4495,9 @@ class AgregarServicio(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
+        empresa_id = request.session.get("empresa_activa")
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return HttpResponseForbidden("No tienes acceso a esta empresa")
         codigo_nuevo = generar_codigo_servicio()
         form = ServicioFormulario(initial={'codigo': codigo_nuevo})
         contexto = {'form': form}
@@ -4499,11 +4505,16 @@ class AgregarServicio(LoginRequiredMixin, View):
         return render(request, 'inventario/servicios/agregarServicio.html', contexto)
 
     def post(self, request):
+        empresa_id = request.session.get("empresa_activa")
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return HttpResponseForbidden("No tienes acceso a esta empresa")
         form = ServicioFormulario(request.POST)
         contexto = {'form': form}
         contexto = complementarContexto(contexto, request.user)
         if form.is_valid():
-            form.save()
+            servicio = form.save(commit=False)
+            servicio.empresa_id = empresa_id
+            servicio.save()
             return redirect('inventario:listarServicios')
         return render(request, 'inventario/servicios/agregarServicio.html', contexto)
 # Editar servicio
@@ -4512,14 +4523,20 @@ class EditarServicio(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request, p):
-        servicio = Servicio.objects.get(pk=p)
+        empresa_id = request.session.get("empresa_activa")
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return HttpResponseForbidden("No tienes acceso a esta empresa")
+        servicio = get_object_or_404(Servicio, pk=p, empresa_id=empresa_id)
         form = ServicioFormulario(instance=servicio)
         contexto = {'form': form, 'edit_mode': True, 'servicio': servicio}
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/servicios/agregarServicio.html', contexto)
 
     def post(self, request, p):
-        servicio = Servicio.objects.get(pk=p)
+        empresa_id = request.session.get("empresa_activa")
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return HttpResponseForbidden("No tienes acceso a esta empresa")
+        servicio = get_object_or_404(Servicio, pk=p, empresa_id=empresa_id)
         form = ServicioFormulario(request.POST, instance=servicio)
         contexto = {'form': form, 'edit_mode': True, 'servicio': servicio}
         contexto = complementarContexto(contexto, request.user)
@@ -4534,7 +4551,10 @@ class EliminarServicio(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request, p):
-        servicio = Servicio.objects.get(pk=p)
+        empresa_id = request.session.get("empresa_activa")
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return HttpResponseForbidden("No tienes acceso a esta empresa")
+        servicio = get_object_or_404(Servicio, pk=p, empresa_id=empresa_id)
         servicio.delete()
         return redirect('inventario:listarServicios')
     
