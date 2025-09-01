@@ -6,62 +6,6 @@ Verifica que los XMLs se firmen correctamente con XAdES-BES en lugar de XMLDSig 
 import os
 import sys
 import django
-from lxml import etree
-from tempfile import gettempdir
-
-# Configurar Django
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sistema.settings')
-django.setup()
-
-from inventario.models import Factura, Opciones, FormaPago, Caja
-from decimal import Decimal
-
-def verificar_configuracion_firma():
-    """Verificar que la configuración de firma esté disponible"""
-    print("🔍 VERIFICACIÓN DE CONFIGURACIÓN DE FIRMA")
-    print("=" * 50)
-    
-    opciones = Opciones.objects.first()
-    if not opciones:
-        print("❌ No hay configuración de Opciones")
-        return False
-    
-    if not opciones.firma_electronica:
-        print("❌ No hay archivo de firma electrónica configurado")
-        return False
-    
-    if not opciones.password_firma:
-        print("❌ No hay contraseña de firma configurada")
-        return False
-    
-    # Verificar que el archivo existe
-    if not os.path.exists(opciones.firma_electronica.path):
-        print(f"❌ Archivo de firma no encontrado: {opciones.firma_electronica.path}")
-        return False
-    
-    print("✅ Configuración de firma disponible:")
-    print(f"   Archivo: {opciones.firma_electronica.path}")
-    print(f"   Tamaño: {os.path.getsize(opciones.firma_electronica.path)} bytes")
-    
-    return True
-
-def test_firma_xades_bes():
-    """Test de firma XAdES-BES"""
-    print("\n🎯 TEST DE FIRMA XAdES-BES")
-    print("=" * 50)
-    
-    if not verificar_configuracion_firma():
-        return False
-    
-    # Buscar una factura para test
-    factura = Factura.objects.first()
-    if not factura:
-        print("❌ No hay facturas disponibles para test")
-        return False
-
-    print(f"📄 Usando factura ID {factura.id} para test")
-
     try:
         # Test 1: Crear XML temporal para test
         from inventario.sri.integracion_django import SRIIntegration
@@ -79,14 +23,8 @@ def test_firma_xades_bes():
                 total=factura.monto_general or Decimal('0.00')
             )
 
-        # Generar XML de test
-        tmp_dir = gettempdir()
-        xml_path = os.path.join(tmp_dir, f"test_factura_{factura.id}.xml")
-        xml_content = integration.generar_xml_factura(factura, validar_xsd=False)
-        
-        with open(xml_path, 'w', encoding='utf-8') as f:
-            f.write(xml_content)
-        
+        # Generar XML de test (integration devuelve la RUTA del XML)
+        xml_path = integration.generar_xml_factura(factura, validar_xsd=False)
         print(f"✅ XML generado: {xml_path}")
         
         # Test 2: Probar firma XAdES-BES
@@ -121,7 +59,63 @@ def test_firma_xades_bes():
                 print(f"❌ Error en firma básica: {e2}")
         
         # Limpiar archivos temporales
-        for path in [xml_path, xml_firmado_path, xml_path.replace('.xml', '_firmado_basico.xml')]:
+        for path in [xml_firmado_path, xml_path.replace('.xml', '_firmado_basico.xml')]:
+            if os.path.exists(path):
+                os.remove(path)
+                
+    except Exception as e:
+        print(f"❌ Error general en test: {e}")
+        return False
+
+        if not factura.formas_pago.exists():
+            caja = Caja.objects.filter(activo=True).first()
+            if not caja:
+                print("❌ No hay cajas activas")
+                return False
+            FormaPago.objects.create(
+                factura=factura,
+                forma_pago='01',
+                caja=caja,
+                total=factura.monto_general or Decimal('0.00')
+            )
+
+    # Generar XML de test (integration devuelve la RUTA del XML)
+    xml_path = integration.generar_xml_factura(factura, validar_xsd=False)
+    print(f"✅ XML generado: {xml_path}")
+        
+        # Test 2: Probar firma XAdES-BES
+        xml_firmado_path = xml_path.replace('.xml', '_firmado_xades.xml')
+        
+        try:
+            from inventario.sri.firmador_xades import firmar_xml_xades_bes
+            success = firmar_xml_xades_bes(xml_path, xml_firmado_path)
+            
+            if success and os.path.exists(xml_firmado_path):
+                print("✅ Firma XAdES-BES exitosa!")
+                analizar_xml_firmado(xml_firmado_path)
+            else:
+                print("❌ Firma XAdES-BES falló")
+                
+        except Exception as e:
+            print(f"❌ Error en firma XAdES-BES: {e}")
+            
+            # Fallback: Probar firma básica
+            print("\n🔄 Probando firma XMLDSig básica como fallback...")
+            try:
+                from inventario.sri.firmador import firmar_xml
+                xml_basico_path = xml_path.replace('.xml', '_firmado_basico.xml')
+                firmar_xml(xml_path, xml_basico_path)
+                
+                if os.path.exists(xml_basico_path):
+                    print("✅ Firma XMLDSig básica exitosa")
+                    analizar_xml_firmado(xml_basico_path, es_xades=False)
+                else:
+                    print("❌ Firma XMLDSig básica también falló")
+            except Exception as e2:
+                print(f"❌ Error en firma básica: {e2}")
+        
+        # Limpiar archivos temporales
+    for path in [xml_firmado_path, xml_path.replace('.xml', '_firmado_basico.xml')]:
             if os.path.exists(path):
                 os.remove(path)
                 
