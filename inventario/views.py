@@ -740,8 +740,20 @@ class AgregarCliente(LoginRequiredMixin, View):
     def post(self, request):
         # Crea una instancia del formulario y la llena con los datos:
         form = ClienteFormulario(request.POST)
-        # Revisa si es valido:
 
+        # Recuperar la empresa activa desde la sesión
+        empresa_id = request.session.get("empresa_activa")
+        if not empresa_id:
+            messages.error(request, 'No hay una empresa activa seleccionada.')
+            return render(request, 'inventario/cliente/agregarCliente.html', {'form': form})
+
+        try:
+            empresa = Empresa.objects.get(id=empresa_id)
+        except Empresa.DoesNotExist:
+            messages.error(request, 'La empresa seleccionada no existe.')
+            return render(request, 'inventario/cliente/agregarCliente.html', {'form': form})
+
+        # Revisa si es valido:
         if form.is_valid():
             # Procesa y asigna los datos con form.cleaned_data como se requiere
             identificacion = form.cleaned_data['identificacion'] # Renombrado
@@ -762,9 +774,10 @@ class AgregarCliente(LoginRequiredMixin, View):
                               direccion=direccion, telefono=telefono,
                               correo=correo, observaciones=observaciones, convencional=convencional,
                               tipoVenta=tipoVenta,
-                              tipoRegimen=tipoRegimen, tipoCliente=tipoCliente, 
+                              tipoRegimen=tipoRegimen, tipoCliente=tipoCliente,
                               # CORRECCIÓN: usar tipoIdentificacion
-                              tipoIdentificacion=tipoIdentificacion)
+                              tipoIdentificacion=tipoIdentificacion,
+                              empresa=empresa)
 
             cliente.save()
             form = ClienteFormulario()
