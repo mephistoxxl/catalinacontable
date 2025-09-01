@@ -672,44 +672,14 @@ class SRIIntegration:
         logger.info(f"Factura {factura.id} actualizada y guardada en BD")
     
     def _firmar_xml_xades_bes(self, xml_path, xml_firmado_path):
-        """
-        Firma XML con XAdES-BES usando múltiples estrategias
-        
-        Args:
-            xml_path (str): Ruta al XML sin firmar
-            xml_firmado_path (str): Ruta donde guardar el XML firmado
-            
-        Returns:
-            bool: True si firma exitosa, False en caso contrario
-        """
+        """Firma un XML utilizando el esquema XAdES-BES."""
         try:
-            # Estrategia 1: Usar firmador XAdES-BES personalizado
-            try:
-                from .firmador_xades import firmar_xml_xades_bes
-                firmar_xml_xades_bes(xml_path, xml_firmado_path)
-                logger.info("XML firmado exitosamente con XAdES-BES personalizado")
-                return True
-            except Exception as e:
-                logger.warning(f"Firmador XAdES-BES personalizado falló: {e}")
-            
-            # Estrategia 2: Fallback a endesive si está disponible
-            try:
-                from .firmador_xades import firmar_xml_con_endesive
-                firmar_xml_con_endesive(xml_path, xml_firmado_path)
-                logger.info("XML firmado exitosamente con endesive XAdES")
-                return True
-            except Exception as e:
-                logger.warning(f"Firmador endesive falló: {e}")
-            
-            # ❌ NO MÁS FALLBACKS - SI LA FIRMA XAdES-BES FALLA, TODO SE DETIENE
-            logger.error("🚫 CRÍTICO: Firma XAdES-BES falló completamente")
-            logger.error("🚫 NO SE ENVIARÁ XML SIN FIRMA VÁLIDA XAdES-BES")
-            logger.error("🚫 PROCESO DETENIDO - REVISAR CONFIGURACIÓN DE FIRMA")
-            raise Exception("FIRMA XAdES-BES REQUERIDA - NO SE PERMITE FALLBACK A XMLDSig BÁSICO")
-                
+            from .firmador_xades import firmar_xml_xades_bes
+            firmar_xml_xades_bes(xml_path, xml_firmado_path)
+            logger.info("XML firmado exitosamente con XAdES-BES")
+            return True
         except Exception as e:
             logger.error(f"Error crítico en proceso de firma: {e}")
-            # 🚫 NO MÁS RETURNS FALSE - SIEMPRE RAISE EXCEPTION
             raise Exception(f"PROCESO DE FIRMA FALLÓ COMPLETAMENTE: {e}")
     
     def _generar_ride_autorizado(self, factura, resultado):
