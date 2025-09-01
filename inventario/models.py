@@ -64,9 +64,16 @@ class UsuarioEmpresa(models.Model):
 
 class Opciones(models.Model):
     # INFORMACIÓN BÁSICA EMPRESA
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='opciones',
+        null=True,
+        blank=True,
+    )
     identificacion = models.CharField(
-        max_length=13, 
-        unique=True, 
+        max_length=13,
+        unique=True,
         validators=[RegexValidator(r'^\d{13}$', 'El RUC debe tener exactamente 13 dígitos')],
         default='0000000000000',
         help_text='RUC de 13 dígitos de su empresa'
@@ -442,7 +449,14 @@ class Producto(models.Model):
         ('7', 'Exento de IVA'), # Código SRI: 7
         ('8', 'IVA Diferenciado') # Código SRI: 8 (solo turismo) ✅ CORREGIDO
     ]
-    
+
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='productos',
+        null=True,
+        blank=True,
+    )
     codigo = models.CharField(max_length=20, unique = True)
     codigo_barras = models.CharField(max_length=100)
     descripcion = models.CharField(max_length=40)
@@ -574,6 +588,13 @@ class Cliente(models.Model):
         ('07', 'Consumidor Final'),
         ('08', 'Identificación del Exterior'),
     ]
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='clientes',
+        null=True,
+        blank=True,
+    )
     tipoIdentificacion = models.CharField(max_length=2, choices=TIPO_IDENTIFICACION_CHOICES)
     identificacion = models.CharField(max_length=13, unique=True)
     razon_social = models.CharField(max_length=200)
@@ -628,6 +649,13 @@ import datetime
 
 
 class Factura(models.Model):
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='facturas',
+        null=True,
+        blank=True,
+    )
     # Relación con el cliente usando su identificación
     cliente = models.ForeignKey('Cliente', to_field='identificacion', on_delete=models.CASCADE)
 
@@ -1291,6 +1319,13 @@ class Factura(models.Model):
 
 
 class DetalleFactura(models.Model):
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='detalles_factura',
+        null=True,
+        blank=True,
+    )
     factura = models.ForeignKey(Factura, on_delete=models.CASCADE)
     producto = models.ForeignKey('Producto', on_delete=models.CASCADE,null=True, blank=True)
     cantidad = models.IntegerField()
@@ -1564,7 +1599,15 @@ class Proveedor(models.Model):
         ('07', 'Consumidor Final'),
         ('08', 'Identificación del Exterior'),
     ]
-    
+
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='proveedores',
+        null=True,
+        blank=True,
+    )
+
     tipoIdentificacion = models.CharField(max_length=2, choices=TIPO_IDENTIFICACION_CHOICES)
     identificacion_proveedor = models.CharField(max_length=13, unique=True)  # ✅ Ampliado a 13
     razon_social_proveedor = models.CharField(max_length=200)  # ✅ Ampliado a 200
@@ -1618,6 +1661,13 @@ class Proveedor(models.Model):
 # ----------------------------------------PEDIDO-----------------------------------------
 class Pedido(models.Model):
     # id
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='pedidos',
+        null=True,
+        blank=True,
+    )
     proveedor = models.ForeignKey(Proveedor, to_field='identificacion_proveedor', on_delete=models.CASCADE)
     fecha = models.DateField()
     sub_monto = models.DecimalField(max_digits=20, decimal_places=2)
@@ -1636,6 +1686,13 @@ class Pedido(models.Model):
 # -------------------------------------DETALLES DE PEDIDO-------------------------------
 class DetallePedido(models.Model):
     # id
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='detalles_pedido',
+        null=True,
+        blank=True,
+    )
     id_pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE)
     id_producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
     cantidad = models.IntegerField()
@@ -1649,6 +1706,13 @@ class DetallePedido(models.Model):
 # ------------------------------------NOTIFICACIONES------------------------------------
 class Notificaciones(models.Model):
     # id
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='notificaciones',
+        null=True,
+        blank=True,
+    )
     autor = models.ForeignKey(Usuario, to_field='username', on_delete=models.CASCADE)
     mensaje = models.TextField()
 
@@ -1662,6 +1726,13 @@ class Secuencia(models.Model):
         verbose_name="ID"
     )
 
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='secuencias',
+        null=True,
+        blank=True,
+    )
     descripcion = models.CharField(
         max_length=100,
         verbose_name="Descripción"
@@ -1791,6 +1862,13 @@ class FacturadorManager(BaseUserManager):
 
 
 class Facturador(AbstractBaseUser):
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='facturadores',
+        null=True,
+        blank=True,
+    )
     nombres = models.CharField(max_length=255, verbose_name='Nombres')
     telefono = models.CharField(max_length=15, blank=True, null=True, verbose_name='Teléfono')
     correo = models.EmailField(unique=True, verbose_name='Correo')
@@ -1850,6 +1928,13 @@ class Facturador(AbstractBaseUser):
         return self.activo
 
 class Almacen(models.Model):
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='almacenes',
+        null=True,
+        blank=True,
+    )
     descripcion = models.CharField(max_length=255)
     activo = models.BooleanField(default=True)  # Campo activo añadido
 
@@ -1863,6 +1948,13 @@ class Caja(models.Model):
     Modelo para manejar las cajas del sistema
     """
     
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='cajas',
+        null=True,
+        blank=True,
+    )
     # ✅ Campo principal: Descripción de la caja
     descripcion = models.CharField(
         max_length=100,
@@ -1948,6 +2040,13 @@ class FormaPago(models.Model):
     ('20', 'Otros con utilización del sistema financiero'),
     ('21', 'Endoso de títulos'),
     ]
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='formas_pago',
+        null=True,
+        blank=True,
+    )
     
     # ✅ Relación con factura
     factura = models.ForeignKey(
@@ -2072,6 +2171,13 @@ class CampoAdicional(models.Model):
     """
     
     # ✅ Relación con factura
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='campos_adicionales',
+        null=True,
+        blank=True,
+    )
     factura = models.ForeignKey(
         Factura, 
         on_delete=models.CASCADE, 
@@ -2224,6 +2330,13 @@ class MaquinaFiscal(models.Model):
     """
     
     # ✅ Relación uno a uno con factura
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='maquinas_fiscales',
+        null=True,
+        blank=True,
+    )
     factura = models.OneToOneField(
         Factura, 
         on_delete=models.CASCADE, 
@@ -2385,6 +2498,13 @@ class TipoNegociable(models.Model):
     """
     
     # ✅ Relación uno a uno con factura
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='tipos_negociables',
+        null=True,
+        blank=True,
+    )
     factura = models.OneToOneField(
         Factura, 
         on_delete=models.CASCADE, 
@@ -2608,6 +2728,13 @@ class TotalImpuesto(models.Model):
     Sección <totalConImpuestos><totalImpuesto> del XML
     CRÍTICO: Sin esto el XML será INVÁLIDO
     """
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='totales_impuestos',
+        null=True,
+        blank=True,
+    )
     factura = models.ForeignKey(
         Factura, 
         on_delete=models.CASCADE, 
@@ -2677,6 +2804,13 @@ class ImpuestoDetalle(models.Model):
     Sección <detalles><detalle><impuestos><impuesto> del XML
     CRÍTICO: Cada ítem debe tener sus impuestos calculados
     """
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='impuestos_detalle',
+        null=True,
+        blank=True,
+    )
     detalle_factura = models.ForeignKey(
         DetalleFactura, 
         on_delete=models.CASCADE,
@@ -2712,6 +2846,13 @@ class DetalleAdicional(models.Model):
     Sección <detalles><detalle><detallesAdicionales> del XML
     Máximo 3 detalles adicionales por ítem según XSD
     """
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='detalles_adicionales',
+        null=True,
+        blank=True,
+    )
     detalle_factura = models.ForeignKey(
         DetalleFactura, 
         on_delete=models.CASCADE,
@@ -2757,6 +2898,13 @@ class Banco(models.Model):
     """
     Modelo para manejar las cuentas bancarias del sistema
     """
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='bancos',
+        null=True,
+        blank=True,
+    )
     
     # ✅ Campos según tu imagen del formulario
     banco = models.CharField(
@@ -2950,6 +3098,13 @@ class Servicio(models.Model):
     Modelo para registrar servicios facturables en el sistema.
     Ejemplo: MANTENIMIENTO DE EQUIPOS DE CERRAJERÍA
     """
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='servicios',
+        null=True,
+        blank=True,
+    )
     tiposIVA = [
         ('0', '0%'),
         ('5', '5%'),
