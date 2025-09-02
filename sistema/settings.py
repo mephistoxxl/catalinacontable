@@ -200,5 +200,10 @@ STATIC_URL = '/static/'
 
 AUTH_USER_MODEL = 'inventario.Usuario' # modelo de usuario
 
+# Permite deshabilitar migraciones del app inventario en entornos de prueba
+import os
+if os.environ.get('DISABLE_INVENTARIO_MIGRATIONS'):
+    MIGRATION_MODULES = {'inventario': None}
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
