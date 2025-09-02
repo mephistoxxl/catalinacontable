@@ -197,30 +197,36 @@ class Panel(LoginRequiredMixin, View):
 
     def get(self, request):
         from datetime import date
+
+        empresa_id = request.session.get("empresa_activa")
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return redirect('inventario:seleccionar_empresa')
+
         #Recupera los datos del usuario despues del login
-        contexto = {'usuario': request.user.username,
-                    'id_usuario': request.user.id,
-                    'nombre': request.user.first_name,
-                    'apellido': request.user.last_name,
-                    'correo': request.user.email,
-                    'fecha': date.today(),
-                    'productosRegistrados': Producto.numeroRegistrados(),
-                    'productosVendidos': DetalleFactura.productosVendidos(),
-                    'clientesRegistrados': Cliente.numeroRegistrados(),
-                    'usuariosRegistrados': Usuario.numeroRegistrados(),
-                    'facturasEmitidas': Factura.numeroRegistrados(),
-                    'ingresoTotal': Factura.ingresoTotal(),
-                    'ultimasVentas': DetalleFactura.ultimasVentas(),
-                    'administradores': Usuario.numeroUsuarios('administrador'),
-                    'usuarios': Usuario.numeroUsuarios('usuario'),
-                    # Nuevos datos para el panel de ventas
-                    'ventasEsteMes': Factura.ventasEsteMes(),
-                    'ventasMesAnterior': Factura.ventasMesAnterior(),
-                    'promedioVentasMensuales': Factura.promedioVentasMensuales(),
-                    'ventasUltimosMeses': Factura.ventasUltimosMeses(6),
-                    # Datos para top productos vendidos
-                    'topProductosVendidos': DetalleFactura.topProductosVendidos(5),
-                    }
+        contexto = {
+            'usuario': request.user.username,
+            'id_usuario': request.user.id,
+            'nombre': request.user.first_name,
+            'apellido': request.user.last_name,
+            'correo': request.user.email,
+            'fecha': date.today(),
+            'productosRegistrados': Producto.numeroRegistrados(empresa_id),
+            'productosVendidos': DetalleFactura.productosVendidos(empresa_id),
+            'clientesRegistrados': Cliente.numeroRegistrados(empresa_id),
+            'usuariosRegistrados': Usuario.numeroRegistrados(empresa_id),
+            'facturasEmitidas': Factura.numeroRegistrados(empresa_id),
+            'ingresoTotal': Factura.ingresoTotal(empresa_id),
+            'ultimasVentas': DetalleFactura.ultimasVentas(empresa_id),
+            'administradores': Usuario.numeroUsuarios('administrador', empresa_id),
+            'usuarios': Usuario.numeroUsuarios('usuario', empresa_id),
+            # Nuevos datos para el panel de ventas
+            'ventasEsteMes': Factura.ventasEsteMes(empresa_id),
+            'ventasMesAnterior': Factura.ventasMesAnterior(empresa_id),
+            'promedioVentasMensuales': Factura.promedioVentasMensuales(empresa_id=empresa_id),
+            'ventasUltimosMeses': Factura.ventasUltimosMeses(6, empresa_id),
+            # Datos para top productos vendidos
+            'topProductosVendidos': DetalleFactura.topProductosVendidos(5, empresa_id),
+        }
 
         return render(request, 'inventario/panel.html', contexto)
 

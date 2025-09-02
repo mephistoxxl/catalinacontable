@@ -28,15 +28,29 @@ class Usuario(AbstractUser):
     )
 
     @classmethod
-    def numeroRegistrados(self):
-        return int(self.objects.all().count())
+    def numeroRegistrados(cls, empresa_id=None):
+        """Devuelve el número de usuarios registrados.
+
+        Si ``empresa_id`` es proporcionado, cuenta únicamente los usuarios
+        asociados a esa empresa específica.
+        """
+        usuarios = cls.objects.all()
+        if empresa_id is not None:
+            usuarios = usuarios.filter(empresas__id=empresa_id).distinct()
+        return int(usuarios.count())
 
     @classmethod
-    def numeroUsuarios(self, tipo):
+    def numeroUsuarios(cls, tipo, empresa_id=None):
+        """Cuenta usuarios por tipo (administrador/usuario) opcionalmente
+        filtrando por empresa."""
+        usuarios = cls.objects.all()
+        if empresa_id is not None:
+            usuarios = usuarios.filter(empresas__id=empresa_id)
         if tipo == 'administrador':
-            return int(self.objects.filter(is_superuser=True).count())
+            usuarios = usuarios.filter(is_superuser=True)
         elif tipo == 'usuario':
-            return int(self.objects.filter(is_superuser=False).count())
+            usuarios = usuarios.filter(is_superuser=False)
+        return int(usuarios.distinct().count())
 
 from django.core.exceptions import ValidationError  # ← Y ESTA TAMBIÉN
 
@@ -518,8 +532,12 @@ class Producto(models.Model):
 
     # ✅ MÉTODOS EXISTENTES (sin cambios)
     @classmethod
-    def numeroRegistrados(cls):
-        return int(cls.objects.all().count())
+    def numeroRegistrados(cls, empresa_id=None):
+        """Cuenta productos registrados opcionalmente filtrando por empresa."""
+        productos = cls.objects.all()
+        if empresa_id is not None:
+            productos = productos.filter(empresa_id=empresa_id)
+        return int(productos.count())
 
     @classmethod
     def productosRegistrados(cls):
@@ -618,8 +636,12 @@ class Cliente(models.Model):
     ])
 
     @classmethod
-    def numeroRegistrados(self):
-        return int(self.objects.all().count())
+    def numeroRegistrados(cls, empresa_id=None):
+        """Cuenta clientes registrados opcionalmente filtrando por empresa."""
+        clientes = cls.objects.all()
+        if empresa_id is not None:
+            clientes = clientes.filter(empresa_id=empresa_id)
+        return int(clientes.count())
 
     @classmethod
     def cedulasRegistradas(self):
@@ -1245,25 +1267,33 @@ class Factura(models.Model):
         return f'Factura {self.establecimiento}-{self.punto_emision}-{self.secuencia}'
 
     @classmethod
-    def numeroRegistrados(cls):
-        return cls.objects.count()
+    def numeroRegistrados(cls, empresa_id=None):
+        facturas = cls.objects.all()
+        if empresa_id is not None:
+            facturas = facturas.filter(empresa_id=empresa_id)
+        return facturas.count()
 
     @classmethod
-    def ingresoTotal(cls):
-        return cls.objects.aggregate(total=models.Sum('monto_general'))['total'] or 0
+    def ingresoTotal(cls, empresa_id=None):
+        facturas = cls.objects.all()
+        if empresa_id is not None:
+            facturas = facturas.filter(empresa_id=empresa_id)
+        return facturas.aggregate(total=models.Sum('monto_general'))['total'] or 0
 
     @classmethod
-    def ventasUltimosMeses(cls, meses=6):
+    def ventasUltimosMeses(cls, meses=6, empresa_id=None):
         """Obtiene las ventas de los últimos N meses"""
         from datetime import date, timedelta
         from django.db.models import Sum
         from django.db.models.functions import TruncMonth
-        
+
         fecha_limite = date.today() - timedelta(days=meses*30)
-        
-        ventas_por_mes = cls.objects.filter(
-            fecha_emision__gte=fecha_limite
-        ).annotate(
+
+        facturas = cls.objects.filter(fecha_emision__gte=fecha_limite)
+        if empresa_id is not None:
+            facturas = facturas.filter(empresa_id=empresa_id)
+
+        ventas_por_mes = facturas.annotate(
             mes=TruncMonth('fecha_emision')
         ).values('mes').annotate(
             total=Sum('monto_general')
@@ -1272,25 +1302,28 @@ class Factura(models.Model):
         return list(ventas_por_mes)
 
     @classmethod
-    def ventasEsteMes(cls):
+    def ventasEsteMes(cls, empresa_id=None):
         """Obtiene el total de ventas del mes actual"""
         from datetime import date
         from django.db.models import Sum
-        
+
         hoy = date.today()
-        ventas_mes = cls.objects.filter(
+        facturas = cls.objects.filter(
             fecha_emision__year=hoy.year,
             fecha_emision__month=hoy.month
-        ).aggregate(total=Sum('monto_general'))['total'] or 0
-        
+        )
+        if empresa_id is not None:
+            facturas = facturas.filter(empresa_id=empresa_id)
+        ventas_mes = facturas.aggregate(total=Sum('monto_general'))['total'] or 0
+
         return ventas_mes
 
     @classmethod
-    def ventasMesAnterior(cls):
+    def ventasMesAnterior(cls, empresa_id=None):
         """Obtiene el total de ventas del mes anterior"""
         from datetime import date
         from django.db.models import Sum
-        
+
         hoy = date.today()
         if hoy.month == 1:
             mes_anterior = 12
@@ -1299,24 +1332,28 @@ class Factura(models.Model):
             mes_anterior = hoy.month - 1
             año_anterior = hoy.year
             
-        ventas_mes_anterior = cls.objects.filter(
+        facturas = cls.objects.filter(
             fecha_emision__year=año_anterior,
             fecha_emision__month=mes_anterior
-        ).aggregate(total=Sum('monto_general'))['total'] or 0
-        
+        )
+        if empresa_id is not None:
+            facturas = facturas.filter(empresa_id=empresa_id)
+        ventas_mes_anterior = facturas.aggregate(total=Sum('monto_general'))['total'] or 0
+
         return ventas_mes_anterior
 
     @classmethod
-    def promedioVentasMensuales(cls, meses=12):
+    def promedioVentasMensuales(cls, meses=12, empresa_id=None):
         """Calcula el promedio de ventas de los últimos N meses"""
         from datetime import date, timedelta
         from django.db.models import Sum
-        
+
         fecha_limite = date.today() - timedelta(days=meses*30)
-        total_ventas = cls.objects.filter(
-            fecha_emision__gte=fecha_limite
-        ).aggregate(total=Sum('monto_general'))['total'] or 0
-        
+        facturas = cls.objects.filter(fecha_emision__gte=fecha_limite)
+        if empresa_id is not None:
+            facturas = facturas.filter(empresa_id=empresa_id)
+        total_ventas = facturas.aggregate(total=Sum('monto_general'))['total'] or 0
+
         return total_ventas / meses if meses > 0 else 0
 
 
@@ -1477,30 +1514,38 @@ class DetalleFactura(models.Model):
             logger = logging.getLogger(__name__)
             logger.error(f"Error creando impuestos para detalle {self.id}: {e}")
     @classmethod
-    def productosVendidos(cls):
+    def productosVendidos(cls, empresa_id=None):
         vendidos = cls.objects.all()
+        if empresa_id is not None:
+            vendidos = vendidos.filter(empresa_id=empresa_id)
         totalVendidos = 0
         for producto in vendidos:
             totalVendidos += producto.cantidad
         return totalVendidos
     @classmethod
-    def ultimasVentas(cls):
-        return cls.objects.all().order_by('-id')[:10]
+    def ultimasVentas(cls, empresa_id=None):
+        ventas = cls.objects.all()
+        if empresa_id is not None:
+            ventas = ventas.filter(empresa_id=empresa_id)
+        return ventas.order_by('-id')[:10]
     
     @classmethod
-    def topProductosVendidos(cls, limite=5):
+    def topProductosVendidos(cls, limite=5, empresa_id=None):
         """Obtiene los productos más vendidos con cantidad total"""
         from django.db.models import Sum
-        
+
         productos_top = cls.objects.filter(
             producto__isnull=False
-        ).values(
+        )
+        if empresa_id is not None:
+            productos_top = productos_top.filter(empresa_id=empresa_id)
+        productos_top = productos_top.values(
             'producto__descripcion',
             'producto__id'
         ).annotate(
             total_vendido=Sum('cantidad')
         ).order_by('-total_vendido')[:limite]
-        
+
         return list(productos_top)
     # ✅ PROPERTIES para XML
     @property
