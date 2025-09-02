@@ -97,7 +97,9 @@ LOGGING = {
 
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'CAMBIA_ESTO')
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    raise Exception('SECRET_KEY no está configurada en el entorno')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # (DEBUG ya está arriba)
