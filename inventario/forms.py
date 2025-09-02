@@ -900,18 +900,30 @@ class NuevoUsuarioFormulario(forms.Form):
         )
 
     password = forms.CharField(
-        label = 'Clave',
+        label='Clave',
         max_length=100,
-        widget = forms.TextInput(attrs={'placeholder': 'Inserte una clave',
-        'id':'password','class':'form-control','type':'password','value':''} )
-        )
+        widget=forms.PasswordInput(
+            attrs={
+                'placeholder': 'Inserte una clave',
+                'id': 'password',
+                'class': 'form-control',
+                'value': '',
+            }
+        ),
+    )
 
     rep_password = forms.CharField(
-        label = 'Repetir clave',
+        label='Repetir clave',
         max_length=100,
-        widget = forms.TextInput(attrs={'placeholder': 'Repita la clave de arriba',
-        'id':'rep_password','class':'form-control','type':'password','value':''} )
-        )
+        widget=forms.PasswordInput(
+            attrs={
+                'placeholder': 'Repita la clave de arriba',
+                'id': 'rep_password',
+                'class': 'form-control',
+                'value': '',
+            }
+        ),
+    )
 
     level =  forms.CharField(
         label="Nivel de acceso",
@@ -933,20 +945,28 @@ class ClaveFormulario(forms.Form):
         #)
 
     clave_nueva = forms.CharField(
-        label = 'Ingrese la clave nueva',
+        label='Ingrese la clave nueva',
         max_length=50,
-        widget = forms.TextInput(
-        attrs={'placeholder': 'Inserte la clave nueva de acceso',
-        'id':'clave_nueva','class':'form-control', 'type': 'password'}),
-        )
+        widget=forms.PasswordInput(
+            attrs={
+                'placeholder': 'Inserte la clave nueva de acceso',
+                'id': 'clave_nueva',
+                'class': 'form-control',
+            }
+        ),
+    )
 
     repetir_clave = forms.CharField(
         label="Repita la clave nueva",
         max_length=50,
-        widget = forms.TextInput(
-        attrs={'placeholder': 'Vuelva a insertar la clave nueva',
-        'id':'repetir_clave','class':'form-control', 'type': 'password'}),
-        )
+        widget=forms.PasswordInput(
+            attrs={
+                'placeholder': 'Vuelva a insertar la clave nueva',
+                'id': 'repetir_clave',
+                'class': 'form-control',
+            }
+        ),
+    )
 
 
 class ImportarBDDFormulario(forms.Form):

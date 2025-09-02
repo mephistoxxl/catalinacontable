@@ -3170,17 +3170,23 @@ class CrearUsuario(LoginRequiredMixin, View):
                 error = 1
                 messages.error(request, "El correo '%s' ya existe. eliga otro!" % email)
 
-            if (error == 0):
+            if error == 0:
                 if level == '0':
-                    nuevoUsuario = Usuario.objects.create_user(username=identificacion, password=password, email=email)
+                    nuevoUsuario = Usuario(username=identificacion, email=email)
                     nivel = 0
                 elif level == '1':
-                    nuevoUsuario = Usuario.objects.create_superuser(username=identificacion, password=password, email=email)
+                    nuevoUsuario = Usuario(
+                        username=identificacion,
+                        email=email,
+                        is_superuser=True,
+                        is_staff=True,
+                    )
                     nivel = 1
 
                 nuevoUsuario.first_name = nombre_completo
                 nuevoUsuario.last_name = ''
                 nuevoUsuario.nivel = nivel
+                nuevoUsuario.set_password(password)
                 nuevoUsuario.save()
                 UsuarioEmpresa.objects.create(usuario=nuevoUsuario, empresa=empresa)
 
