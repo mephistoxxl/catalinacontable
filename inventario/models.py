@@ -10,6 +10,7 @@ from django.core.validators import (
     RegexValidator,
 )
 import logging
+from .crypto_utils import EncryptedCharField
 # MODELOS
 
 # --------------------------------USUARIO------------------------------------------------
@@ -106,11 +107,11 @@ class Opciones(models.Model):
         blank=True,
         help_text='Archivo de firma electrónica (.p12 o .pfx). Se almacena cifrado y nunca se expone públicamente.'
     )
-    password_firma = models.CharField(
-        max_length=128,
+    password_firma = EncryptedCharField(
+        max_length=500,
         null=True,
         blank=True,
-        help_text='Contraseña de la firma electrónica (se recomienda cifrar este campo y nunca mostrarlo en texto plano).'
+        help_text='Contraseña de la firma electrónica (almacenada cifrada).'
     )
     fecha_caducidad_firma = models.DateField(
         null=True,
