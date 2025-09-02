@@ -11,6 +11,9 @@ from lxml import etree
 logger = logging.getLogger(__name__)
 
 
+from .ambiente import obtener_ambiente_sri
+
+
 class SRIXMLGenerator:
     """
     Generador de XML para comprobantes electrónicos según ficha técnica SRI Ecuador v2.31
@@ -216,10 +219,11 @@ class SRIXMLGenerator:
             
             logger.info(f"📄 Generando XML con {factura.formas_pago.count()} formas de pago")
             
-            # Verificar que el ambiente esté configurado correctamente
-            if not emisor.tipo_ambiente or emisor.tipo_ambiente not in ['1', '2']:
-                logger.warning(f"Ambiente no válido: {emisor.tipo_ambiente}. Usando '1' (pruebas) por defecto.")
-                emisor.tipo_ambiente = '1'
+            # Verificar/forzar ambiente consistente (usar helper central)
+            ambiente = obtener_ambiente_sri()  # '1' o '2'
+            if emisor.tipo_ambiente != ambiente:
+                logger.warning(f"Desfase de ambiente en Opciones.tipo_ambiente='{emisor.tipo_ambiente}' vs helper='{ambiente}'. Usando '{ambiente}'.")
+                emisor.tipo_ambiente = ambiente
             
             logger.info(f"Emisor: {emisor.razon_social} - RUC: {emisor.identificacion}")
             logger.info(f"Ambiente: {emisor.tipo_ambiente} ({'PRUEBAS' if emisor.tipo_ambiente == '1' else 'PRODUCCIÓN'})")
@@ -274,66 +278,75 @@ class SRIXMLGenerator:
     def _agregar_info_tributaria(self, root, factura, emisor):
         """Agregar información tributaria según ficha técnica SRI"""
         info_tributaria = ET.SubElement(root, 'infoTributaria')
-        
-        # Campos obligatorios según ficha técnica
-        ET.SubElement(info_tributaria, 'ambiente').text = emisor.tipo_ambiente
+
+        # Ambiente del comprobante: debe coincidir con el de la clave de acceso
+        ambiente = obtener_ambiente_sri()
+        ET.SubElement(info_tributaria, 'ambiente').text = ambiente
         ET.SubElement(info_tributaria, 'tipoEmision').text = emisor.tipo_emision
         ET.SubElement(info_tributaria, 'razonSocial').text = self._limpiar_texto(emisor.razon_social)
-        
+
         # Nombre comercial (opcional)
         if emisor.nombre_comercial:
             ET.SubElement(info_tributaria, 'nombreComercial').text = self._limpiar_texto(emisor.nombre_comercial)
-        
+
         # RUC formateado
         if hasattr(emisor, 'ruc_formatted'):
             ruc = emisor.ruc_formatted
         else:
             # Formatear RUC a 13 dígitos
             ruc = str(emisor.identificacion).zfill(13)
-            
         ET.SubElement(info_tributaria, 'ruc').text = ruc
-        
-        # Clave de acceso - USAR LA QUE YA ESTÁ EN EL MODELO
+
+        # Clave de acceso - validar ambiente consistente
         if not factura.clave_acceso:
             raise ValueError(f"Factura {factura.id} no tiene clave de acceso generada")
+        # El dígito de ambiente en clave (posición fija) debe igualar a 'ambiente'
+        try:
+            clave_amb = str(factura.clave_acceso)[23]
+        except Exception:
+            clave_amb = None
+        if clave_amb and clave_amb != ambiente:
+            raise ValueError(
+                f"Desfase AMBIENTE: clave usa '{clave_amb}' y XML usa '{ambiente}'. Limpie la clave y regenere."
+            )
         ET.SubElement(info_tributaria, 'claveAcceso').text = factura.clave_acceso
-        
+
         ET.SubElement(info_tributaria, 'codDoc').text = '01'  # Factura
-        
+
         # Formatear establecimiento, punto emisión y secuencial
         # Si las properties no existen, formatear manualmente
         if hasattr(factura, 'establecimiento_formatted'):
             estab = factura.establecimiento_formatted
         else:
             estab = f"{int(factura.establecimiento):03d}"
-            
+
         if hasattr(factura, 'punto_emision_formatted'):
             pto_emi = factura.punto_emision_formatted
         else:
             pto_emi = f"{int(factura.punto_emision):03d}"
-            
+
         if hasattr(factura, 'secuencia_formatted'):
             secuencial = factura.secuencia_formatted
         else:
             secuencial = f"{int(factura.secuencia):09d}"
-        
+
         ET.SubElement(info_tributaria, 'estab').text = estab
         ET.SubElement(info_tributaria, 'ptoEmi').text = pto_emi
         ET.SubElement(info_tributaria, 'secuencial').text = secuencial
-        
+
         # NOTA: direccion_establecimiento es un campo directo, no una propiedad
         direccion_matriz = getattr(emisor, 'direccion_establecimiento', '')
         ET.SubElement(info_tributaria, 'dirMatriz').text = self._limpiar_texto(direccion_matriz)
-        
+
         # Agente de retención (opcional)
         if hasattr(emisor, 'agente_retencion_xml'):
             agente_retencion = emisor.agente_retencion_xml
         else:
             agente_retencion = emisor.numero_agente_retencion if emisor.es_agente_retencion else None
-            
+
         if agente_retencion:
             ET.SubElement(info_tributaria, 'agenteRetencion').text = agente_retencion
-        
+
         # Contribuyente RIMPE (opcional)
         if emisor.tipo_regimen == 'RIMPE':
             ET.SubElement(info_tributaria, 'contribuyenteRimpe').text = 'CONTRIBUYENTE RÉGIMEN RIMPE'
