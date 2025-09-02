@@ -470,7 +470,7 @@ class Producto(models.Model):
         null=False,
         blank=False,
     )
-    codigo = models.CharField(max_length=20, unique = True)
+    codigo = models.CharField(max_length=20)
     codigo_barras = models.CharField(max_length=100)
     descripcion = models.CharField(max_length=40)
     precio = models.DecimalField(max_digits=9, decimal_places=2)
@@ -593,6 +593,9 @@ class Producto(models.Model):
         verbose_name = "Producto"
         verbose_name_plural = "Productos"
         ordering = ['descripcion']
+        constraints = [
+            models.UniqueConstraint(fields=['empresa', 'codigo'], name='unique_codigo_por_empresa')
+        ]
     # ---------------------------------------------------------------------------------------
 
 
@@ -613,7 +616,7 @@ class Cliente(models.Model):
         blank=False,
     )
     tipoIdentificacion = models.CharField(max_length=2, choices=TIPO_IDENTIFICACION_CHOICES)
-    identificacion = models.CharField(max_length=13, unique=True)
+    identificacion = models.CharField(max_length=13)
     razon_social = models.CharField(max_length=200)
     nombre_comercial = models.CharField(max_length=200, blank=True, null=True)
     direccion = models.CharField(max_length=200)
@@ -660,6 +663,11 @@ class Cliente(models.Model):
         return format(int(identificacion), ',d')
     # -----------------------------------------------------------------------------------------
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['empresa', 'identificacion'], name='unique_identificacion_por_empresa')
+        ]
+
 
 # -------------------------------------FACTURA---------------------------------------------
 from django.db import models
@@ -678,7 +686,7 @@ class Factura(models.Model):
         blank=False,
     )
     # Relación con el cliente usando su identificación
-    cliente = models.ForeignKey('Cliente', to_field='identificacion', on_delete=models.CASCADE)
+    cliente = models.ForeignKey('Cliente', on_delete=models.CASCADE)
 
     # Almacén relacionado con la factura
     almacen = models.ForeignKey('Almacen', on_delete=models.CASCADE, null=True, blank=True)
@@ -1656,7 +1664,7 @@ class Proveedor(models.Model):
     )
 
     tipoIdentificacion = models.CharField(max_length=2, choices=TIPO_IDENTIFICACION_CHOICES)
-    identificacion_proveedor = models.CharField(max_length=13, unique=True)  # ✅ Ampliado a 13
+    identificacion_proveedor = models.CharField(max_length=13)  # ✅ Ampliado a 13
     razon_social_proveedor = models.CharField(max_length=200)  # ✅ Ampliado a 200
     nombre_comercial_proveedor = models.CharField(max_length=200, blank=True, null=True)  # ✅ Ampliado
     direccion = models.CharField(max_length=200)
@@ -1704,6 +1712,11 @@ class Proveedor(models.Model):
         return format(int(cedula), ',d')
     # ---------------------------------------------------------------------------------------
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['empresa', 'identificacion_proveedor'], name='unique_proveedor_por_empresa')
+        ]
+
 
 # ----------------------------------------PEDIDO-----------------------------------------
 class Pedido(models.Model):
@@ -1715,7 +1728,7 @@ class Pedido(models.Model):
         null=True,
         blank=True,
     )
-    proveedor = models.ForeignKey(Proveedor, to_field='identificacion_proveedor', on_delete=models.CASCADE)
+    proveedor = models.ForeignKey(Proveedor, on_delete=models.CASCADE)
     fecha = models.DateField()
     sub_monto = models.DecimalField(max_digits=20, decimal_places=2)
     monto_general = models.DecimalField(max_digits=20, decimal_places=2)
@@ -3194,8 +3207,8 @@ def crear_detalles_factura(factura, codigos, cantidades, descuentos, porcentajes
         factura.save()
 
     for codigo, cantidad_str, descuento_str, porcentaje_str in zip(codigos, cantidades, descuentos, porcentajes_descuento):
-        producto = Producto.objects.filter(codigo=codigo).first()
-        servicio = Servicio.objects.filter(codigo=codigo).first()
+        producto = Producto.objects.filter(empresa_id=factura.empresa_id, codigo=codigo).first()
+        servicio = Servicio.objects.filter(empresa_id=factura.empresa_id, codigo=codigo).first()
         if not producto and not servicio:
             errores.append(f"Producto o servicio con código '{codigo}' no encontrado.")
             continue

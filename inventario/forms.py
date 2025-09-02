@@ -114,7 +114,8 @@ class ProductoFormulario(forms.ModelForm):
         widget=forms.NumberInput(attrs={'class': 'form-control', 'readonly': 'readonly', 'id': 'precio_iva2'}),
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, empresa=None, **kwargs):
+        self.empresa = empresa
         super(ProductoFormulario, self).__init__(*args, **kwargs)
         if self.instance.pk:
             # El formulario se utiliza para editar un producto existente
@@ -145,6 +146,16 @@ class ProductoFormulario(forms.ModelForm):
             self.fields['precio_iva2'].initial = precio2 * (Decimal('1.00') + iva_percent)
         else:
             self.fields['precio_iva2'].initial = 0
+
+    def clean_codigo(self):
+        codigo = self.cleaned_data.get('codigo')
+        if self.empresa:
+            qs = Producto.objects.filter(empresa=self.empresa, codigo=codigo)
+            if self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise ValidationError('Ya existe un producto con este código en esta empresa.')
+        return codigo
             
 class ImportarClientesFormulario(forms.Form):
     importar = forms.FileField(
@@ -294,11 +305,25 @@ class ClienteFormulario(forms.ModelForm):
         label="Tipo de cliente",
         choices=tipoCL,
         widget=forms.Select(attrs={
-            'placeholder': 'Tipo de cliente', 
-            'id': 'id_tipoCliente', 
+            'placeholder': 'Tipo de cliente',
+            'id': 'id_tipoCliente',
             'class': 'form-control'
         })
     )
+
+    def __init__(self, *args, empresa=None, **kwargs):
+        self.empresa = empresa
+        super().__init__(*args, **kwargs)
+
+    def clean_identificacion(self):
+        identificacion = self.cleaned_data.get('identificacion')
+        if self.empresa:
+            qs = Cliente.objects.filter(empresa=self.empresa, identificacion=identificacion)
+            if self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise ValidationError('Ya existe un cliente con esta identificación en esta empresa.')
+        return identificacion
 
     class Meta:
         model = Cliente
@@ -755,11 +780,25 @@ class ProveedorFormulario(forms.ModelForm):
         label="Tipo de proveedor",
         choices=tipoPR,
         widget=forms.Select(attrs={
-            'placeholder': 'Tipo de proveedor', 
-            'id': 'id_tipoProveedor', 
+            'placeholder': 'Tipo de proveedor',
+            'id': 'id_tipoProveedor',
             'class': 'form-control'
         })
     )
+
+    def __init__(self, *args, empresa=None, **kwargs):
+        self.empresa = empresa
+        super().__init__(*args, **kwargs)
+
+    def clean_identificacion_proveedor(self):
+        identificacion = self.cleaned_data.get('identificacion_proveedor')
+        if self.empresa:
+            qs = Proveedor.objects.filter(empresa=self.empresa, identificacion_proveedor=identificacion)
+            if self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise ValidationError('Ya existe un proveedor con esta identificación en esta empresa.')
+        return identificacion
 
     class Meta:
         model = Proveedor

@@ -500,18 +500,18 @@ class AgregarProducto(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request):
-        form = ProductoFormulario(request.POST)
-        if form.is_valid():
-            # Obtener la empresa activa desde la sesión
-            empresa_id = request.session.get("empresa_activa")
-            if not empresa_id:
-                messages.error(request, "No hay una empresa activa seleccionada.")
-                return render(request, 'inventario/producto/agregarProducto.html', {'form': form})
-
+        empresa_id = request.session.get("empresa_activa")
+        empresa = None
+        if empresa_id:
             try:
                 empresa = Empresa.objects.get(id=empresa_id)
             except Empresa.DoesNotExist:
-                messages.error(request, "La empresa seleccionada no existe.")
+                empresa = None
+
+        form = ProductoFormulario(request.POST, empresa=empresa)
+        if form.is_valid():
+            if not empresa:
+                messages.error(request, "No hay una empresa activa seleccionada.")
                 return render(request, 'inventario/producto/agregarProducto.html', {'form': form})
 
             codigo = form.cleaned_data['codigo']
@@ -663,11 +663,9 @@ class EditarProducto(LoginRequiredMixin, View):
         if not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden()
 
-        # Crea una instancia del formulario y la llena con los datos:
-        form = ProductoFormulario(request.POST)
-        # Revisa si es valido:
+        prod = get_object_or_404(Producto, id=p, empresa_id=empresa_id)
+        form = ProductoFormulario(request.POST, instance=prod, empresa=prod.empresa)
         if form.is_valid():
-            # ✅ CORREGIDO: Procesar TODOS los campos del formulario
             codigo = form.cleaned_data['codigo']
             codigo_barras = form.cleaned_data['codigo_barras']
             descripcion = form.cleaned_data['descripcion']
@@ -675,13 +673,9 @@ class EditarProducto(LoginRequiredMixin, View):
             precio2 = form.cleaned_data.get('precio2', None)
             categoria = form.cleaned_data['categoria']
             disponible = form.cleaned_data['disponible']
-            iva = form.cleaned_data['iva']  # ✅ ESTO FALTABA!
+            iva = form.cleaned_data['iva']
             costo_actual = form.cleaned_data['costo_actual']
 
-            # Obtener el producto a editar
-            prod = get_object_or_404(Producto, id=p, empresa_id=empresa_id)
-
-            # ✅ ACTUALIZAR TODOS LOS CAMPOS
             prod.codigo = codigo
             prod.codigo_barras = codigo_barras
             prod.descripcion = descripcion
@@ -689,19 +683,16 @@ class EditarProducto(LoginRequiredMixin, View):
             prod.precio2 = precio2
             prod.categoria = categoria
             prod.disponible = disponible
-            prod.iva = iva  # ✅ ESTO ES LO QUE FALTABA!
+            prod.iva = iva
             prod.costo_actual = costo_actual
 
-            # ✅ RECALCULAR PRECIOS CON IVA USANDO EL MÉTODO save() DEL MODELO
-            # El modelo ya tiene la lógica para calcular precio_iva1 y precio_iva2
-            prod.save()  # Esto ejecutará automáticamente el cálculo de IVA
+            prod.save()
 
-            form = ProductoFormulario(instance=prod)
+            form = ProductoFormulario(instance=prod, empresa=prod.empresa)
             messages.success(request, 'Actualizado exitosamente el producto de ID %s.' % p)
             request.session['productoProcesado'] = 'editado'
             return HttpResponseRedirect("/inventario/editarProducto/%s" % prod.id)
         else:
-            # De lo contrario lanzara el mismo formulario
             return render(request, 'inventario/producto/agregarProducto.html', {'form': form})
 
     def get(self, request, p):
@@ -710,7 +701,7 @@ class EditarProducto(LoginRequiredMixin, View):
             return HttpResponseForbidden()
 
         prod = get_object_or_404(Producto, id=p, empresa_id=empresa_id)
-        form = ProductoFormulario(instance=prod)
+        form = ProductoFormulario(instance=prod, empresa=prod.empresa)
         # Envia al usuario el formulario para que lo llene
         contexto = {'form': form, 'modo': request.session.get('productoProcesado'), 'editar': True}
         contexto = complementarContexto(contexto, request.user)
@@ -722,8 +713,15 @@ class EditarProducto(LoginRequiredMixin, View):
 # Búsqueda de Clientes
 def buscar_cliente(request):
     query = request.GET.get('q', '')
-    clientes = Cliente.objects.filter(identificacion__icontains=query)[:5] # Usar 'identificacion'
-    resultados = [{'id': cliente.id, 'nombre': f"{cliente.identificacion} - {cliente.razon_social} {cliente.nombre_comercial if cliente.nombre_comercial else ''}"} for cliente in clientes] # Usar 'identificacion', 'razon_social', 'nombre_comercial'
+    empresa_id = request.session.get("empresa_activa")
+    clientes = Cliente.objects.filter(empresa_id=empresa_id, identificacion__icontains=query)[:5]
+    resultados = [
+        {
+            'id': cliente.id,
+            'nombre': f"{cliente.identificacion} - {cliente.razon_social} {cliente.nombre_comercial if cliente.nombre_comercial else ''}"
+        }
+        for cliente in clientes
+    ]
     return JsonResponse(resultados, safe=False)
 
 # Búsqueda de Productos
@@ -761,19 +759,18 @@ class AgregarCliente(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request):
-        # Crea una instancia del formulario y la llena con los datos:
-        form = ClienteFormulario(request.POST)
-
-        # Recuperar la empresa activa desde la sesión
         empresa_id = request.session.get("empresa_activa")
-        if not empresa_id:
-            messages.error(request, 'No hay una empresa activa seleccionada.')
-            return render(request, 'inventario/cliente/agregarCliente.html', {'form': form})
+        empresa = None
+        if empresa_id:
+            try:
+                empresa = Empresa.objects.get(id=empresa_id)
+            except Empresa.DoesNotExist:
+                empresa = None
 
-        try:
-            empresa = Empresa.objects.get(id=empresa_id)
-        except Empresa.DoesNotExist:
-            messages.error(request, 'La empresa seleccionada no existe.')
+        form = ClienteFormulario(request.POST, empresa=empresa)
+
+        if not empresa:
+            messages.error(request, 'No hay una empresa activa seleccionada.')
             return render(request, 'inventario/cliente/agregarCliente.html', {'form': form})
 
         # Revisa si es valido:
@@ -1008,7 +1005,7 @@ class EditarCliente(LoginRequiredMixin, View):
     def post(self, request, p):
         # Crea una instancia del formulario y la llena con los datos:
         cliente = Cliente.objects.get(id=p)
-        form = ClienteFormulario(request.POST, instance=cliente)
+        form = ClienteFormulario(request.POST, instance=cliente, empresa=cliente.empresa)
         # Revisa si es valido:
 
         if form.is_valid():
@@ -1039,7 +1036,7 @@ class EditarCliente(LoginRequiredMixin, View):
             cliente.tipoCliente = tipoCliente
             cliente.tipoIdentificacion = tipoIdentificacion
             cliente.save()
-            form = ClienteFormulario(instance=cliente)
+            form = ClienteFormulario(instance=cliente, empresa=cliente.empresa)
 
             messages.success(request, 'Actualizado exitosamente el cliente de ID %s.' % p)
             request.session['clienteProcesado'] = 'editado'
@@ -1050,7 +1047,7 @@ class EditarCliente(LoginRequiredMixin, View):
 
     def get(self, request, p):
         cliente = Cliente.objects.get(id=p)
-        form = ClienteFormulario(instance=cliente)
+        form = ClienteFormulario(instance=cliente, empresa=cliente.empresa)
         #Envia al usuario el formulario para que lo llene
         contexto = {'form': form, 'modo': request.session.get('clienteProcesado'), 'editar': True}
         contexto = complementarContexto(contexto, request.user)
@@ -1474,8 +1471,8 @@ class DetallesFactura(LoginRequiredMixin, View):
             # Procesar cada producto
             errores = []  # Inicializar la lista de errores
             for codigo, cantidad_str in zip(codigos, cantidades):
-                producto = Producto.objects.filter(codigo=codigo).first()
-                servicio = Servicio.objects.filter(codigo=codigo).first()
+                producto = Producto.objects.filter(empresa_id=factura.empresa_id, codigo=codigo).first()
+                servicio = Servicio.objects.filter(empresa_id=factura.empresa_id, codigo=codigo).first()
                 if not producto and not servicio:
                     errores.append(f"Producto o servicio con código '{codigo}' no encontrado.")
                     continue
@@ -2656,8 +2653,8 @@ class ListarProveedores(LoginRequiredMixin, View):
 
     def get(self, request):
         from django.db import models
-        #Saca una lista de todos los clientes de la BDD
-        proveedores = Proveedor.objects.all()
+        empresa_id = request.session.get("empresa_activa")
+        proveedores = Proveedor.objects.filter(empresa_id=empresa_id)
         contexto = {'tabla': proveedores}
         contexto = complementarContexto(contexto, request.user)
 
@@ -2671,9 +2668,19 @@ class AgregarProveedor(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request):
-        # Crea una instancia del formulario y la llena con los datos:
-        form = ProveedorFormulario(request.POST)
-        # Revisa si es valido:
+        empresa_id = request.session.get("empresa_activa")
+        empresa = None
+        if empresa_id:
+            try:
+                empresa = Empresa.objects.get(id=empresa_id)
+            except Empresa.DoesNotExist:
+                empresa = None
+
+        form = ProveedorFormulario(request.POST, empresa=empresa)
+
+        if not empresa:
+            messages.error(request, 'No hay una empresa activa seleccionada.')
+            return render(request, 'inventario/proveedor/agregarProveedor.html', {'form': form})
 
         if form.is_valid():
             # ✅ ACTUALIZADO: Usar nombres de campos correctos del formulario actualizado
@@ -2709,7 +2716,8 @@ class AgregarProveedor(LoginRequiredMixin, View):
                 convencional=convencional,
                 tipoVenta=tipoVenta,
                 tipoRegimen=tipoRegimen,
-                tipoProveedor=tipoProveedor
+                tipoProveedor=tipoProveedor,
+                empresa=empresa,
             )
             proveedor.save()
             form = ProveedorFormulario()
@@ -2810,7 +2818,7 @@ class EditarProveedor(LoginRequiredMixin, View):
     def post(self, request, p):
         # Crea una instancia del formulario y la llena con los datos:
         proveedor = Proveedor.objects.get(id=p)
-        form = ProveedorFormulario(request.POST, instance=proveedor)
+        form = ProveedorFormulario(request.POST, instance=proveedor, empresa=proveedor.empresa)
         # Revisa si es valido:
 
         if form.is_valid():
@@ -2848,7 +2856,7 @@ class EditarProveedor(LoginRequiredMixin, View):
             proveedor.tipoRegimen = tipoRegimen
             proveedor.tipoProveedor = tipoProveedor
             proveedor.save()
-            form = ProveedorFormulario(instance=proveedor)
+            form = ProveedorFormulario(instance=proveedor, empresa=proveedor.empresa)
 
             messages.success(request, 'Proveedor actualizado exitosamente (ID %s).' % p)
             request.session['proveedorProcesado'] = 'editado'
@@ -2859,7 +2867,7 @@ class EditarProveedor(LoginRequiredMixin, View):
 
     def get(self, request, p):
         proveedor = Proveedor.objects.get(id=p)
-        form = ProveedorFormulario(instance=proveedor)
+        form = ProveedorFormulario(instance=proveedor, empresa=proveedor.empresa)
         #Envia al usuario el formulario para que lo llene
         contexto = {'form': form, 'modo': request.session.get('proveedorProcesado'), 'editar': True}
         contexto = complementarContexto(contexto, request.user)
@@ -2995,7 +3003,7 @@ class DetallesPedido(LoginRequiredMixin, View):
 
             from datetime import date
 
-            proveedor = Proveedor.objects.get(identificacion_proveedor=cedula)
+            proveedor = Proveedor.objects.get(identificacion_proveedor=cedula, empresa_id=empresa_id)
             iva = ivaActual('objeto')
             presente = False
             pedido = Pedido(proveedor=proveedor, fecha=date.today(), sub_monto=sub_monto, monto_general=monto_general,
@@ -3857,8 +3865,8 @@ class ListarProveedores(LoginRequiredMixin, View):
 
     def get(self, request):
         from django.db import models
-        #Saca una lista de todos los proveedores de la BDD
-        proveedores = Proveedor.objects.all()
+        empresa_id = request.session.get("empresa_activa")
+        proveedores = Proveedor.objects.filter(empresa_id=empresa_id)
         contexto = {'tabla': proveedores}
         contexto = complementarContexto(contexto, request.user)
 
@@ -3873,9 +3881,19 @@ class AgregarProveedor(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request):
-        # Crea una instancia del formulario y la llena con los datos:
-        form = ProveedorFormulario(request.POST)
-        # Revisa si es valido:
+        empresa_id = request.session.get("empresa_activa")
+        empresa = None
+        if empresa_id:
+            try:
+                empresa = Empresa.objects.get(id=empresa_id)
+            except Empresa.DoesNotExist:
+                empresa = None
+
+        form = ProveedorFormulario(request.POST, empresa=empresa)
+
+        if not empresa:
+            messages.error(request, 'No hay una empresa activa seleccionada.')
+            return render(request, 'inventario/proveedor/agregarProveedor.html', {'form': form})
 
         if form.is_valid():
             # ✅ ACTUALIZADO: Usar nombres de campos correctos del formulario actualizado
@@ -3911,7 +3929,8 @@ class AgregarProveedor(LoginRequiredMixin, View):
                 convencional=convencional,
                 tipoVenta=tipoVenta,
                 tipoRegimen=tipoRegimen,
-                tipoProveedor=tipoProveedor
+                tipoProveedor=tipoProveedor,
+                empresa=empresa,
             )
 
             proveedor.save()
@@ -3967,12 +3986,13 @@ class ExportarProveedores(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request):
+        empresa_id = request.session.get('empresa_activa')
         form = ExportarProveedoresFormulario(request.POST)
         if form.is_valid():
             request.session['proveedoresExportados'] = True
 
             #Se obtienen las entradas de proveedor en formato JSON
-            data = serializers.serialize("json", Proveedor.objects.all())
+            data = serializers.serialize("json", Proveedor.objects.filter(empresa_id=empresa_id))
             fs = FileSystemStorage('inventario/tmp/')
 
             #Se utiliza la variable fs para acceder a la carpeta con mas facilidad
@@ -4011,7 +4031,7 @@ class EditarProveedor(LoginRequiredMixin, View):
     def post(self, request, p):
         # Crea una instancia del formulario y la llena con los datos:
         proveedor = Proveedor.objects.get(id=p)
-        form = ProveedorFormulario(request.POST, instance=proveedor)
+        form = ProveedorFormulario(request.POST, instance=proveedor, empresa=proveedor.empresa)
         # Revisa si es valido:
 
         if form.is_valid():
@@ -4054,12 +4074,11 @@ class EditarProveedor(LoginRequiredMixin, View):
             return HttpResponseRedirect("/inventario/editarProveedor/%s" % p)
 
         else:
-            #De lo contrario lanzara el mismo formulario
             return render(request, 'inventario/proveedor/editarProveedor.html', {'form': form})
 
     def get(self, request, p):
         proveedor = Proveedor.objects.get(id=p)
-        form = ProveedorFormulario(instance=proveedor)
+        form = ProveedorFormulario(instance=proveedor, empresa=proveedor.empresa)
 
         contexto = {'form': form, 'proveedor': proveedor}
         contexto = complementarContexto(contexto, request.user)
