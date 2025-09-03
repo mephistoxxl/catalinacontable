@@ -15,11 +15,16 @@ class Command(BaseCommand):
         parser.add_argument('--dry-run', action='store_true', help='No guarda cambios, solo reporta')
         parser.add_argument('--only', type=int, help='Procesa solo la factura con este ID')
         parser.add_argument('--create-missing', action='store_true', help='Crea Cliente si no existe')
+        parser.add_argument(
+            '--target-field', choices=['id', 'identificacion'], default=None,
+            help='Forzar a mapear cliente_id hacia Cliente.id o Cliente.identificacion (por defecto: autodetectar)'
+        )
 
     def handle(self, *args, **options):
         dry_run = options.get('dry_run')
         only = options.get('only')
         create_missing = options.get('create_missing')
+        target_override = options.get('target_field')
 
         # Detectar facturas con cliente_id inválido
         cliente_exist = Cliente.objects.filter(id=OuterRef('cliente_id'))
@@ -27,11 +32,31 @@ class Command(BaseCommand):
         if only:
             base_qs = base_qs.filter(id=only)
 
+        # Detectar a qué columna referencia realmente la FK en DB (id vs identificacion)
+        fk_to_identificacion = False
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("PRAGMA foreign_key_list('inventario_factura')")
+                rows = cursor.fetchall()
+                for r in rows:
+                    # PRAGMA columns: id, seq, table, from, to, on_update, on_delete, match
+                    col_from = r[3]
+                    col_to = r[4]
+                    if col_from == 'cliente_id':
+                        fk_to_identificacion = (col_to == 'identificacion')
+                        break
+        except Exception:
+            # Si no se puede detectar, asumimos FK hacia id
+            fk_to_identificacion = False
+
         total = base_qs.count()
         self.stdout.write(self.style.WARNING(f"Facturas con FK cliente inválida: {total}"))
-    fixed = 0
-        created_clients = 0
-        unresolved = 0
+        target_field = target_override if target_override else ('identificacion' if fk_to_identificacion else 'id')
+        if target_override:
+            self.stdout.write(self.style.HTTP_INFO(f"FK objetivo forzado: Cliente.{target_field}"))
+        else:
+            self.stdout.write(self.style.HTTP_INFO(f"FK objetivo detectado: Cliente.{target_field}"))
+        stats = {"fixed": 0, "created": 0, "unresolved": 0}
 
         def guess_tipo_identificacion(ident):
             ident = (ident or '').strip()
@@ -41,9 +66,8 @@ class Command(BaseCommand):
                 return '05'  # Cédula
             return '07'      # Consumidor Final / Otros
 
-    def process_factura(f):
-            nonlocal fixed, created_clients, unresolved
-            ident = (f.identificacion_cliente or '').strip()
+        def process_factura(f):
+            ident = (getattr(f, 'identificacion_cliente', '') or '').strip()
 
             # 1) Buscar por empresa + identificacion_cliente
             cli = None
@@ -60,7 +84,7 @@ class Command(BaseCommand):
                     empresa_id=f.empresa_id,
                     tipoIdentificacion=guess_tipo_identificacion(ident),
                     identificacion=ident,
-                    razon_social=f.nombre_cliente or f"CLIENTE {ident}",
+                    razon_social=(getattr(f, 'nombre_cliente', None) or f"CLIENTE {ident}"),
                     nombre_comercial=None,
                     direccion='S/D',
                     telefono='',
@@ -71,37 +95,42 @@ class Command(BaseCommand):
                     tipoRegimen='1',
                     tipoCliente='1',
                 )
-                created_clients += 1
+                stats["created"] += 1
 
             if cli is None:
-                unresolved += 1
+                stats["unresolved"] += 1
                 self.stdout.write(self.style.ERROR(
                     f"No se pudo resolver Factura {f.id} (empresa={f.empresa_id}, ident='{ident}', cliente_id={f.cliente_id})"
                 ))
                 return
 
+            new_fk_value = cli.identificacion if target_field == 'identificacion' else cli.id
             if dry_run:
-                self.stdout.write(f"→ Factura {f.id}: set cliente_id {f.cliente_id} → {cli.id} ({cli.identificacion})")
+                self.stdout.write(
+                    f"→ Factura {f.id}: set cliente_id {f.cliente_id} → {new_fk_value} (Cliente.{target_field})"
+                )
             else:
-                Factura.objects.filter(id=f.id).update(cliente_id=cli.id)
-            fixed += 1
+                Factura.objects.filter(id=f.id).update(cliente_id=new_fk_value)
+            stats["fixed"] += 1
 
         if dry_run:
             for f in base_qs.iterator():
                 process_factura(f)
         else:
-            # Do updates with constraints disabled to avoid interim FK failures
-            with transaction.atomic():
-                with connection.constraint_checks_disabled():
+            # Do updates with constraints disabled (outer) so commit occurs with checks off
+            with connection.constraint_checks_disabled():
+                with transaction.atomic():
                     for f in base_qs.iterator():
                         process_factura(f)
-                # Re-validate all constraints at the end
-                connection.check_constraints()
+                # Re-validate constraints only if target matches current FK mapping
+                current_target = 'identificacion' if fk_to_identificacion else 'id'
+                if target_field == current_target:
+                    connection.check_constraints()
 
         summary = (
-            f"Arregladas: {fixed} | Clientes creados: {created_clients} | Sin resolver: {unresolved}"
+            f"Arregladas: {stats['fixed']} | Clientes creados: {stats['created']} | Sin resolver: {stats['unresolved']}"
         )
         if dry_run:
-            self.stdout.write(self.style.NOTICE(f"[DRY-RUN] {summary}"))
+            self.stdout.write(self.style.WARNING(f"[DRY-RUN] {summary}"))
         else:
             self.stdout.write(self.style.SUCCESS(summary))
