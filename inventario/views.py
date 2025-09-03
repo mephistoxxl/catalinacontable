@@ -110,6 +110,13 @@ class EmitirProforma(LoginRequiredMixin, View):
     def post(self, request):
         from .forms import EmitirProformaFormulario
         
+        # Obtener empresa activa
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id:
+            return redirect('inventario:seleccionar_empresa')
+        
+        empresa = Empresa.objects.get(id=empresa_id)
+        
         # Obtener almacenes y vendedores (facturadores) activos
         almacenes = Almacen.objects.filter(activo=True)
         vendedores = Facturador.objects.filter(activo=True)
@@ -118,7 +125,45 @@ class EmitirProforma(LoginRequiredMixin, View):
         form = EmitirProformaFormulario(request.POST, almacenes=almacenes, vendedores=vendedores)
         
         if form.is_valid():
-            messages.success(request, 'Proforma guardada (placeholder)')
+            # Procesar cliente
+            cliente_id = form.cleaned_data.get('cliente_id')
+            identificacion_cliente = form.cleaned_data.get('identificacion_cliente')
+            nombre_cliente = form.cleaned_data.get('nombre_cliente')
+            correo_cliente = form.cleaned_data.get('correo_cliente')
+            
+            cliente = None
+            if cliente_id:
+                # Cliente existente encontrado por la búsqueda
+                try:
+                    cliente = Cliente.objects.get(id=cliente_id, empresa=empresa)
+                except Cliente.DoesNotExist:
+                    cliente = None
+            
+            # Si no se encontró cliente existente pero hay datos, crear uno nuevo
+            if not cliente and identificacion_cliente and nombre_cliente:
+                try:
+                    # Verificar si ya existe un cliente con esa identificación
+                    cliente = Cliente.objects.get(identificacion=identificacion_cliente, empresa=empresa)
+                except Cliente.DoesNotExist:
+                    # Crear cliente nuevo
+                    cliente = Cliente.objects.create(
+                        empresa=empresa,
+                        identificacion=identificacion_cliente,
+                        razon_social=nombre_cliente.strip(),
+                        correo=correo_cliente or '',
+                        # Datos por defecto
+                        telefono='',
+                        direccion='',
+                        tipoIdentificacion='05' if len(identificacion_cliente) == 10 else '04',
+                        tipo_contribuyente='CONTRIBUYENTE ESPECIAL',
+                        obligado_llevar_contabilidad='NO'
+                    )
+                    
+            if cliente:
+                messages.success(request, f'Proforma creada para cliente: {cliente.razon_social}')
+            else:
+                messages.success(request, 'Proforma creada sin cliente específico')
+                
             return redirect('inventario:listarProformas')
             
         contexto = {

@@ -621,6 +621,13 @@ class EmitirProformaFormulario(forms.Form):
         })
     )
 
+    cliente_id = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={
+            'id': 'cliente_id'
+        })
+    )
+
     nombre_cliente = forms.CharField(
         label="Nombre del Cliente",
         max_length=100,

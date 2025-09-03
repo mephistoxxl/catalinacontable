@@ -88,7 +88,10 @@
                   <label class="col-span-1">C.I/RUC:</label>
                   <div class="col-span-2 flex gap-2 items-center">
                     {{ form.identificacion_cliente }}
-                    <button type="button" title="Editar" class="tb-btn" style="padding:3px 6px;"><i class="fa fa-pencil"></i></button>
+                    <button type="button" onclick="buscarCliente()" class="inline-flex items-center px-3 py-2 border border-blue-300 text-xs font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all duration-150" title="Buscar cliente">
+                      <i class="fa fa-search mr-1"></i>Buscar
+                    </button>
+                    <input type="hidden" id="cliente_id" name="cliente_id">
                   </div>
                 </div>
                 <div class="grid grid-cols-3 gap-2 items-center">
@@ -136,10 +139,6 @@
                   {{ form.forma_pago }}
                 </div>
               </div>
-            </div>
-            <div class="mt-2">
-              <label for="id_observaciones">Observaciones (opcional)</label>
-              {{ form.observaciones }}
             </div>
           </div>
 
@@ -212,6 +211,14 @@
             </div>
           </div>
 
+          <!-- Campo Observaciones movido al final -->
+          <div class="mt-3 p-3 bg-gray-50 rounded-md border border-gray-200">
+            <label for="id_observaciones" class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-comment-alt mr-1 text-gray-500"></i>Observaciones (opcional)
+            </label>
+            {{ form.observaciones }}
+          </div>
+
           <div class="flex justify-end pt-2 border-t border-gray-200">
             <button type="submit" class="inline-flex items-center px-4 py-1 text-xs font-medium rounded-md text-white bg-gray-800 hover:bg-black">
               <i class="fa fa-save mr-2 text-xs"></i> Guardar Proforma
@@ -237,6 +244,17 @@ document.addEventListener('DOMContentLoaded', function() {
   const codigoInput = document.getElementById('codigo_producto');
   if (codigoInput) {
     codigoInput.addEventListener('keypress', function(e){ if(e.key==='Enter'){ e.preventDefault(); pf_buscarProducto(); }});
+  }
+
+  // Enter en identificación cliente para buscar
+  const identificacionInput = document.getElementById('id_identificacion_cliente');
+  if (identificacionInput) {
+    identificacionInput.addEventListener('keypress', function(e){ 
+      if(e.key==='Enter'){ 
+        e.preventDefault(); 
+        buscarCliente(); 
+      }
+    });
   }
 
   // Inicializa 12 filas vacías del grid
@@ -266,27 +284,271 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // --- Modal selección productos (reutilizado de factura) ---
-function pf_abrirModalProductos(){ const m=document.getElementById('pf-modal-productos'); if(m){ m.style.display='block'; pf_cargarProductosModal(); }}
-function pf_cerrarModalProductos(){ const m=document.getElementById('pf-modal-productos'); if(m){ m.style.display='none'; }}
-function pf_setLoader(on){ const l=document.getElementById('pf-modal-loader'); if(l) l.style.display=on?'flex':'none'; }
+function pf_abrirModalProductos(){ 
+  console.log('🚪 ABRIENDO MODAL DE PRODUCTOS');
+  const m = document.getElementById('pf-modal-productos'); 
+  if (m) { 
+    m.style.display = 'block'; 
+    console.log('✅ Modal visible, cargando productos...');
+    pf_cargarProductosModal(); 
+  } else {
+    console.error('❌ No se encontró el modal pf-modal-productos');
+  }
+}
+
+function pf_cerrarModalProductos(){ 
+  console.log('🚪 CERRANDO MODAL DE PRODUCTOS');
+  const m = document.getElementById('pf-modal-productos'); 
+  if (m) { 
+    m.style.display = 'none'; 
+  }
+}
+
+function pf_setLoader(on){ 
+  const l = document.getElementById('pf-modal-loader'); 
+  if (l) l.style.display = on ? 'flex' : 'none'; 
+}
+
 function pf_cargarProductosModal(q){
+  console.log('🔄 CARGANDO PRODUCTOS EN MODAL, query:', q);
   pf_setLoader(true);
   const url = q && q.trim() ? `/inventario/buscar_producto/?q=${encodeURIComponent(q.trim())}` : `/inventario/buscar_producto/?all=1`;
-  fetch(url).then(r=>r.json()).then(lista=>pf_renderProductosModal(Array.isArray(lista)?lista:[])).catch(()=>pf_renderProductosModal([])).finally(()=>pf_setLoader(false));
+  console.log('🌐 URL de consulta:', url);
+  
+  fetch(url)
+    .then(r => {
+      console.log('📡 Respuesta recibida:', r.status, r.statusText);
+      return r.json();
+    })
+    .then(lista => {
+      console.log('📦 Productos recibidos:', lista?.length || 0);
+      pf_renderProductosModal(Array.isArray(lista) ? lista : []);
+    })
+    .catch(error => {
+      console.error('💥 Error al cargar productos:', error);
+      pf_renderProductosModal([]);
+    })
+    .finally(() => {
+      pf_setLoader(false);
+    });
 }
 function pf_renderProductosModal(lista){
-  const tbody=document.getElementById('pf-modal-tbody'); const vacio=document.getElementById('pf-modal-vacio');
-  if(!tbody) return; tbody.innerHTML=''; if(!lista||lista.length===0){ if(vacio) vacio.style.display='block'; return; } if(vacio) vacio.style.display='none';
-  lista.forEach(item=>{ const tr=document.createElement('tr'); const precio=Number(item.precio||0); const iva=Number(item.iva_percent||0); const pIva=Number(item.precio_con_iva||(precio*(1+iva)));
-    tr.innerHTML=`<td class="text-center"><button type=\"button\" class=\"btn btn-success btn-sm\"><i class=\"fa fa-check\"></i></button></td>
-      <td>${item.codigo||''}</td><td>${(item.nombre||'').replace(/</g,'&lt;')}</td>
-      <td class="text-right">${precio.toFixed(2)}</td><td class="text-right">${pIva.toFixed(2)}</td>`;
-    tr.querySelector('button').addEventListener('click',()=>pf_seleccionarDesdeModal(item)); tbody.appendChild(tr);
+  console.log('🎨 RENDERIZANDO MODAL CON PRODUCTOS:', lista?.length || 0);
+  
+  const tbody = document.getElementById('pf-modal-tbody'); 
+  const vacio = document.getElementById('pf-modal-vacio');
+  
+  if (!tbody) {
+    console.error('❌ No se encontró tbody del modal pf-modal-tbody');
+    return; 
+  }
+  
+  // Limpiar contenido anterior
+  tbody.innerHTML = '';
+  
+  if (!lista || lista.length === 0) { 
+    console.log('📭 Sin productos para mostrar');
+    if (vacio) vacio.style.display = 'block'; 
+    return; 
+  } 
+  
+  if (vacio) vacio.style.display = 'none';
+  
+  console.log('📦 Creando filas para', lista.length, 'productos');
+  
+  lista.forEach((item, index) => { 
+    const tr = document.createElement('tr'); 
+    const precio = Number(item.precio || 0); 
+    const iva = Number(item.iva_percent || 0); 
+    const pIva = Number(item.precio_con_iva || (precio * (1 + iva)));
+    
+    tr.innerHTML = `
+      <td class="text-center">
+        <button type="button" class="btn btn-success btn-sm" 
+                title="Seleccionar ${item.nombre}" 
+                style="padding: 4px 8px; cursor: pointer; z-index: 9999; position: relative;">
+          <i class="fa fa-check"></i>
+        </button>
+      </td>
+      <td>${item.codigo || ''}</td>
+      <td>${(item.nombre || '').replace(/</g, '&lt;')}</td>
+      <td class="text-right">${precio.toFixed(2)}</td>
+      <td class="text-right">${pIva.toFixed(2)}</td>
+    `;
+    
+    const button = tr.querySelector('button');
+    if (button) {
+      // Agregar event listener con verificación DIRECTA
+      button.onclick = function(e) {
+        console.log('🖱️ CLICK DETECTADO en producto #' + (index + 1), item);
+        e.preventDefault();
+        e.stopPropagation();
+        pf_seleccionarDesdeModal(item);
+        return false;
+      };
+      
+      console.log('🎯 Event listener agregado para producto:', item.nombre);
+    } else {
+      console.error('❌ No se pudo crear el botón para el producto:', item.nombre);
+    }
+    
+    tbody.appendChild(tr);
   });
+  
+  console.log('✅ Modal renderizado exitosamente con', lista.length, 'productos');
 }
-function pf_seleccionarDesdeModal(item){ try{ const c=document.getElementById('codigo_producto'); const n=document.getElementById('producto'); if(!c||!n) return; c.value=item.codigo||''; n.value=item.nombre||''; n.dataset.precio=String(item.precio||0); n.dataset.codigo=item.codigo||''; n.dataset.ivaPercent=String(item.iva_percent!=null?item.iva_percent:0.12); pf_cerrarModalProductos(); pf_agregarProducto(); }catch(e){ console.error('pf modal',e);} }
-function pf_buscarProducto(){ const codigo=document.getElementById('codigo_producto').value.trim(); if(!codigo){ pf_abrirModalProductos(); return; }
-  fetch(`/inventario/buscar_producto/?q=${encodeURIComponent(codigo)}`).then(r=>{ if(!r.ok) throw new Error('error'); return r.json();}).then(data=>{ if(data.length>0){ const p=data[0]; const n=document.getElementById('producto'); const display=document.getElementById('producto_display'); if(display) display.value=p.nombre||''; n.value=p.nombre||''; n.dataset.precio=p.precio; n.dataset.ivaPercent=p.iva_percent||'0.12'; n.dataset.codigo=p.codigo; } else { alert('No encontrado'); }}).catch(()=>alert('Error buscando'));
+function pf_seleccionarDesdeModal(item) {
+  try {
+    console.log('🎯 SELECCIÓN DESDE MODAL:', item);
+    
+    // Validar que el item tenga los datos necesarios
+    if (!item) {
+      console.error('❌ Item es nulo o undefined');
+      alert('Error: Producto inválido');
+      return;
+    }
+    
+    // Cerrar modal
+    pf_cerrarModalProductos();
+    console.log('✅ Modal cerrado');
+    
+    // Preparar datos del producto
+    const precio = parseFloat(item.precio || 0);
+    const ivaPercent = parseFloat(item.iva_percent != null ? item.iva_percent : 0.15);
+    
+    if (isNaN(precio) || precio < 0) {
+      console.error('❌ Precio inválido:', precio);
+      alert('Error: Precio del producto inválido');
+      return;
+    }
+    
+    const linea = {
+      codigo: String(item.codigo || ''),
+      descripcion: String(item.nombre || ''),
+      cantidad: 1,
+      precio: precio,
+      descuento: 0
+    };
+    
+    console.log('📦 Datos preparados:', linea, 'IVA:', ivaPercent);
+    
+    // Buscar fila vacía manualmente
+    const tbody = document.getElementById('proforma-rows');
+    if (!tbody) {
+      console.error('❌ No se encontró tbody proforma-rows');
+      alert('Error: No se encontró la tabla de productos');
+      return;
+    }
+    
+    const rows = tbody.querySelectorAll('tr');
+    console.log('📊 Filas encontradas:', rows.length);
+    
+    let filaEncontrada = false;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const codigoInput = row.querySelector('input[name="codigo[]"]');
+      const descripcionInput = row.querySelector('input[name="descripcion[]"]');
+      
+      if (codigoInput && descripcionInput && 
+          (!codigoInput.value || codigoInput.value.trim() === '') &&
+          (!descripcionInput.value || descripcionInput.value.trim() === '')) {
+        
+        console.log('✏️ Llenando fila #' + (i + 1));
+        
+        // Llenar la fila directamente
+        codigoInput.value = linea.codigo;
+        descripcionInput.value = linea.descripcion;
+        
+        const cantidadInput = row.querySelector('input[name="cantidad[]"]');
+        const precioInput = row.querySelector('input[name="precio[]"]');
+        const descuentoInput = row.querySelector('input[name="descuento[]"]');
+        
+        if (cantidadInput) cantidadInput.value = String(linea.cantidad);
+        if (precioInput) precioInput.value = linea.precio.toFixed(2);
+        if (descuentoInput) descuentoInput.value = linea.descuento.toFixed(2);
+        
+        // Configurar IVA
+        const ivaSpan = row.querySelector('.pf-iva');
+        const ivaHidden = row.querySelector('input[name="iva[]"]');
+        
+        if (ivaSpan) {
+          ivaSpan.dataset.iva = String(ivaPercent);
+          ivaSpan.textContent = `${Math.round(ivaPercent * 100)}%`;
+        }
+        if (ivaHidden) {
+          ivaHidden.value = String(ivaPercent);
+        }
+        
+        console.log('✅ Fila llenada exitosamente');
+        filaEncontrada = true;
+        
+        // Recalcular totales
+        pf_recalc();
+        break;
+      }
+    }
+    
+    if (!filaEncontrada) {
+      console.error('❌ No se encontró fila vacía');
+      alert('No hay filas vacías disponibles. Elimine un producto existente primero.');
+    } else {
+      console.log('🎉 PRODUCTO AGREGADO EXITOSAMENTE DESDE MODAL');
+    }
+    
+  } catch (e) {
+    console.error('💥 ERROR CRÍTICO al seleccionar producto del modal:', e);
+    alert('Error crítico al agregar el producto. Revise la consola para más detalles.');
+  }
+}
+function pf_buscarProducto() {
+  const codigo = document.getElementById('codigo_producto').value.trim();
+  
+  // Si no hay código, abrir modal para mostrar todos los productos
+  if (!codigo) {
+    pf_abrirModalProductos();
+    return;
+  }
+  
+  // Buscar producto específico por código
+  fetch(`/inventario/buscar_producto/?q=${encodeURIComponent(codigo)}`)
+    .then(r => {
+      if (!r.ok) throw new Error('Error en la respuesta del servidor');
+      return r.json();
+    })
+    .then(data => {
+      if (data.length > 0) {
+        const producto = data[0];
+        const displayInput = document.getElementById('producto_display');
+        
+        if (displayInput) {
+          displayInput.value = producto.nombre || '';
+        }
+        
+        // Agregar automáticamente el producto encontrado
+        const ivaPercent = parseFloat(producto.iva_percent || 0.15);
+        const linea = {
+          codigo: producto.codigo || '',
+          descripcion: producto.nombre || '',
+          cantidad: 1,
+          precio: parseFloat(producto.precio || 0),
+          descuento: 0
+        };
+        
+        pf_addRowPrefilled(linea, ivaPercent);
+        
+        // Limpiar campos
+        document.getElementById('codigo_producto').value = '';
+        if (displayInput) displayInput.value = '';
+        
+        console.log('Producto agregado:', producto);
+      } else {
+        alert('Producto no encontrado');
+      }
+    })
+    .catch(error => {
+      console.error('Error buscando producto:', error);
+      alert('Error al buscar producto. Intente nuevamente.');
+    });
 }
 function pf_agregarProducto(){
   const codigo = document.getElementById('codigo_producto').value.trim();
@@ -405,11 +667,48 @@ document.addEventListener('keydown', (e) => {
     if (next) next.focus();
   }
 });
+
+// Función de búsqueda de cliente para proforma
+function buscarCliente() {
+  const cedula = document.getElementById('id_identificacion_cliente').value.trim();
+  
+  if (!cedula) {
+    alert('Por favor, ingrese una cédula o RUC para buscar.');
+    return;
+  }
+
+  fetch(`/inventario/buscar_cliente/?q=${cedula}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.error) {
+        alert(data.message || 'Cliente no encontrado.');
+        const nombreCliente = document.getElementById('id_nombre_cliente');
+        const clienteId = document.getElementById('cliente_id');
+        const correoCliente = document.getElementById('id_correo_cliente');
+        if (nombreCliente) nombreCliente.value = '';
+        if (clienteId) clienteId.value = '';
+        if (correoCliente) correoCliente.value = '';
+        return;
+      }
+
+      const nombreCliente = document.getElementById('id_nombre_cliente');
+      const clienteId = document.getElementById('cliente_id');
+      const correoCliente = document.getElementById('id_correo_cliente');
+      const nombreCompleto = data.nombre_comercial ? `${data.razon_social} ${data.nombre_comercial}` : data.razon_social;
+      if (nombreCliente) nombreCliente.value = nombreCompleto;
+      if (clienteId) clienteId.value = data.id;
+      if (correoCliente) correoCliente.value = data.correo || '';
+    })
+    .catch(error => {
+      console.error('Error al buscar cliente:', error);
+      alert('Error de conexión al buscar cliente.');
+    });
+}
 </script>
 
 <!-- Modal productos para Proforma -->
 <div id="pf-modal-productos" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1050;">
-  <div style="background:#fff; width:95%; max-width:980px; max-height:85vh; overflow:hidden; border-radius:6px; box-shadow:0 10px 25px rgba(0,0,0,.2); margin:40px auto;">
+  <div style="background:#fff; width:95%; max-width:980px; max-height:85vh; overflow:hidden; border-radius:6px; box-shadow:0 10px 25px rgba(0,0,0,.2); margin:40px auto; position:relative; z-index:1051;">
     <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid #e5e7eb;">
       <div style="display:flex; align-items:center; gap:8px;"><i class="fa fa-list-alt"></i><strong>Seleccionar producto o servicio</strong></div>
       <button type="button" onclick="pf_cerrarModalProductos()" class="btn btn-light"><i class="fa fa-times"></i></button>
@@ -427,8 +726,6 @@ document.addEventListener('keydown', (e) => {
     </div>
     <div id="pf-modal-vacio" style="display:none; padding:16px; color:#64748b;">Sin resultados.</div>
   </div>
-  <div id="pf-modal-loader" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center;"><div class="spinner-border" role="status"><span class="sr-only">Cargando…</span></div></div>
-  <div style="position:absolute; inset:0;" onclick="pf_cerrarModalProductos()"></div>
-  
+  <div id="pf-modal-loader" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; z-index:1052;"><div class="spinner-border" role="status"><span class="sr-only">Cargando…</span></div></div>
 </div>
 {% endblock %}
