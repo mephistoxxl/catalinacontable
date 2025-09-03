@@ -483,7 +483,7 @@ def ride_proforma(request, p):
         })
 
     # Limitar filas visibles para favorecer caber en una sola página (totales siguen completos)
-    MAX_ROWS = 12
+    MAX_ROWS = 10
     if len(detalles_pdf) > MAX_ROWS:
         detalles_pdf_display = detalles_pdf[:MAX_ROWS]
         detalles_omitidos = len(detalles_pdf) - MAX_ROWS

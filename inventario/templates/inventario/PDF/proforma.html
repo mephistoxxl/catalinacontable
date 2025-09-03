@@ -82,23 +82,14 @@
       </div>
     </div>
 
-    <!-- Encabezado: Cliente y Empresa -->
+    <!-- Encabezado: Cliente -->
     <div class="mt-4">
-      <div class="grid">
-        <div class="card">
-          <h3>Datos del cliente</h3>
-          <div>Nombre: {{ proforma.cliente.razon_social }}{% if proforma.cliente.nombre_comercial %} ({{ proforma.cliente.nombre_comercial }}){% endif %}</div>
-          <div>Dirección: {{ proforma.cliente.direccion }}</div>
-          <div>Mail: {{ proforma.cliente.correo }}</div>
-          <div>Teléfono: {{ proforma.cliente.telefono }}</div>
-        </div>
-        <div class="card">
-          <h3>Datos de la empresa</h3>
-          <div>Nombre: {% if empresa.nombre_comercial %}{{ empresa.nombre_comercial }}{% else %}{{ empresa.razon_social }}{% endif %}</div>
-          <div>Dirección: {{ empresa.direccion }}</div>
-          <div>Mail: {{ empresa.correo }}</div>
-          <div>Teléfono: {{ empresa.telefono }}</div>
-        </div>
+      <div class="card">
+        <h3>Datos del cliente</h3>
+        <div>Nombre: {{ proforma.cliente.razon_social }}{% if proforma.cliente.nombre_comercial %} ({{ proforma.cliente.nombre_comercial }}){% endif %}</div>
+        <div>Dirección: {{ proforma.cliente.direccion }}</div>
+        <div>Mail: {{ proforma.cliente.correo }}</div>
+        <div>Teléfono: {{ proforma.cliente.telefono }}</div>
       </div>
       <div class="mt-2"><span class="label">Fecha:</span> <span class="value">{{ proforma.fecha_emision|date:"d/m/Y" }}</span></div>
     </div>
@@ -136,13 +127,14 @@
       </table>
     </div>
 
-    <!-- Totales y notas, estilo en dos columnas -->
+    <!-- Totales y condiciones, estilo en dos columnas -->
     <div class="totals-wrap mt-6">
       <div>
-        <div class="note mb-2">&nbsp;</div>
         <div class="block" style="min-height: 40px;">
-          <div>Forma de pago: {{ forma_pago_text }}</div>
-          {% if nota_text %}<div>Nota: {{ nota_text }}</div>{% endif %}
+          <div class="label" style="text-transform: uppercase; margin-bottom: 4px;">Condiciones y forma de pago:</div>
+          {% if condiciones_text %}<div>{{ condiciones_text|linebreaksbr }}</div>{% endif %}
+          <div>Método de pago: {{ forma_pago_text }}</div>
+          {% if nota_text %}<div>{{ nota_text }}</div>{% endif %}
         </div>
       </div>
       <div class="totals-box">
