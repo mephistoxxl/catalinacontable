@@ -92,6 +92,9 @@
       <div class="p-3">
         <form method="POST" action="{% url 'inventario:emitirProforma' %}" class="space-y-3" id="formProforma">
           {% csrf_token %}
+          {% if proformador_token %}
+          <input type="hidden" id="proformador_token" name="t" value="{{ proformador_token }}" />
+          {% endif %}
           {% if facturador %}
           <input type="hidden" id="facturador_id" name="facturador_id" value="{{ facturador.id }}" />
           {% endif %}
@@ -104,7 +107,7 @@
                 <div class="grid grid-cols-3 gap-2 items-center">
                   <label class="col-span-1">Código Proforma:</label>
                   <div class="col-span-2">
-                    <input type="text" id="codigo_proforma" name="codigo_proforma" class="w-full border rounded px-2 py-1 bg-gray-100" readonly value="PR00001">
+                    <input type="text" id="codigo_proforma" name="codigo_proforma" class="w-full border rounded px-2 py-1 bg-gray-100" readonly value="{{ proforma_siguiente_numero|default:'PR000001' }}">
                   </div>
                 </div>
 
@@ -346,6 +349,8 @@ function buscarCliente() {
 
 document.addEventListener('DOMContentLoaded', function() {
   const hoy = new Date().toISOString().split('T')[0];
+  // Exponer el siguiente código desde backend
+  window.PROFORMA_NEXT_CODE = '{{ proforma_siguiente_numero|default:"" }}';
   const fechaEmision = document.getElementById('id_fecha_emision');
   const fechaValidez = document.getElementById('id_fecha_validez');
   if (fechaEmision && !fechaEmision.value) fechaEmision.value = hoy;
@@ -1002,12 +1007,15 @@ function pf_ejecutarEliminacion(row) {
 // Función para generar código de proforma automáticamente
 function generarCodigoProforma() {
   console.log('🔢 Generando código de proforma...');
-  
-  // Por el momento usar código fijo hasta que el backend esté listo
   const codigoInput = document.getElementById('codigo_proforma');
-  if (codigoInput && (!codigoInput.value || codigoInput.value.length < 5)) {
-    codigoInput.value = 'PR00001';
-    console.log('✅ Código de proforma establecido: PR00001');
+  const nextFromServer = (window.PROFORMA_NEXT_CODE || '').trim();
+  if (codigoInput) {
+    if (nextFromServer) {
+      codigoInput.value = nextFromServer;
+      console.log('✅ Código de proforma desde backend:', nextFromServer);
+    } else if (!codigoInput.value) {
+      codigoInput.value = 'PR000001';
+    }
   }
 }
 
@@ -1114,7 +1122,8 @@ function pf_procederGuardado() {
       cliente: clienteData,
       productos: productos,
       observaciones: observaciones,
-      facturador_id: facturadorInput?.value || null
+  facturador_id: facturadorInput?.value || null,
+  t: document.getElementById('proformador_token')?.value || null
     };
     
     console.log('📤 Enviando datos al servidor:', datosProforma);
@@ -1132,7 +1141,22 @@ function pf_procederGuardado() {
     .then(data => {
       if (data.success) {
         alert('✅ Proforma guardada exitosamente');
-        // Opcionalmente limpiar el formulario
+        // Calcular siguiente código a mostrar
+        try {
+          const actual = String(data.proforma_numero || '').trim();
+          let nextCode = '';
+          if (actual) {
+            const digits = (actual.match(/(\d+)/) || [,'0'])[1];
+            const n = parseInt(digits, 10) || 0;
+            nextCode = 'PR' + String(n + 1).padStart(Math.max(6, digits.length || 6), '0');
+          }
+          if (nextCode) {
+            window.PROFORMA_NEXT_CODE = nextCode;
+            const codigoInput = document.getElementById('codigo_proforma');
+            if (codigoInput) codigoInput.value = nextCode;
+          }
+        } catch (e) { console.warn('No se pudo calcular siguiente código:', e); }
+        // Limpiar el formulario
         limpiarProforma();
       } else {
         alert('❌ Error al guardar: ' + (data.message || 'Error desconocido'));

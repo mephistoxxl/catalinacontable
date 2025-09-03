@@ -90,51 +90,61 @@ class EmitirProforma(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
-        """Muestra el formulario para emitir proforma"""
+        """Muestra el formulario para emitir proforma; SIEMPRE exige login de proformador.
+        Se valida mediante un token firmado de un solo uso temporal enviado desde el login.
+        """
         try:
-            # ✅ VERIFICAR QUE HAY UN FACTURADOR EN SESIÓN
-            facturador_id = request.session.get('facturador_id')
-            if not facturador_id:
-                messages.warning(request, 'Debe iniciar sesión como facturador antes de emitir proformas.')
-                return redirect('inventario:login_proformador')
+            from django.core import signing
 
             # Verificar empresa activa
             empresa_id = request.session.get('empresa_activa')
             if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
                 return redirect('inventario:seleccionar_empresa')
 
-            # Verificar que el facturador existe, está activo y corresponde a la empresa activa (si aplica)
+            # Requerir token firmado en la URL (emitido por LoginProformador)
+            token = request.GET.get('t')
+            if not token:
+                messages.warning(request, 'Debe iniciar sesión como facturador antes de emitir proformas.')
+                return redirect('inventario:login_proformador')
+
             try:
-                facturador = Facturador.objects.get(id=facturador_id, activo=True)
-                # Si el modelo de Facturador tiene relación con empresa, validar que coincida
-                if hasattr(facturador, 'empresa_id') and facturador.empresa_id and facturador.empresa_id != int(empresa_id):
-                    messages.error(request, 'El facturador no pertenece a la empresa activa. Inicie sesión nuevamente como facturador.')
-                    request.session.pop('facturador_id', None)
-                    request.session.pop('facturador_nombre', None)
-                    return redirect('inventario:login_proformador')
-            except Facturador.DoesNotExist:
+                data = signing.loads(token, salt='proformador', max_age=120)
+                facturador_id = data.get('fid')
+            except Exception:
+                messages.error(request, 'Sesión de proformador expirada. Inicie sesión nuevamente.')
+                return redirect('inventario:login_proformador')
+
+            # Validar facturador activo y que pertenezca a la empresa si aplica
+            facturador = Facturador.objects.filter(id=facturador_id, activo=True).first()
+            if not facturador:
                 messages.error(request, 'El facturador no existe o no está activo.')
-                # Limpiar sesión de facturador inválido
-                request.session.pop('facturador_id', None)
-                request.session.pop('facturador_nombre', None)
+                return redirect('inventario:login_proformador')
+            if hasattr(facturador, 'empresa_id') and facturador.empresa_id and facturador.empresa_id != int(empresa_id):
+                messages.error(request, 'El facturador no pertenece a la empresa activa. Inicie sesión nuevamente.')
                 return redirect('inventario:login_proformador')
 
             from .forms import EmitirProformaFormulario
-            
             # Obtener almacenes y vendedores (facturadores) activos
             almacenes = Almacen.objects.filter(activo=True)
             vendedores = Facturador.objects.filter(activo=True)
-            
-            # Crear el formulario con los datos
+
             form = EmitirProformaFormulario(almacenes=almacenes, vendedores=vendedores)
-            
+            # Calcular el siguiente código de proforma para mostrar en la UI
+            try:
+                from .models import Proforma, Empresa as _Empresa
+                empresa_obj = _Empresa.objects.get(id=empresa_id)
+                siguiente_codigo = Proforma.siguiente_numero(empresa_obj)
+            except Exception:
+                siguiente_codigo = 'PR000001'
             contexto = {
                 'form': form,
-                'facturador': facturador  # ✅ AGREGAR INFO DEL FACTURADOR
+                'facturador': facturador,
+                'proformador_token': token,
+                'proforma_siguiente_numero': siguiente_codigo,
             }
             contexto = complementarContexto(contexto, request.user)
             return render(request, 'inventario/proforma/emitirProforma.html', contexto)
-            
+
         except Exception as e:
             print(f"Error en EmitirProforma GET: {e}")
             messages.error(request, 'Error interno del servidor.')
@@ -158,6 +168,16 @@ class EmitirProforma(LoginRequiredMixin, View):
             try:
                 import json
                 data = json.loads(request.body)
+                # Requiere token de proformador en payload para cada emisión
+                from django.core import signing
+                token = data.get('t')
+                if not token:
+                    return JsonResponse({'success': False, 'message': 'Debe iniciar sesión como facturador para emitir proformas.'})
+                try:
+                    token_data = signing.loads(token, salt='proformador', max_age=120)
+                    facturador_id = token_data.get('fid')
+                except Exception:
+                    return JsonResponse({'success': False, 'message': 'Sesión de proformador expirada. Inicie sesión nuevamente.'})
                 
                 # Validar datos básicos
                 cliente_data = data.get('cliente', {})
@@ -213,37 +233,10 @@ class EmitirProforma(LoginRequiredMixin, View):
                         'message': 'Debe seleccionar o crear un cliente válido'
                     })
                 
-                # Crear la proforma
-                # 0) Si el cliente envía explícitamente un facturador_id (hidden), usarlo
-                facturador = None
-                payload_fact_id = data.get('facturador_id')
-                if payload_fact_id:
-                    facturador = Facturador.objects.filter(id=payload_fact_id, activo=True).first()
-                    if facturador and hasattr(facturador, 'empresa_id') and facturador.empresa_id and facturador.empresa_id != empresa.id:
-                        facturador = None
-
-                # 1) Intentar usar el facturador autenticado en sesión
-                if not facturador:
-                    session_fact_id = request.session.get('facturador_id')
-                    if session_fact_id:
-                        facturador = Facturador.objects.filter(id=session_fact_id, activo=True).first()
-                        # Validar pertenencia a la empresa activa si el modelo lo soporta
-                        if facturador and hasattr(facturador, 'empresa_id') and facturador.empresa_id and facturador.empresa_id != empresa.id:
-                            facturador = None
-
-                # 2) Fallback: tomar cualquier facturador activo de la empresa
-                if not facturador:
-                    facturador = Facturador.objects.filter(empresa=empresa, activo=True).first()
-
-                # 3) Último recurso: cualquier facturador activo del sistema
-                if not facturador:
-                    facturador = Facturador.objects.filter(activo=True).first()
-
-                if not facturador:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'No hay facturador activo configurado para la empresa'
-                    })
+                # Resolver facturador únicamente desde el token (no se persiste en sesión)
+                facturador = Facturador.objects.filter(id=facturador_id, activo=True).first()
+                if not facturador or (hasattr(facturador, 'empresa_id') and facturador.empresa_id and facturador.empresa_id != empresa.id):
+                    return JsonResponse({'success': False, 'message': 'Facturador inválido. Inicie sesión nuevamente.'})
                 
                 proforma = Proforma.objects.create(
                     empresa=empresa,
@@ -307,6 +300,18 @@ class EmitirProforma(LoginRequiredMixin, View):
         almacenes = Almacen.objects.filter(activo=True)
         vendedores = Facturador.objects.filter(activo=True)
         form = EmitirProformaFormulario(request.POST, almacenes=almacenes, vendedores=vendedores)
+        # Validar token mínimo en POST clásico
+        from django.core import signing
+        token = request.POST.get('t')
+        if not token:
+            messages.warning(request, 'Debe iniciar sesión como facturador antes de emitir proformas.')
+            return redirect('inventario:login_proformador')
+        try:
+            token_data = signing.loads(token, salt='proformador', max_age=120)
+            facturador_id = token_data.get('fid')
+        except Exception:
+            messages.error(request, 'Sesión de proformador expirada. Inicie sesión nuevamente.')
+            return redirect('inventario:login_proformador')
         
         if form.is_valid():
             # Procesar cliente
@@ -350,7 +355,8 @@ class EmitirProforma(LoginRequiredMixin, View):
             'form': form,
             'proformador': {
                 'nombres': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
-            }
+            },
+            'proformador_token': token,
         }
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/proforma/emitirProforma.html', contexto)
@@ -4220,12 +4226,12 @@ class LoginProformador(View):
                     break
             
             if facturador_valido:
-                # Guardar la sesión del facturador
-                request.session['facturador_id'] = facturador_valido.id
-                request.session['facturador_nombre'] = facturador_valido.nombres
-                
+                # Emitir token firmado de 2 minutos de validez, no guardar en sesión
+                from django.core import signing
+                token = signing.dumps({'fid': facturador_valido.id}, salt='proformador')
                 messages.success(request, f'Bienvenido {facturador_valido.nombres}')
-                return redirect('inventario:emitirProforma')
+                # Redirigir a emisión con token en la URL
+                return redirect(f"/inventario/proformas/emitir/?t={token}")
             else:
                 messages.error(request, 'Contraseña incorrecta. Verifique e intente nuevamente.')
                 return render(request, 'inventario/facturador/login_proformador.html')

@@ -3308,15 +3308,45 @@ class Proforma(models.Model):
         help_text="Factura generada a partir de esta proforma"
     )
     
+    @classmethod
+    def siguiente_numero(cls, empresa):
+        """Calcula el siguiente código secuencial por empresa.
+        Formato: PR000001 (prefijo PR + 6 dígitos). Ignora formatos viejos (p.ej. PF-000001).
+        """
+        from django.db.models import F
+
+        max_n = 0
+        # Recorremos solo los números existentes de esa empresa
+        for cod in cls.objects.filter(empresa=empresa).values_list('numero', flat=True):
+            if not cod:
+                continue
+            # Extraer parte numérica
+            digits = ''.join(ch for ch in str(cod) if ch.isdigit())
+            try:
+                n = int(digits)
+            except (TypeError, ValueError):
+                continue
+            if n > max_n:
+                max_n = n
+        return f"PR{max_n + 1:06d}"
+
     def save(self, *args, **kwargs):
         """Guarda la proforma y calcula automáticamente los totales"""
-        # Generar número automáticamente si no existe
-        if not self.numero:
-            ultimo_numero = Proforma.objects.filter(
-                empresa=self.empresa
-            ).count()
-            self.numero = f"PF-{(ultimo_numero + 1):06d}"
-        
+        # Generar número automáticamente si no existe (por empresa)
+        if not self.numero and self.empresa_id:
+            # Intentar pocas veces en caso de colisión por concurrencia
+            intentos = 0
+            while intentos < 5:
+                candidato = Proforma.siguiente_numero(self.empresa)
+                if not Proforma.objects.filter(empresa=self.empresa, numero=candidato).exists():
+                    self.numero = candidato
+                    break
+                intentos += 1
+            if not self.numero:
+                # Último recurso: asignar usando timestamp para evitar choque (muy raro)
+                import time
+                self.numero = f"PR{int(time.time()) % 1000000:06d}"
+
         # Calcular totales antes de guardar
         if self.pk:
             self.calcular_totales()
