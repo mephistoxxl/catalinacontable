@@ -47,6 +47,15 @@
   .text-right input { text-align: right; }
   /* Card for top section (above the table) */
   .form-card { box-shadow: inset 0 0 0 1px #e5e7eb; }
+  
+  /* Estilos para botones del modal de confirmación */
+  #pf-modal-confirmar-eliminacion button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  #pf-modal-confirmar-eliminacion button:active {
+    transform: translateY(0);
+  }
 </style>
 
 <div class="bg-gray-50 p-3">
@@ -60,9 +69,14 @@
             <p class="text-gray-300 text-[11px] hidden sm:block">Similar a la factura, sin pagos ni envío al SRI</p>
           </div>
         </div>
-        {% if proformador %}
+        {% if facturador %}
         <div class="text-right">
-          <p class="text-gray-300 text-xs"><i class="fa fa-user-circle mr-1"></i>{{ proformador.nombres }}</p>
+          <p class="text-gray-300 text-xs">
+            <i class="fa fa-user-circle mr-1"></i>{{ facturador.nombres }}
+          </p>
+          <a href="{% url 'inventario:login_proformador' %}" class="text-blue-300 hover:text-blue-200 text-xs">
+            <i class="fa fa-sign-out mr-1"></i>Cambiar
+          </a>
         </div>
         {% endif %}
       </div>
@@ -78,11 +92,21 @@
       <div class="p-3">
         <form method="POST" action="{% url 'inventario:emitirProforma' %}" class="space-y-3" id="formProforma">
           {% csrf_token %}
+          {% if facturador %}
+          <input type="hidden" id="facturador_id" name="facturador_id" value="{{ facturador.id }}" />
+          {% endif %}
 
           <div class="form-card rounded-md border border-gray-300 bg-white p-3 mb-3">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <!-- Columna izquierda -->
               <div class="space-y-2">
+
+                <div class="grid grid-cols-3 gap-2 items-center">
+                  <label class="col-span-1">Código Proforma:</label>
+                  <div class="col-span-2">
+                    <input type="text" id="codigo_proforma" name="codigo_proforma" class="w-full border rounded px-2 py-1 bg-gray-100" readonly value="PR00001">
+                  </div>
+                </div>
 
                 <div class="grid grid-cols-3 gap-2 items-center">
                   <label class="col-span-1">C.I/RUC:</label>
@@ -117,7 +141,7 @@
                 <div class="grid grid-cols-2 gap-2 items-center">
                   <label>Facturador:</label>
                   <select class="border rounded px-2 py-1 bg-gray-100" disabled>
-                    <option>{% if user.is_authenticated %}{{ user.first_name }} {{ user.last_name }}{% else %}Usuario{% endif %}</option>
+                    <option>{% if facturador %}{{ facturador.nombres }}{% else %}Sin facturador{% endif %}</option>
                   </select>
                 </div>
                 <div class="grid grid-cols-2 gap-2 items-center">
@@ -152,7 +176,7 @@
                 <i class="fas fa-search text-blue-600 mr-2"></i>
                 <h5 class="text-sm font-medium text-gray-800">Buscar Producto / Servicio</h5>
               </div>
-              <div class="grid grid-cols-1 md:grid-cols-6 gap-2 items-end">
+              <div class="grid grid-cols-1 md:grid-cols-7 gap-2 items-end">
                 <div class="md:col-span-2">
                   <label for="codigo_producto" class="block text-xs font-medium text-gray-700 mb-1">Código</label>
                   <input type="text" id="codigo_producto" class="w-full border rounded px-2 py-1" placeholder="Código" />
@@ -161,9 +185,15 @@
                   <label for="producto_display" class="block text-xs font-medium text-gray-700 mb-1">Producto</label>
                   <input type="text" id="producto_display" class="w-full bg-gray-100 border rounded px-2 py-1" placeholder="Nombre del producto" disabled>
                 </div>
-                <div class="md:col-span-1 flex gap-2">
-                  <button type="button" onclick="pf_buscarProducto()" class="inline-flex items-center px-3 py-2 border border-gray-300 text-xs rounded-md bg-white hover:bg-gray-50"><i class="fa fa-search mr-1"></i>Buscar</button>
-                  <button type="button" onclick="pf_agregarProducto()" class="inline-flex items-center px-3 py-2 border border-transparent text-xs rounded-md text-white bg-green-600 hover:bg-green-700"><i class="fa fa-plus mr-1"></i>Agregar</button>
+                <div class="md:col-span-1">
+                  <button type="button" onclick="pf_buscarProducto()" class="w-full inline-flex items-center justify-center px-2 py-2 border border-gray-300 text-xs rounded-md bg-white hover:bg-gray-50">
+                    <i class="fa fa-search mr-1"></i>Buscar
+                  </button>
+                </div>
+                <div class="md:col-span-1">
+                  <button type="button" onclick="pf_agregarProducto()" class="w-full inline-flex items-center justify-center px-2 py-2 border border-transparent text-xs rounded-md text-white bg-green-600 hover:bg-green-700">
+                    <i class="fa fa-plus mr-1"></i>Agregar
+                  </button>
                 </div>
               </div>
             </div>
@@ -181,10 +211,11 @@
                       <th class="px-2 py-1 text-right w-20">Desc. %</th>
                       <th class="px-2 py-1 text-right w-16">IVA</th>
                       <th class="px-2 py-1 text-right w-28">Total</th>
+                      <th class="px-2 py-1 text-center w-12">Acción</th>
                     </tr>
                   </thead>
                   <tbody id="proforma-rows">
-                    <!-- Fila plantilla; el JS duplicará hasta 12 filas vacías -->
+                    <!-- Fila plantilla; el JS duplicará hasta 7 filas vacías -->
                     <tr class="border-t">
                       <td class="px-2 py-1"><input name="codigo[]" class="w-full border rounded px-2 py-1" readonly /></td>
                       <td class="px-2 py-1"><input name="descripcion[]" class="w-full border rounded px-2 py-1" readonly /></td>
@@ -193,6 +224,11 @@
                       <td class="px-2 py-1 text-right"><input name="descuento[]" type="number" step="0.01" value="" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()" /></td>
                       <td class="px-2 py-1 text-right pf-iva-cell"><span class="pf-iva" data-iva="0.15" title="Click para cambiar IVA">15%</span><input type="hidden" name="iva[]" value="0.15"></td>
                       <td class="px-2 py-1 text-right"><span class="pf-total">0.00</span></td>
+                      <td class="px-2 py-1 text-center">
+                        <button type="button" onclick="pf_eliminarFila(this)" class="inline-flex items-center justify-center w-6 h-6 border border-red-300 text-red-600 bg-red-50 hover:bg-red-100 rounded text-xs" title="Eliminar producto">
+                          <i class="fa fa-trash"></i>
+                        </button>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -219,10 +255,32 @@
             {{ form.observaciones }}
           </div>
 
-          <div class="flex justify-end pt-2 border-t border-gray-200">
-            <button type="submit" class="inline-flex items-center px-4 py-1 text-xs font-medium rounded-md text-white bg-gray-800 hover:bg-black">
-              <i class="fa fa-save mr-2 text-xs"></i> Guardar Proforma
-            </button>
+          <div class="flex flex-col sm:flex-row justify-between items-center gap-3 pt-3 border-t border-gray-200">
+            <!-- Botones de acción izquierda -->
+            <div class="flex flex-wrap gap-2">
+              <button type="button" onclick="limpiarProforma()" class="inline-flex items-center px-3 py-2 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <i class="fa fa-eraser mr-1"></i> Limpiar
+              </button>
+              <button type="button" onclick="duplicarProforma()" class="inline-flex items-center px-3 py-2 border border-gray-300 text-xs font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <i class="fa fa-copy mr-1"></i> Duplicar
+              </button>
+            </div>
+            
+            <!-- Botones de acción derecha -->
+            <div class="flex flex-wrap gap-2">
+              <button type="button" onclick="vistaPreviaProforma()" class="inline-flex items-center px-3 py-2 border border-blue-300 text-xs font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <i class="fa fa-eye mr-1"></i> Vista Previa
+              </button>
+              <button type="button" onclick="imprimirProforma()" class="inline-flex items-center px-3 py-2 border border-purple-300 text-xs font-medium rounded-md text-purple-700 bg-purple-50 hover:bg-purple-100 focus:outline-none focus:ring-1 focus:ring-purple-500">
+                <i class="fa fa-print mr-1"></i> Imprimir
+              </button>
+              <button type="button" onclick="exportarPDF()" class="inline-flex items-center px-3 py-2 border border-red-300 text-xs font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-1 focus:ring-red-500">
+                <i class="fa fa-file-pdf mr-1"></i> PDF
+              </button>
+              <button type="button" onclick="pf_guardarProforma()" class="inline-flex items-center px-4 py-2 text-xs font-medium rounded-md text-white bg-gray-800 hover:bg-black focus:outline-none focus:ring-2 focus:ring-gray-500">
+                <i class="fa fa-save mr-1"></i> Guardar Proforma
+              </button>
+            </div>
           </div>
         </form>
       </div>
@@ -230,7 +288,62 @@
   </div>
 </div>
 
+<!-- Espacio adicional para evitar solapamiento con footer -->
+<div style="height: 120px;"></div>
+
 <script>
+// Función de búsqueda de cliente para proforma - DEFINIDA PRIMERO
+function buscarCliente() {
+  const cedula = document.getElementById('id_identificacion_cliente').value.trim();
+  
+  if (!cedula) {
+    alert('Por favor, ingrese una cédula o RUC para buscar.');
+    return;
+  }
+
+  console.log('Buscando cliente:', cedula);
+
+  fetch(`/inventario/buscar_cliente/?q=${cedula}`)
+    .then(response => response.json())
+    .then(data => {
+      console.log('Respuesta del servidor:', data);
+      
+      if (data.error) {
+        alert(data.message || 'Cliente no encontrado.');
+        const nombreCliente = document.getElementById('id_nombre_cliente');
+        const clienteId = document.getElementById('cliente_id');
+        const correoCliente = document.getElementById('id_correo_cliente');
+        if (nombreCliente) nombreCliente.value = '';
+        if (clienteId) clienteId.value = '';
+        if (correoCliente) correoCliente.value = '';
+        return;
+      }
+
+      const nombreCliente = document.getElementById('id_nombre_cliente');
+      const clienteId = document.getElementById('cliente_id');
+      const correoCliente = document.getElementById('id_correo_cliente');
+      
+      console.log('Elementos encontrados:', {
+        nombreCliente: nombreCliente,
+        clienteId: clienteId,
+        correoCliente: correoCliente
+      });
+      
+      const nombreCompleto = data.nombre_comercial ? `${data.razon_social} ${data.nombre_comercial}` : data.razon_social;
+      console.log('Nombre a asignar:', nombreCompleto);
+      
+      if (nombreCliente) nombreCliente.value = nombreCompleto;
+      if (clienteId) clienteId.value = data.id;
+      if (correoCliente) correoCliente.value = data.correo || '';
+      
+      console.log('Campos actualizados');
+    })
+    .catch(error => {
+      console.error('Error al buscar cliente:', error);
+      alert('Error de conexión al buscar cliente.');
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   const hoy = new Date().toISOString().split('T')[0];
   const fechaEmision = document.getElementById('id_fecha_emision');
@@ -240,6 +353,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const d = new Date(); d.setDate(d.getDate() + 7); // 7 días por defecto
     fechaValidez.value = d.toISOString().split('T')[0];
   }
+
+  // Generar código de proforma automáticamente
+  generarCodigoProforma();
+
   // Enter en código para buscar
   const codigoInput = document.getElementById('codigo_producto');
   if (codigoInput) {
@@ -257,7 +374,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // Inicializa 12 filas vacías del grid
+  // Inicializa 7 filas vacías del grid
   const tbody = document.getElementById('proforma-rows');
   if (tbody) {
     const template = tbody.firstElementChild?.cloneNode(true);
@@ -265,7 +382,7 @@ document.addEventListener('DOMContentLoaded', function() {
       template.querySelectorAll('input').forEach(i => i.value = '');
       const totalCell = template.querySelector('.pf-total'); if (totalCell) totalCell.textContent = '0.00';
       tbody.innerHTML = '';
-      for (let i = 0; i < 12; i++) tbody.appendChild(template.cloneNode(true));
+      for (let i = 0; i < 7; i++) tbody.appendChild(template.cloneNode(true));
     }
   }
 
@@ -668,42 +785,406 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Función de búsqueda de cliente para proforma
-function buscarCliente() {
-  const cedula = document.getElementById('id_identificacion_cliente').value.trim();
-  
-  if (!cedula) {
-    alert('Por favor, ingrese una cédula o RUC para buscar.');
+// --- Funciones de acciones de proforma ---
+function limpiarProforma() {
+  if (confirm('¿Está seguro de que desea limpiar todos los campos de la proforma?')) {
+    // Limpiar campos del cliente
+    const identificacion = document.getElementById('id_identificacion_cliente');
+    const nombreCliente = document.getElementById('id_nombre_cliente');
+    const correoCliente = document.getElementById('id_correo_cliente');
+    const clienteId = document.getElementById('cliente_id');
+    const concepto = document.getElementById('id_concepto');
+    const observaciones = document.getElementById('id_observaciones');
+    
+    if (identificacion) identificacion.value = '';
+    if (nombreCliente) nombreCliente.value = '';
+    if (correoCliente) correoCliente.value = '';
+    if (clienteId) clienteId.value = '';
+    if (concepto) concepto.value = '';
+    if (observaciones) observaciones.value = '';
+    
+    // Limpiar campos de búsqueda de productos
+    const codigoProd = document.getElementById('codigo_producto');
+    const prodDisplay = document.getElementById('producto_display');
+    if (codigoProd) codigoProd.value = '';
+    if (prodDisplay) prodDisplay.value = '';
+    
+    // Limpiar todas las filas de productos
+    const rows = document.querySelectorAll('#proforma-rows tr');
+    rows.forEach(row => {
+      const inputs = row.querySelectorAll('input');
+      inputs.forEach(input => {
+        if (input.type !== 'hidden') {
+          input.value = '';
+        } else if (input.name === 'iva[]') {
+          input.value = '0.15';
+        }
+      });
+      
+      const ivaSpan = row.querySelector('.pf-iva');
+      const totalSpan = row.querySelector('.pf-total');
+      if (ivaSpan) {
+        ivaSpan.dataset.iva = '0.15';
+        ivaSpan.textContent = '15%';
+      }
+      if (totalSpan) totalSpan.textContent = '0.00';
+    });
+    
+    // Recalcular totales
+    pf_recalc();
+    
+    // Regenerar código de proforma
+    generarCodigoProforma();
+    
+    console.log('✨ Proforma limpiada completamente');
+  }
+}
+
+function duplicarProforma() {
+  alert('Función duplicar proforma en desarrollo. Se creará una copia de la proforma actual.');
+  console.log('📋 Duplicando proforma...');
+}
+
+function vistaPreviaProforma() {
+  const form = document.getElementById('formProforma');
+  if (!form) {
+    alert('Error: No se encontró el formulario');
     return;
   }
+  
+  // Crear un formulario temporal para vista previa
+  const tempForm = form.cloneNode(true);
+  tempForm.target = '_blank';
+  tempForm.action = form.action + '?preview=1';
+  
+  document.body.appendChild(tempForm);
+  tempForm.submit();
+  document.body.removeChild(tempForm);
+  
+  console.log('👁️ Abriendo vista previa de proforma...');
+}
 
-  fetch(`/inventario/buscar_cliente/?q=${cedula}`)
+function imprimirProforma() {
+  if (confirm('¿Desea guardar la proforma antes de imprimir?')) {
+    // Guardar primero, luego imprimir
+    const form = document.getElementById('formProforma');
+    if (form) {
+      const tempForm = form.cloneNode(true);
+      tempForm.target = '_blank';
+      tempForm.action = form.action + '?print=1';
+      
+      document.body.appendChild(tempForm);
+      tempForm.submit();
+      document.body.removeChild(tempForm);
+    }
+  }
+  console.log('🖨️ Preparando impresión de proforma...');
+}
+
+function exportarPDF() {
+  const form = document.getElementById('formProforma');
+  if (!form) {
+    alert('Error: No se encontró el formulario');
+    return;
+  }
+  
+  // Crear formulario temporal para PDF
+  const tempForm = form.cloneNode(true);
+  tempForm.target = '_blank';
+  tempForm.action = form.action + '?pdf=1';
+  
+  document.body.appendChild(tempForm);
+  tempForm.submit();
+  document.body.removeChild(tempForm);
+  
+  console.log('📄 Generando PDF de proforma...');
+}
+
+// Función para eliminar una fila de producto
+let pf_filaAEliminar = null; // Variable global para guardar referencia de la fila
+
+function pf_eliminarFila(button) {
+  try {
+    console.log('🗑️ Solicitando eliminación de fila...');
+    
+    const row = button.closest('tr');
+    if (!row) {
+      console.error('❌ No se encontró la fila a eliminar');
+      return;
+    }
+    
+    // Verificar si la fila tiene datos
+    const codigoInput = row.querySelector('input[name="codigo[]"]');
+    const descripcionInput = row.querySelector('input[name="descripcion[]"]');
+    
+    const tieneDatos = (codigoInput && codigoInput.value.trim()) || 
+                      (descripcionInput && descripcionInput.value.trim());
+    
+    if (tieneDatos) {
+      // Guardar referencia de la fila y mostrar modal
+      pf_filaAEliminar = row;
+      
+      // Llenar información del modal
+      const codigo = codigoInput ? codigoInput.value.trim() : '';
+      const descripcion = descripcionInput ? descripcionInput.value.trim() : '';
+      
+      document.getElementById('pf-eliminar-codigo').textContent = codigo || '(Sin código)';
+      document.getElementById('pf-eliminar-descripcion').textContent = descripcion || '(Sin descripción)';
+      
+      // Mostrar modal
+      document.getElementById('pf-modal-confirmar-eliminacion').style.display = 'block';
+    } else {
+      // Si no hay datos, eliminar directamente sin confirmación
+      pf_ejecutarEliminacion(row);
+    }
+    
+  } catch (error) {
+    console.error('💥 Error al solicitar eliminación:', error);
+    alert('Error al procesar la eliminación. Intente nuevamente.');
+  }
+}
+
+function pf_cancelarEliminacion() {
+  console.log('❌ Eliminación cancelada por el usuario');
+  document.getElementById('pf-modal-confirmar-eliminacion').style.display = 'none';
+  pf_filaAEliminar = null;
+}
+
+function pf_confirmarEliminacion() {
+  console.log('✅ Eliminación confirmada por el usuario');
+  
+  if (pf_filaAEliminar) {
+    pf_ejecutarEliminacion(pf_filaAEliminar);
+    pf_filaAEliminar = null;
+  }
+  
+  document.getElementById('pf-modal-confirmar-eliminacion').style.display = 'none';
+}
+
+function pf_ejecutarEliminacion(row) {
+  try {
+    console.log('🗑️ Ejecutando eliminación de fila...');
+    
+    // Limpiar todos los campos de la fila
+    const inputs = row.querySelectorAll('input');
+    inputs.forEach(input => {
+      if (input.type !== 'hidden') {
+        input.value = '';
+      } else if (input.name === 'iva[]') {
+        input.value = '0.15';
+      }
+    });
+    
+    // Resetear IVA y total
+    const ivaSpan = row.querySelector('.pf-iva');
+    const totalSpan = row.querySelector('.pf-total');
+    
+    if (ivaSpan) {
+      ivaSpan.dataset.iva = '0.15';
+      ivaSpan.textContent = '15%';
+    }
+    
+    if (totalSpan) {
+      totalSpan.textContent = '0.00';
+    }
+    
+    // Recalcular totales
+    pf_recalc();
+    
+    console.log('✅ Fila eliminada exitosamente');
+    
+  } catch (error) {
+    console.error('💥 Error al ejecutar eliminación:', error);
+    alert('Error al eliminar el producto. Intente nuevamente.');
+  }
+}
+
+// Función para generar código de proforma automáticamente
+function generarCodigoProforma() {
+  console.log('🔢 Generando código de proforma...');
+  
+  // Por el momento usar código fijo hasta que el backend esté listo
+  const codigoInput = document.getElementById('codigo_proforma');
+  if (codigoInput && (!codigoInput.value || codigoInput.value.length < 5)) {
+    codigoInput.value = 'PR00001';
+    console.log('✅ Código de proforma establecido: PR00001');
+  }
+}
+
+// ===== FUNCIÓN PARA GUARDAR PROFORMA =====
+function pf_guardarProforma() {
+  console.log('💾 Iniciando proceso de guardado de proforma...');
+  
+  try {
+    // 1. Validar que haya productos
+    const productosTabla = document.querySelectorAll('#proforma-rows tr');
+    console.log('🔍 Filas encontradas:', productosTabla.length);
+    
+    // Filtrar solo las filas que tienen productos (código no vacío)
+    const filasConProductos = Array.from(productosTabla).filter(fila => {
+      const codigoInput = fila.querySelector('input[name="codigo[]"]');
+      return codigoInput && codigoInput.value.trim() !== '';
+    });
+    
+    console.log('📦 Filas con productos:', filasConProductos.length);
+    
+    if (filasConProductos.length === 0) {
+      alert('❌ Debe agregar al menos un producto a la proforma');
+      return;
+    }
+
+    // 2. Validar datos del cliente básicamente
+    const identificacionInput = document.querySelector('input[name="identificacion_cliente"]');
+    const nombreInput = document.querySelector('input[name="nombre_cliente"]');
+    
+    if (!identificacionInput?.value?.trim() || !nombreInput?.value?.trim()) {
+      alert('❌ Debe seleccionar o ingresar datos de cliente válidos');
+      return;
+    }
+
+    // 3. Proceder directamente con el guardado (el facturador ya está autenticado en sesión)
+    pf_procederGuardado();
+    
+  } catch (error) {
+    console.error('💥 Error en pf_guardarProforma:', error);
+    alert('❌ Error inesperado al guardar. Intente nuevamente.');
+  }
+}
+
+function pf_procederGuardado() {
+  console.log('💾 Procediendo con el guardado de la proforma...');
+  
+  try {
+    // Obtener datos del cliente
+    const clienteData = {};
+  // Facturador actual (desde hidden)
+  const facturadorInput = document.getElementById('facturador_id');
+    const clienteIdInput = document.querySelector('input[name="cliente_id"]');
+    const identificacionInput = document.querySelector('input[name="identificacion_cliente"]');
+    const nombreInput = document.querySelector('input[name="nombre_cliente"]');
+    const correoInput = document.querySelector('input[name="correo_cliente"]');
+    
+    if (clienteIdInput && clienteIdInput.value) {
+      clienteData.id = clienteIdInput.value;
+    }
+    if (identificacionInput && identificacionInput.value) {
+      clienteData.identificacion = identificacionInput.value;
+    }
+    if (nombreInput && nombreInput.value) {
+      clienteData.nombre = nombreInput.value;
+    }
+    if (correoInput && correoInput.value) {
+      clienteData.correo = correoInput.value;
+    }
+    
+    console.log('👤 Datos del cliente:', clienteData);
+    
+    // Obtener productos de la tabla
+    const productosTabla = document.querySelectorAll('#proforma-rows tr');
+    const productos = [];
+    
+    productosTabla.forEach(fila => {
+      const codigoInput = fila.querySelector('input[name="codigo[]"]');
+      const descripcionInput = fila.querySelector('input[name="descripcion[]"]');
+      const cantidadInput = fila.querySelector('input[name="cantidad[]"]');
+      const precioInput = fila.querySelector('input[name="precio[]"]');
+      const descuentoInput = fila.querySelector('input[name="descuento[]"]');
+      const ivaHidden = fila.querySelector('input[name="iva[]"]');
+      
+      if (codigoInput && codigoInput.value.trim()) {
+        productos.push({
+          codigo: codigoInput.value,
+          descripcion: descripcionInput?.value || '',
+          cantidad: parseFloat(cantidadInput?.value || '1'),
+          precio: parseFloat(precioInput?.value || '0'),
+          descuento: parseFloat(descuentoInput?.value || '0'),
+          iva: parseFloat(ivaHidden?.value || '0.15')
+        });
+      }
+    });
+    
+    console.log('📦 Productos:', productos);
+    
+    // Obtener observaciones
+    const observacionesInput = document.querySelector('textarea[name="observaciones"]');
+    const observaciones = observacionesInput?.value || '';
+    
+    // Enviar datos al servidor
+    const datosProforma = {
+      cliente: clienteData,
+      productos: productos,
+      observaciones: observaciones,
+      facturador_id: facturadorInput?.value || null
+    };
+    
+    console.log('📤 Enviando datos al servidor:', datosProforma);
+    
+    fetch('/inventario/proformas/emitir/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+      },
+      body: JSON.stringify(datosProforma)
+    })
     .then(response => response.json())
     .then(data => {
-      if (data.error) {
-        alert(data.message || 'Cliente no encontrado.');
-        const nombreCliente = document.getElementById('id_nombre_cliente');
-        const clienteId = document.getElementById('cliente_id');
-        const correoCliente = document.getElementById('id_correo_cliente');
-        if (nombreCliente) nombreCliente.value = '';
-        if (clienteId) clienteId.value = '';
-        if (correoCliente) correoCliente.value = '';
-        return;
+      if (data.success) {
+        alert('✅ Proforma guardada exitosamente');
+        // Opcionalmente limpiar el formulario
+        limpiarProforma();
+      } else {
+        alert('❌ Error al guardar: ' + (data.message || 'Error desconocido'));
       }
-
-      const nombreCliente = document.getElementById('id_nombre_cliente');
-      const clienteId = document.getElementById('cliente_id');
-      const correoCliente = document.getElementById('id_correo_cliente');
-      const nombreCompleto = data.nombre_comercial ? `${data.razon_social} ${data.nombre_comercial}` : data.razon_social;
-      if (nombreCliente) nombreCliente.value = nombreCompleto;
-      if (clienteId) clienteId.value = data.id;
-      if (correoCliente) correoCliente.value = data.correo || '';
     })
     .catch(error => {
-      console.error('Error al buscar cliente:', error);
-      alert('Error de conexión al buscar cliente.');
+      console.error('💥 Error en guardar proforma:', error);
+      alert('❌ Error de conexión al guardar la proforma. Verifique su conexión e intente nuevamente.');
     });
+    
+  } catch (error) {
+    console.error('💥 Error en pf_procederGuardado:', error);
+    alert('❌ Error inesperado al guardar. Intente nuevamente.');
+  }
 }
+  
+  // TODO: Implementar consulta al backend cuando esté disponible
+  /*
+  fetch('/inventario/obtener_ultimo_codigo_proforma/')
+    .then(response => response.json())
+    .then(data => {
+      let nuevoCodigo = 'PR00001'; // Código por defecto
+      
+      if (data.ultimo_codigo) {
+        console.log('📋 Último código encontrado:', data.ultimo_codigo);
+        
+        // Extraer el número del último código (PR00001 -> 1)
+        const match = data.ultimo_codigo.match(/PR(\d+)/);
+        if (match) {
+          const ultimoNumero = parseInt(match[1]);
+          const nuevoNumero = ultimoNumero + 1;
+          nuevoCodigo = `PR${String(nuevoNumero).padStart(5, '0')}`;
+        }
+      }
+      
+      console.log('✅ Nuevo código generado:', nuevoCodigo);
+      
+      // Asignar el nuevo código al campo
+      const codigoInput = document.getElementById('codigo_proforma');
+      if (codigoInput) {
+        codigoInput.value = nuevoCodigo;
+      }
+    })
+    .catch(error => {
+      console.error('❌ Error al generar código de proforma:', error);
+      // En caso de error, usar código por defecto
+      const codigoInput = document.getElementById('codigo_proforma');
+      if (codigoInput && !codigoInput.value) {
+        codigoInput.value = 'PR00001';
+      }
+    });
+  */
 </script>
 
 <!-- Modal productos para Proforma -->
@@ -727,5 +1208,52 @@ function buscarCliente() {
     <div id="pf-modal-vacio" style="display:none; padding:16px; color:#64748b;">Sin resultados.</div>
   </div>
   <div id="pf-modal-loader" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; z-index:1052;"><div class="spinner-border" role="status"><span class="sr-only">Cargando…</span></div></div>
+</div>
+
+<!-- Modal de confirmación de eliminación -->
+<div id="pf-modal-confirmar-eliminacion" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1060;">
+  <div style="background:#fff; width:90%; max-width:450px; border-radius:8px; box-shadow:0 15px 35px rgba(0,0,0,.1); margin:15vh auto; position:relative; z-index:1061;">
+    <!-- Header -->
+    <div style="display:flex; align-items:center; justify-content:center; padding:20px 20px 15px; border-bottom:1px solid #e5e7eb; background:#fef2f2; border-radius:8px 8px 0 0;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:40px; height:40px; background:#fee2e2; border-radius:50%; display:flex; align-items:center; justify-content:center;">
+          <i class="fa fa-exclamation-triangle" style="color:#dc2626; font-size:18px;"></i>
+        </div>
+        <div>
+          <h3 style="margin:0; color:#dc2626; font-size:16px; font-weight:600;">Confirmar eliminación</h3>
+          <p style="margin:2px 0 0; color:#7f1d1d; font-size:12px;">Esta acción no se puede deshacer</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Contenido -->
+    <div style="padding:20px;">
+      <p style="margin:0; color:#374151; font-size:14px; line-height:1.5; text-align:center;">
+        ¿Está seguro de que desea eliminar este producto de la proforma?
+      </p>
+      <div id="pf-producto-eliminar-info" style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:12px; margin:15px 0; font-size:12px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+          <strong style="color:#374151;">Código:</strong>
+          <span id="pf-eliminar-codigo" style="color:#6b7280;"></span>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+          <strong style="color:#374151;">Descripción:</strong>
+          <span id="pf-eliminar-descripcion" style="color:#6b7280; text-align:right; max-width:250px; word-wrap:break-word;"></span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Footer con botones -->
+    <div style="display:flex; justify-content:flex-end; gap:10px; padding:0 20px 20px; border-radius:0 0 8px 8px;">
+      <button type="button" onclick="pf_cancelarEliminacion()" 
+              style="padding:8px 16px; border:1px solid #d1d5db; background:#fff; color:#374151; border-radius:6px; font-size:12px; cursor:pointer; transition:all 0.15s;">
+        <i class="fa fa-times mr-1"></i>Cancelar
+      </button>
+      <button type="button" onclick="pf_confirmarEliminacion()" 
+              style="padding:8px 16px; border:1px solid #dc2626; background:#dc2626; color:#fff; border-radius:6px; font-size:12px; cursor:pointer; transition:all 0.15s;">
+        <i class="fa fa-trash mr-1"></i>Eliminar
+      </button>
+    </div>
+  </div>
 </div>
 {% endblock %}

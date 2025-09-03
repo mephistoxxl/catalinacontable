@@ -1,63 +1,140 @@
 {% extends "inventario/comun/base.html" %}
 {% block content %}
-<div class="p-3">
-  <div class="max-w-4xl mx-auto bg-white rounded-lg shadow border border-gray-200">
-    <div class="flex items-center justify-between px-3 py-2 border-b">
-      <h2 class="text-base font-semibold"><i class="fa fa-file-alt mr-2"></i>Proforma {{ proforma.numero }}</h2>
-      <div class="space-x-2">
-        <a href="{% url 'inventario:ride_proforma' proforma.id %}" class="px-3 py-1 text-xs rounded-md bg-gray-800 text-white hover:bg-black"><i class="fa fa-print mr-1"></i>Imprimir</a>
-      </div>
-    </div>
-    <div class="p-3 text-sm">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <div class="text-gray-600">Cliente</div>
-          <div class="font-medium">{{ proforma.cliente_nombre }}</div>
-          <div class="text-gray-600 mt-2">Identificación</div>
-          <div class="font-medium">{{ proforma.identificacion_cliente }}</div>
-        </div>
-        <div>
-          <div class="text-gray-600">Fecha Emisión</div>
-          <div class="font-medium">{{ proforma.fecha_emision }}</div>
-          <div class="text-gray-600 mt-2">Válida Hasta</div>
-          <div class="font-medium">{{ proforma.fecha_validez }}</div>
-        </div>
-      </div>
 
-      <div class="mt-3 overflow-x-auto">
-        <table class="min-w-full text-xs">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-2 py-2 text-left">Descripción</th>
-              <th class="px-2 py-2 text-right">Cant.</th>
-              <th class="px-2 py-2 text-right">P. Unit.</th>
-              <th class="px-2 py-2 text-right">Desc.</th>
-              <th class="px-2 py-2 text-right">Subtotal</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for d in proforma.detalles %}
-            <tr class="border-t">
-              <td class="px-2 py-2">{{ d.descripcion }}</td>
-              <td class="px-2 py-2 text-right">{{ d.cantidad }}</td>
-              <td class="px-2 py-2 text-right">{{ d.precio }}</td>
-              <td class="px-2 py-2 text-right">{{ d.descuento }}</td>
-              <td class="px-2 py-2 text-right">{{ d.subtotal }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+<style>
+  .tabla-compacta th { padding: 8px 12px !important; font-size: 11px !important; font-weight: 600 !important; }
+  .tabla-compacta td { padding: 6px 12px !important; font-size: 12px !important; }
+  .badge { border-radius: 9999px; padding: 2px 8px; font-size: 10px; font-weight: 600; display: inline-block; }
+  .badge-borrador { background-color: #eef2ff; color: #4338ca; }
+  .badge-enviada { background-color: #eff6ff; color: #1d4ed8; }
+  .badge-aprobada { background-color: #ecfdf5; color: #047857; }
+  .badge-rechazada { background-color: #fef2f2; color: #b91c1c; }
+  .badge-convertida { background-color: #f5f3ff; color: #6d28d9; }
+  .badge-vencida { background-color: #fff7ed; color: #c2410c; }
+</style>
 
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
-        <div></div><div></div>
-        <div class="space-y-1 border rounded-md p-2 bg-gray-50">
-          <div class="flex justify-between text-xs"><span>Total sin Impuestos:</span><span>{{ proforma.total_sin_impuestos }}</span></div>
-          <div class="flex justify-between text-xs"><span>Descuento:</span><span>{{ proforma.total_descuento }}</span></div>
-          <div class="flex justify-between text-xs font-semibold"><span>Importe Total:</span><span>{{ proforma.importe_total }}</span></div>
+<div class="bg-gray-50 p-3" style="padding-top: 8px; padding-bottom: 12px;">
+  <div class="max-w-5xl mx-auto">
+
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 rounded-lg">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center">
+          <i class="fa fa-file-invoice text-white text-base"></i>
+          <div class="ml-3">
+            <h2 class="text-base font-semibold text-white">Proforma {{ proforma.numero }}</h2>
+            <p class="text-gray-300 text-[11px]">Detalles completos de la proforma</p>
+          </div>
+        </div>
+        <div class="space-x-2">
+          <a href="{% url 'inventario:ride_proforma' proforma.id %}" class="px-3 py-1 text-xs rounded-md bg-gray-100 text-gray-900 hover:bg-white border border-gray-300"><i class="fa fa-download mr-1"></i>Descargar PDF</a>
         </div>
       </div>
     </div>
+
+    <!-- Card -->
+    <div class="bg-white rounded-lg shadow-lg border border-gray-200 mt-2">
+      <div class="p-3 text-sm">
+        <!-- Top info -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <div class="text-gray-600">Cliente</div>
+            <div class="font-medium">
+              {{ proforma.cliente.razon_social }}{% if proforma.cliente.nombre_comercial %} ({{ proforma.cliente.nombre_comercial }}){% endif %}
+            </div>
+            <div class="text-gray-600 mt-2">Identificación</div>
+            <div class="font-medium">{{ proforma.cliente.identificacion }}</div>
+            {% if proforma.cliente.correo %}
+              <div class="text-gray-600 mt-2">Correo</div>
+              <div class="font-medium">{{ proforma.cliente.correo }}</div>
+            {% endif %}
+            {% if proforma.cliente.telefono %}
+              <div class="text-gray-600 mt-2">Teléfono</div>
+              <div class="font-medium">{{ proforma.cliente.telefono }}</div>
+            {% endif %}
+            {% if proforma.cliente.direccion %}
+              <div class="text-gray-600 mt-2">Dirección</div>
+              <div class="font-medium">{{ proforma.cliente.direccion }}</div>
+            {% endif %}
+          </div>
+          <div>
+            <div class="text-gray-600">Fecha Emisión</div>
+            <div class="font-medium">{{ proforma.fecha_emision }}</div>
+            <div class="text-gray-600 mt-2">Válida Hasta</div>
+            <div class="font-medium">{{ proforma.fecha_vencimiento }}</div>
+            <div class="text-gray-600 mt-2">Estado</div>
+            <div>
+              {% with e=proforma.estado %}
+                <span class="badge {% if e == 'BORRADOR' %}badge-borrador{% elif e == 'ENVIADA' %}badge-enviada{% elif e == 'APROBADA' %}badge-aprobada{% elif e == 'RECHAZADA' %}badge-rechazada{% elif e == 'CONVERTIDA' %}badge-convertida{% elif e == 'VENCIDA' %}badge-vencida{% endif %}">{{ proforma.get_estado_display }}</span>
+              {% endwith %}
+            </div>
+            <div class="text-gray-600 mt-2">Proformador</div>
+            <div class="font-medium">{{ proforma.facturador.nombres }}{% if proforma.facturador.correo %} - {{ proforma.facturador.correo }}{% endif %}</div>
+            {% if proforma.almacen %}
+              <div class="text-gray-600 mt-2">Almacén</div>
+              <div class="font-medium">{{ proforma.almacen.descripcion }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Observaciones -->
+        {% if proforma.observaciones %}
+          <div class="mt-3">
+            <div class="text-gray-600 mb-1">Observaciones</div>
+            <div class="text-xs border rounded-md p-2 bg-gray-50 whitespace-pre-wrap">{{ proforma.observaciones }}</div>
+          </div>
+        {% endif %}
+
+        <!-- Detalles -->
+        <div class="mt-3 overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 tabla-compacta">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cant.</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">P. Unit.</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Desc. %</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Desc. $</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total línea</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              {% for d in proforma.detalles.all %}
+                <tr class="hover:bg-gray-50 transition-colors duration-150">
+                  <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ d.codigo }}</td>
+                  <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ d.descripcion }}</td>
+                  <td class="px-3 py-2 whitespace-nowrap text-xs text-right">{{ d.cantidad }}</td>
+                  <td class="px-3 py-2 whitespace-nowrap text-xs text-right">{{ d.precio_unitario }}</td>
+                  <td class="px-3 py-2 whitespace-nowrap text-xs text-right">{% if d.porcentaje_descuento > 0 %}{{ d.porcentaje_descuento }}%{% else %}-{% endif %}</td>
+                  <td class="px-3 py-2 whitespace-nowrap text-xs text-right">{{ d.descuento }}</td>
+                  <td class="px-3 py-2 whitespace-nowrap text-xs text-right">{{ d.subtotal }}</td>
+                  <td class="px-3 py-2 whitespace-nowrap text-xs text-right">{{ d.total }}</td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="8" class="px-3 py-6 text-center text-xs text-gray-500">No hay detalles en esta proforma</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Totales -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
+          <div></div><div></div>
+          <div class="space-y-1 border rounded-md p-2 bg-gray-50">
+            <div class="flex justify-between text-xs"><span>Subtotal:</span><span>{{ proforma.subtotal }}</span></div>
+            <div class="flex justify-between text-xs"><span>Descuento:</span><span>{{ proforma.total_descuento }}</span></div>
+            <div class="flex justify-between text-xs"><span>Impuestos (IVA):</span><span>{{ proforma.total_impuestos }}</span></div>
+            <div class="flex justify-between text-xs font-semibold"><span>Importe Total:</span><span>{{ proforma.total }}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
+
 {% endblock %}

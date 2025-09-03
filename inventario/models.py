@@ -10,6 +10,8 @@ from django.core.validators import (
     RegexValidator,
 )
 import logging
+import datetime
+from django.utils import timezone
 from .crypto_utils import EncryptedCharField
 # MODELOS
 
@@ -3193,6 +3195,402 @@ class Servicio(models.Model):
     class Meta:
         verbose_name = "Servicio"
         verbose_name_plural = "Servicios"
+
+
+# -----------------------------------PROFORMA-----------------------------------------
+class Proforma(models.Model):
+    """Modelo para manejar proformas/cotizaciones en el sistema"""
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='proformas',
+        null=False,
+        blank=False,
+    )
+    
+    # Datos de la proforma
+    numero = models.CharField(max_length=20, help_text="Número de proforma (ej: PF-000001)")
+    fecha_emision = models.DateField(help_text="Fecha de emisión de la proforma")
+    fecha_vencimiento = models.DateField(help_text="Fecha de vencimiento de la cotización")
+    
+    # Cliente relacionado
+    cliente = models.ForeignKey(
+        'Cliente', 
+        on_delete=models.CASCADE, 
+        help_text="Cliente al que se dirige la proforma"
+    )
+    
+    # Vendedor/facturador que crea la proforma
+    facturador = models.ForeignKey(
+        'Facturador',
+        on_delete=models.PROTECT,
+        related_name='proformas',
+        help_text="Facturador que emite la proforma"
+    )
+    
+    # Almacén opcional
+    almacen = models.ForeignKey(
+        'Almacen',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        help_text="Almacén desde donde se cotiza"
+    )
+    
+    # Observaciones generales
+    observaciones = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Observaciones o condiciones de la proforma"
+    )
+    
+    # Montos calculados
+    subtotal = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        default=0.00,
+        help_text="Subtotal sin impuestos"
+    )
+    
+    total_descuento = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        default=0.00,
+        help_text="Total de descuentos aplicados"
+    )
+    
+    total_impuestos = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        default=0.00,
+        help_text="Total de impuestos (IVA)"
+    )
+    
+    total = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        default=0.00,
+        help_text="Total final de la proforma"
+    )
+    
+    # Estado de la proforma
+    ESTADO_CHOICES = [
+        ('BORRADOR', 'Borrador'),
+        ('ENVIADA', 'Enviada'),
+        ('APROBADA', 'Aprobada'),
+        ('RECHAZADA', 'Rechazada'),
+        ('CONVERTIDA', 'Convertida a Factura'),
+        ('VENCIDA', 'Vencida'),
+    ]
+    
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_CHOICES,
+        default='BORRADOR',
+        help_text="Estado actual de la proforma"
+    )
+    
+    # Campos de auditoría
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+    creado_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.PROTECT,
+        help_text="Usuario que creó la proforma"
+    )
+    
+    # Factura generada (si se convierte)
+    factura = models.OneToOneField(
+        'Factura',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Factura generada a partir de esta proforma"
+    )
+    
+    def save(self, *args, **kwargs):
+        """Guarda la proforma y calcula automáticamente los totales"""
+        # Generar número automáticamente si no existe
+        if not self.numero:
+            ultimo_numero = Proforma.objects.filter(
+                empresa=self.empresa
+            ).count()
+            self.numero = f"PF-{(ultimo_numero + 1):06d}"
+        
+        # Calcular totales antes de guardar
+        if self.pk:
+            self.calcular_totales()
+        
+        super().save(*args, **kwargs)
+        
+        # Recalcular totales después de guardar (para asegurar que los detalles estén disponibles)
+        if self.pk:
+            self.calcular_totales()
+    
+    def calcular_totales(self):
+        """Calcula automáticamente todos los totales de la proforma"""
+        from django.db.models import Sum
+        from decimal import Decimal, ROUND_HALF_UP
+        
+        # Verificar si la proforma tiene detalles
+        if not hasattr(self, 'detalles') or not self.detalles.exists():
+            self.subtotal = Decimal('0.00')
+            self.total_descuento = Decimal('0.00')
+            self.total_impuestos = Decimal('0.00')
+            self.total = Decimal('0.00')
+            return
+        
+        # Calcular subtotal y descuentos
+        subtotal = Decimal('0.00')
+        total_descuento = Decimal('0.00')
+        
+        for detalle in self.detalles.all():
+            subtotal += detalle.subtotal
+            total_descuento += detalle.descuento
+        
+        # Calcular impuestos
+        total_impuestos = Decimal('0.00')
+        for detalle in self.detalles.all():
+            # Obtener el IVA del producto o servicio
+            if detalle.producto:
+                porcentaje_iva = detalle.producto.get_porcentaje_iva_real()
+            elif detalle.servicio:
+                MAPEO_IVA = {
+                    '0': 0.00, '5': 5.00, '2': 12.00, '10': 13.00,
+                    '3': 14.00, '4': 15.00, '6': 0.00, '7': 0.00, '8': 8.00
+                }
+                porcentaje_iva = MAPEO_IVA.get(detalle.servicio.iva, 0.00)
+            else:
+                porcentaje_iva = 0.00
+            
+            # Calcular IVA sobre el subtotal menos descuento del detalle
+            base_imponible = detalle.subtotal - detalle.descuento
+            iva_detalle = base_imponible * (Decimal(str(porcentaje_iva)) / 100)
+            total_impuestos += iva_detalle
+        
+        # Asignar valores con redondeo
+        self.subtotal = subtotal.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        self.total_descuento = total_descuento.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        self.total_impuestos = total_impuestos.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        self.total = (self.subtotal - self.total_descuento + self.total_impuestos).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
+        
+        # Guardar solo los campos calculados para evitar recursión
+        Proforma.objects.filter(pk=self.pk).update(
+            subtotal=self.subtotal,
+            total_descuento=self.total_descuento,
+            total_impuestos=self.total_impuestos,
+            total=self.total,
+            fecha_actualizacion=timezone.now()
+        )
+    
+    def convertir_a_factura(self, establecimiento, punto_emision, secuencial):
+        """Convierte la proforma a una factura oficial"""
+        if self.estado == 'CONVERTIDA':
+            raise ValueError("Esta proforma ya fue convertida a factura")
+        
+        # Crear la factura
+        factura = Factura.objects.create(
+            empresa=self.empresa,
+            cliente=self.cliente,
+            almacen=self.almacen,
+            facturador=self.facturador,
+            fecha_emision=datetime.date.today(),
+            fecha_vencimiento=self.fecha_vencimiento,
+            establecimiento=establecimiento,
+            punto_emision=punto_emision,
+            secuencia=secuencial,
+            concepto=f"Factura generada desde proforma {self.numero}",
+        )
+        
+        # Copiar detalles de proforma a factura
+        for detalle_proforma in self.detalles.all():
+            DetalleFactura.objects.create(
+                factura=factura,
+                empresa=self.empresa,
+                producto=detalle_proforma.producto,
+                servicio=detalle_proforma.servicio,
+                cantidad=detalle_proforma.cantidad,
+                sub_total=detalle_proforma.subtotal,
+                total=detalle_proforma.total,
+                descuento=detalle_proforma.descuento,
+                porcentaje_descuento=detalle_proforma.porcentaje_descuento,
+            )
+        
+        # Actualizar estado de la proforma
+        self.estado = 'CONVERTIDA'
+        self.factura = factura
+        self.save()
+        
+        # Recalcular totales de la factura
+        factura.calcular_totales()
+        
+        return factura
+    
+    @property
+    def esta_vencida(self):
+        """Verifica si la proforma está vencida"""
+        from datetime import date
+        return self.fecha_vencimiento < date.today()
+    
+    @property
+    def puede_convertirse(self):
+        """Verifica si la proforma puede convertirse a factura"""
+        return self.estado in ['ENVIADA', 'APROBADA'] and not self.esta_vencida
+    
+    def __str__(self):
+        return f"{self.numero} - {self.cliente.razon_social}"
+    
+    class Meta:
+        verbose_name = "Proforma"
+        verbose_name_plural = "Proformas"
+        ordering = ['-fecha_creacion']
+        constraints = [
+            models.UniqueConstraint(fields=['empresa', 'numero'], name='unique_numero_proforma_por_empresa')
+        ]
+
+
+class ProformaDetalle(models.Model):
+    """Detalles/líneas de una proforma"""
+    proforma = models.ForeignKey(
+        Proforma,
+        on_delete=models.CASCADE,
+        related_name='detalles',
+        help_text="Proforma a la que pertenece este detalle"
+    )
+    
+    # Producto o servicio
+    producto = models.ForeignKey(
+        'Producto',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        help_text="Producto cotizado"
+    )
+    
+    servicio = models.ForeignKey(
+        'Servicio',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        help_text="Servicio cotizado"
+    )
+    
+    # Cantidad y precios
+    cantidad = models.IntegerField(
+        help_text="Cantidad de productos/servicios",
+        validators=[MinValueValidator(1)]
+    )
+    
+    precio_unitario = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Precio unitario del producto/servicio"
+    )
+    
+    subtotal = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        help_text="Subtotal (cantidad x precio unitario)"
+    )
+    
+    # Descuentos
+    descuento = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        default=0.00,
+        help_text="Descuento monetario aplicado"
+    )
+    
+    porcentaje_descuento = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0.00,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Porcentaje de descuento aplicado"
+    )
+    
+    # Total del detalle
+    total = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        help_text="Total del detalle (subtotal - descuento + impuestos)"
+    )
+    
+    def save(self, *args, **kwargs):
+        """Calcula automáticamente los valores del detalle"""
+        from decimal import Decimal, ROUND_HALF_UP
+        
+        # Validar que se asigne producto o servicio
+        if not self.producto and not self.servicio:
+            raise ValueError("Debe asignar un producto o servicio")
+        
+        # Obtener precio unitario automáticamente
+        if self.producto and not self.precio_unitario:
+            self.precio_unitario = self.producto.precio
+        elif self.servicio and not self.precio_unitario:
+            self.precio_unitario = self.servicio.precio1
+        
+        # Calcular subtotal
+        subtotal_calculado = Decimal(str(self.precio_unitario)) * Decimal(str(self.cantidad))
+        self.subtotal = subtotal_calculado.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        
+        # Aplicar descuento si hay porcentaje
+        if self.porcentaje_descuento > 0:
+            descuento_calculado = self.subtotal * (Decimal(str(self.porcentaje_descuento)) / 100)
+            self.descuento = descuento_calculado.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        
+        # Calcular total (por ahora sin impuestos, se calculan a nivel de proforma)
+        self.total = (self.subtotal - self.descuento).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        
+        super().save(*args, **kwargs)
+        
+        # Recalcular totales de la proforma padre
+        if self.proforma_id:
+            self.proforma.calcular_totales()
+    
+    def delete(self, *args, **kwargs):
+        """Al eliminar un detalle, recalcula los totales de la proforma"""
+        proforma = self.proforma
+        super().delete(*args, **kwargs)
+        proforma.calcular_totales()
+    
+    @property
+    def descripcion(self):
+        """Descripción del producto o servicio"""
+        if self.producto:
+            return self.producto.descripcion
+        elif self.servicio:
+            return self.servicio.descripcion
+        return "Sin descripción"
+    
+    @property
+    def codigo(self):
+        """Código del producto o servicio"""
+        if self.producto:
+            return self.producto.codigo
+        elif self.servicio:
+            return self.servicio.codigo
+        return ""
+    
+    def clean(self):
+        """Validaciones del modelo"""
+        from django.core.exceptions import ValidationError
+        
+        if not self.producto and not self.servicio:
+            raise ValidationError("Debe asignar un producto o un servicio")
+        
+        if self.producto and self.servicio:
+            raise ValidationError("No puede asignar producto y servicio al mismo tiempo")
+    
+    def __str__(self):
+        return f"{self.descripcion} (Cant: {self.cantidad})"
+    
+    class Meta:
+        verbose_name = "Detalle de Proforma"
+        verbose_name_plural = "Detalles de Proforma"
+        ordering = ['id']
 
 # Función para crear detalles de factura a partir de códigos y cantidades
 def crear_detalles_factura(factura, codigos, cantidades, descuentos, porcentajes_descuento, errores):

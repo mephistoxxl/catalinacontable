@@ -91,8 +91,8 @@ urlpatterns = [
     # Login para facturadores
     path('login_facturador/', views.LoginFacturador.as_view(), name='login_facturador'),
 
-    # Login para proformadores (placeholder - redirects to login)
-    path('login_proformador/', views.Login.as_view(), name='login_proformador'),
+    # Login para proformadores
+    path('login_proformador/', views.LoginProformador.as_view(), name='login_proformador'),
 
     # Búsqueda y Almacenes
     path('buscar_cliente/', views.buscar_cliente, name='buscar_cliente'),

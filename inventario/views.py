@@ -73,8 +73,13 @@ class ListarProformas(LoginRequiredMixin, View):
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return redirect('inventario:seleccionar_empresa')
 
+        # Obtener proformas de la empresa activa
+        from .models import Proforma
+        proformas = Proforma.objects.filter(empresa_id=empresa_id).order_by('-fecha_creacion')
+
         contexto = {
-            'proformas': [],  # Placeholder list until model is implemented
+            'proformas': proformas,
+            'total_proformas': proformas.count(),
         }
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/proforma/listarProformas.html', contexto)
@@ -85,30 +90,61 @@ class EmitirProforma(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
-        empresa_id = request.session.get('empresa_activa')
-        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
-            return redirect('inventario:seleccionar_empresa')
+        """Muestra el formulario para emitir proforma"""
+        try:
+            # ✅ VERIFICAR QUE HAY UN FACTURADOR EN SESIÓN
+            facturador_id = request.session.get('facturador_id')
+            if not facturador_id:
+                messages.warning(request, 'Debe iniciar sesión como facturador antes de emitir proformas.')
+                return redirect('inventario:login_proformador')
 
-        from .forms import EmitirProformaFormulario
-        
-        # Obtener almacenes y vendedores (facturadores) activos
-        almacenes = Almacen.objects.filter(activo=True)
-        vendedores = Facturador.objects.filter(activo=True)
-        
-        # Crear el formulario con los datos
-        form = EmitirProformaFormulario(almacenes=almacenes, vendedores=vendedores)
-        
-        contexto = {
-            'form': form,
-            'proformador': {
-                'nombres': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+            # Verificar empresa activa
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                return redirect('inventario:seleccionar_empresa')
+
+            # Verificar que el facturador existe, está activo y corresponde a la empresa activa (si aplica)
+            try:
+                facturador = Facturador.objects.get(id=facturador_id, activo=True)
+                # Si el modelo de Facturador tiene relación con empresa, validar que coincida
+                if hasattr(facturador, 'empresa_id') and facturador.empresa_id and facturador.empresa_id != int(empresa_id):
+                    messages.error(request, 'El facturador no pertenece a la empresa activa. Inicie sesión nuevamente como facturador.')
+                    request.session.pop('facturador_id', None)
+                    request.session.pop('facturador_nombre', None)
+                    return redirect('inventario:login_proformador')
+            except Facturador.DoesNotExist:
+                messages.error(request, 'El facturador no existe o no está activo.')
+                # Limpiar sesión de facturador inválido
+                request.session.pop('facturador_id', None)
+                request.session.pop('facturador_nombre', None)
+                return redirect('inventario:login_proformador')
+
+            from .forms import EmitirProformaFormulario
+            
+            # Obtener almacenes y vendedores (facturadores) activos
+            almacenes = Almacen.objects.filter(activo=True)
+            vendedores = Facturador.objects.filter(activo=True)
+            
+            # Crear el formulario con los datos
+            form = EmitirProformaFormulario(almacenes=almacenes, vendedores=vendedores)
+            
+            contexto = {
+                'form': form,
+                'facturador': facturador  # ✅ AGREGAR INFO DEL FACTURADOR
             }
-        }
-        contexto = complementarContexto(contexto, request.user)
-        return render(request, 'inventario/proforma/emitirProforma.html', contexto)
+            contexto = complementarContexto(contexto, request.user)
+            return render(request, 'inventario/proforma/emitirProforma.html', contexto)
+            
+        except Exception as e:
+            print(f"Error en EmitirProforma GET: {e}")
+            messages.error(request, 'Error interno del servidor.')
+            return redirect('inventario:panel')
 
     def post(self, request):
         from .forms import EmitirProformaFormulario
+        from .models import Proforma, ProformaDetalle, Cliente, Producto, Servicio
+        from decimal import Decimal
+        from django.utils import timezone
         
         # Obtener empresa activa
         empresa_id = request.session.get('empresa_activa')
@@ -117,11 +153,159 @@ class EmitirProforma(LoginRequiredMixin, View):
         
         empresa = Empresa.objects.get(id=empresa_id)
         
-        # Obtener almacenes y vendedores (facturadores) activos
+        # Verificar si es una solicitud AJAX para guardar proforma
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            try:
+                import json
+                data = json.loads(request.body)
+                
+                # Validar datos básicos
+                cliente_data = data.get('cliente', {})
+                productos_data = data.get('productos', [])
+                observaciones = data.get('observaciones', '')
+                fecha_vencimiento = data.get('fecha_vencimiento')
+                
+                if not productos_data:
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Debe agregar al menos un producto a la proforma'
+                    })
+                
+                # Procesar cliente
+                cliente = None
+                if cliente_data.get('id'):
+                    try:
+                        cliente = Cliente.objects.get(id=cliente_data['id'], empresa=empresa)
+                    except Cliente.DoesNotExist:
+                        pass
+                
+                # Si no existe cliente, crear uno nuevo
+                if not cliente and cliente_data.get('identificacion'):
+                    identificacion = cliente_data['identificacion']
+                    nombre = cliente_data.get('nombre', '').strip()
+                    correo = cliente_data.get('correo', '').strip()
+                    
+                    if nombre:
+                        try:
+                            # Verificar si ya existe
+                            cliente = Cliente.objects.get(
+                                identificacion=identificacion, 
+                                empresa=empresa
+                            )
+                        except Cliente.DoesNotExist:
+                            # Crear cliente nuevo
+                            cliente = Cliente.objects.create(
+                                empresa=empresa,
+                                identificacion=identificacion,
+                                razon_social=nombre,
+                                correo=correo or '',
+                                telefono='',
+                                direccion='Por definir',
+                                tipoIdentificacion='05' if len(identificacion) == 10 else '04',
+                                tipoVenta='1',
+                                tipoRegimen='1',
+                                tipoCliente='1'
+                            )
+                
+                if not cliente:
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Debe seleccionar o crear un cliente válido'
+                    })
+                
+                # Crear la proforma
+                # 0) Si el cliente envía explícitamente un facturador_id (hidden), usarlo
+                facturador = None
+                payload_fact_id = data.get('facturador_id')
+                if payload_fact_id:
+                    facturador = Facturador.objects.filter(id=payload_fact_id, activo=True).first()
+                    if facturador and hasattr(facturador, 'empresa_id') and facturador.empresa_id and facturador.empresa_id != empresa.id:
+                        facturador = None
+
+                # 1) Intentar usar el facturador autenticado en sesión
+                if not facturador:
+                    session_fact_id = request.session.get('facturador_id')
+                    if session_fact_id:
+                        facturador = Facturador.objects.filter(id=session_fact_id, activo=True).first()
+                        # Validar pertenencia a la empresa activa si el modelo lo soporta
+                        if facturador and hasattr(facturador, 'empresa_id') and facturador.empresa_id and facturador.empresa_id != empresa.id:
+                            facturador = None
+
+                # 2) Fallback: tomar cualquier facturador activo de la empresa
+                if not facturador:
+                    facturador = Facturador.objects.filter(empresa=empresa, activo=True).first()
+
+                # 3) Último recurso: cualquier facturador activo del sistema
+                if not facturador:
+                    facturador = Facturador.objects.filter(activo=True).first()
+
+                if not facturador:
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'No hay facturador activo configurado para la empresa'
+                    })
+                
+                proforma = Proforma.objects.create(
+                    empresa=empresa,
+                    cliente=cliente,
+                    fecha_emision=timezone.now().date(),
+                    fecha_vencimiento=fecha_vencimiento or (timezone.now().date() + timezone.timedelta(days=30)),
+                    facturador=facturador,
+                    observaciones=observaciones,
+                    creado_por=request.user,
+                    estado='BORRADOR'
+                )
+                
+                # Agregar productos/servicios
+                for item in productos_data:
+                    codigo = item.get('codigo')
+                    cantidad = int(item.get('cantidad', 1))
+                    precio = Decimal(str(item.get('precio', 0)))
+                    descuento = Decimal(str(item.get('descuento', 0)))
+                    
+                    # Buscar producto o servicio
+                    producto = None
+                    servicio = None
+                    
+                    try:
+                        producto = Producto.objects.get(codigo=codigo, empresa=empresa)
+                    except Producto.DoesNotExist:
+                        try:
+                            servicio = Servicio.objects.get(codigo=codigo, empresa=empresa)
+                        except Servicio.DoesNotExist:
+                            continue  # Saltar este item si no se encuentra
+                    
+                    # Crear detalle de proforma
+                    ProformaDetalle.objects.create(
+                        proforma=proforma,
+                        producto=producto,
+                        servicio=servicio,
+                        cantidad=cantidad,
+                        precio_unitario=precio,
+                        descuento=descuento
+                    )
+                
+                # La proforma calculará automáticamente los totales
+                proforma.calcular_totales()
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Proforma {proforma.numero} guardada correctamente',
+                    'proforma_id': proforma.id,
+                    'proforma_numero': proforma.numero
+                })
+                
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                return JsonResponse({
+                    'success': False,
+                    'message': f'Error al guardar proforma: {str(e)}'
+                })
+        
+        # Procesamiento normal del formulario (no AJAX)
         almacenes = Almacen.objects.filter(activo=True)
         vendedores = Facturador.objects.filter(activo=True)
-        
-        # Crear el formulario con los datos POST y las opciones
         form = EmitirProformaFormulario(request.POST, almacenes=almacenes, vendedores=vendedores)
         
         if form.is_valid():
@@ -133,36 +317,32 @@ class EmitirProforma(LoginRequiredMixin, View):
             
             cliente = None
             if cliente_id:
-                # Cliente existente encontrado por la búsqueda
                 try:
                     cliente = Cliente.objects.get(id=cliente_id, empresa=empresa)
                 except Cliente.DoesNotExist:
                     cliente = None
             
-            # Si no se encontró cliente existente pero hay datos, crear uno nuevo
             if not cliente and identificacion_cliente and nombre_cliente:
                 try:
-                    # Verificar si ya existe un cliente con esa identificación
                     cliente = Cliente.objects.get(identificacion=identificacion_cliente, empresa=empresa)
                 except Cliente.DoesNotExist:
-                    # Crear cliente nuevo
                     cliente = Cliente.objects.create(
                         empresa=empresa,
                         identificacion=identificacion_cliente,
                         razon_social=nombre_cliente.strip(),
                         correo=correo_cliente or '',
-                        # Datos por defecto
                         telefono='',
-                        direccion='',
+                        direccion='Por definir',
                         tipoIdentificacion='05' if len(identificacion_cliente) == 10 else '04',
-                        tipo_contribuyente='CONTRIBUYENTE ESPECIAL',
-                        obligado_llevar_contabilidad='NO'
+                        tipoVenta='1',
+                        tipoRegimen='1',
+                        tipoCliente='1'
                     )
                     
             if cliente:
-                messages.success(request, f'Proforma creada para cliente: {cliente.razon_social}')
+                messages.success(request, f'Datos de cliente procesados: {cliente.razon_social}')
             else:
-                messages.success(request, 'Proforma creada sin cliente específico')
+                messages.success(request, 'Formulario procesado sin cliente específico')
                 
             return redirect('inventario:listarProformas')
             
@@ -185,29 +365,234 @@ class VerProforma(LoginRequiredMixin, View):
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return redirect('inventario:seleccionar_empresa')
 
+        # Cargar proforma real con relaciones necesarias
+        from django.db.models import Prefetch
+        proforma = get_object_or_404(
+            Proforma.objects.select_related('empresa', 'cliente', 'facturador', 'almacen', 'creado_por')
+            .prefetch_related(
+                Prefetch('detalles', queryset=ProformaDetalle.objects.select_related('producto', 'servicio'))
+            ),
+            pk=p,
+            empresa_id=empresa_id,
+        )
+
+        # Asegurar totales actualizados
+        try:
+            proforma.calcular_totales()
+        except Exception:
+            pass
+
         contexto = {
-            'proforma': {
-                'id': p,
-                'numero': f'PF-{p:06d}',
-            }
+            'proforma': proforma,
         }
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/proforma/verProforma.html', contexto)
 
 
 def ride_proforma(request, p):
-    """Renderiza un RIDE-like de Proforma (placeholder)."""
+    """RIDE Imprimible de Proforma: datos reales y desglose de IVA para PDF."""
     empresa_id = request.session.get('empresa_activa')
     if not empresa_id:
         return redirect('inventario:seleccionar_empresa')
 
-    contexto = {
-        'proforma': {
-            'id': p,
-            'numero': f'PF-{p:06d}',
-        }
+    # Cargar proforma con relaciones
+    from decimal import Decimal, ROUND_HALF_UP
+    from django.db.models import Prefetch
+
+    proforma = get_object_or_404(
+        Proforma.objects.select_related('empresa', 'cliente', 'facturador', 'almacen', 'creado_por')
+        .prefetch_related(Prefetch('detalles', queryset=ProformaDetalle.objects.select_related('producto', 'servicio'))),
+        pk=p,
+        empresa_id=empresa_id,
+    )
+
+    # Asegurar totales actualizados
+    try:
+        proforma.calcular_totales()
+    except Exception:
+        pass
+
+    # Obtener opciones/empresa para encabezado
+    try:
+        opciones = Opciones.objects.filter(empresa=proforma.empresa).first()
+    except Exception:
+        opciones = None
+
+    # Resolver logo: primero el configurado en Opciones (MEDIA), sino fallback estático
+    logo_url = None
+    try:
+        if opciones and getattr(opciones, 'imagen', None):
+            # URL pública del logo subido
+            logo_url = opciones.imagen.url
+        else:
+            base_static = settings.STATIC_URL.rstrip('/')
+            logo_url = f"{base_static}/inventario/assets/logo/logo2.png"
+    except Exception:
+        logo_url = None
+
+    # Construir contexto de empresa para el encabezado
+    empresa_ctx = {
+        'razon_social': (opciones.razon_social if opciones and getattr(opciones, 'razon_social', None) else proforma.empresa.razon_social),
+        'ruc': (opciones.identificacion if opciones and getattr(opciones, 'identificacion', None) else proforma.empresa.ruc),
+        'direccion': (opciones.direccion_establecimiento if opciones and getattr(opciones, 'direccion_establecimiento', None) else ''),
+        'telefono': (opciones.telefono if opciones and getattr(opciones, 'telefono', None) else ''),
+        'nombre_comercial': (opciones.nombre_comercial if opciones and getattr(opciones, 'nombre_comercial', None) else ''),
+        'correo': (opciones.correo if opciones and getattr(opciones, 'correo', None) else ''),
     }
-    return render(request, 'inventario/PDF/proforma.html', contexto)
+
+    # Desglose de IVA por porcentaje y detalles enriquecidos para el PDF
+    MAPEO_IVA = { '0': Decimal('0.00'), '5': Decimal('5.00'), '2': Decimal('12.00'), '10': Decimal('13.00'),
+                  '3': Decimal('14.00'), '4': Decimal('15.00'), '6': Decimal('0.00'), '7': Decimal('0.00'), '8': Decimal('8.00') }
+
+    def obtener_porcentaje_iva(det):
+        if det.producto:
+            try:
+                return Decimal(str(det.producto.get_porcentaje_iva_real()))
+            except Exception:
+                return Decimal('12.00')
+        if det.servicio:
+            try:
+                code = str(det.servicio.iva)
+                return MAPEO_IVA.get(code, Decimal('12.00'))
+            except Exception:
+                return Decimal('12.00')
+        return Decimal('0.00')
+
+    iva_breakdown = {}  # { porcentaje(Decimal): {'base': Decimal, 'iva': Decimal} }
+    detalles_pdf = []
+    for det in proforma.detalles.all():
+        pct = obtener_porcentaje_iva(det)
+        base = (det.subtotal - det.descuento).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        iva_val = (base * (pct / Decimal('100'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        total_linea = (base + iva_val).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+        if pct not in iva_breakdown:
+            iva_breakdown[pct] = {'base': Decimal('0.00'), 'iva': Decimal('0.00')}
+        iva_breakdown[pct]['base'] += base
+        iva_breakdown[pct]['iva'] += iva_val
+
+        detalles_pdf.append({
+            'codigo': det.codigo,
+            'descripcion': det.descripcion,
+            'cantidad': det.cantidad,
+            'precio_unitario': det.precio_unitario,
+            'porcentaje_iva': pct,
+            'descuento': det.descuento,
+            'subtotal': det.subtotal,
+            'total_linea': total_linea,
+        })
+
+    # Limitar filas visibles para favorecer caber en una sola página (totales siguen completos)
+    MAX_ROWS = 12
+    if len(detalles_pdf) > MAX_ROWS:
+        detalles_pdf_display = detalles_pdf[:MAX_ROWS]
+        detalles_omitidos = len(detalles_pdf) - MAX_ROWS
+    else:
+        detalles_pdf_display = detalles_pdf
+        detalles_omitidos = 0
+
+    # Totales auxiliares
+    subtotal_neto = (proforma.subtotal - proforma.total_descuento).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    subtotal_0 = iva_breakdown.get(Decimal('0.00'), {'base': Decimal('0.00')})['base'].quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    subtotal_iva_base = (subtotal_neto - subtotal_0).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    # Ordenar IVA breakdown por porcentaje ascendente
+    iva_items = sorted([(str(k).rstrip('0').rstrip('.') if '.' in str(k) else str(k), v) for k, v in iva_breakdown.items()], key=lambda x: Decimal(x[0]))
+
+    # Metadata de generación
+    try:
+        from django.utils import timezone
+        generado_el = timezone.now()
+    except Exception:
+        import datetime as _dt
+        generado_el = _dt.datetime.now()
+    generado_por = getattr(request.user, 'get_full_name', lambda: '')() or getattr(request.user, 'username', '')
+
+    # Derivar forma de pago visual y nota
+    obs_text = proforma.observaciones or ''
+    forma_pago_text = None
+    try:
+        if 'forma de pago' in obs_text.lower():
+            # Extraer línea que contenga 'forma de pago'
+            for line in obs_text.splitlines():
+                if 'forma de pago' in line.lower():
+                    forma_pago_text = line.split(':', 1)[-1].strip() or None
+                    break
+    except Exception:
+        pass
+    if not forma_pago_text:
+        forma_pago_text = 'Contado'
+    nota_text = (proforma.observaciones or (getattr(opciones, 'mensaje_factura', '') if opciones else '')).strip()
+
+    contexto = {
+        'proforma': proforma,
+        'empresa': empresa_ctx,
+        'opciones': opciones,
+        'logo_url': logo_url,
+        'detalles_pdf': detalles_pdf,
+    'detalles_pdf_display': detalles_pdf_display,
+    'detalles_omitidos': detalles_omitidos,
+        'iva_items': iva_items,  # lista de tuplas: [(porcentaje_str, {'base': x, 'iva': y}), ...]
+        'subtotal_neto': subtotal_neto,
+        'subtotal_0': subtotal_0,
+        'subtotal_iva_base': subtotal_iva_base,
+        'generado_por': generado_por,
+        'generado_el': generado_el,
+    # Condiciones dinámicas: usa observaciones de la proforma o mensaje de factura de opciones como fallback
+    'condiciones_text': (proforma.observaciones or (getattr(opciones, 'mensaje_factura', '') if opciones else '')),
+        'forma_pago_text': forma_pago_text,
+        'nota_text': nota_text,
+    }
+    # Renderizar a PDF y forzar descarga
+    try:
+        from io import BytesIO
+        from django.template.loader import get_template
+        from django.utils.text import slugify
+        from xhtml2pdf import pisa
+        from django.contrib.staticfiles import finders
+
+        def link_callback(uri, rel):
+            """Convierte rutas STATIC/MEDIA a rutas absolutas de sistema para xhtml2pdf."""
+            # MEDIA
+            media_url = getattr(settings, 'MEDIA_URL', '')
+            media_root = getattr(settings, 'MEDIA_ROOT', '')
+            static_url = getattr(settings, 'STATIC_URL', '')
+            static_root = getattr(settings, 'STATIC_ROOT', '')
+
+            if media_url and uri.startswith(media_url):
+                path = os.path.join(media_root, uri.replace(media_url, ""))
+                return path
+            if static_url and uri.startswith(static_url):
+                # Intentar resolver con finders (útil en dev)
+                rel_path = uri.replace(static_url, "")
+                found = finders.find(rel_path)
+                if found:
+                    return found
+                # Fallback a STATIC_ROOT si está colectado
+                path = os.path.join(static_root, rel_path)
+                return path
+            # Devolver tal cual (http/https u otros)
+            return uri
+
+        template = get_template('inventario/PDF/proforma.html')
+        html = template.render(context=contexto, request=request)
+        pdf_buffer = BytesIO()
+        pisa_status = pisa.CreatePDF(html, dest=pdf_buffer, link_callback=link_callback)
+
+        if pisa_status.err:
+            # Si falla, devolver HTML como fallback para inspección rápida
+            return render(request, 'inventario/PDF/proforma.html', contexto)
+
+        pdf_buffer.seek(0)
+        empresa_name = empresa_ctx.get('nombre_comercial') or empresa_ctx.get('razon_social') or 'empresa'
+        filename_base = f"proforma_{proforma.numero or proforma.id}_{empresa_name}"
+        safe_name = slugify(str(filename_base)) or f"proforma-{proforma.id}"
+        response = HttpResponse(pdf_buffer.read(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{safe_name}.pdf"'
+        return response
+    except Exception:
+        # Ante cualquier error inesperado, mostrar HTML
+        return render(request, 'inventario/PDF/proforma.html', contexto)
 
 
 #Interfaz de inicio de sesion----------------------------------------------------#
@@ -3813,6 +4198,46 @@ class LoginFacturador(View):
     def get(self, request):
         # Mostrar el formulario de login
         return render(request, 'inventario/facturador/login_facturador.html')
+
+
+class LoginProformador(View):
+    def post(self, request):
+        try:
+            # Obtener solo la contraseña del formulario
+            password = request.POST.get('password')
+            
+            if not password:
+                messages.error(request, 'La contraseña es requerida.')
+                return render(request, 'inventario/facturador/login_proformador.html')
+            
+            # Buscar el facturador que tenga esta contraseña entre todos los activos
+            facturadores = Facturador.objects.filter(activo=True)
+            facturador_valido = None
+            
+            for facturador in facturadores:
+                if facturador.check_password(password):
+                    facturador_valido = facturador
+                    break
+            
+            if facturador_valido:
+                # Guardar la sesión del facturador
+                request.session['facturador_id'] = facturador_valido.id
+                request.session['facturador_nombre'] = facturador_valido.nombres
+                
+                messages.success(request, f'Bienvenido {facturador_valido.nombres}')
+                return redirect('inventario:emitirProforma')
+            else:
+                messages.error(request, 'Contraseña incorrecta. Verifique e intente nuevamente.')
+                return render(request, 'inventario/facturador/login_proformador.html')
+                
+        except Exception as e:
+            print(f"Error en LoginProformador: {e}")
+            messages.error(request, 'Error interno del servidor.')
+            return render(request, 'inventario/facturador/login_proformador.html')
+
+    def get(self, request):
+        # Mostrar el formulario de login
+        return render(request, 'inventario/facturador/login_proformador.html')
 
 #Para agregar los almacénes
 def gestion_almacenes(request):
