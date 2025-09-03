@@ -1,101 +1,162 @@
 <div class="space-y-2">
-  <!-- Tabla simple editable para detalles de la proforma (placeholder) -->
-  <table class="min-w-full text-xs border border-gray-200">
-    <thead class="bg-gray-50">
-      <tr>
-        <th class="px-2 py-1 text-left">Código</th>
-        <th class="px-2 py-1 text-left">Descripción</th>
-        <th class="px-2 py-1 text-right">Cantidad</th>
-        <th class="px-2 py-1 text-right">P. Unitario</th>
-        <th class="px-2 py-1 text-right">Descuento</th>
-        <th class="px-2 py-1 text-right">Subtotal</th>
-        <th class="px-2 py-1"></th>
-      </tr>
-    </thead>
-    <tbody id="proforma-rows"></tbody>
-  </table>
-
-  <div class="flex justify-end">
-    <button type="button" class="px-3 py-1 text-xs rounded-md border border-gray-300 hover:bg-gray-50" onclick="addProformaRow()">
-      <i class="fa fa-plus mr-1"></i> Agregar ítem
-    </button>
+  <!-- Tabla estilo planilla, fija con filas vacías por defecto -->
+  <div class="overflow-x-auto border border-gray-200 rounded-md">
+    <table class="min-w-full text-xs">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-2 py-1 text-left w-40">Código</th>
+          <th class="px-2 py-1 text-left">Descripción</th>
+          <th class="px-2 py-1 text-right w-20">Cantidad</th>
+          <th class="px-2 py-1 text-right w-28">Precio</th>
+          <th class="px-2 py-1 text-right w-20">Desc. %</th>
+          <th class="px-2 py-1 text-right w-16">IVA</th>
+          <th class="px-2 py-1 text-right w-28">Total</th>
+        </tr>
+      </thead>
+      <tbody id="proforma-rows">
+        <!-- Fila plantilla; el JS duplicará hasta 12 filas vacías -->
+        <tr class="border-t">
+          <td class="px-2 py-1"><input name="codigo[]" class="w-full border rounded px-2 py-1" /></td>
+          <td class="px-2 py-1"><input name="descripcion[]" class="w-full border rounded px-2 py-1" /></td>
+          <td class="px-2 py-1 text-right"><input name="cantidad[]" type="number" step="1" value="" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()" /></td>
+          <td class="px-2 py-1 text-right"><input name="precio[]" type="number" step="0.01" value="" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()" /></td>
+          <td class="px-2 py-1 text-right"><input name="descuento[]" type="number" step="0.01" value="" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()" /></td>
+          <td class="px-2 py-1 text-right"><span class="pf-iva" data-iva="0.15">15%</span><input type="hidden" name="iva[]" value="0.15"></td>
+          <td class="px-2 py-1 text-right"><span class="pf-total">0.00</span></td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
+  <!-- Totales al estilo del ejemplo -->
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
     <div></div>
     <div></div>
     <div class="space-y-1 border rounded-md p-2 bg-gray-50">
-      <div class="flex justify-between text-xs">
-        <span>Total sin Impuestos:</span>
-        <span id="pf_total_sin_imp">0.00</span>
-      </div>
-      <div class="flex justify-between text-xs">
-        <span>Descuento:</span>
-        <span id="pf_total_desc">0.00</span>
-      </div>
-      <div class="flex justify-between text-xs font-semibold">
-        <span>Importe Total:</span>
-        <span id="pf_importe_total">0.00</span>
-      </div>
+      <div class="flex justify-between text-xs"><span>Sub Total:</span><span id="pf_subtotal">0.00</span></div>
+      <div class="flex justify-between text-xs"><span>Descuento:</span><span id="pf_total_desc">0.00</span></div>
+      <div class="flex justify-between text-xs"><span>Sub Total Neto:</span><span id="pf_subtotal_neto">0.00</span></div>
+      <div class="flex justify-between text-xs font-semibold"><span>Sub Total con IVA:</span><span id="pf_importe_total">0.00</span></div>
     </div>
   </div>
 </div>
 
 <script>
-function addProformaRow() {
+// Crear 12 filas vacías al cargar
+document.addEventListener('DOMContentLoaded', () => {
   const tbody = document.getElementById('proforma-rows');
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td class="px-2 py-1 border-t"><input name="codigo[]" class="w-full border rounded px-2 py-1"/></td>
-    <td class="px-2 py-1 border-t"><input name="descripcion[]" class="w-full border rounded px-2 py-1"/></td>
-    <td class="px-2 py-1 border-t text-right"><input name="cantidad[]" type="number" step="0.01" value="1" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()"/></td>
-    <td class="px-2 py-1 border-t text-right"><input name="precio[]" type="number" step="0.01" value="0.00" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()"/></td>
-    <td class="px-2 py-1 border-t text-right"><input name="descuento[]" type="number" step="0.01" value="0.00" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()"/></td>
-    <td class="px-2 py-1 border-t text-right"><span class="pf-subtotal">0.00</span></td>
-    <td class="px-2 py-1 border-t text-right"><button type="button" class="text-red-600 text-xs" onclick="this.closest('tr').remove(); pf_recalc();"><i class="fa fa-trash"></i></button></td>
-  `;
-  tbody.appendChild(tr);
-  pf_recalc();
+  if (!tbody) return;
+  const template = tbody.firstElementChild?.cloneNode(true);
+  if (!template) return;
+  // limpia la plantilla
+  template.querySelectorAll('input').forEach(i => i.value = '');
+  const totalCell = template.querySelector('.pf-total'); if (totalCell) totalCell.textContent = '0.00';
+  // Deja una y clona hasta 12
+  tbody.innerHTML = '';
+  for (let i = 0; i < 12; i++) {
+    const row = template.cloneNode(true);
+    tbody.appendChild(row);
+  }
+});
+
+// Agrega un producto en la primera fila vacía o sobreescribe según foco
+function pf_addRowPrefilled(item, ivaPercent) {
+  const rows = document.querySelectorAll('#proforma-rows tr');
+  // 1) fila enfocada
+  const active = document.activeElement && document.activeElement.closest('tr');
+  if (active && active.parentElement && active.parentElement.id === 'proforma-rows') {
+    pf_fillRow(active, item, ivaPercent);
+    pf_recalc();
+    return;
+  }
+  // 2) primera fila vacía
+  for (const r of rows) {
+    const codeInput = r.querySelector('input[name="codigo[]"]');
+    const descInput = r.querySelector('input[name="descripcion[]"]');
+    if (codeInput && !codeInput.value && descInput && !descInput.value) {
+      pf_fillRow(r, item, ivaPercent);
+      pf_recalc();
+      return;
+    }
+  }
+  // 3) si no hay vacías, sobreescribe la última fila
+  if (rows.length) {
+    pf_fillRow(rows[rows.length - 1], item, ivaPercent);
+    pf_recalc();
+  }
 }
 
-function pf_addRowPrefilled(item, ivaPercent) {
-  const tbody = document.getElementById('proforma-rows');
-  const tr = document.createElement('tr');
-  const qty = Number(item.cantidad || 1);
-  const price = Number(item.precio || 0);
-  const desc = Number(item.descuento || 0);
-  const line = Math.max(qty * price - desc, 0);
-  tr.innerHTML = `
-    <td class="px-2 py-1 border-t"><input name="codigo[]" class="w-full border rounded px-2 py-1" value="${item.codigo || ''}"/></td>
-    <td class="px-2 py-1 border-t"><input name="descripcion[]" class="w-full border rounded px-2 py-1" value="${(item.descripcion || '').replace(/"/g,'&quot;')}"/></td>
-    <td class="px-2 py-1 border-t text-right"><input name="cantidad[]" type="number" step="1" value="${qty}" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()"/></td>
-    <td class="px-2 py-1 border-t text-right"><input name="precio[]" type="number" step="0.01" value="${price.toFixed(2)}" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()"/></td>
-    <td class="px-2 py-1 border-t text-right"><input name="descuento[]" type="number" step="0.01" value="${desc.toFixed(2)}" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()"/></td>
-    <td class="px-2 py-1 border-t text-right"><span class="pf-subtotal">${line.toFixed(2)}</span></td>
-    <td class="px-2 py-1 border-t text-right"><button type="button" class="text-red-600 text-xs" onclick="this.closest('tr').remove(); pf_recalc();"><i class="fa fa-trash"></i></button></td>
-  `;
-  tbody.appendChild(tr);
-  pf_recalc();
+function pf_fillRow(row, item, ivaPercent) {
+  const code = row.querySelector('input[name="codigo[]"]');
+  const desc = row.querySelector('input[name="descripcion[]"]');
+  const qty = row.querySelector('input[name="cantidad[]"]');
+  const price = row.querySelector('input[name="precio[]"]');
+  const disc = row.querySelector('input[name="descuento[]"]');
+  const ivaSpan = row.querySelector('.pf-iva');
+  const ivaHidden = row.querySelector('input[name="iva[]"]');
+
+  code.value = item.codigo || '';
+  desc.value = item.descripcion || '';
+  qty.value = item.cantidad != null ? item.cantidad : 1;
+  price.value = (item.precio != null ? Number(item.precio) : 0).toFixed(2);
+  disc.value = (item.descuento != null ? Number(item.descuento) : 0).toFixed(2);
+
+  const ivaP = (ivaPercent != null ? Number(ivaPercent) : 0.15);
+  if (ivaSpan) { ivaSpan.dataset.iva = String(ivaP); ivaSpan.textContent = `${Math.round(ivaP * 100)}%`; }
+  if (ivaHidden) ivaHidden.value = String(ivaP);
+}
+
+function pf_clearRow(row) {
+  row.querySelectorAll('input').forEach(inp => inp.value = '');
+  const ivaSpan = row.querySelector('.pf-iva');
+  const ivaHidden = row.querySelector('input[name="iva[]"]');
+  if (ivaSpan) { ivaSpan.dataset.iva = '0.15'; ivaSpan.textContent = '15%'; }
+  if (ivaHidden) ivaHidden.value = '0.15';
+  const totalCell = row.querySelector('.pf-total');
+  if (totalCell) totalCell.textContent = '0.00';
 }
 
 function pf_recalc() {
   const rows = document.querySelectorAll('#proforma-rows tr');
-  let totalSinImp = 0, totalDesc = 0, total = 0;
+  let subTotal = 0, totalDesc = 0, subNeto = 0, totalConIva = 0;
+
   rows.forEach(r => {
-    const qty = parseFloat(r.querySelector('input[name="cantidad[]"]').value || '0');
-    const price = parseFloat(r.querySelector('input[name="precio[]"]').value || '0');
-    const desc = parseFloat(r.querySelector('input[name="descuento[]"]').value || '0');
-    const line = Math.max(qty * price - desc, 0);
-    r.querySelector('.pf-subtotal').textContent = line.toFixed(2);
-    totalSinImp += qty * price;
-    totalDesc += desc;
-    total += line;
+    const qty = parseFloat((r.querySelector('input[name="cantidad[]"]')?.value || '').replace(',', '.')) || 0;
+    const price = parseFloat((r.querySelector('input[name="precio[]"]')?.value || '').replace(',', '.')) || 0;
+    const descPct = parseFloat((r.querySelector('input[name="descuento[]"]')?.value || '').replace(',', '.')) || 0;
+    const iva = parseFloat(r.querySelector('.pf-iva')?.dataset.iva || '0.15') || 0.15;
+    if (qty <= 0 || price <= 0) { r.querySelector('.pf-total').textContent = '0.00'; return; }
+
+    const base = qty * price; // sin IVA
+    const descVal = Math.max(0, base * (descPct / 100));
+    const neto = base - descVal;
+    const conIva = neto * (1 + iva);
+
+    subTotal += base;
+    totalDesc += descVal;
+    subNeto += neto;
+    totalConIva += conIva;
+
+    r.querySelector('.pf-total').textContent = conIva.toFixed(2);
   });
-  document.getElementById('pf_total_sin_imp').textContent = totalSinImp.toFixed(2);
+
+  document.getElementById('pf_subtotal').textContent = subTotal.toFixed(2);
   document.getElementById('pf_total_desc').textContent = totalDesc.toFixed(2);
-  document.getElementById('pf_importe_total').textContent = total.toFixed(2);
+  document.getElementById('pf_subtotal_neto').textContent = subNeto.toFixed(2);
+  document.getElementById('pf_importe_total').textContent = totalConIva.toFixed(2);
 }
 
-// initialize with one row
-if (!document.getElementById('proforma-rows').children.length) addProformaRow();
+// Navegación rápida con Enter: salta a la siguiente celda
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const el = e.target;
+  if (!(el instanceof HTMLInputElement)) return;
+  const cells = Array.from(document.querySelectorAll('#proforma-rows input'));
+  const idx = cells.indexOf(el);
+  if (idx >= 0) {
+    e.preventDefault();
+    const next = cells[idx + 1];
+    if (next) next.focus();
+  }
+});
 </script>

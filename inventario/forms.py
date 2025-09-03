@@ -686,6 +686,60 @@ class EmitirProformaFormulario(forms.Form):
         })
     )
 
+    # Campos adicionales para la proforma
+    almacen = forms.ModelChoiceField(
+        label="Almacén",
+        queryset=None,  # Se poblará dinámicamente en la vista
+        required=False,
+        empty_label="Seleccionar almacén...",
+        widget=forms.Select(attrs={
+            'class': 'border rounded px-2 py-1',
+            'id': 'id_almacen',
+        })
+    )
+
+    vendedor = forms.ModelChoiceField(
+        label="Vendedor",
+        queryset=None,  # Se poblará dinámicamente en la vista  
+        required=False,
+        empty_label="Seleccionar vendedor...",
+        widget=forms.Select(attrs={
+            'class': 'border rounded px-2 py-1',
+            'id': 'id_vendedor',
+        })
+    )
+
+    # Formas de pago disponibles para la proforma
+    FORMAS_PAGO_CHOICES = [
+        ('01', 'Efectivo'),
+        ('20', 'Crédito'),
+        ('04', 'Cheque'),
+        ('19', 'Tarjeta de Crédito'),
+        ('16', 'Depósito'),
+    ]
+
+    forma_pago = forms.ChoiceField(
+        label="Forma de Pago",
+        choices=FORMAS_PAGO_CHOICES,
+        initial='01',  # Efectivo por defecto
+        widget=forms.Select(attrs={
+            'class': 'border rounded px-2 py-1',
+            'id': 'id_forma_pago',
+        })
+    )
+
+    def __init__(self, *args, **kwargs):
+        # Extraer las opciones pasadas desde la vista
+        almacenes = kwargs.pop('almacenes', None)
+        vendedores = kwargs.pop('vendedores', None)
+        super().__init__(*args, **kwargs)
+        
+        # Poblar los querysets si se proporcionaron
+        if almacenes is not None:
+            self.fields['almacen'].queryset = almacenes
+        if vendedores is not None:
+            self.fields['vendedor'].queryset = vendedores
+
     def clean(self):
         cleaned_data = super().clean()
         # Si se proporciona correo, validar que haya identificación o nombre (mínimo contexto)

@@ -90,18 +90,43 @@ class EmitirProforma(LoginRequiredMixin, View):
             return redirect('inventario:seleccionar_empresa')
 
         from .forms import EmitirProformaFormulario
-        form = EmitirProformaFormulario()
-        contexto = {'form': form}
+        
+        # Obtener almacenes y vendedores (facturadores) activos
+        almacenes = Almacen.objects.filter(activo=True)
+        vendedores = Facturador.objects.filter(activo=True)
+        
+        # Crear el formulario con los datos
+        form = EmitirProformaFormulario(almacenes=almacenes, vendedores=vendedores)
+        
+        contexto = {
+            'form': form,
+            'proformador': {
+                'nombres': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+            }
+        }
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/proforma/emitirProforma.html', contexto)
 
     def post(self, request):
         from .forms import EmitirProformaFormulario
-        form = EmitirProformaFormulario(request.POST)
+        
+        # Obtener almacenes y vendedores (facturadores) activos
+        almacenes = Almacen.objects.filter(activo=True)
+        vendedores = Facturador.objects.filter(activo=True)
+        
+        # Crear el formulario con los datos POST y las opciones
+        form = EmitirProformaFormulario(request.POST, almacenes=almacenes, vendedores=vendedores)
+        
         if form.is_valid():
             messages.success(request, 'Proforma guardada (placeholder)')
             return redirect('inventario:listarProformas')
-        contexto = {'form': form}
+            
+        contexto = {
+            'form': form,
+            'proformador': {
+                'nombres': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+            }
+        }
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/proforma/emitirProforma.html', contexto)
 
@@ -5330,3 +5355,126 @@ def generar_xml_factura_view(request, factura_id):
             'success': False,
             'message': f'Error generando XML: {str(e)}'
         })
+
+
+def debug_proforma_data(request):
+    """Vista temporal para debuggear datos de proforma"""
+    from django.http import HttpResponse
+    
+    html_content = """
+    <html>
+    <head><title>Debug Proforma Data</title><style>body{font-family:Arial;margin:20px;} h2{color:#333;} .success{color:green;} .error{color:red;} .warning{color:orange;}</style></head>
+    <body>
+    <h1>🔍 Debug de Datos para Proformas</h1>
+    """
+    
+    # Verificar empresas
+    empresas = Empresa.objects.all()
+    html_content += f"<h2>📢 Empresas ({empresas.count()})</h2>"
+    if empresas.exists():
+        html_content += "<ul>"
+        for empresa in empresas:
+            html_content += f"<li><strong>{empresa.razon_social}</strong> (ID: {empresa.id})</li>"
+        html_content += "</ul>"
+    else:
+        html_content += "<p class='error'>❌ No hay empresas</p>"
+    
+    # Verificar almacenes
+    almacenes = Almacen.objects.all()
+    almacenes_activos = Almacen.objects.filter(activo=True)
+    html_content += f"<h2>📦 Almacenes (Total: {almacenes.count()}, Activos: {almacenes_activos.count()})</h2>"
+    
+    if almacenes.exists():
+        html_content += "<ul>"
+        for almacen in almacenes:
+            estado_class = "success" if almacen.activo else "error"
+            estado = "✅ Activo" if almacen.activo else "❌ Inactivo"
+            empresa_info = f" - Empresa: {almacen.empresa}" if almacen.empresa else " - Sin empresa"
+            html_content += f"<li><strong>{almacen.descripcion}</strong> (ID: {almacen.id}) <span class='{estado_class}'>{estado}</span>{empresa_info}</li>"
+        html_content += "</ul>"
+    else:
+        html_content += "<p class='error'>❌ No hay almacenes</p>"
+    
+    # Verificar facturadores
+    facturadores = Facturador.objects.all()
+    facturadores_activos = Facturador.objects.filter(activo=True)
+    html_content += f"<h2>👥 Facturadores (Total: {facturadores.count()}, Activos: {facturadores_activos.count()})</h2>"
+    
+    if facturadores.exists():
+        html_content += "<ul>"
+        for facturador in facturadores:
+            estado_class = "success" if facturador.activo else "error"
+            estado = "✅ Activo" if facturador.activo else "❌ Inactivo"
+            empresa_info = f" - Empresa: {facturador.empresa}" if facturador.empresa else " - Sin empresa"
+            html_content += f"<li><strong>{facturador.nombres}</strong> (ID: {facturador.id}) <span class='{estado_class}'>{estado}</span>{empresa_info}</li>"
+        html_content += "</ul>"
+    else:
+        html_content += "<p class='error'>❌ No hay facturadores</p>"
+    
+    # Crear datos si no existen
+    if request.GET.get('create_data') == '1':
+        html_content += "<h2>🔧 Creando Datos de Prueba</h2>"
+        
+        empresa_principal = empresas.first() if empresas.exists() else None
+        
+        # Crear almacenes
+        if not almacenes_activos.exists():
+            almacen1, created1 = Almacen.objects.get_or_create(
+                descripcion="Almacén Principal",
+                defaults={'activo': True, 'empresa': empresa_principal}
+            )
+            almacen2, created2 = Almacen.objects.get_or_create(
+                descripcion="Almacén Secundario", 
+                defaults={'activo': True, 'empresa': empresa_principal}
+            )
+            if created1 or created2:
+                html_content += "<p class='success'>✅ Almacenes creados</p>"
+        
+        # Crear facturadores
+        if not facturadores_activos.exists():
+            try:
+                facturador1, created1 = Facturador.objects.get_or_create(
+                    correo="facturador1@test.com",
+                    defaults={
+                        'nombres': "Juan Pérez",
+                        'activo': True,
+                        'empresa': empresa_principal,
+                        'telefono': '0999999999'
+                    }
+                )
+                if created1:
+                    facturador1.set_password("123456")
+                    facturador1.save()
+                
+                facturador2, created2 = Facturador.objects.get_or_create(
+                    correo="facturador2@test.com",
+                    defaults={
+                        'nombres': "María López",
+                        'activo': True,
+                        'empresa': empresa_principal,
+                        'telefono': '0988888888'
+                    }
+                )
+                if created2:
+                    facturador2.set_password("123456")
+                    facturador2.save()
+                    
+                if created1 or created2:
+                    html_content += "<p class='success'>✅ Facturadores creados</p>"
+            except Exception as e:
+                html_content += f"<p class='error'>❌ Error creando facturadores: {e}</p>"
+        
+        html_content += '<p><a href="?">🔄 Recargar sin crear datos</a></p>'
+    else:
+        html_content += '<p><a href="?create_data=1" style="background:#4CAF50;color:white;padding:10px;text-decoration:none;border-radius:5px;">🚀 Crear datos de prueba</a></p>'
+    
+    html_content += """
+    <hr>
+    <h3>🔗 Enlaces útiles</h3>
+    <p><a href="/inventario/proformas/emitir/" style="background:#2196F3;color:white;padding:8px;text-decoration:none;border-radius:3px;">📄 Ir a Emisión de Proforma</a></p>
+    <p><a href="/inventario/panel/" style="background:#FF9800;color:white;padding:8px;text-decoration:none;border-radius:3px;">🏠 Ir al Panel</a></p>
+    </body>
+    </html>
+    """
+    
+    return HttpResponse(html_content)

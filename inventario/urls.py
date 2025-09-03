@@ -91,6 +91,9 @@ urlpatterns = [
     # Login para facturadores
     path('login_facturador/', views.LoginFacturador.as_view(), name='login_facturador'),
 
+    # Login para proformadores (placeholder - redirects to login)
+    path('login_proformador/', views.Login.as_view(), name='login_proformador'),
+
     # Búsqueda y Almacenes
     path('buscar_cliente/', views.buscar_cliente, name='buscar_cliente'),
     path('buscar_producto/', views.buscar_producto, name='buscar_producto'),
@@ -140,6 +143,9 @@ urlpatterns = [
     path('sri/problemas/', views.FacturasSRIProblemas.as_view(), name='facturas_sri_problemas'),
     path('sri/sincronizar-masivo/', views.sincronizar_masivo_sri, name='sincronizar_masivo_sri'),
     path('sri/validar-xml/<int:factura_id>/', views.validar_xml_factura, name='validar_xml_factura'),
+
+    # Vista de debug temporal para proformas
+    path('debug/proforma-data/', views.debug_proforma_data, name='debug_proforma_data'),
 
 ]
 
