@@ -1,0 +1,63 @@
+{% extends "inventario/comun/base.html" %}
+{% block content %}
+<div class="p-3">
+  <div class="max-w-4xl mx-auto bg-white rounded-lg shadow border border-gray-200">
+    <div class="flex items-center justify-between px-3 py-2 border-b">
+      <h2 class="text-base font-semibold"><i class="fa fa-file-alt mr-2"></i>Proforma {{ proforma.numero }}</h2>
+      <div class="space-x-2">
+        <a href="{% url 'inventario:ride_proforma' proforma.id %}" class="px-3 py-1 text-xs rounded-md bg-gray-800 text-white hover:bg-black"><i class="fa fa-print mr-1"></i>Imprimir</a>
+      </div>
+    </div>
+    <div class="p-3 text-sm">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <div class="text-gray-600">Cliente</div>
+          <div class="font-medium">{{ proforma.cliente_nombre }}</div>
+          <div class="text-gray-600 mt-2">Identificación</div>
+          <div class="font-medium">{{ proforma.identificacion_cliente }}</div>
+        </div>
+        <div>
+          <div class="text-gray-600">Fecha Emisión</div>
+          <div class="font-medium">{{ proforma.fecha_emision }}</div>
+          <div class="text-gray-600 mt-2">Válida Hasta</div>
+          <div class="font-medium">{{ proforma.fecha_validez }}</div>
+        </div>
+      </div>
+
+      <div class="mt-3 overflow-x-auto">
+        <table class="min-w-full text-xs">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-2 py-2 text-left">Descripción</th>
+              <th class="px-2 py-2 text-right">Cant.</th>
+              <th class="px-2 py-2 text-right">P. Unit.</th>
+              <th class="px-2 py-2 text-right">Desc.</th>
+              <th class="px-2 py-2 text-right">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in proforma.detalles %}
+            <tr class="border-t">
+              <td class="px-2 py-2">{{ d.descripcion }}</td>
+              <td class="px-2 py-2 text-right">{{ d.cantidad }}</td>
+              <td class="px-2 py-2 text-right">{{ d.precio }}</td>
+              <td class="px-2 py-2 text-right">{{ d.descuento }}</td>
+              <td class="px-2 py-2 text-right">{{ d.subtotal }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
+        <div></div><div></div>
+        <div class="space-y-1 border rounded-md p-2 bg-gray-50">
+          <div class="flex justify-between text-xs"><span>Total sin Impuestos:</span><span>{{ proforma.total_sin_impuestos }}</span></div>
+          <div class="flex justify-between text-xs"><span>Descuento:</span><span>{{ proforma.total_descuento }}</span></div>
+          <div class="flex justify-between text-xs font-semibold"><span>Importe Total:</span><span>{{ proforma.importe_total }}</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

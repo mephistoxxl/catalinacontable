@@ -1,0 +1,39 @@
+{% extends "inventario/comun/base.html" %}
+{% block content %}
+<div class="p-3">
+  <div class="max-w-6xl mx-auto bg-white rounded-lg shadow border border-gray-200">
+    <div class="flex items-center justify-between px-3 py-2 border-b">
+      <h2 class="text-base font-semibold"><i class="fa fa-list mr-2"></i>Proformas</h2>
+      <a href="{% url 'inventario:emitirProforma' %}" class="px-3 py-1 text-xs rounded-md bg-gray-800 text-white hover:bg-black"><i class="fa fa-plus mr-1"></i>Nueva</a>
+    </div>
+    <div class="p-3 overflow-x-auto">
+      <table class="min-w-full text-xs">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-2 py-2 text-left">#</th>
+            <th class="px-2 py-2 text-left">Cliente</th>
+            <th class="px-2 py-2 text-left">Fecha</th>
+            <th class="px-2 py-2 text-right">Total</th>
+            <th class="px-2 py-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in proformas %}
+          <tr class="border-t">
+            <td class="px-2 py-2">{{ p.numero }}</td>
+            <td class="px-2 py-2">{{ p.cliente_nombre }}</td>
+            <td class="px-2 py-2">{{ p.fecha_emision }}</td>
+            <td class="px-2 py-2 text-right">{{ p.total }}</td>
+            <td class="px-2 py-2 text-right">
+              <a class="text-blue-600 hover:underline" href="{% url 'inventario:verProforma' p.id %}">Ver</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="px-2 py-4 text-center text-gray-500">No hay proformas</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

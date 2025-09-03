@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>RIDE Proforma</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #111; }
+    .container { width: 750px; margin: 0 auto; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 8px; }
+    .emisor { font-size: 12px; }
+    .title { font-size: 18px; font-weight: bold; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+    th { background: #f7f7f7; }
+    .right { text-align: right; }
+    .totals { width: 300px; margin-left: auto; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="emisor">
+        <div><strong>{{ empresa.razon_social }}</strong></div>
+        <div>RUC: {{ empresa.identificacion }}</div>
+        <div>{{ empresa.direccion_establecimiento }}</div>
+        <div>Tel: {{ empresa.telefono }}</div>
+      </div>
+      <div class="title">PROFORMA</div>
+    </div>
+
+    <div class="grid" style="margin-top: 8px;">
+      <div>
+        <div><strong>Cliente:</strong> {{ proforma.cliente_nombre }}</div>
+        <div><strong>Identificación:</strong> {{ proforma.identificacion_cliente }}</div>
+        <div><strong>Correo:</strong> {{ proforma.correo_cliente }}</div>
+      </div>
+      <div>
+        <div><strong>Número:</strong> {{ proforma.numero }}</div>
+        <div><strong>Fecha Emisión:</strong> {{ proforma.fecha_emision }}</div>
+        <div><strong>Válida Hasta:</strong> {{ proforma.fecha_validez }}</div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Descripción</th>
+          <th class="right">Cantidad</th>
+          <th class="right">Precio Unit.</th>
+          <th class="right">Descuento</th>
+          <th class="right">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in proforma.detalles %}
+        <tr>
+          <td>{{ d.descripcion }}</td>
+          <td class="right">{{ d.cantidad }}</td>
+          <td class="right">{{ d.precio }}</td>
+          <td class="right">{{ d.descuento }}</td>
+          <td class="right">{{ d.subtotal }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <table class="totals">
+      <tr>
+        <th>Total sin Impuestos</th>
+        <td class="right">{{ proforma.total_sin_impuestos }}</td>
+      </tr>
+      <tr>
+        <th>Descuento</th>
+        <td class="right">{{ proforma.total_descuento }}</td>
+      </tr>
+      <tr>
+        <th>Importe Total</th>
+        <td class="right"><strong>{{ proforma.importe_total }}</strong></td>
+      </tr>
+    </table>
+    <p style="margin-top:10px; color:#666;">Esta proforma no es un comprobante fiscal. Válida hasta {{ proforma.fecha_validez }}.</p>
+  </div>
+</body>
+</html>

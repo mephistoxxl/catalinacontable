@@ -1,0 +1,81 @@
+<div class="space-y-2">
+  <!-- Tabla simple editable para detalles de la proforma (placeholder) -->
+  <table class="min-w-full text-xs border border-gray-200">
+    <thead class="bg-gray-50">
+      <tr>
+        <th class="px-2 py-1 text-left">Código</th>
+        <th class="px-2 py-1 text-left">Descripción</th>
+        <th class="px-2 py-1 text-right">Cantidad</th>
+        <th class="px-2 py-1 text-right">P. Unitario</th>
+        <th class="px-2 py-1 text-right">Descuento</th>
+        <th class="px-2 py-1 text-right">Subtotal</th>
+        <th class="px-2 py-1"></th>
+      </tr>
+    </thead>
+    <tbody id="proforma-rows"></tbody>
+  </table>
+
+  <div class="flex justify-end">
+    <button type="button" class="px-3 py-1 text-xs rounded-md border border-gray-300 hover:bg-gray-50" onclick="addProformaRow()">
+      <i class="fa fa-plus mr-1"></i> Agregar ítem
+    </button>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+    <div></div>
+    <div></div>
+    <div class="space-y-1 border rounded-md p-2 bg-gray-50">
+      <div class="flex justify-between text-xs">
+        <span>Total sin Impuestos:</span>
+        <span id="pf_total_sin_imp">0.00</span>
+      </div>
+      <div class="flex justify-between text-xs">
+        <span>Descuento:</span>
+        <span id="pf_total_desc">0.00</span>
+      </div>
+      <div class="flex justify-between text-xs font-semibold">
+        <span>Importe Total:</span>
+        <span id="pf_importe_total">0.00</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function addProformaRow() {
+  const tbody = document.getElementById('proforma-rows');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="px-2 py-1 border-t"><input name="codigo[]" class="w-full border rounded px-2 py-1"/></td>
+    <td class="px-2 py-1 border-t"><input name="descripcion[]" class="w-full border rounded px-2 py-1"/></td>
+    <td class="px-2 py-1 border-t text-right"><input name="cantidad[]" type="number" step="0.01" value="1" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()"/></td>
+    <td class="px-2 py-1 border-t text-right"><input name="precio[]" type="number" step="0.01" value="0.00" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()"/></td>
+    <td class="px-2 py-1 border-t text-right"><input name="descuento[]" type="number" step="0.01" value="0.00" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()"/></td>
+    <td class="px-2 py-1 border-t text-right"><span class="pf-subtotal">0.00</span></td>
+    <td class="px-2 py-1 border-t text-right"><button type="button" class="text-red-600 text-xs" onclick="this.closest('tr').remove(); pf_recalc();"><i class="fa fa-trash"></i></button></td>
+  `;
+  tbody.appendChild(tr);
+  pf_recalc();
+}
+
+function pf_recalc() {
+  const rows = document.querySelectorAll('#proforma-rows tr');
+  let totalSinImp = 0, totalDesc = 0, total = 0;
+  rows.forEach(r => {
+    const qty = parseFloat(r.querySelector('input[name="cantidad[]"]').value || '0');
+    const price = parseFloat(r.querySelector('input[name="precio[]"]').value || '0');
+    const desc = parseFloat(r.querySelector('input[name="descuento[]"]').value || '0');
+    const line = Math.max(qty * price - desc, 0);
+    r.querySelector('.pf-subtotal').textContent = line.toFixed(2);
+    totalSinImp += qty * price;
+    totalDesc += desc;
+    total += line;
+  });
+  document.getElementById('pf_total_sin_imp').textContent = totalSinImp.toFixed(2);
+  document.getElementById('pf_total_desc').textContent = totalDesc.toFixed(2);
+  document.getElementById('pf_importe_total').textContent = total.toFixed(2);
+}
+
+// initialize with one row
+if (!document.getElementById('proforma-rows').children.length) addProformaRow();
+</script>

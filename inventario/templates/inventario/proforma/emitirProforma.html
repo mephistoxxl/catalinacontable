@@ -1,0 +1,110 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+<style>
+  /* Compact inputs consistent with factura UI */
+  input, select, textarea { height: 28px; font-size: 13px; }
+  textarea { height: auto; min-height: 72px; }
+  label { font-size: 11px; margin-bottom: 2px; color: #111827; }
+</style>
+
+<div class="bg-gray-50 p-3">
+  <div class="max-w-5xl mx-auto">
+    <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 mb-2 rounded-lg">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center">
+          <i class="fas fa-file-alt text-white mr-2"></i>
+          <div>
+            <h2 class="text-base font-semibold text-white">Emitir Proforma</h2>
+            <p class="text-gray-300 text-[11px] hidden sm:block">Similar a la factura, sin pagos ni envío al SRI</p>
+          </div>
+        </div>
+        {% if proformador %}
+        <div class="text-right">
+          <p class="text-gray-300 text-xs"><i class="fa fa-user-circle mr-1"></i>{{ proformador.nombres }}</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if messages %}
+      {% for message in messages %}
+        <div class="mb-2 rounded bg-blue-100 px-3 py-1 text-blue-800 text-xs">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+      <div class="p-3">
+        <form method="POST" action="{% url 'inventario:emitirProforma' %}" class="space-y-3">
+          {% csrf_token %}
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <!-- Cliente -->
+            <div class="space-y-2">
+              <div>
+                <label for="id_identificacion_cliente">CI/RUC</label>
+                {{ form.identificacion_cliente }}
+              </div>
+              <div>
+                <label for="id_nombre_cliente">Nombre del Cliente</label>
+                {{ form.nombre_cliente }}
+              </div>
+              <div>
+                <label for="id_correo_cliente">Correo del Cliente</label>
+                {{ form.correo_cliente }}
+              </div>
+            </div>
+
+            <!-- Datos de la proforma -->
+            <div class="space-y-2">
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label for="id_fecha_emision">Fecha de Emisión</label>
+                  {{ form.fecha_emision }}
+                </div>
+                <div>
+                  <label for="id_fecha_validez">Válida Hasta</label>
+                  {{ form.fecha_validez }}
+                </div>
+              </div>
+              <div>
+                <label for="id_concepto">Concepto</label>
+                {{ form.concepto }}
+              </div>
+              <div>
+                <label for="id_observaciones">Observaciones (opcional)</label>
+                {{ form.observaciones }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Detalles (productos/servicios) -->
+          <div class="border-t border-gray-200 pt-2">
+            <h3 class="text-xs font-medium text-gray-800 mb-2"><i class="fas fa-box-open mr-1"></i>Detalles</h3>
+            {% include 'inventario/proforma/detallesProforma.html' %}
+          </div>
+
+          <div class="flex justify-end pt-2 border-t border-gray-200">
+            <button type="submit" class="inline-flex items-center px-4 py-1 text-xs font-medium rounded-md text-white bg-gray-800 hover:bg-black">
+              <i class="fa fa-save mr-2 text-xs"></i> Guardar Proforma
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const hoy = new Date().toISOString().split('T')[0];
+  const fechaEmision = document.getElementById('id_fecha_emision');
+  const fechaValidez = document.getElementById('id_fecha_validez');
+  if (fechaEmision && !fechaEmision.value) fechaEmision.value = hoy;
+  if (fechaValidez && !fechaValidez.value) {
+    const d = new Date(); d.setDate(d.getDate() + 7); // 7 días por defecto
+    fechaValidez.value = d.toISOString().split('T')[0];
+  }
+});
+</script>
+{% endblock %}
