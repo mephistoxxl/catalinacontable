@@ -607,6 +607,95 @@ class EmitirFacturaFormulario(forms.Form):
 
         return cleaned_data
 
+class EmitirProformaFormulario(forms.Form):
+    """Formulario para emitir una proforma (cotización), sin pagos ni SRI."""
+    # Datos del cliente (búsqueda manual similar a Factura)
+    identificacion_cliente = forms.CharField(
+        label="CI/RUC",
+        max_length=13,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Cédula o RUC del cliente',
+            'id': 'id_identificacion_cliente',
+        })
+    )
+
+    nombre_cliente = forms.CharField(
+        label="Nombre del Cliente",
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Nombre completo del cliente',
+            'readonly': 'readonly',
+            'id': 'id_nombre_cliente',
+        })
+    )
+
+    correo_cliente = forms.EmailField(
+        label="Correo del Cliente",
+        required=False,
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Correo del cliente',
+            'id': 'id_correo_cliente',
+        })
+    )
+
+    # Fechas
+    fecha_emision = forms.DateField(
+        label="Fecha de Emisión",
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control',
+            'id': 'id_fecha_emision',
+        })
+    )
+
+    fecha_validez = forms.DateField(
+        label="Válida Hasta",
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control',
+            'id': 'id_fecha_validez',
+        })
+    )
+
+    concepto = forms.CharField(
+        label="Concepto",
+        max_length=255,
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'id': 'id_concepto',
+            'placeholder': 'Concepto de la proforma (opcional)'
+        })
+    )
+
+    observaciones = forms.CharField(
+        label="Observaciones",
+        max_length=500,
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'id': 'id_observaciones',
+            'placeholder': 'Observaciones (opcional)'
+        })
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # Si se proporciona correo, validar que haya identificación o nombre (mínimo contexto)
+        correo = cleaned_data.get('correo_cliente')
+        ident = cleaned_data.get('identificacion_cliente')
+        nombre = cleaned_data.get('nombre_cliente')
+        if correo and not (ident or nombre):
+            raise forms.ValidationError("Debe ingresar identificación o nombre del cliente si especifica correo.")
+        return cleaned_data
+
 class ProveedorFormulario(forms.ModelForm):
     # ✅ ACTUALIZADO: Ahora usa las mismas opciones que Cliente
     TIPO_IDENTIFICACION_CHOICES = [

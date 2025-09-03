@@ -61,6 +61,84 @@ logger = logging.getLogger(__name__)
 
 #Vistas endogenas.
 
+# =====================
+# Proformas (placeholders)
+# =====================
+class ListarProformas(LoginRequiredMixin, View):
+    login_url = '/inventario/login'
+    redirect_field_name = None
+
+    def get(self, request):
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return redirect('inventario:seleccionar_empresa')
+
+        contexto = {
+            'proformas': [],  # Placeholder list until model is implemented
+        }
+        contexto = complementarContexto(contexto, request.user)
+        return render(request, 'inventario/proforma/listarProformas.html', contexto)
+
+
+class EmitirProforma(LoginRequiredMixin, View):
+    login_url = '/inventario/login'
+    redirect_field_name = None
+
+    def get(self, request):
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return redirect('inventario:seleccionar_empresa')
+
+        from .forms import EmitirProformaFormulario
+        form = EmitirProformaFormulario()
+        contexto = {'form': form}
+        contexto = complementarContexto(contexto, request.user)
+        return render(request, 'inventario/proforma/emitirProforma.html', contexto)
+
+    def post(self, request):
+        from .forms import EmitirProformaFormulario
+        form = EmitirProformaFormulario(request.POST)
+        if form.is_valid():
+            messages.success(request, 'Proforma guardada (placeholder)')
+            return redirect('inventario:listarProformas')
+        contexto = {'form': form}
+        contexto = complementarContexto(contexto, request.user)
+        return render(request, 'inventario/proforma/emitirProforma.html', contexto)
+
+
+class VerProforma(LoginRequiredMixin, View):
+    login_url = '/inventario/login'
+    redirect_field_name = None
+
+    def get(self, request, p):
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return redirect('inventario:seleccionar_empresa')
+
+        contexto = {
+            'proforma': {
+                'id': p,
+                'numero': f'PF-{p:06d}',
+            }
+        }
+        contexto = complementarContexto(contexto, request.user)
+        return render(request, 'inventario/proforma/verProforma.html', contexto)
+
+
+def ride_proforma(request, p):
+    """Renderiza un RIDE-like de Proforma (placeholder)."""
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id:
+        return redirect('inventario:seleccionar_empresa')
+
+    contexto = {
+        'proforma': {
+            'id': p,
+            'numero': f'PF-{p:06d}',
+        }
+    }
+    return render(request, 'inventario/PDF/proforma.html', contexto)
+
 
 #Interfaz de inicio de sesion----------------------------------------------------#
 #Interfaz de inicio de sesion----------------------------------------------------#

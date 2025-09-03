@@ -59,6 +59,12 @@ urlpatterns = [
     path('factura/<int:factura_id>/guardar-forma-pago/', views.GuardarFormaPagoView.as_view(), name='guardarFormaPago'),
     path('validar_facturador/', views.validar_facturador, name='validar_facturador'),
 
+    # Proformas (placeholder views)
+    path('proformas/', views.ListarProformas.as_view(), name='listarProformas'),
+    path('proformas/emitir/', views.EmitirProforma.as_view(), name='emitirProforma'),
+    path('proformas/ver/<int:p>/', views.VerProforma.as_view(), name='verProforma'),
+    path('proformas/ride/<int:p>/', views.ride_proforma, name='ride_proforma'),
+
     # Usuarios
     path('crearUsuario', views.CrearUsuario.as_view(), name='crearUsuario'),
     path('listarUsuarios', views.ListarUsuarios.as_view(), name='listarUsuarios'),
