@@ -221,22 +221,21 @@ class ProformaRIDEGenerator:
             else:
                 logo = ""
 
-            # Datos de empresa
+            # Datos de empresa (sin direcciones ni 'OBLIGADO A LLEVAR CONTABILIDAD')
             razon_social = getattr(opciones, 'razon_social', '') or getattr(proforma.empresa, 'razon_social', '')
-            dir_matriz = getattr(opciones, 'direccion_matriz', getattr(opciones, 'direccion_establecimiento', ''))
-            dir_sucursal = getattr(opciones, 'direccion_establecimiento', '')
+            identificacion_val = getattr(opciones, 'identificacion', '') or getattr(proforma.empresa, 'ruc', '')
             contribuyente_especial = getattr(opciones, 'contribuyente_especial', '') if hasattr(opciones, 'contribuyente_especial') else ''
-            obligado = getattr(opciones, 'obligado', 'NO')
             agente_retencion = getattr(opciones, 'agente_retencion', '') if hasattr(opciones, 'agente_retencion') else ''
-            
-            datos_empresa = f"""
-<b>{razon_social}</b><br/>
-<b>Dirección Matriz:</b> {dir_matriz}<br/>
-<b>Dirección Sucursal:</b> {dir_sucursal}<br/>
-{'<b>Contribuyente Especial Nro</b> ' + contribuyente_especial + '<br/>' if contribuyente_especial else ''}
-<b>OBLIGADO A LLEVAR CONTABILIDAD:</b> {obligado}<br/>
-{f'<b>Agente de Retención Resolución No.</b> {agente_retencion}' if agente_retencion else ''}
-"""
+
+            datos_empresa_lineas = []
+            if identificacion_val:
+                datos_empresa_lineas.append(f"<b>RUC:</b> {identificacion_val}")
+            datos_empresa_lineas.append(f"<b>{razon_social}</b>")
+            if contribuyente_especial:
+                datos_empresa_lineas.append(f"<b>Contribuyente Especial Nro</b> {contribuyente_especial}")
+            if agente_retencion:
+                datos_empresa_lineas.append(f"<b>Agente de Retención Resolución No.</b> {agente_retencion}")
+            datos_empresa = "<br/>".join(datos_empresa_lineas)
             datos_empresa_paragraph = Paragraph(datos_empresa, self.styles['DatosEmpresa'])
 
             ANCHO_SUPERIOR = 195  # mm

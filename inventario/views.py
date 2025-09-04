@@ -76,7 +76,11 @@ class ListarProformas(LoginRequiredMixin, View):
 
         # Obtener proformas de la empresa activa
         from .models import Proforma
-        proformas = Proforma.objects.filter(empresa_id=empresa_id).order_by('-fecha_creacion')
+        proformas = (
+            Proforma.objects.select_related('cliente')
+            .filter(empresa_id=empresa_id)
+            .order_by('-fecha_creacion')
+        )
 
         contexto = {
             'proformas': proformas,
@@ -1021,6 +1025,15 @@ class Eliminar(LoginRequiredMixin, View):
             cliente.delete()
             messages.success(request, 'Cliente de ID %s borrado exitosamente.' % p)
             return HttpResponseRedirect("/inventario/listarClientes")
+
+        elif modo == 'proforma':
+            # Eliminar proforma perteneciente a la empresa activa
+            from .models import Proforma
+            proforma = get_object_or_404(Proforma, id=p, empresa_id=empresa_id)
+            numero = proforma.numero
+            proforma.delete()
+            messages.success(request, f'Proforma {numero} eliminada exitosamente.')
+            return redirect('inventario:listarProformas')
 
 
         elif modo == 'proveedor':
