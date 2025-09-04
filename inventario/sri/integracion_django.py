@@ -598,22 +598,75 @@ class SRIIntegration:
             if hasattr(factura, 'mensaje_sri'):
                 factura.mensaje_sri = 'Comprobante autorizado'
                 
-            # Obtener datos de autorización
-            autorizaciones = resultado.get('autorizaciones', [])
+            # Obtener datos de autorización en distintas variantes de estructura
+            aut = None
+
+            autorizaciones = resultado.get('autorizaciones')
             if autorizaciones:
-                aut = autorizaciones[0]
+                if isinstance(autorizaciones, list):
+                    aut = autorizaciones[0]
+                elif isinstance(autorizaciones, dict):
+                    aut_data = autorizaciones.get('autorizacion', autorizaciones)
+                    if isinstance(aut_data, list):
+                        aut = aut_data[0]
+                    else:
+                        aut = aut_data
+                else:
+                    aut_data = getattr(autorizaciones, 'autorizacion', autorizaciones)
+                    aut = aut_data[0] if isinstance(aut_data, list) else aut_data
+
+            if aut is None:
+                autorizacion = resultado.get('autorizacion')
+                if autorizacion:
+                    aut = autorizacion[0] if isinstance(autorizacion, list) else autorizacion
+
+            if aut is None:
+                numero = resultado.get('numeroAutorizacion') or resultado.get('numero_autorizacion')
+                fecha = resultado.get('fechaAutorizacion') or resultado.get('fecha_autorizacion')
+                comprobante = resultado.get('comprobante') or resultado.get('xml_autorizado')
+                if numero or fecha or comprobante:
+                    aut = {
+                        'numeroAutorizacion': numero,
+                        'fechaAutorizacion': fecha,
+                        'comprobante': comprobante,
+                    }
+
+            if aut:
                 if hasattr(factura, 'numero_autorizacion'):
-                    factura.numero_autorizacion = aut.get('numeroAutorizacion')
+                    numero_aut = aut.get('numeroAutorizacion') or aut.get('numero_autorizacion')
+                    factura.numero_autorizacion = numero_aut
+                    if not numero_aut:
+                        logger.warning(
+                            f"Factura {factura.id} autorizada sin numeroAutorizacion en resultado"
+                        )
                 if hasattr(factura, 'fecha_autorizacion'):
-                    fecha_str = aut.get('fechaAutorizacion')
+                    fecha_str = aut.get('fechaAutorizacion') or aut.get('fecha_autorizacion')
                     if fecha_str:
                         try:
                             from datetime import datetime
-                            factura.fecha_autorizacion = datetime.fromisoformat(fecha_str.replace('Z', '+00:00'))
-                        except:
-                            logger.warning(f"Error parseando fecha autorización: {fecha_str}")
+                            factura.fecha_autorizacion = datetime.fromisoformat(
+                                fecha_str.replace('Z', '+00:00')
+                            )
+                        except Exception:
+                            logger.warning(
+                                f"Error parseando fecha autorización: {fecha_str}"
+                            )
+                    else:
+                        logger.warning(
+                            f"Factura {factura.id} autorizada sin fechaAutorizacion en resultado"
+                        )
                 if hasattr(factura, 'xml_autorizado'):
-                    factura.xml_autorizado = aut.get('comprobante') or factura.xml_autorizado
+                    xml_aut = aut.get('comprobante') or aut.get('xml_autorizado')
+                    if xml_aut:
+                        factura.xml_autorizado = xml_aut or factura.xml_autorizado
+                    else:
+                        logger.warning(
+                            f"Factura {factura.id} autorizada sin XML de comprobante en resultado"
+                        )
+            else:
+                logger.warning(
+                    f"Factura {factura.id} autorizada pero sin datos de autorización; se recomienda reconsultar"
+                )
             
             logger.info(f"Factura {factura.id} marcada como AUTORIZADA")
 
