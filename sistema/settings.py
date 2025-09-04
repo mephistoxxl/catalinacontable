@@ -209,3 +209,22 @@ if os.environ.get('DISABLE_INVENTARIO_MIGRATIONS'):
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ==============================
+# Email configuration
+# ==============================
+# Default: console backend in development to avoid SMTP connection errors.
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@example.com')
+SERVER_EMAIL = os.environ.get('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
+
+# SMTP settings (used if EMAIL_BACKEND is SMTP)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
+try:
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 25))
+except Exception:
+    EMAIL_PORT = 25
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'False') == 'True'
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False') == 'True'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')

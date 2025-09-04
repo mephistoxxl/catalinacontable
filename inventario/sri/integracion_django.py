@@ -820,7 +820,23 @@ class SRIIntegration:
             if not destinatario:
                 return {'success': False, 'message': 'El cliente no tiene correo registrado'}
 
-            email = EmailMessage(asunto_base, cuerpo, to=[destinatario])
+            # Usar el correo configurado en Opciones como remitente
+            from_email = None
+            try:
+                if getattr(opciones, 'correo', None):
+                    from_email = f"{opciones.razon_social} <{opciones.correo}>"
+            except Exception:
+                from_email = None
+            if not from_email:
+                from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@example.com')
+
+            email = EmailMessage(
+                asunto_base,
+                cuerpo,
+                from_email=from_email,
+                to=[destinatario],
+                reply_to=[opciones.correo] if getattr(opciones, 'correo', None) else None,
+            )
 
             # Adjuntar RIDE PDF
             try:
