@@ -465,24 +465,72 @@ class ProformaRIDEGenerator:
             elementos.append(Spacer(1, 6*mm))
 
             # === INFORMACIÓN + TOTALES ===
-            # Obtener datos del proformador y empresa
-            facturador_nombre = getattr(proforma, 'facturador', None)
-            if facturador_nombre:
-                facturador_nombre = facturador_nombre.nombres
+            # Datos del vendedor (facturador) con robustos fallbacks
+            facturador = getattr(proforma, 'facturador', None)
+            # Nombre
+            if facturador:
+                nombre_partes = []
+                for attr in ('nombres', 'nombre', 'first_name'):
+                    if hasattr(facturador, attr) and getattr(facturador, attr):
+                        nombre_partes.append(str(getattr(facturador, attr)))
+                        break
+                for attr in ('apellidos', 'apellido', 'last_name'):
+                    if hasattr(facturador, attr) and getattr(facturador, attr):
+                        nombre_partes.append(str(getattr(facturador, attr)))
+                        break
+                if not nombre_partes and hasattr(facturador, 'get_full_name'):
+                    try:
+                        full = facturador.get_full_name()
+                        if full:
+                            nombre_partes = [full]
+                    except Exception:
+                        pass
+                facturador_nombre = ' '.join(nombre_partes).strip() or str(facturador)
             else:
                 facturador_nombre = 'N/A'
-            
-            # Obtener configuración de empresa
+
+            # Teléfono del vendedor
+            facturador_telefono = None
+            if facturador:
+                for tel_attr in ('telefono', 'celular', 'movil', 'phone', 'telefono1', 'telefono2'):
+                    if hasattr(facturador, tel_attr):
+                        val = getattr(facturador, tel_attr)
+                        if val:
+                            facturador_telefono = str(val)
+                            break
+
+            # Correo del vendedor
+            facturador_correo = None
+            if facturador:
+                for mail_attr in ('correo', 'email'):
+                    if hasattr(facturador, mail_attr):
+                        val = getattr(facturador, mail_attr)
+                        if val:
+                            facturador_correo = str(val)
+                            break
+                # Fallback: usuario o user relacionado
+                if not facturador_correo:
+                    for rel in ('usuario', 'user'):
+                        if hasattr(facturador, rel):
+                            user_obj = getattr(facturador, rel)
+                            if hasattr(user_obj, 'email') and getattr(user_obj, 'email'):
+                                facturador_correo = str(getattr(user_obj, 'email'))
+                                break
+
+            # Fallback a datos de empresa si faltan teléfono/correo del vendedor
             from inventario.models import Opciones
             empresa_config = Opciones.objects.first()
-            empresa_telefono = getattr(empresa_config, 'telefono', 'N/A') if empresa_config else 'N/A'
-            empresa_correo = getattr(empresa_config, 'correo', 'N/A') if empresa_config else 'N/A'
-            
+            empresa_telefono = getattr(empresa_config, 'telefono', None) if empresa_config else None
+            empresa_correo = getattr(empresa_config, 'correo', None) if empresa_config else None
+
+            telefono_info = facturador_telefono or empresa_telefono or 'N/A'
+            correo_info = facturador_correo or empresa_correo or 'N/A'
+
             info_adicional = f"""
             <b>Información</b><br/>
             Vendedor: {facturador_nombre}<br/>
-            Teléfono: {empresa_telefono}<br/>
-            Correo: {empresa_correo}
+            Teléfono: {telefono_info}<br/>
+            Correo: {correo_info}
             """
 
             # --- TOTALES ---
