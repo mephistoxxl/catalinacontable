@@ -5,6 +5,7 @@ from datetime import datetime
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+from django.core.mail import EmailMessage
 from django.utils import timezone
 from inventario.models import Factura, DetalleFactura, Opciones
 from .sri_client import SRIClient
@@ -721,7 +722,67 @@ class SRIIntegration:
             
         except Exception as e:
             logger.error(f"Error generando RIDE: {e}")
-    
+    def enviar_factura_email(self, factura):
+        """
+        Envía por correo electrónico el RIDE y XML autorizado de una factura.
+
+        Args:
+            factura (Factura): instancia de factura ya autorizada.
+
+        Returns:
+            dict: resultado del envío con ``success`` y ``message``.
+        """
+        try:
+            if not factura.numero_autorizacion or not factura.fecha_autorizacion:
+                return {'success': False, 'message': 'La factura no está autorizada'}
+
+            opciones = Opciones.objects.first()
+            if not opciones:
+                return {'success': False, 'message': 'No se encontraron opciones de empresa'}
+
+            # Asegurar existencia de RIDE autorizado
+            if not getattr(factura, 'ride_autorizado'):
+                self._generar_ride_autorizado(factura, {'numero_autorizacion': factura.numero_autorizacion})
+
+            if not getattr(factura, 'ride_autorizado'):
+                return {'success': False, 'message': 'No se pudo generar RIDE autorizado'}
+
+            asunto_base = (
+                f"Documento Electronico {factura.establecimiento}-"
+                f"{factura.punto_emision}-{factura.secuencia} - {opciones.razon_social}"
+            )
+
+            cuerpo = (
+                f"Estimado/a {factura.nombre_cliente},\n\n"
+                f"Adjunto encontrará su comprobante electrónico.\n\n"
+                f"Emisor: {opciones.razon_social}\n"
+                f"RUC: {opciones.identificacion}\n"
+            )
+
+            destinatario = getattr(factura.cliente, 'correo', None)
+            if not destinatario:
+                return {'success': False, 'message': 'El cliente no tiene correo registrado'}
+
+            email = EmailMessage(asunto_base, cuerpo, to=[destinatario])
+
+            # Adjuntar RIDE PDF
+            try:
+                with default_storage.open(factura.ride_autorizado.name, 'rb') as ride_file:
+                    email.attach(f"{asunto_base}.pdf", ride_file.read(), 'application/pdf')
+            except Exception as e:
+                logger.error(f"Error adjuntando RIDE: {e}")
+
+            # Adjuntar XML autorizado
+            if factura.xml_autorizado:
+                xml_file = ContentFile(factura.xml_autorizado.encode('utf-8'))
+                email.attach(f"{asunto_base}.xml", xml_file.read(), 'application/xml')
+
+            email.send(fail_silently=False)
+            return {'success': True, 'message': 'Factura enviada por correo exitosamente'}
+        except Exception as e:
+            logger.error(f"Error enviando factura por correo: {e}")
+            return {'success': False, 'message': str(e)}
+
     def consultar_estado_factura(self, factura_id):
         """
         Consulta el estado actual de una factura en el SRI
