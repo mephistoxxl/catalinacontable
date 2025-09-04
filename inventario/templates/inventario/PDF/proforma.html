@@ -7,150 +7,189 @@
     /* Reset básico */
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 10px; }
-  .container { width: auto; margin: 0 auto; padding: 10px 12px; }
-    .row { display: flex; flex-wrap: nowrap; }
-    .col { flex: 1; }
+    body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 10px; }
+    .wrap { padding: 10px 12px; }
+    .muted { color: #666; }
     .right { text-align: right; }
-  .mt-2 { margin-top: 8px; } .mt-4 { margin-top: 12px; } .mt-6 { margin-top: 16px; } .mb-2 { margin-bottom: 6px; }
-  .muted { color: #555; }
-  .footer { margin-top: 16px; font-size: 9px; color: #6b7280; display: flex; justify-content: space-between; }
+    .small { font-size: 9px; }
+    .mb-1 { margin-bottom: 4px; } .mb-2 { margin-bottom: 8px; } .mb-3 { margin-bottom: 12px; }
+    .mt-1 { margin-top: 4px; } .mt-2 { margin-top: 8px; } .mt-3 { margin-top: 12px; }
 
-    /* Header Emisor */
-  .header { border-bottom: 2px solid #0ea5e9; padding-bottom: 8px; display: flex; align-items: center; }
-  .logo { width: 95px; height: 48px; object-fit: contain; margin-right: 10px; }
-  .emisor h1 { font-size: 14px; margin: 0; }
-    .emisor .line { display: flex; gap: 16px; font-weight: bold; }
-    .doc-title { margin-left: auto; text-align: right; }
-  .doc-title .title { font-weight: bold; font-size: 16px; }
-  .doc-title .number { font-size: 11px; color: #374151; }
+    /* Página */
+    @page { size: A4; margin: 10mm; }
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 
-    /* Bloque cliente/fechas */
-    .block { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 10px; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .card { border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 8px; background: #fff; }
-  .card h3 { margin: 0 0 4px 0; font-size: 11px; color: #111; text-transform: uppercase; }
-    .label { color: #374151; font-weight: bold; }
-    .value { color: #111; }
+    /* Encabezado */
+    .hdr { width: 100%; padding-bottom: 8px; }
+    .logo { width: 95px; height: 95px; }
+    .hcol-title { text-align: right; }
+    .hdoc-title { font-weight: bold; font-size: 14px; }
+    .hdoc-num { font-size: 11px; }
 
-    /* Tabla de detalles */
+    /* Bloques */
+    .box { border: 1px solid #e5e7eb; padding: 8px; border-radius: 6px; }
+    .box h3 { margin: 0 0 4px 0; font-size: 11px; text-transform: uppercase; }
+    .twocol { width: 100%; }
+    .twocol td { vertical-align: top; padding: 0; }
+    .divider { height: 6px; }
+
+    /* Tabla de ítems */
     table { width: 100%; border-collapse: collapse; }
-  thead th { font-size: 10px; text-transform: uppercase; font-weight: bold; color: #fff; border-bottom: 0; padding: 4px 6px; background: #0ea5e9; }
-  tbody td { padding: 4px 6px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
-    .text-right { text-align: right; }
-    .desc-cell { white-space: pre-wrap; }
+    thead th { font-size: 10px; text-transform: uppercase; color: #111; background: #f3f4f6; padding: 6px 6px; }
+    tbody td { padding: 5px 6px; border-bottom: 1px solid #eee; }
+    .mono { font-family: "DejaVu Sans Mono", monospace; }
 
     /* Totales */
-  .totals-wrap { display: grid; grid-template-columns: 1fr 240px; gap: 10px; }
-  .totals-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 8px; background: #f9fafb; }
-  .totals-box .row { justify-content: space-between; margin: 1px 0; }
-  .totals-box .label { color: #555; }
-  .totals-box .grand { font-weight: bold; font-size: 11px; }
+    .totals { width: 100%; }
+    .totals td { vertical-align: top; }
+    .sum { border: 1px solid #e5e7eb; background: #fafafa; padding: 8px; border-radius: 6px; }
+    .grand { font-weight: bold; font-size: 11px; }
 
-    /* Footer/Notas */
-    .note { color: #374151; font-size: 10px; }
-
-    /* Soporte impresión */
-  @page { size: A4; margin: 10mm 10mm 10mm 10mm; }
-    @media print {
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .container { width: auto; }
-      .header { border-color: #0ea5e9; }
-    }
+    /* Firmas */
+    .sign { margin-top: 16px; }
+    .sign td { padding-top: 18px; }
+    .sign .line { border-top: 1px solid #cbd5e1; height: 2px; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <!-- Encabezado Empresa/Documento -->
-    <div class="header">
-      {% if logo_url %}
-        <img class="logo" src="{{ logo_url }}" alt="Logo" />
-      {% endif %}
-      <div class="emisor">
-        <h1>
-          {% if empresa.nombre_comercial %}{{ empresa.nombre_comercial }}{% else %}{{ empresa.razon_social }}{% endif %}
-        </h1>
-        <div class="line">
-          <div>RUC&nbsp;&nbsp;<span class="value">{{ empresa.ruc }}</span></div>
-          {% if empresa.telefono %}<div>TELEFONOS&nbsp;&nbsp;<span class="value">{{ empresa.telefono }}</span></div>{% endif %}
-        </div>
-        <div class="muted">{{ empresa.direccion }}{% if empresa.correo %} • {{ empresa.correo }}{% endif %}</div>
-      </div>
-      <div class="doc-title">
-        <div class="title">PROFORMA</div>
-        <div class="number">{{ proforma.numero }}</div>
-      </div>
-    </div>
-
-    <!-- Encabezado: Cliente -->
-    <div class="mt-4">
-      <div class="card">
-        <h3>Datos del cliente</h3>
-        <div>Nombre: {{ proforma.cliente.razon_social }}{% if proforma.cliente.nombre_comercial %} ({{ proforma.cliente.nombre_comercial }}){% endif %}</div>
-        <div>Dirección: {{ proforma.cliente.direccion }}</div>
-        <div>Mail: {{ proforma.cliente.correo }}</div>
-        <div>Teléfono: {{ proforma.cliente.telefono }}</div>
-      </div>
-      <div class="mt-2"><span class="label">Fecha:</span> <span class="value">{{ proforma.fecha_emision|date:"d/m/Y" }}</span></div>
-    </div>
-
-    <!-- Detalles -->
-    <div class="mt-6">
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 62%">CONCEPTO</th>
-            <th class="text-right" style="width: 12%">CANTIDAD</th>
-            <th class="text-right" style="width: 13%">PRECIO</th>
-            <th class="text-right" style="width: 13%">TOTAL</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for d in detalles_pdf_display %}
+  <div class="wrap">
+    <!-- ENCABEZADO EMPRESA/DOCUMENTO -->
+    <table class="hdr" cellspacing="0" cellpadding="0">
+      <tr>
+        <td style="width: 60%; vertical-align: top;">
+          <table width="100%" cellspacing="0" cellpadding="0">
             <tr>
-              <td class="desc-cell">{{ d.descripcion }}</td>
-              <td class="text-right">{{ d.cantidad }}</td>
-              <td class="text-right">{{ d.precio_unitario }}</td>
-              <td class="text-right">{{ d.total_linea }}</td>
+              <td style="width: 110px; vertical-align: top;">
+                {% if logo_url %}<img class="logo" src="{{ logo_url }}" alt="Logo" />{% endif %}
+              </td>
+              <td>
+                <div style="font-size: 12px; font-weight: bold;">{% if empresa.nombre_comercial %}{{ empresa.nombre_comercial }}{% else %}{{ empresa.razon_social }}{% endif %}</div>
+                <div class="small">{{ empresa.ruc }}</div>
+                <div class="small">{{ empresa.direccion }}</div>
+                <div class="small">{% if empresa.telefono %}{{ empresa.telefono }}{% endif %}{% if empresa.correo %}{% if empresa.telefono %} • {% endif %}{{ empresa.correo }}{% endif %}</div>
+              </td>
             </tr>
-          {% empty %}
-            <tr>
-              <td colspan="4" class="text-right muted">Sin detalles</td>
-            </tr>
-          {% endfor %}
-          {% if detalles_omitidos > 0 %}
-          <tr>
-            <td colspan="4" class="muted" style="font-size:9px;">… {{ detalles_omitidos }} ítem(s) no mostrados para ajustar a una sola página</td>
-          </tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
+          </table>
+        </td>
+        <td class="hcol-title" style="width: 40%; vertical-align: top;">
+          <div class="hdoc-title">PROFORMA</div>
+          <div class="hdoc-num">{{ proforma.numero }}</div>
+          <div class="small">Fecha: {{ proforma.fecha_emision|date:"d/m/Y" }}</div>
+          <div class="small">Vencimiento: {{ proforma.fecha_vencimiento|date:"d/m/Y" }}</div>
+        </td>
+      </tr>
+    </table>
 
-    <!-- Totales y condiciones, estilo en dos columnas -->
-    <div class="totals-wrap mt-6">
-      <div>
-        <div class="block" style="min-height: 40px;">
-          <div class="label" style="text-transform: uppercase; margin-bottom: 4px;">Condiciones y forma de pago:</div>
-          {% if condiciones_text %}<div>{{ condiciones_text|linebreaksbr }}</div>{% endif %}
-          <div>Método de pago: {{ forma_pago_text }}</div>
-          {% if nota_text %}<div>{{ nota_text }}</div>{% endif %}
-        </div>
-      </div>
-      <div class="totals-box">
-        <div class="row"><div class="label">Subtotal</div><div>{{ proforma.subtotal }}</div></div>
-        <div class="row"><div class="label">Descuento</div><div>{{ proforma.total_descuento }}</div></div>
-        {% for pct, vals in iva_items %}
-          {% if pct != '0' %}
-          <div class="row"><div class="label">IVA {{ pct }}%</div><div>{{ vals.iva }}</div></div>
-          {% endif %}
+    <div class="divider"></div>
+
+    <!-- BLOQUES: CLIENTE y DATOS DEL DOCUMENTO -->
+    <table class="twocol" cellspacing="6" cellpadding="0">
+      <tr>
+        <td style="width: 60%;">
+          <div class="box">
+            <h3>Cliente</h3>
+            <div><b>{{ proforma.cliente.razon_social }}</b>{% if proforma.cliente.nombre_comercial %} ({{ proforma.cliente.nombre_comercial }}){% endif %}</div>
+            <div class="small">Identificación: {{ proforma.cliente.identificacion }} • {{ proforma.cliente.tipoIdentificacion }}</div>
+            <div class="small">Dirección: {{ proforma.cliente.direccion }}</div>
+            <div class="small">Tel.: {{ proforma.cliente.telefono }}{% if proforma.cliente.correo %} • {{ proforma.cliente.correo }}{% endif %}</div>
+          </div>
+        </td>
+        <td style="width: 40%;">
+          <div class="box">
+            <h3>Documento</h3>
+            <table width="100%" cellspacing="0" cellpadding="0">
+              <tr><td>Emisión:</td><td class="right">{{ proforma.fecha_emision|date:"d/m/Y" }}</td></tr>
+              <tr><td>Vencimiento:</td><td class="right">{{ proforma.fecha_vencimiento|date:"d/m/Y" }}</td></tr>
+              <tr><td>Validez:</td><td class="right">{% if validez_dias %}{{ validez_dias }} día(s){% else %}-{% endif %}</td></tr>
+              <tr><td>Atendido por:</td><td class="right">{{ vendedor_nombre|default:generado_por }}</td></tr>
+            </table>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- DETALLES -->
+    <div class="mt-2"></div>
+    <table cellspacing="0" cellpadding="0">
+      <thead>
+        <tr>
+          <th style="width: 8%" class="right">Cód.</th>
+          <th style="width: 40%; text-align: left;">Concepto</th>
+          <th style="width: 8%" class="right">Cant.</th>
+          <th style="width: 12%" class="right">Precio</th>
+          <th style="width: 12%" class="right">Subtotal</th>
+          <th style="width: 8%" class="right">Imp.</th>
+          <th style="width: 12%" class="right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in detalles_pdf_display %}
+          <tr>
+            <td class="right mono">{{ d.codigo }}</td>
+            <td>{{ d.descripcion }}</td>
+            <td class="right mono">{{ d.cantidad }}</td>
+            <td class="right mono">${{ d.precio_unitario|floatformat:2 }}</td>
+            <td class="right mono">${{ d.base|floatformat:2 }}</td>
+            <td class="right mono">{% if d.porcentaje_iva %}{{ d.porcentaje_iva|floatformat:0 }}%{% else %}0%{% endif %}</td>
+            <td class="right mono">${{ d.total_linea|floatformat:2 }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="right muted">Sin detalles</td></tr>
         {% endfor %}
-        <div class="row grand"><div class="label">Total</div><div>{{ proforma.total }}</div></div>
-      </div>
-    </div>
+        {% if detalles_omitidos > 0 %}
+          <tr><td colspan="7" class="small muted">… {{ detalles_omitidos }} ítem(s) no mostrados para ajustar a una sola página</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
 
-    <div class="mt-6 note">Esta proforma no es un comprobante fiscal.</div>
-  <div class="footer"><div>Generado por: {{ generado_por }}</div><div>{{ generado_el|date:"d/m/Y H:i" }}</div></div>
+    <!-- TOTALES / CONDICIONES -->
+    <div class="mt-2"></div>
+    <table class="totals" cellspacing="6" cellpadding="0">
+      <tr>
+        <td style="width: 60%;">
+          <div class="box">
+            <h3>Condiciones</h3>
+            {% if condiciones_text %}
+              <div class="small" style="line-height: 1.3;">{{ condiciones_text|linebreaksbr }}</div>
+            {% endif %}
+            <div class="small mt-1">Método de pago: <b>{{ forma_pago_text }}</b></div>
+            {% if nota_text %}<div class="small mt-1">{{ nota_text }}</div>{% endif %}
+            <div class="small mt-2 muted">Esta proforma no es un comprobante fiscal.</div>
+            {% if cuenta_bancaria_text %}
+              <div class="small mt-2">Cuenta Bancaria: {{ cuenta_bancaria_text }}</div>
+            {% endif %}
+          </div>
+        </td>
+        <td style="width: 40%;">
+          <div class="sum">
+            <div class="sum-row"><table width="100%"><tr><td>Subtotal</td><td class="right mono">${{ proforma.subtotal|floatformat:2 }}</td></tr></table></div>
+            <div class="sum-row"><table width="100%"><tr><td>Descuento</td><td class="right mono">${{ proforma.total_descuento|floatformat:2 }}</td></tr></table></div>
+            {% for pct, vals in iva_items %}
+              {% if pct != '0' %}
+              <div class="sum-row"><table width="100%"><tr><td>Impuesto {{ pct }}%</td><td class="right mono">${{ vals.iva|floatformat:2 }}</td></tr></table></div>
+              {% endif %}
+            {% endfor %}
+            <div class="sum-row grand"><table width="100%"><tr><td>Total</td><td class="right mono">${{ proforma.total|floatformat:2 }}</td></tr></table></div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- FIRMAS -->
+    <table class="sign" width="100%" cellspacing="12" cellpadding="0">
+      <tr>
+        <td style="width: 50%; text-align: center;">
+          <div class="line"></div>
+          <div class="small">Aceptado por</div>
+        </td>
+        <td style="width: 50%; text-align: center;">
+          <div class="line"></div>
+          <div class="small">Firma / Sello</div>
+        </td>
+      </tr>
+    </table>
+
+  <div class="small muted">Generado por: {{ vendedor_nombre|default:generado_por }} • {{ generado_el|date:"d/m/Y H:i" }}</div>
   </div>
 </body>
 </html>

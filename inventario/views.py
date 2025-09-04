@@ -46,6 +46,7 @@ import json
 import logging
 from django.contrib import admin
 from .sri.ride_generator import RIDEGenerator
+from .proforma.ride_proformgenerator import ProformaRIDEGenerator
 import os
 from pathlib import Path
 from django.conf import settings
@@ -396,7 +397,7 @@ class VerProforma(LoginRequiredMixin, View):
 
 
 def ride_proforma(request, p):
-    """RIDE Imprimible de Proforma: datos reales y desglose de IVA para PDF."""
+    """Descarga PDF de PROFORMA usando el generador dedicado (similar al RIDE)."""
     empresa_id = request.session.get('empresa_activa')
     if not empresa_id:
         return redirect('inventario:seleccionar_empresa')
@@ -483,8 +484,11 @@ def ride_proforma(request, p):
             'cantidad': det.cantidad,
             'precio_unitario': det.precio_unitario,
             'porcentaje_iva': pct,
+            'porcentaje_iva_str': f"{pct.normalize()}%" if hasattr(pct, 'normalize') else f"{pct}%",
             'descuento': det.descuento,
             'subtotal': det.subtotal,
+            'base': base,
+            'iva_valor': iva_val,
             'total_linea': total_linea,
         })
 
@@ -530,6 +534,30 @@ def ride_proforma(request, p):
         forma_pago_text = 'Contado'
     nota_text = (proforma.observaciones or (getattr(opciones, 'mensaje_factura', '') if opciones else '')).strip()
 
+    # Extras de presentación
+    vendedor_nombre = None
+    try:
+        vendedor_nombre = proforma.facturador.nombres if proforma.facturador else None
+    except Exception:
+        vendedor_nombre = None
+    # Validez (días) estimada con base en vencimiento si existe
+    try:
+        validez_dias = (proforma.fecha_vencimiento - proforma.fecha_emision).days if (proforma.fecha_vencimiento and proforma.fecha_emision) else None
+    except Exception:
+        validez_dias = None
+
+    # Posible cuenta bancaria si está configurada en Opciones (tolerante a distintos nombres)
+    cuenta_bancaria_text = None
+    try:
+        for _attr in ['cuenta_bancaria', 'bank_account', 'numero_cuenta', 'cuenta']:
+            if opciones and hasattr(opciones, _attr):
+                val = getattr(opciones, _attr)
+                if val:
+                    cuenta_bancaria_text = val
+                    break
+    except Exception:
+        cuenta_bancaria_text = None
+
     contexto = {
         'proforma': proforma,
         'empresa': empresa_ctx,
@@ -548,8 +576,24 @@ def ride_proforma(request, p):
     'condiciones_text': (proforma.observaciones or (getattr(opciones, 'mensaje_factura', '') if opciones else '')),
         'forma_pago_text': forma_pago_text,
         'nota_text': nota_text,
+        'vendedor_nombre': vendedor_nombre,
+        'validez_dias': validez_dias,
+    'cuenta_bancaria_text': cuenta_bancaria_text,
     }
-    # Renderizar a PDF y forzar descarga
+    # Intentar usar el generador de archivo estilo RIDE para proforma
+    try:
+        gen = ProformaRIDEGenerator()
+        pdf_path = gen.generar_ride_proforma_file(proforma)
+        if pdf_path and os.path.exists(pdf_path):
+            from django.utils.text import slugify
+            empresa_name = empresa_ctx.get('nombre_comercial') or empresa_ctx.get('razon_social') or 'empresa'
+            filename_base = f"proforma_{proforma.numero or proforma.id}_{empresa_name}"
+            safe_name = slugify(str(filename_base)) or f"proforma-{proforma.id}"
+            return FileResponse(open(pdf_path, 'rb'), as_attachment=True, filename=f"{safe_name}.pdf")
+    except Exception as e:
+        logger.warning(f"Fallo generador de proforma RIDE: {e}. Se usará plantilla HTML.")
+
+    # Renderizar a PDF con xhtml2pdf como fallback y forzar descarga
     try:
         from io import BytesIO
         from django.template.loader import get_template
