@@ -5649,6 +5649,44 @@ def consultar_estado_sri(request, factura_id):
 
 
 @csrf_exempt
+def enviar_factura_email(request, factura_id):
+    """Envía la factura autorizada al correo del cliente."""
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False,
+            'message': 'Método no permitido'
+        }, status=405)
+
+    try:
+        from inventario.sri.integracion_django import SRIIntegration
+
+        factura = get_object_or_404(Factura, id=factura_id)
+
+        if not factura.numero_autorizacion or not factura.fecha_autorizacion:
+            return JsonResponse({
+                'success': False,
+                'message': 'La factura no está autorizada'
+            })
+
+        integration = SRIIntegration()
+        resultado = integration.enviar_factura_email(factura)
+
+        return JsonResponse(resultado)
+
+    except Factura.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': f'No se encontró la factura con ID {factura_id}'
+        })
+    except Exception as e:
+        logger.error(f"Error en enviar_factura_email: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'Error interno del servidor: {str(e)}'
+        })
+
+
+@csrf_exempt
 def sincronizar_masivo_sri(request):
     """
     Sincroniza masivamente el estado de todas las facturas pendientes con el SRI

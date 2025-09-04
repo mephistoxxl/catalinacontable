@@ -184,6 +184,13 @@
                                                     <i class="fa fa-refresh mr-2 text-blue-500 action-icon"></i>
                                                     <span>Consultar</span>
                                                 </button>
+                                                {% if fila.numero_autorizacion and fila.fecha_autorizacion %}
+                                                <button onclick="enviarFacturaEmail({{ fila.id }})"
+                                                        class="flex items-center w-full text-left px-3 py-1.5 text-xs text-indigo-700 hover:bg-indigo-50 hover:text-indigo-900 border-none bg-transparent">
+                                                    <i class="fa fa-envelope mr-2 text-indigo-500 action-icon"></i>
+                                                    <span>Enviar Email</span>
+                                                </button>
+                                                {% endif %}
                                                 <div class="border-t border-gray-100"></div>
                                                 <a href="/inventario/generarFactura/{{ fila.id }}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                                                     <i class="fa fa-file-text-o mr-2 text-gray-500 action-icon"></i>
@@ -533,6 +540,42 @@
                 loadingModal.remove();
             }
 
+            mostrarModal({
+                titulo: '🔥 Error de Conexión',
+                mensaje: 'No se pudo conectar con el servidor',
+                detalles: `<p class="mt-2 text-sm text-gray-600">Error: ${error.message}</p>`,
+                tipo: 'error'
+            });
+        });
+    }
+
+    // ✅ FUNCIÓN ENVIAR FACTURA POR EMAIL
+    function enviarFacturaEmail(facturaId) {
+        fetch(`/inventario/sri/enviar-email/${facturaId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                mostrarModal({
+                    titulo: '📧 Email enviado',
+                    mensaje: data.message,
+                    tipo: 'success'
+                });
+                setTimeout(() => { window.location.reload(); }, 3000);
+            } else {
+                mostrarModal({
+                    titulo: '❌ Error',
+                    mensaje: data.message,
+                    tipo: 'error'
+                });
+            }
+        })
+        .catch(error => {
             mostrarModal({
                 titulo: '🔥 Error de Conexión',
                 mensaje: 'No se pudo conectar con el servidor',
