@@ -3,7 +3,7 @@ from django.contrib.auth.hashers import check_password
 from django.shortcuts import render, get_object_or_404, redirect
 
 # para redirigir a otras paginas
-from django.http import HttpResponseRedirect, HttpResponse, FileResponse, JsonResponse, HttpResponseForbidden
+from django.http import HttpResponseRedirect, HttpResponse, FileResponse, JsonResponse, HttpResponseForbidden, Http404
 from urllib3 import request
 #el formulario de login
 from .forms import *
@@ -5526,7 +5526,7 @@ def enviar_documento_sri(request, factura_id):
                 }
             })
 
-    except Factura.DoesNotExist:
+    except Http404:
         return JsonResponse({
             'success': False,
             'message': f'No se encontró la factura con ID {factura_id}'
@@ -5578,7 +5578,7 @@ def autorizar_documento_sri(request, factura_id):
                 'error_detalle': resultado.get('resultado', {})
             })
             
-    except Factura.DoesNotExist:
+    except Http404:
         return JsonResponse({
             'success': False,
             'message': f'No se encontró la factura con ID {factura_id}'
@@ -5635,7 +5635,7 @@ def consultar_estado_sri(request, factura_id):
                 'message': resultado.get('message', 'Error consultando estado')
             })
             
-    except Factura.DoesNotExist:
+    except Http404:
         return JsonResponse({
             'success': False,
             'message': f'No se encontró la factura con ID {factura_id}'
@@ -5678,7 +5678,7 @@ def enviar_factura_email(request, factura_id):
 
         return JsonResponse(resultado)
 
-    except Factura.DoesNotExist:
+    except Http404:
         return JsonResponse({
             'success': False,
             'message': f'No se encontró la factura con ID {factura_id}'
@@ -5834,7 +5834,7 @@ def validar_xml_factura(request, factura_id):
                 'validacion': 'XML NO cumple con el XSD'
             })
             
-    except Factura.DoesNotExist:
+    except Http404:
         return JsonResponse({
             'success': False,
             'message': f'No se encontró la factura con ID {factura_id}'
@@ -5883,7 +5883,7 @@ def reenviar_factura_sri(request, factura_id):
                 'message': resultado.get('message', 'Error reenviando factura')
             })
             
-    except Factura.DoesNotExist:
+    except Http404:
         return JsonResponse({
             'success': False,
             'message': f'No se encontró la factura con ID {factura_id}'
@@ -5920,7 +5920,7 @@ def generar_xml_factura_view(request, factura_id):
         
         return response
         
-    except Factura.DoesNotExist:
+    except Http404:
         return JsonResponse({
             'success': False,
             'message': f'No se encontró la factura con ID {factura_id}'
