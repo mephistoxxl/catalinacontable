@@ -5662,13 +5662,18 @@ def enviar_factura_email(request, factura_id):
 
         factura = get_object_or_404(Factura, id=factura_id)
 
-        if not factura.numero_autorizacion or not factura.fecha_autorizacion:
-            return JsonResponse({
-                'success': False,
-                'message': 'La factura no está autorizada'
-            })
-
         integration = SRIIntegration()
+
+        # Revalidar autorización si faltan datos
+        if not factura.numero_autorizacion or not factura.fecha_autorizacion:
+            integration.consultar_estado_factura(factura.id)
+            factura.refresh_from_db()
+            if factura.estado_sri != 'AUTORIZADA':
+                return JsonResponse({
+                    'success': False,
+                    'message': 'La factura no está autorizada'
+                })
+
         resultado = integration.enviar_factura_email(factura)
 
         return JsonResponse(resultado)
