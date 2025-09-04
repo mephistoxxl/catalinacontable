@@ -43,6 +43,16 @@ class ProformaRIDEGenerator:
             alignment=TA_CENTER,
             spaceAfter=0
         ))
+        # Encabezado limpio (sin negrita) para tablas
+        self.styles.add(ParagraphStyle(
+            name='CabeceraLimpia',
+            parent=self.styles['Normal'],
+            fontSize=9,
+            fontName='Helvetica',
+            textColor=colors.black,
+            alignment=TA_CENTER,
+            spaceAfter=0
+        ))
         self.styles.add(ParagraphStyle(
             name='DatosEmpresa',
             parent=self.styles['Normal'],
@@ -427,12 +437,12 @@ class ProformaRIDEGenerator:
 
             # === TABLA DE ÍTEMS PROFORMA ===
             headers = [
-                Paragraph('<b>Descripción</b>', self.styles['CabeceraBlanca']),
-                Paragraph('<b>Cantidad</b>', self.styles['CabeceraBlanca']),
-                Paragraph('<b>Precio</b>', self.styles['CabeceraBlanca']),
-                Paragraph('<b>IVA</b>', self.styles['CabeceraBlanca']),
-                Paragraph('<b>Desc.</b>', self.styles['CabeceraBlanca']),
-                Paragraph('<b>Total</b>', self.styles['CabeceraBlanca'])
+                Paragraph('Descripción', self.styles['CabeceraLimpia']),
+                Paragraph('Cantidad', self.styles['CabeceraLimpia']),
+                Paragraph('Precio', self.styles['CabeceraLimpia']),
+                Paragraph('IVA', self.styles['CabeceraLimpia']),
+                Paragraph('Desc.', self.styles['CabeceraLimpia']),
+                Paragraph('Total', self.styles['CabeceraLimpia'])
             ]
             tabla_data = [headers]
             for detalle in detalles:
@@ -540,15 +550,19 @@ class ProformaRIDEGenerator:
                 ancho_tabla*0.10, ancho_tabla*0.12
             ])
             tabla_productos.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                # Encabezado sin fondo gris y tipografía más agradable
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                # Tamaño de letra más grande para el encabezado
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('ALIGN', (0, 1), (0, -1), 'LEFT'),  # Concepto alineado a la izquierda
                 ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),  # Números a la derecha
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('GRID', (0, 0), (-1, -1), 0.25, colors.black),
+                # Solo líneas superiores para un look limpio
+                ('LINEABOVE', (0, 0), (-1, 0), 0.6, colors.black),  # línea superior del header
+                ('LINEABOVE', (0, 1), (-1, -1), 0.25, colors.black),  # línea superior para cada fila
                 ('LEFTPADDING', (0, 0), (-1, -1), 2),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 2),
                 ('TOPPADDING', (0, 0), (-1, -1), 2),
@@ -627,88 +641,121 @@ class ProformaRIDEGenerator:
             Correo: {correo_info}
             """
 
-            # --- TOTALES ---
+            # --- TOTALES (desglose como en la imagen) ---
             totales_labels = []
             totales_values = []
 
-            # Subtotales por tarifa de IVA y otros impuestos
-            subtotales = {}
-            ivas = {}
+            if detalles:
+                subtotal_bruto = 0.0
+                total_desc = 0.0
+                subtotal_cero = 0.0
+                subtotal_gravado = 0.0
+                iva_breakdown = {}
 
-            # Si la proforma tiene desglose de impuestos en modelo relacionado, se puede completar aquí.
-
-            # Subtotales especiales (solo si existen y son > 0)
-            # Subtotales especiales si existieran en Proforma (ajustar según tu modelo)
-
-            # Subtotal global
-            if hasattr(proforma, 'subtotal') and getattr(proforma, 'subtotal') is not None:
-                totales_labels.append('Subtotal')
-                totales_values.append(self._fmt_num(getattr(proforma, 'subtotal', 0.0), 2))
-
-            # Descuento (solo si existe)
-            if getattr(proforma, 'total_descuento', 0.0) > 0:
-                totales_labels.append('DESCUENTO')
-                totales_values.append(f"{getattr(proforma, 'total_descuento', 0.0):.2f}")
-
-            # ICE (si existiera una relación de impuestos en proforma; omitir por defecto)
-
-            # Impuestos totales provenientes de la proforma con posible tasa
-            iva_pct_unico = None
-            try:
-                tasas = set()
                 for d in detalles:
-                    percent = None
+                    try:
+                        qty = float(getattr(d, 'cantidad', 1) or 1)
+                    except Exception:
+                        qty = 1.0
+                    try:
+                        pu = float(getattr(d, 'precio_unitario', getattr(d, 'precio', 0.0)) or 0.0)
+                    except Exception:
+                        pu = 0.0
+                    try:
+                        desc = float(getattr(d, 'descuento', 0.0) or 0.0)
+                    except Exception:
+                        desc = 0.0
+
+                    base_linea = max(0.0, (qty * pu) - desc)
+                    subtotal_bruto += (qty * pu)
+                    total_desc += desc
+
+                    # tasa IVA
+                    pct = None
                     for attr in ('porcentaje_iva', 'iva_porcentaje', 'iva', 'tarifa_iva'):
                         if hasattr(d, attr):
                             raw = getattr(d, attr)
+                            if raw in (None, ''):
+                                continue
                             if attr == 'iva':
-                                percent = self._map_codigo_iva_to_percent(raw)
-                                if percent is None:
-                                    percent = self._parse_iva_pct(raw)
+                                pct = self._map_codigo_iva_to_percent(raw)
+                                if pct is None:
+                                    pct = self._parse_iva_pct(raw)
                             else:
-                                percent = self._parse_iva_pct(raw)
-                            if percent is not None:
+                                pct = self._parse_iva_pct(raw)
+                            if pct is not None:
                                 break
-                    if percent is None:
+                    if pct is None:
                         for origen in (getattr(d, 'producto', None), getattr(d, 'servicio', None)):
                             if origen is None:
                                 continue
-                            # helper del modelo
                             if hasattr(origen, 'get_porcentaje_iva_real'):
                                 try:
                                     val = getattr(origen, 'get_porcentaje_iva_real')()
                                     if val is not None:
-                                        percent = float(val)
+                                        pct = float(val)
                                 except Exception:
-                                    percent = None
-                            if percent is None:
+                                    pct = None
+                            if pct is None:
                                 for attr in ('porcentaje_iva', 'iva_porcentaje', 'iva', 'tarifa_iva', 'porcentaje'):
                                     if hasattr(origen, attr):
                                         raw = getattr(origen, attr)
+                                        if raw in (None, ''):
+                                            continue
                                         if attr == 'iva':
-                                            percent = self._map_codigo_iva_to_percent(raw)
-                                            if percent is None:
-                                                percent = self._parse_iva_pct(raw)
+                                            pct = self._map_codigo_iva_to_percent(raw)
+                                            if pct is None:
+                                                pct = self._parse_iva_pct(raw)
                                         else:
-                                            percent = self._parse_iva_pct(raw)
-                                        if percent is not None:
+                                            pct = self._parse_iva_pct(raw)
+                                        if pct is not None:
                                             break
-                    if percent is not None:
-                        tasas.add(round(percent, 2))
-                if len(tasas) == 1:
-                    unico = list(tasas)[0]
-                    iva_pct_unico = int(unico) if float(int(unico)) == float(unico) else unico
-            except Exception:
-                iva_pct_unico = None
+                            if pct is not None:
+                                break
 
-            if getattr(proforma, 'total_impuestos', 0.0) > 0:
-                label_imp = f"Impuesto {iva_pct_unico}%" if iva_pct_unico is not None else 'Impuestos'
-                totales_labels.append(label_imp)
-                totales_values.append(self._fmt_num(getattr(proforma, 'total_impuestos', 0.0), 2))
+                    tasa = (pct or 0.0) / 100.0
+                    if tasa == 0.0:
+                        subtotal_cero += base_linea
+                    else:
+                        subtotal_gravado += base_linea
+                        iva_breakdown[pct or 0.0] = iva_breakdown.get(pct or 0.0, 0.0) + (base_linea * tasa)
 
-            # Valor total (siempre)
-            totales_labels.append('Total')
-            totales_values.append(self._fmt_num(getattr(proforma, 'total', 0.0), 2))
+                subtotal_neto = max(0.0, subtotal_bruto - total_desc)
+
+                # Armar líneas
+                totales_labels.extend(['SUBTOTAL', 'DESCUENTO', 'SUBTOTAL NETO', 'SUBTOTAL 0%', 'SUBTOTAL IVA'])
+                totales_values.extend([
+                    self._fmt_num(subtotal_bruto, 2),
+                    self._fmt_num(total_desc, 2),
+                    self._fmt_num(subtotal_neto, 2),
+                    self._fmt_num(subtotal_cero, 2),
+                    self._fmt_num(subtotal_gravado, 2),
+                ])
+
+                # Asegurar que existan 5% y 15% en el desglose
+                for fijo in (5.0, 15.0):
+                    iva_breakdown.setdefault(fijo, 0.0)
+                # Ordenar por porcentaje
+                for key in sorted(iva_breakdown.keys()):
+                    etiqueta = f"IVA {int(key) if float(int(key)) == float(key) else key} %"
+                    totales_labels.append(etiqueta)
+                    totales_values.append(self._fmt_num(iva_breakdown[key], 2))
+
+                total_general = subtotal_neto + sum(iva_breakdown.values())
+                totales_labels.append('TOTAL')
+                totales_values.append(self._fmt_num(total_general, 2))
+            else:
+                # Fallback a campos de proforma si no hay detalles
+                totales_labels.append('Subtotal')
+                totales_values.append(self._fmt_num(getattr(proforma, 'subtotal', 0.0), 2))
+                if getattr(proforma, 'total_descuento', 0.0) is not None:
+                    totales_labels.append('DESCUENTO')
+                    totales_values.append(self._fmt_num(getattr(proforma, 'total_descuento', 0.0), 2))
+                if getattr(proforma, 'total_impuestos', 0.0) is not None:
+                    totales_labels.append('Impuestos')
+                    totales_values.append(self._fmt_num(getattr(proforma, 'total_impuestos', 0.0), 2))
+                totales_labels.append('TOTAL')
+                totales_values.append(self._fmt_num(getattr(proforma, 'total', 0.0), 2))
 
             totales_text = '<br/>'.join(totales_labels)
             valores_text = '<br/>'.join(totales_values)
@@ -727,6 +774,8 @@ class ProformaRIDEGenerator:
                 ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                 # ('GRID', (0, 0), (-1, -1), 0.25, colors.black),
+                # Solo línea superior para separar la sección de totales
+                ('LINEABOVE', (0, 0), (-1, 0), 0.6, colors.black),
                 ('LEFTPADDING', (0, 0), (-1, -1), 2),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 2),
                 ('TOPPADDING', (0, 0), (-1, -1), 2),
