@@ -332,35 +332,50 @@ class ProformaRIDEGenerator:
             # Agregar espacio extra antes de la tabla de cliente
             elementos.append(Spacer(1, 10*mm))
 
-            # === DATOS DEL CLIENTE ===
+            # === DATOS DEL CLIENTE (compacto, una sola columna de valores) ===
             cliente = getattr(proforma, 'cliente', None)
             cliente_nombre = getattr(cliente, 'razon_social', getattr(cliente, 'nombres', ''))
             cliente_ident = getattr(cliente, 'identificacion', '')
             cliente_dir = getattr(cliente, 'direccion', '')
-            cliente_email = getattr(cliente, 'correo', '')
-            cliente_telefono = getattr(cliente, 'telefono', '')
-            cliente_data = [
-                [Paragraph('<b>Cliente</b>', self.styles['Campo']), Paragraph('', self.styles['Campo'])],
-                [Paragraph(f'<b>Razón Social / Nombres y Apellidos:</b> {cliente_nombre}', self.styles['Campo']),
-                 Paragraph(f'<b>Identificación:</b> {cliente_ident}', self.styles['Campo'])],
-                [Paragraph(f'<b>Fecha de Emisión:</b> {(getattr(proforma, "fecha_emision", None) or datetime.now()).strftime("%d/%m/%Y")}', self.styles['Campo']),
-                 Paragraph('', self.styles['Campo'])],
-                [Paragraph(f'<b>Dirección:</b> {cliente_dir}', self.styles['Campo']),
-                 Paragraph(f'<b>Email:</b> {cliente_email}', self.styles['Campo'])],
-                [Paragraph(f'<b>Teléfono:</b> {cliente_telefono}', self.styles['Campo']),
-                 Paragraph('', self.styles['Campo'])]
+            # Email del cliente (con fallback a 'email')
+            cliente_email = getattr(cliente, 'correo', '') or getattr(cliente, 'email', '')
+            # Unir posibles teléfonos en una sola línea
+            tels = []
+            for tel_attr in ('telefono', 'celular', 'telefono_secundario', 'movil'):
+                if hasattr(cliente, tel_attr):
+                    val = getattr(cliente, tel_attr)
+                    if val:
+                        tels.append(str(val))
+            cliente_telefonos = ' '.join(dict.fromkeys(tels))  # quitar duplicados preservando orden
+            fecha_emision_text = (getattr(proforma, 'fecha_emision', None) or datetime.now()).strftime('%d/%m/%Y')
+
+            etiqueta_style = self.styles['Campo']
+            valor_style = self.styles['Campo']
+
+            cliente_rows = [
+                [Paragraph('<b>Cliente:</b>', etiqueta_style), Paragraph(cliente_nombre or '', valor_style)],
+                [Paragraph('<b>RUC:</b>', etiqueta_style), Paragraph(cliente_ident or '', valor_style)],
+                [Paragraph('<b>Direccion:</b>', etiqueta_style), Paragraph(cliente_dir or '', valor_style)],
+                [Paragraph('<b>Email:</b>', etiqueta_style), Paragraph(cliente_email or '', valor_style)],
+                [Paragraph('<b>Telefonos:</b>', etiqueta_style), Paragraph(cliente_telefonos or '', valor_style)],
+                [Paragraph('<b>Fecha:</b>', etiqueta_style), Paragraph(fecha_emision_text, valor_style)],
             ]
-            # Ejemplo para la tabla de cliente
-            tabla_cliente = Table(cliente_data, colWidths=[ANCHO_TOTAL_TABLA*0.5*mm, ANCHO_TOTAL_TABLA*0.5*mm])
+
+            # Tabla de cliente compacta: 2 columnas (etiqueta/valor)
+            etiqueta_col_mm = 30
+            tabla_cliente = Table(
+                cliente_rows,
+                colWidths=[etiqueta_col_mm*mm, (ANCHO_TOTAL_TABLA - etiqueta_col_mm)*mm]
+            )
 
             tabla_cliente.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),  # etiquetas a la derecha
+                ('ALIGN', (1, 0), (1, -1), 'LEFT'),   # valores a la izquierda
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                #('GRID', (0, 0), (-1, -1), 0.25, colors.black),
-                ('LEFTPADDING', (0, 0), (-1, -1), 8),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-                ('TOPPADDING', (0, 0), (-1, -1), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                ('TOPPADDING', (0, 0), (-1, -1), 2),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
             ]))
             elementos.append(tabla_cliente)
             # Separar tabla de productos
