@@ -184,7 +184,7 @@
                                                     <i class="fa fa-refresh mr-2 text-blue-500 action-icon"></i>
                                                     <span>Consultar</span>
                                                 </button>
-                                                {% if fila.numero_autorizacion and fila.fecha_autorizacion %}
+                                                {% if fila.estado_sri == 'AUTORIZADA' or fila.estado_sri == 'AUTORIZADO' %}
                                                 <button onclick="enviarFacturaEmail({{ fila.id }})"
                                                         class="flex items-center w-full text-left px-3 py-1.5 text-xs text-indigo-700 hover:bg-indigo-50 hover:text-indigo-900 border-none bg-transparent">
                                                     <i class="fa fa-envelope mr-2 text-indigo-500 action-icon"></i>
