@@ -733,8 +733,12 @@ class SRIIntegration:
             dict: resultado del envío con ``success`` y ``message``.
         """
         try:
+            # Revalidar autorización si faltan datos
             if not factura.numero_autorizacion or not factura.fecha_autorizacion:
-                return {'success': False, 'message': 'La factura no está autorizada'}
+                self.consultar_estado_factura(factura.id)
+                factura.refresh_from_db()
+                if factura.estado_sri != 'AUTORIZADA':
+                    return {'success': False, 'message': 'La factura no está autorizada'}
 
             opciones = Opciones.objects.first()
             if not opciones:
