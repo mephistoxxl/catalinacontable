@@ -17,6 +17,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm, inch
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from xml.etree import ElementTree as ET
+import re
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,8 +34,6 @@ class ProformaRIDEGenerator:
     def setup_styles(self):
         """Configurar estilos para el PDF exactos al SRI"""
         self.styles = getSampleStyleSheet()
-        
-        # Estilo para texto en cabeceras - SIN FONDO AZUL
         self.styles.add(ParagraphStyle(
             name='CabeceraBlanca',
             parent=self.styles['Normal'],
@@ -44,8 +43,6 @@ class ProformaRIDEGenerator:
             alignment=TA_CENTER,
             spaceAfter=0
         ))
-        
-        # Estilo para datos de empresa (más compacto y alineado a la derecha)
         self.styles.add(ParagraphStyle(
             name='DatosEmpresa',
             parent=self.styles['Normal'],
@@ -55,8 +52,6 @@ class ProformaRIDEGenerator:
             spaceAfter=1,
             leading=10
         ))
-        
-        # Estilo para campos normales (más compacto)
         self.styles.add(ParagraphStyle(
             name='Campo',
             parent=self.styles['Normal'],
@@ -66,8 +61,6 @@ class ProformaRIDEGenerator:
             spaceAfter=0,
             leading=9
         ))
-        
-        # Estilo para encabezado - LIMPIO SIN COLORES
         self.styles.add(ParagraphStyle(
             name='EncabezadoLimpio',
             parent=self.styles['Normal'],
@@ -78,8 +71,6 @@ class ProformaRIDEGenerator:
             spaceAfter=2,
             leading=15
         ))
-        
-        # Estilo para etiquetas - LIMPIO
         self.styles.add(ParagraphStyle(
             name='EtiquetaLimpia',
             parent=self.styles['Normal'],
@@ -89,8 +80,6 @@ class ProformaRIDEGenerator:
             spaceAfter=0,
             leading=9
         ))
-        
-        # Estilo para valores - LIMPIO  
         self.styles.add(ParagraphStyle(
             name='ValorLimpio',
             parent=self.styles['Normal'],
@@ -100,8 +89,6 @@ class ProformaRIDEGenerator:
             spaceAfter=0,
             leading=9
         ))
-        
-        # Estilo para valores numéricos
         self.styles.add(ParagraphStyle(
             name='NumericoDecimals',
             parent=self.styles['Normal'],
@@ -110,8 +97,6 @@ class ProformaRIDEGenerator:
             alignment=TA_RIGHT,
             spaceAfter=1
         ))
-        
-        # Estilo para clave de acceso - COMPACTO Y LIMPIO
         self.styles.add(ParagraphStyle(
             name='ClaveAcceso',
             parent=self.styles['Normal'],
@@ -134,6 +119,66 @@ class ProformaRIDEGenerator:
         # Convertir a formato ES: 1.234,56
         s = s.replace(',', 'X').replace('.', ',').replace('X', '.')
         return s
+
+    def _parse_iva_pct(self, raw):
+        """Devuelve el IVA como porcentaje (0..100) a partir de distintos formatos.
+
+        Soporta: 12, '12', '12%', '12.00 %', '0.12', '0,12', 'IVA_12', '15%&'.
+        Retorna None si no puede inferirlo.
+        """
+        if raw in (None, ""):
+            return None
+        # numérico directo
+        if isinstance(raw, (int, float)):
+            try:
+                val = float(raw)
+            except Exception:
+                return None
+            if 0 <= val <= 1:
+                return val * 100.0
+            if 1 < val <= 100:
+                return val
+            # fuera de rango típico, descartar
+            return None
+        # texto: extraer primer número
+        try:
+            s = str(raw).lower().replace(',', '.')
+            # Si es un código SRI puro (solo dígitos), mapearlo primero
+            if s.isdigit():
+                mapped = self._map_codigo_iva_to_percent(s)
+                if mapped is not None:
+                    return mapped
+            match = re.search(r"([0-9]+(?:\.[0-9]+)?)", s)
+            if not match:
+                return None
+            num = float(match.group(1))
+            if 0 <= num <= 1:
+                return num * 100.0
+            if 1 < num <= 100:
+                return num
+            return None
+        except Exception:
+            return None
+
+    def _map_codigo_iva_to_percent(self, code):
+        """Mapea códigos SRI de IVA a porcentaje (0..100). Devuelve None si no coincide."""
+        try:
+            c = str(code).strip()
+        except Exception:
+            return None
+        mapping = {
+            '0': 0.0,   # 0%
+            '2': 12.0,  # 12%
+            '3': 14.0,  # 14% (histórico)
+            '4': 15.0,  # 15% (actual)
+            '5': 5.0,   # 5%
+            '6': 0.0,   # No objeto de impuesto
+            '7': 0.0,   # Exento de IVA
+            '8': 8.0,   # 8% (diferenciado)
+            '9': 16.0,  # 16% (algunos servicios)
+            '10': 13.0  # 13%
+        }
+        return mapping.get(c)
 
     def generar_codigo_barras(self, clave_acceso):
         """Generar código de barras horizontal con la clave de acceso"""
@@ -270,10 +315,9 @@ class ProformaRIDEGenerator:
             # 1. Encabezado "PROFORMA 2022 - 87656"
             encabezado = Paragraph(f"PROFORMA {fecha_emi.strftime('%Y')} - {numero}", self.styles['EncabezadoLimpio'])
 
-            # 2. Datos organizados (solo fecha y vencimiento)
+            # 2. Datos organizados (solo fecha)
             datos_info = [
                 ['Fecha:', fecha_emi.strftime('%d/%m/%Y')],
-                ['Vencimiento:', fecha_venc.strftime('%d/%m/%Y') if fecha_venc else '-'],
             ]
 
             # Crear tabla de datos simple y limpia
@@ -383,11 +427,11 @@ class ProformaRIDEGenerator:
 
             # === TABLA DE ÍTEMS PROFORMA ===
             headers = [
-                Paragraph('<b>Concepto</b>', self.styles['CabeceraBlanca']),
+                Paragraph('<b>Descripción</b>', self.styles['CabeceraBlanca']),
                 Paragraph('<b>Cantidad</b>', self.styles['CabeceraBlanca']),
                 Paragraph('<b>Precio</b>', self.styles['CabeceraBlanca']),
-                Paragraph('<b>Subtotal</b>', self.styles['CabeceraBlanca']),
-                Paragraph('<b>Impuesto</b>', self.styles['CabeceraBlanca']),
+                Paragraph('<b>IVA</b>', self.styles['CabeceraBlanca']),
+                Paragraph('<b>Desc.</b>', self.styles['CabeceraBlanca']),
                 Paragraph('<b>Total</b>', self.styles['CabeceraBlanca'])
             ]
             tabla_data = [headers]
@@ -411,38 +455,88 @@ class ProformaRIDEGenerator:
                 descuento_val = float(getattr(detalle, 'descuento', 0.0))
                 precio_unitario = self._fmt_num(precio_unitario_val, 2)
 
-                # Subtotal sin IVA
-                subtotal = (precio_unitario_val * cantidad_val) - descuento_val
-                subtotal_fmt = self._fmt_num(subtotal, 2)
+                # Base imponible (después de descuento)
+                base_val = (precio_unitario_val * cantidad_val) - descuento_val
+                if base_val < 0:
+                    base_val = 0.0
 
-                # Impuesto: intentar encontrar porcentaje en el detalle
+                # IVA: obtener porcentaje con parser robusto
                 iva_pct = None
                 for attr in ('porcentaje_iva', 'iva_porcentaje', 'iva', 'tarifa_iva'):
                     if hasattr(detalle, attr):
-                        try:
-                            iva_pct = float(getattr(detalle, attr))
+                        raw = getattr(detalle, attr)
+                        if raw in (None, ''):
+                            continue
+                        # Si la propiedad es 'iva', puede ser código SRI: mapear primero
+                        if attr == 'iva':
+                            iva_pct = self._map_codigo_iva_to_percent(raw)
+                            if iva_pct is None:
+                                iva_pct = self._parse_iva_pct(raw)
+                        else:
+                            iva_pct = self._parse_iva_pct(raw)
+                        if iva_pct is not None:
                             break
-                        except Exception:
-                            pass
-                impuesto_text = f"{int(iva_pct)}%" if iva_pct is not None else ''
+                # Fallback: tomar IVA desde el producto/servicio si no está en el detalle
+                if iva_pct is None:
+                    for origen in (getattr(detalle, 'producto', None), getattr(detalle, 'servicio', None)):
+                        if origen is None:
+                            continue
+                        # Método helper del modelo si existe
+                        if hasattr(origen, 'get_porcentaje_iva_real'):
+                            try:
+                                val = getattr(origen, 'get_porcentaje_iva_real')()
+                                if val is not None:
+                                    iva_pct = float(val)
+                                    if iva_pct is not None:
+                                        break
+                            except Exception:
+                                pass
+                        # Atributos comunes
+                        for attr in ('porcentaje_iva', 'iva_porcentaje', 'iva', 'tarifa_iva', 'porcentaje'):
+                            if hasattr(origen, attr):
+                                raw = getattr(origen, attr)
+                                if raw in (None, ''):
+                                    continue
+                                if attr == 'iva':
+                                    iva_pct = self._map_codigo_iva_to_percent(raw)
+                                    if iva_pct is None:
+                                        iva_pct = self._parse_iva_pct(raw)
+                                else:
+                                    iva_pct = self._parse_iva_pct(raw)
+                                if iva_pct is not None:
+                                    break
+                        if iva_pct is not None:
+                            break
+                # Convertir a tasa
+                iva_rate = (iva_pct or 0.0) / 100.0
 
-                # Total por línea (igual al subtotal en el mock)
-                precio_total = subtotal_fmt
+                iva_monto_val = base_val * iva_rate
+                total_val = base_val + iva_monto_val
+
+                iva_monto = self._fmt_num(iva_monto_val, 2)
+                # Mostrar en columna IVA el porcentaje configurado (del detalle o del producto/servicio)
+                iva_display_pct = iva_pct or 0.0
+                if float(int(round(iva_display_pct))) == float(round(iva_display_pct)):
+                    iva_display = f"{int(round(iva_display_pct))}%"
+                else:
+                    iva_display = f"{iva_display_pct:.2f}%"
+                desc_fmt = self._fmt_num(descuento_val, 2)
+                total_fmt = self._fmt_num(total_val, 2)
 
                 fila = [
                     Paragraph(str(descripcion), self.styles['Campo']),
                     Paragraph(str(cantidad), self.styles['Campo']),
                     Paragraph(str(precio_unitario), self.styles['NumericoDecimals']),
-                    Paragraph(str(subtotal_fmt), self.styles['NumericoDecimals']),
-                    Paragraph(impuesto_text, self.styles['Campo']),
-                    Paragraph(str(precio_total), self.styles['NumericoDecimals'])
+                    Paragraph(str(iva_display), self.styles['Campo']),
+                    Paragraph(str(desc_fmt), self.styles['NumericoDecimals']),
+                    Paragraph(str(total_fmt), self.styles['NumericoDecimals'])
                 ]
                 tabla_data.append(fila)
             # Ejemplo para la tabla de productos
             ancho_tabla = ANCHO_TOTAL_TABLA * mm
             tabla_productos = Table(tabla_data, colWidths=[
-                ancho_tabla*0.44, ancho_tabla*0.10,
-                ancho_tabla*0.12, ancho_tabla*0.12,
+                ancho_tabla*0.46, ancho_tabla*0.10,
+                ancho_tabla*0.12, ancho_tabla*0.10,
                 ancho_tabla*0.10, ancho_tabla*0.12
             ])
             tabla_productos.setStyle(TableStyle([
@@ -563,12 +657,47 @@ class ProformaRIDEGenerator:
             try:
                 tasas = set()
                 for d in detalles:
+                    percent = None
                     for attr in ('porcentaje_iva', 'iva_porcentaje', 'iva', 'tarifa_iva'):
-                        if hasattr(d, attr) and getattr(d, attr) not in (None, ''):
-                            tasas.add(float(getattr(d, attr)))
-                            break
+                        if hasattr(d, attr):
+                            raw = getattr(d, attr)
+                            if attr == 'iva':
+                                percent = self._map_codigo_iva_to_percent(raw)
+                                if percent is None:
+                                    percent = self._parse_iva_pct(raw)
+                            else:
+                                percent = self._parse_iva_pct(raw)
+                            if percent is not None:
+                                break
+                    if percent is None:
+                        for origen in (getattr(d, 'producto', None), getattr(d, 'servicio', None)):
+                            if origen is None:
+                                continue
+                            # helper del modelo
+                            if hasattr(origen, 'get_porcentaje_iva_real'):
+                                try:
+                                    val = getattr(origen, 'get_porcentaje_iva_real')()
+                                    if val is not None:
+                                        percent = float(val)
+                                except Exception:
+                                    percent = None
+                            if percent is None:
+                                for attr in ('porcentaje_iva', 'iva_porcentaje', 'iva', 'tarifa_iva', 'porcentaje'):
+                                    if hasattr(origen, attr):
+                                        raw = getattr(origen, attr)
+                                        if attr == 'iva':
+                                            percent = self._map_codigo_iva_to_percent(raw)
+                                            if percent is None:
+                                                percent = self._parse_iva_pct(raw)
+                                        else:
+                                            percent = self._parse_iva_pct(raw)
+                                        if percent is not None:
+                                            break
+                    if percent is not None:
+                        tasas.add(round(percent, 2))
                 if len(tasas) == 1:
-                    iva_pct_unico = int(list(tasas)[0])
+                    unico = list(tasas)[0]
+                    iva_pct_unico = int(unico) if float(int(unico)) == float(unico) else unico
             except Exception:
                 iva_pct_unico = None
 
