@@ -1706,63 +1706,72 @@ class EditarCliente(LoginRequiredMixin, View):
 def obtener_datos_secuencia(request, secuencia_id):
     """
     Busca la secuencia seleccionada por su ID y devuelve los datos formateados.
-    Ahora calcula automáticamente el siguiente número de factura.
+    Calcula automáticamente el siguiente número según el tipo de documento:
+    - '01' Factura: busca en Factura
+    - '06' Guía de Remisión: busca en GuiaRemision
     """
     try:
         secuencia = Secuencia.objects.get(id=secuencia_id)
-        
-        # Obtener establecimiento y punto de emisión formateados
+
         establecimiento_formatted = secuencia.get_establecimiento_formatted()
         punto_emision_formatted = secuencia.get_punto_emision_formatted()
-        
-        # Buscar todas las facturas de este establecimiento y punto de emisión
-        facturas_existentes = Factura.objects.filter(
-            establecimiento=establecimiento_formatted,
-            punto_emision=punto_emision_formatted
-        ).values_list('secuencia', flat=True)
-        
-        # Convertir a enteros y encontrar el máximo
+
         numeros_existentes = []
-        for seq in facturas_existentes:
-            try:
-                numeros_existentes.append(int(seq))
-            except (ValueError, TypeError):
-                continue
-        
-        # Calcular el siguiente número
+
+        try:
+            if secuencia.tipo_documento == '01':
+                # Facturas
+                facturas_existentes = Factura.objects.filter(
+                    establecimiento=establecimiento_formatted,
+                    punto_emision=punto_emision_formatted
+                ).values_list('secuencia', flat=True)
+                for seq in facturas_existentes:
+                    try:
+                        numeros_existentes.append(int(seq))
+                    except (ValueError, TypeError):
+                        continue
+            elif secuencia.tipo_documento == '06':
+                # Guías de Remisión
+                guias_existentes = GuiaRemision.objects.filter(
+                    establecimiento=establecimiento_formatted,
+                    punto_emision=punto_emision_formatted
+                ).values_list('secuencial', flat=True)
+                for seq in guias_existentes:
+                    try:
+                        numeros_existentes.append(int(seq))
+                    except (ValueError, TypeError):
+                        continue
+            else:
+                # Fallback: usar el valor de Secuencia como base
+                if secuencia.secuencial is not None:
+                    numeros_existentes.append(int(secuencia.secuencial))
+        except Exception as inner_e:
+            print(f"🔎 DEBUG: Error interno al calcular siguiente número: {inner_e}")
+
         if numeros_existentes:
             siguiente_numero = max(numeros_existentes) + 1
-            print(f"🔍 DEBUG: Última factura encontrada: {max(numeros_existentes)}, siguiente: {siguiente_numero}")
         else:
             siguiente_numero = 1
-            print(f"🔍 DEBUG: No hay facturas previas, comenzando desde 1")
-        
-        # Formatear el siguiente número con ceros a la izquierda
+
         siguiente_numero_formateado = f"{siguiente_numero:09d}"
-        
+
         return JsonResponse({
             'success': True,
             'data': {
                 'id': secuencia.id,
                 'descripcion': secuencia.descripcion,
-                'establecimiento': establecimiento_formatted,  # Formato: "001"
-                'punto_emision': punto_emision_formatted,      # Formato: "001"  
-                'secuencial': siguiente_numero_formateado,     # ✅ SIGUIENTE NÚMERO AUTO-CALCULADO
+                'establecimiento': establecimiento_formatted,
+                'punto_emision': punto_emision_formatted,
+                'secuencial': siguiente_numero_formateado,
                 'tipo_documento': secuencia.tipo_documento,
                 'activo': secuencia.activo
             }
         })
     except Secuencia.DoesNotExist:
-        return JsonResponse({
-            'success': False,
-            'error': 'Secuencia no encontrada'
-        }, status=404)
+        return JsonResponse({'success': False, 'error': 'Secuencia no encontrada'}, status=404)
     except Exception as e:
         print(f"💥 DEBUG: Error en obtener_datos_secuencia: {str(e)}")
-        return JsonResponse({
-            'success': False,
-            'error': f'Error interno: {str(e)}'
-        }, status=500)
+        return JsonResponse({'success': False, 'error': f'Error interno: {str(e)}'}, status=500)
 
 
 # ===== ASEGURAR QUE ESTAS FUNCIONES TAMBIÉN ESTÉN PRESENTES =====
@@ -6191,18 +6200,36 @@ def emitir_guia_remision(request):
                 # Obtener configuración
                 config = ConfiguracionGuiaRemision.get_configuracion()
                 
+                # Establecimiento/Punto/Secuencial desde selección de Secuencia (si llega)
+                est_post = (request.POST.get('establecimiento') or '').strip()
+                pemi_post = (request.POST.get('punto_emision') or '').strip()
+                secu_post = (request.POST.get('secuencial') or '').strip()
+
+                establecimiento = est_post if est_post else config.establecimiento_defecto
+                punto_emision = pemi_post if pemi_post else config.punto_emision_defecto
+
+                # Normalizar a 3 y 9 dígitos
+                try:
+                    establecimiento = f"{int(establecimiento):03d}"
+                except Exception:
+                    establecimiento = f"{str(establecimiento).zfill(3)}" if establecimiento else "001"
+                try:
+                    punto_emision = f"{int(punto_emision):03d}"
+                except Exception:
+                    punto_emision = f"{str(punto_emision).zfill(3)}" if punto_emision else "001"
+
                 # Crear la guía
                 guia = GuiaRemision(
-                    establecimiento=config.establecimiento_defecto,
-                    punto_emision=config.punto_emision_defecto,
+                    establecimiento=establecimiento,
+                    punto_emision=punto_emision,
                     fecha_emision=request.POST.get('fecha_emision'),
                     fecha_inicio_traslado=request.POST.get('fecha_inicio_traslado'),
                     fecha_fin_traslado=request.POST.get('fecha_fin_traslado') or None,
                     motivo_traslado=request.POST.get('motivo_traslado'),
-                    destinatario_identificacion=request.POST.get('destinatario_identificacion'),
-                    destinatario_nombre=request.POST.get('destinatario_nombre'),
-                    direccion_partida=request.POST.get('direccion_partida'),
-                    direccion_destino=request.POST.get('direccion_destino'),
+                    destinatario_identificacion=(request.POST.get('destinatario_identificacion') or ''),
+                    destinatario_nombre=(request.POST.get('destinatario_nombre') or ''),
+                    direccion_partida=(request.POST.get('direccion_partida') or ''),
+                    direccion_destino=(request.POST.get('direccion_destino') or ''),
                     transportista_ruc=request.POST.get('transportista_ruc'),
                     transportista_nombre=request.POST.get('transportista_nombre'),
                     placa=request.POST.get('placa'),
@@ -6210,6 +6237,9 @@ def emitir_guia_remision(request):
                     usuario_creacion=request.user,
                     estado='autorizada'
                 )
+                # Si llega un secuencial calculado, úsalo; si no, el save lo generará
+                if secu_post and secu_post.isdigit():
+                    guia.secuencial = str(int(secu_post)).zfill(9)
                 guia.save()
                 
                 # Procesar productos
@@ -6238,9 +6268,13 @@ def emitir_guia_remision(request):
             messages.error(request, f'Error al crear la guia: {str(e)}')
     
     # GET request - mostrar formulario
+    # GET request - mostrar formulario
+    # Secuencias SOLO de Guía de Remisión (código SRI 06)
+    secuencias_guia = Secuencia.objects.filter(tipo_documento='06', activo=True).order_by('descripcion')
     context = {
         'fecha_hoy': date.today().isoformat(),
         'configuracion': ConfiguracionGuiaRemision.get_configuracion(),
+        'secuencias_guia': secuencias_guia,
     }
     
     # Agregar datos del usuario para el header

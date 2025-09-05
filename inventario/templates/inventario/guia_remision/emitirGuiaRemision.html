@@ -80,6 +80,36 @@
     <form method="post" id="form-guia-remision">
       {% csrf_token %}
       
+      <!-- Secuencia y Numeración -->
+      <div class="section-card">
+        <div class="section-header">
+          <i class="fas fa-list-ol mr-2"></i>Secuencia y Numeración (solo Guía de Remisión)
+        </div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="secuencia_guia">Secuencia</label>
+            <select id="secuencia_guia" name="secuencia_guia">
+              <option value="">Seleccione una secuencia...</option>
+              {% for s in secuencias_guia %}
+                <option value="{{ s.id }}">{{ s.descripcion }} ({{ s.get_establecimiento_formatted }}-{{ s.get_punto_emision_formatted }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="establecimiento">Establecimiento</label>
+            <input type="text" id="establecimiento" name="establecimiento" maxlength="3" readonly>
+          </div>
+          <div class="form-field">
+            <label for="punto_emision">Punto de Emisión</label>
+            <input type="text" id="punto_emision" name="punto_emision" maxlength="3" readonly>
+          </div>
+          <div class="form-field">
+            <label for="secuencial">Secuencial</label>
+            <input type="text" id="secuencial" name="secuencial" maxlength="9" readonly>
+          </div>
+        </div>
+      </div>
+
       <!-- Datos Generales -->
       <div class="section-card">
         <div class="section-header">
@@ -112,38 +142,7 @@
         </div>
       </div>
 
-      <!-- Datos del Destinatario -->
-      <div class="section-card">
-        <div class="section-header">
-          <i class="fas fa-user mr-2"></i>Datos del Destinatario
-        </div>
-        <div class="form-grid">
-          <div class="form-field">
-            <label for="destinatario_identificacion">Identificación *</label>
-            <div class="relative">
-              <input type="text" id="destinatario_identificacion" name="destinatario_identificacion" 
-                     placeholder="Buscar cliente por RUC/Cédula..." required>
-              <div class="absolute right-0.5 top-0.5">
-                <button type="button" class="btn-secondary text-xs px-1.5 py-0.5" onclick="buscarCliente()">
-                  <i class="fas fa-search text-xs"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="form-field">
-            <label for="destinatario_nombre">Razón Social / Nombre *</label>
-            <input type="text" id="destinatario_nombre" name="destinatario_nombre" required readonly>
-          </div>
-          <div class="form-field">
-            <label for="direccion_partida">Dirección de Partida *</label>
-            <textarea id="direccion_partida" name="direccion_partida" rows="2" required></textarea>
-          </div>
-          <div class="form-field">
-            <label for="direccion_destino">Dirección de Destino *</label>
-            <textarea id="direccion_destino" name="direccion_destino" rows="2" required></textarea>
-          </div>
-        </div>
-      </div>
+  <!-- Datos del Destinatario (removidos por solicitud) -->
 
       <!-- Datos del Transportista -->
       <div class="section-card">
@@ -152,8 +151,15 @@
         </div>
         <div class="form-grid">
           <div class="form-field">
-            <label for="transportista_ruc">RUC del Transportista *</label>
-            <input type="text" id="transportista_ruc" name="transportista_ruc" maxlength="13" required>
+            <label for="transportista_ruc">Cédula o RUC del Transportista *</label>
+            <div class="relative">
+              <input type="text" id="transportista_ruc" name="transportista_ruc" maxlength="13" required placeholder="10 o 13 dígitos">
+              <div class="absolute right-0.5 top-0.5">
+                <button type="button" class="btn-secondary text-xs px-1.5 py-0.5" onclick="buscarTransportista()">
+                  <i class="fas fa-search text-xs"></i>
+                </button>
+              </div>
+            </div>
           </div>
           <div class="form-field">
             <label for="transportista_nombre">Razón Social del Transportista *</label>
@@ -163,15 +169,7 @@
             <label for="placa">Placa del Vehículo *</label>
             <input type="text" id="placa" name="placa" maxlength="10" required>
           </div>
-          <div class="form-field">
-            <label for="transportista_observaciones">Observaciones</label>
-            <textarea id="transportista_observaciones" name="transportista_observaciones" rows="2"></textarea>
-          </div>
-        </div>
-      </div>
 
-      <!-- Detalles de Productos -->
-      <div class="section-card">
         <div class="section-header">
           <i class="fas fa-boxes mr-2"></i>Detalles de Productos a Trasladar
         </div>
@@ -226,6 +224,68 @@
 // JavaScript para manejar la funcionalidad del formulario
 let contadorProductos = 0;
 
+// Manejar secuencia seleccionada => llenar establecimiento/punto/secuencial y el "Próximo número"
+document.addEventListener('DOMContentLoaded', function() {
+  const selectSec = document.getElementById('secuencia_guia');
+  const lblNext = document.getElementById('siguiente-numero');
+  const est = document.getElementById('establecimiento');
+  const pemi = document.getElementById('punto_emision');
+  const sec = document.getElementById('secuencial');
+  if (selectSec) {
+    selectSec.addEventListener('change', function() {
+      const id = this.value;
+      if (!id) {
+        est.value = '';
+        pemi.value = '';
+        sec.value = '';
+        lblNext.textContent = '001-001-000000001';
+        return;
+      }
+      fetch(`/inventario/obtener_datos_secuencia/${id}/`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            est.value = data.data.establecimiento || '';
+            pemi.value = data.data.punto_emision || '';
+            sec.value = data.data.secuencial || '';
+            lblNext.textContent = `${est.value || '---'}-${pemi.value || '---'}-${sec.value || '---------'}`;
+          } else {
+            alert(data.error || 'No se pudo obtener la secuencia');
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          alert('Error de conexión al obtener la secuencia');
+        });
+    });
+  }
+});
+
+function tipoDesdeIdentificacion(ident) {
+  if (!ident) return null;
+  const t = ident.trim();
+  if (/^\d{13}$/.test(t)) return '04'; // RUC
+  if (/^\d{10}$/.test(t)) return '05'; // Cédula
+  return null;
+}
+
+function buscarTransportista() {
+  const doc = document.getElementById('transportista_ruc').value.trim();
+  if (!doc) { alert('Ingrese cédula o RUC del transportista'); return; }
+  const tipo = tipoDesdeIdentificacion(doc);
+  if (!tipo) { alert('Ingrese 10 (cédula) o 13 dígitos (RUC)'); return; }
+  fetch(`/inventario/consultar-identificacion/?identificacion=${encodeURIComponent(doc)}&tipo=${tipo}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data && !data.error) {
+        document.getElementById('transportista_nombre').value = (data.razon_social || '').trim();
+      } else {
+        alert(data.message || 'Transportista no encontrado');
+      }
+    })
+    .catch(err => { console.error(err); alert('Error al consultar transportista'); });
+}
+
 function buscarCliente() {
     const identificacion = document.getElementById('destinatario_identificacion').value;
     if (!identificacion) {
@@ -270,9 +330,7 @@ function guardarBorrador() {
 }
 
 // Agregar un producto por defecto al cargar
-document.addEventListener('DOMContentLoaded', function() {
-    agregarProducto();
-});
+document.addEventListener('DOMContentLoaded', function() { agregarProducto(); });
 </script>
 
 {% endblock %}
