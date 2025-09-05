@@ -42,36 +42,36 @@
             <div class="font-medium">
               {{ proforma.cliente.razon_social }}{% if proforma.cliente.nombre_comercial %} ({{ proforma.cliente.nombre_comercial }}){% endif %}
             </div>
-            <div class="text-gray-600 mt-2">Identificación</div>
+            <div class="text-gray-600 mt-1">Identificación</div>
             <div class="font-medium">{{ proforma.cliente.identificacion }}</div>
             {% if proforma.cliente.correo %}
-              <div class="text-gray-600 mt-2">Correo</div>
+              <div class="text-gray-600 mt-1">Correo</div>
               <div class="font-medium">{{ proforma.cliente.correo }}</div>
             {% endif %}
             {% if proforma.cliente.telefono %}
-              <div class="text-gray-600 mt-2">Teléfono</div>
+              <div class="text-gray-600 mt-1">Teléfono</div>
               <div class="font-medium">{{ proforma.cliente.telefono }}</div>
             {% endif %}
             {% if proforma.cliente.direccion %}
-              <div class="text-gray-600 mt-2">Dirección</div>
+              <div class="text-gray-600 mt-1">Dirección</div>
               <div class="font-medium">{{ proforma.cliente.direccion }}</div>
             {% endif %}
           </div>
           <div>
             <div class="text-gray-600">Fecha Emisión</div>
             <div class="font-medium">{{ proforma.fecha_emision }}</div>
-            <div class="text-gray-600 mt-2">Válida Hasta</div>
+            <div class="text-gray-600 mt-1">Válida Hasta</div>
             <div class="font-medium">{{ proforma.fecha_vencimiento }}</div>
-            <div class="text-gray-600 mt-2">Estado</div>
+            <div class="text-gray-600 mt-1">Estado</div>
             <div>
               {% with e=proforma.estado %}
                 <span class="badge {% if e == 'BORRADOR' %}badge-borrador{% elif e == 'ENVIADA' %}badge-enviada{% elif e == 'APROBADA' %}badge-aprobada{% elif e == 'RECHAZADA' %}badge-rechazada{% elif e == 'CONVERTIDA' %}badge-convertida{% elif e == 'VENCIDA' %}badge-vencida{% endif %}">{{ proforma.get_estado_display }}</span>
               {% endwith %}
             </div>
-            <div class="text-gray-600 mt-2">Proformador</div>
+            <div class="text-gray-600 mt-1">Proformador</div>
             <div class="font-medium">{{ proforma.facturador.nombres }}{% if proforma.facturador.correo %} - {{ proforma.facturador.correo }}{% endif %}</div>
             {% if proforma.almacen %}
-              <div class="text-gray-600 mt-2">Almacén</div>
+              <div class="text-gray-600 mt-1">Almacén</div>
               <div class="font-medium">{{ proforma.almacen.descripcion }}</div>
             {% endif %}
           </div>
@@ -79,14 +79,14 @@
 
         <!-- Observaciones -->
         {% if proforma.observaciones %}
-          <div class="mt-3">
+          <div class="mt-2">
             <div class="text-gray-600 mb-1">Observaciones</div>
             <div class="text-xs border rounded-md p-2 bg-gray-50 whitespace-pre-wrap">{{ proforma.observaciones }}</div>
           </div>
         {% endif %}
 
         <!-- Detalles -->
-        <div class="mt-3 overflow-x-auto">
+        <div class="mt-2 overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200 tabla-compacta">
             <thead class="bg-gray-50">
               <tr>
@@ -122,12 +122,19 @@
         </div>
 
         <!-- Totales -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
           <div></div><div></div>
           <div class="space-y-1 border rounded-md p-2 bg-gray-50">
             <div class="flex justify-between text-xs"><span>Subtotal:</span><span>{{ proforma.subtotal }}</span></div>
             <div class="flex justify-between text-xs"><span>Descuento:</span><span>{{ proforma.total_descuento }}</span></div>
             <div class="flex justify-between text-xs"><span>Impuestos (IVA):</span><span>{{ proforma.total_impuestos }}</span></div>
+            {% if iva_items %}
+              {% for pct, monto in iva_items %}
+                {% if pct != '0' and monto and monto|floatformat:2 != '0.00' %}
+                  <div class="flex justify-between text-xs"><span>IVA {{ pct }}%:</span><span>{{ monto|floatformat:2 }}</span></div>
+                {% endif %}
+              {% endfor %}
+            {% endif %}
             <div class="flex justify-between text-xs font-semibold"><span>Importe Total:</span><span>{{ proforma.total }}</span></div>
           </div>
         </div>
