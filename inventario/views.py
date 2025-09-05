@@ -2800,8 +2800,11 @@ def consultar_estado_sri(request, factura_id):
     y mostrar los mensajes de error específicos
     """
     try:
-        # Obtener la factura
-        factura = get_object_or_404(Factura, id=factura_id)
+        # Obtener la factura de la empresa activa
+        empresa_id = request.session.get('empresa_activa')
+        if not request.user.empresas.filter(id=empresa_id).exists():
+            raise Http404("Empresa no válida")
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         # Verificar que tenga clave de acceso
         if not hasattr(factura, 'clave_acceso') or not factura.clave_acceso:
@@ -2998,8 +3001,11 @@ class VerFactura(LoginRequiredMixin, View):
 
     def get(self, request, p):
         try:
-            # Obtener la factura
-            factura = get_object_or_404(Factura, id=p)
+            # Obtener la factura de la empresa activa
+            empresa_id = request.session.get('empresa_activa')
+            if not request.user.empresas.filter(id=empresa_id).exists():
+                raise Http404("Empresa no válida")
+            factura = get_object_or_404(Factura, id=p, empresa_id=empresa_id)
             
             # Obtener los detalles de la factura
             detalles = DetalleFactura.objects.filter(factura=factura).select_related('producto')
@@ -3136,7 +3142,10 @@ class VerFactura(LoginRequiredMixin, View):
     def post(self, request, p):
         """Permite descargar el RIDE (PDF) o el XML SRI - SIEMPRE FIRMA EL PDF"""
         try:
-            factura = get_object_or_404(Factura, id=p)
+            empresa_id = request.session.get('empresa_activa')
+            if not request.user.empresas.filter(id=empresa_id).exists():
+                raise Http404("Empresa no válida")
+            factura = get_object_or_404(Factura, id=p, empresa_id=empresa_id)
             action = request.POST.get('action', 'download_pdf')
             media_root = getattr(settings, 'MEDIA_ROOT', 'media')
 
@@ -3247,7 +3256,10 @@ class GenerarFacturaPDF(LoginRequiredMixin, View):
         from django.conf import settings
         import os
 
-        factura = get_object_or_404(Factura, id=p)
+        empresa_id = request.session.get('empresa_activa')
+        if not request.user.empresas.filter(id=empresa_id).exists():
+            raise Http404("Empresa no válida")
+        factura = get_object_or_404(Factura, id=p, empresa_id=empresa_id)
         media_root = getattr(settings, 'MEDIA_ROOT', 'media')
         pdf_dir = os.path.join(media_root, 'facturas_pdf')
         
@@ -4424,8 +4436,11 @@ class RideView(LoginRequiredMixin, View):
 
     def get(self, request, p):
         try:
-            # Obtener la factura
-            factura = get_object_or_404(Factura, id=p)
+            # Obtener la factura de la empresa activa
+            empresa_id = request.session.get('empresa_activa')
+            if not request.user.empresas.filter(id=empresa_id).exists():
+                raise Http404("Empresa no válida")
+            factura = get_object_or_404(Factura, id=p, empresa_id=empresa_id)
             
             # Obtener los detalles de la factura
             detalles = DetalleFactura.objects.filter(factura=factura).select_related('producto')
@@ -5342,8 +5357,11 @@ class FormasPagoView(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request, factura_id):
-        # Obtener la factura
-        factura = get_object_or_404(Factura, pk=factura_id)
+        # Obtener la factura de la empresa activa
+        empresa_id = request.session.get('empresa_activa')
+        if not request.user.empresas.filter(id=empresa_id).exists():
+            raise Http404("Empresa no válida")
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         # Obtener cajas activas
         cajas = Caja.objects.filter(activo=True).order_by('descripcion')
@@ -5370,7 +5388,10 @@ class GuardarFormaPagoView(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request, factura_id):
-        factura = get_object_or_404(Factura, pk=factura_id)
+        empresa_id = request.session.get('empresa_activa')
+        if not request.user.empresas.filter(id=empresa_id).exists():
+            raise Http404("Empresa no válida")
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         try:
             # Obtener datos del formulario
@@ -5559,7 +5580,10 @@ def enviar_documento_sri(request, factura_id):
     try:
         from inventario.sri.integracion_django import SRIIntegration
 
-        factura = get_object_or_404(Factura, id=factura_id)
+        empresa_id = request.session.get('empresa_activa')
+        if not request.user.empresas.filter(id=empresa_id).exists():
+            raise Http404("Empresa no válida")
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
 
         integration = SRIIntegration()
         resultado = integration.enviar_factura(factura_id)
@@ -5609,8 +5633,11 @@ def autorizar_documento_sri(request, factura_id):
     try:
         from inventario.sri.integracion_django import SRIIntegration
         
-        # Verificar que la factura existe
-        factura = get_object_or_404(Factura, id=factura_id)
+        # Verificar que la factura existe y pertenece a la empresa activa
+        empresa_id = request.session.get('empresa_activa')
+        if not request.user.empresas.filter(id=empresa_id).exists():
+            raise Http404("Empresa no válida")
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         # Procesar factura en el SRI
         integration = SRIIntegration()
@@ -5662,8 +5689,11 @@ def consultar_estado_sri(request, factura_id):
     try:
         from inventario.sri.integracion_django import SRIIntegration
         
-        # Verificar que la factura existe
-        factura = get_object_or_404(Factura, id=factura_id)
+        # Verificar que la factura existe y pertenece a la empresa activa
+        empresa_id = request.session.get('empresa_activa')
+        if not request.user.empresas.filter(id=empresa_id).exists():
+            raise Http404("Empresa no válida")
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         if not factura.clave_acceso:
             return JsonResponse({
@@ -5717,7 +5747,10 @@ def enviar_factura_email(request, factura_id):
     try:
         from inventario.sri.integracion_django import SRIIntegration
 
-        factura = get_object_or_404(Factura, id=factura_id)
+        empresa_id = request.session.get('empresa_activa')
+        if not request.user.empresas.filter(id=empresa_id).exists():
+            raise Http404("Empresa no válida")
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
 
         integration = SRIIntegration()
 
@@ -5861,8 +5894,11 @@ def validar_xml_factura(request, factura_id):
     try:
         from inventario.sri.integracion_django import SRIIntegration
         
-        # Verificar que la factura existe
-        factura = get_object_or_404(Factura, id=factura_id)
+        # Verificar que la factura existe y pertenece a la empresa activa
+        empresa_id = request.session.get('empresa_activa')
+        if not request.user.empresas.filter(id=empresa_id).exists():
+            raise Http404("Empresa no válida")
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         if not factura.clave_acceso:
             return JsonResponse({
@@ -5918,8 +5954,11 @@ def reenviar_factura_sri(request, factura_id):
     try:
         from inventario.sri.integracion_django import SRIIntegration
         
-        # Verificar que la factura existe
-        factura = get_object_or_404(Factura, id=factura_id)
+        # Verificar que la factura existe y pertenece a la empresa activa
+        empresa_id = request.session.get('empresa_activa')
+        if not request.user.empresas.filter(id=empresa_id).exists():
+            raise Http404("Empresa no válida")
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         # Reenviar factura
         integration = SRIIntegration()
@@ -5960,8 +5999,11 @@ def generar_xml_factura_view(request, factura_id):
     try:
         from inventario.sri.integracion_django import SRIIntegration
         
-        # Verificar que la factura existe
-        factura = get_object_or_404(Factura, id=factura_id)
+        # Verificar que la factura existe y pertenece a la empresa activa
+        empresa_id = request.session.get('empresa_activa')
+        if not request.user.empresas.filter(id=empresa_id).exists():
+            raise Http404("Empresa no válida")
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         # Generar XML
         integration = SRIIntegration()
