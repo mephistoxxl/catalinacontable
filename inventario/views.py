@@ -4196,16 +4196,26 @@ class EditarSecuencia(LoginRequiredMixin, View):
 class CrearFacturador(LoginRequiredMixin, View):
     login_url = '/inventario/login'
     redirect_field_name = None
-    
+
     def get(self, request):
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Seleccione una empresa válida.')
+            return redirect('inventario:seleccionar_empresa')
+
         form = FacturadorForm()
         contexto = {'form': form}
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/opciones/facturador_form.html', contexto)
 
     def post(self, request):
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Seleccione una empresa válida.')
+            return redirect('inventario:seleccionar_empresa')
+
         form = FacturadorForm(request.POST)
-        
+
         if form.is_valid():
             try:
                 # Crear el facturador usando el manager personalizado
@@ -4215,37 +4225,54 @@ class CrearFacturador(LoginRequiredMixin, View):
                     correo=form.cleaned_data['correo'],
                     password=form.cleaned_data['password'],  # Se encriptará automáticamente
                     descuento_permitido=form.cleaned_data.get('descuento_permitido', 0.00),
-                    activo=form.cleaned_data.get('activo', True)
+                    activo=form.cleaned_data.get('activo', True),
+                    empresa_id=empresa_id,
                 )
-                
+
                 messages.success(request, f'Facturador {facturador.nombres} creado exitosamente.')
                 return redirect('inventario:listar_facturadores')
-                
+
             except Exception as e:
                 print(f"Error al crear facturador: {e}")
                 messages.error(request, f'Error al crear el facturador: {str(e)}')
         else:
             print("Errores en el formulario:", form.errors)
             messages.error(request, 'Por favor, corrija los errores en el formulario.')
-        
+
         contexto = {'form': form}
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/opciones/facturador_form.html', contexto)
 
 # Listar Facturadores
-class ListarFacturadores(View):
+class ListarFacturadores(LoginRequiredMixin, View):
+    login_url = '/inventario/login'
+    redirect_field_name = None
+
     def get(self, request):
-        facturadores = Facturador.objects.all()
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Seleccione una empresa válida.')
+            return redirect('inventario:seleccionar_empresa')
+
+        facturadores = Facturador.objects.filter(empresa_id=empresa_id)
         contexto = {'facturadores': facturadores}
         contexto = complementarContexto(contexto, request.user)
         # Asegúrate de que la plantilla esté en la ruta correcta
         return render(request, 'inventario/opciones/facturador_list.html', contexto)
 
 # Editar Facturador
-class EditarFacturador(View):
+class EditarFacturador(LoginRequiredMixin, View):
+    login_url = '/inventario/login'
+    redirect_field_name = None
+
     def get(self, request, id):
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Seleccione una empresa válida.')
+            return redirect('inventario:seleccionar_empresa')
+
         # Recupera el facturador o lanza 404 si no existe
-        facturador = get_object_or_404(Facturador, id=id)
+        facturador = get_object_or_404(Facturador, id=id, empresa_id=empresa_id)
         # Crea el formulario con los datos existentes
         form = FacturadorForm(instance=facturador)
         contexto = {
@@ -4256,8 +4283,13 @@ class EditarFacturador(View):
         return render(request, 'inventario/opciones/editar_facturador.html', contexto)
 
     def post(self, request, id):
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Seleccione una empresa válida.')
+            return redirect('inventario:seleccionar_empresa')
+
         # Recupera el facturador o lanza 404 si no existe
-        facturador = get_object_or_404(Facturador, id=id)
+        facturador = get_object_or_404(Facturador, id=id, empresa_id=empresa_id)
 
         # Copia los datos del formulario para evitar problemas con el checkbox
         data = request.POST.copy()
@@ -4285,9 +4317,17 @@ class EditarFacturador(View):
             return render(request, 'inventario/opciones/editar_facturador.html', contexto)
 
 # Eliminar Facturador
-class EliminarFacturador(View):
+class EliminarFacturador(LoginRequiredMixin, View):
+    login_url = '/inventario/login'
+    redirect_field_name = None
+
     def get(self, request, id):
-        facturador = get_object_or_404(Facturador, id=id)
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Seleccione una empresa válida.')
+            return redirect('inventario:seleccionar_empresa')
+
+        facturador = get_object_or_404(Facturador, id=id, empresa_id=empresa_id)
         facturador.delete()
         messages.success(request, 'Facturador eliminado exitosamente.')
         return redirect('inventario:listar_facturadores')
