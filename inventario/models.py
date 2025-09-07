@@ -257,7 +257,7 @@ class Opciones(models.Model):
     # CONFIGURACIÓN FACTURACIÓN
     valor_iva = models.IntegerField(
         default=15,
-        unique=True,
+        unique=True,  # Debe ser único porque es referenciado por ForeignKey (to_field='valor_iva')
         help_text='Porcentaje de IVA vigente en Ecuador'
     )
     
@@ -619,7 +619,7 @@ class Cliente(models.Model):
         blank=False,
     )
     tipoIdentificacion = models.CharField(max_length=2, choices=TIPO_IDENTIFICACION_CHOICES)
-    identificacion = models.CharField(max_length=13)
+    identificacion = models.CharField(max_length=13, unique=True)
     razon_social = models.CharField(max_length=200)
     nombre_comercial = models.CharField(max_length=200, blank=True, null=True)
     direccion = models.CharField(max_length=200)
@@ -689,7 +689,9 @@ class Factura(models.Model):
         blank=False,
     )
     # Relación con el cliente usando su identificación
-    cliente = models.ForeignKey('Cliente', on_delete=models.CASCADE)
+    # En la base actual la FK fue creada accidentalmente apuntando a identificacion.
+    # Hacemos explícito to_field para alinear ORM con el constraint real.
+    cliente = models.ForeignKey('Cliente', to_field='identificacion', db_column='cliente_id', on_delete=models.CASCADE)
 
     # Almacén relacionado con la factura
     almacen = models.ForeignKey('Almacen', on_delete=models.CASCADE, null=True, blank=True)

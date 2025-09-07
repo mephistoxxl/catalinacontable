@@ -3970,81 +3970,97 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
     redirect_field_name = None
     
     def get(self, request):
-        conf = Opciones.objects.get(id=1)
-        form = OpcionesFormulario()
-        
-        # Campos existentes
-        # Campos de texto simple
-        form['identificacion'].field.widget.attrs['value'] = conf.identificacion
-        form['razon_social'].field.widget.attrs['value'] = conf.razon_social
-        form['nombre_comercial'].field.widget.attrs['value'] = conf.nombre_comercial
-        form['correo'].field.widget.attrs['value'] = conf.correo
-        form['telefono'].field.widget.attrs['value'] = conf.telefono
-        form['moneda'].field.widget.attrs['value'] = conf.moneda
-        form['valor_iva'].field.widget.attrs['value'] = conf.valor_iva
-        form['nombre_negocio'].field.widget.attrs['value'] = conf.nombre_negocio
-        
-        # Campos Textarea usan .initial en lugar de .widget.attrs['value']
-        form.fields['direccion_establecimiento'].initial = conf.direccion_establecimiento
-        form.fields['mensaje_factura'].initial = conf.mensaje_factura
-        
-        # Campos Select
-        form.fields['obligado'].initial = conf.obligado
-        form.fields['tipo_regimen'].initial = conf.tipo_regimen
-        
-        # CAMPOS NUEVOS QUE FALTABAN - Información tributaria especial
-        form.fields['es_contribuyente_especial'].initial = conf.es_contribuyente_especial
-        if conf.numero_contribuyente_especial:
-            form['numero_contribuyente_especial'].field.widget.attrs['value'] = conf.numero_contribuyente_especial
-        else:
-            form['numero_contribuyente_especial'].field.widget.attrs['value'] = ''
-        
-        form.fields['es_agente_retencion'].initial = conf.es_agente_retencion
-        if conf.numero_agente_retencion:
-            form['numero_agente_retencion'].field.widget.attrs['value'] = conf.numero_agente_retencion
-        else:
-            form['numero_agente_retencion'].field.widget.attrs['value'] = ''
-        
-        # Agregar la configuración al contexto para acceder directamente en la plantilla
-        contexto = {
-            'form': form,
-            'configuracion': conf  # Añadir la configuración al contexto
+        # Obtener empresa (simplificado: primera). Ajustar si se maneja multiempresa por usuario
+        empresa = Empresa.objects.first()
+        # Intentar obtener configuración ligada a la empresa
+        conf = None
+        if empresa:
+            conf = Opciones.objects.filter(empresa=empresa).first()
+        # Si no existe para la empresa, tomar cualquier existente (legacy sin empresa asociada)
+        if not conf:
+            conf = Opciones.objects.first()
+        # Crear automática si no existe nada
+        if not conf and empresa:
+            conf = Opciones.objects.create(
+                empresa=empresa,
+                identificacion=getattr(empresa, 'ruc', '0000000000000') or '0000000000000',
+                razon_social=getattr(empresa, 'razon_social', '[CONFIGURAR RAZÓN SOCIAL]'),
+                direccion_establecimiento='[CONFIGURAR DIRECCIÓN]',
+                correo='configurar@empresa.com',
+                telefono='0000000000'
+            )
+        # Si aún no hay (ni empresa), error simple
+        if not conf:
+            messages.error(request, 'No hay empresa ni configuración creada.')
+            return HttpResponseRedirect('/')
+
+        # Usar el formulario con instance para evitar set manual campo por campo
+        # Como OpcionesFormulario es forms.Form (no ModelForm) cargamos valores vía initial
+        initial = {
+            'identificacion': conf.identificacion,
+            'razon_social': conf.razon_social,
+            'nombre_comercial': conf.nombre_comercial,
+            'correo': conf.correo,
+            'telefono': conf.telefono,
+            'moneda': conf.moneda,
+            'valor_iva': conf.valor_iva,
+            'nombre_negocio': conf.nombre_negocio,
+            'direccion_establecimiento': conf.direccion_establecimiento,
+            'mensaje_factura': conf.mensaje_factura,
+            'obligado': conf.obligado,
+            'tipo_regimen': conf.tipo_regimen,
+            'es_contribuyente_especial': conf.es_contribuyente_especial,
+            'numero_contribuyente_especial': conf.numero_contribuyente_especial or '',
+            'es_agente_retencion': conf.es_agente_retencion,
+            'numero_agente_retencion': conf.numero_agente_retencion or '',
         }
-        contexto = complementarContexto(contexto, request.user)
+        form = OpcionesFormulario(initial=initial)
+        contexto = complementarContexto({'form': form, 'configuracion': conf}, request.user)
         return render(request, 'inventario/opciones/configuracion.html', contexto)
     
     def post(self, request):
+        empresa = Empresa.objects.first()
+        conf = None
+        if empresa:
+            conf = Opciones.objects.filter(empresa=empresa).first()
+        if not conf:
+            conf = Opciones.objects.first()
+        if not conf and empresa:
+            conf = Opciones.objects.create(
+                empresa=empresa,
+                identificacion=getattr(empresa, 'ruc', '0000000000000') or '0000000000000',
+                razon_social=getattr(empresa, 'razon_social', '[CONFIGURAR RAZÓN SOCIAL]'),
+                direccion_establecimiento='[CONFIGURAR DIRECCIÓN]',
+                correo='configurar@empresa.com',
+                telefono='0000000000'
+            )
         form = OpcionesFormulario(request.POST, request.FILES)
         if form.is_valid():
-            conf = Opciones.objects.get(id=1)
+            # Asignar manual porque no es ModelForm
             conf.identificacion = form.cleaned_data['identificacion']
             conf.razon_social = form.cleaned_data['razon_social']
-            conf.nombre_comercial = form.cleaned_data['nombre_comercial']
-            conf.direccion_establecimiento = form.cleaned_data['direccion_establecimiento']  # <-- SOLO ESTE
-            conf.correo = form.cleaned_data['correo']
-            conf.telefono = form.cleaned_data['telefono']
-            conf.obligado = form.cleaned_data['obligado']
-            conf.tipo_regimen = form.cleaned_data['tipo_regimen']
-            conf.moneda = form.cleaned_data['moneda']
-            conf.valor_iva = form.cleaned_data['valor_iva']
-            conf.mensaje_factura = form.cleaned_data['mensaje_factura']
-            conf.nombre_negocio = form.cleaned_data['nombre_negocio']
-            conf.es_contribuyente_especial = form.cleaned_data['es_contribuyente_especial']
-            conf.numero_contribuyente_especial = form.cleaned_data['numero_contribuyente_especial'] or None
-            conf.es_agente_retencion = form.cleaned_data['es_agente_retencion']
-            conf.numero_agente_retencion = form.cleaned_data['numero_agente_retencion'] or None
-
-            imagen = request.FILES.get('imagen', False)
+            conf.nombre_comercial = form.cleaned_data.get('nombre_comercial')
+            conf.direccion_establecimiento = form.cleaned_data.get('direccion_establecimiento')
+            conf.correo = form.cleaned_data.get('correo')
+            conf.telefono = form.cleaned_data.get('telefono')
+            conf.obligado = form.cleaned_data.get('obligado')
+            conf.tipo_regimen = form.cleaned_data.get('tipo_regimen')
+            conf.moneda = form.cleaned_data.get('moneda')
+            conf.valor_iva = form.cleaned_data.get('valor_iva')
+            conf.mensaje_factura = form.cleaned_data.get('mensaje_factura')
+            conf.nombre_negocio = form.cleaned_data.get('nombre_negocio')
+            conf.es_contribuyente_especial = form.cleaned_data.get('es_contribuyente_especial')
+            conf.numero_contribuyente_especial = form.cleaned_data.get('numero_contribuyente_especial') or None
+            conf.es_agente_retencion = form.cleaned_data.get('es_agente_retencion')
+            conf.numero_agente_retencion = form.cleaned_data.get('numero_agente_retencion') or None
+            imagen = request.FILES.get('imagen')
             if imagen:
-                conf.imagen = imagen  # Solo si se subió una nueva imagen
-
+                conf.imagen = imagen
             conf.save()
             messages.success(request, 'Configuración actualizada exitosamente!')
-            return HttpResponseRedirect("/inventario/configuracionGeneral")
-        else:
-            contexto = {'form': form}
-            contexto = complementarContexto(contexto, request.user)
-            return render(request, 'inventario/opciones/configuracion.html', contexto)
+            return HttpResponseRedirect('/inventario/configuracionGeneral')
+        contexto = complementarContexto({'form': form, 'configuracion': conf}, request.user)
+        return render(request, 'inventario/opciones/configuracion.html', contexto)
 #Fin de vista--------------------------------------------------------------------------------
 
 
@@ -5144,13 +5160,32 @@ class FirmaElectronicaView(LoginRequiredMixin, View):
     redirect_field_name = None
     
     def get(self, request):
-        # Usar get_or_create para asegurar que existe una instancia
-        opciones, created = Opciones.objects.get_or_create(pk=1)
-        
-        # Si se creó una nueva instancia, mostrar mensaje informativo
+        # Obtener instancia existente (NO forzar pk=1 para evitar duplicados por unique valor_iva / identificacion)
+        opciones = Opciones.objects.first()
+        created = False
+        if not opciones:
+            empresa = Empresa.objects.first()
+            if not empresa or not getattr(empresa, 'ruc', None) or len(empresa.ruc) != 13:
+                messages.error(request, 'No existe configuración y el RUC de la empresa no es válido. Configure empresa primero.')
+                return redirect('inventario:configuracionGeneral')
+            opciones = Opciones(
+                empresa=empresa,
+                identificacion=empresa.ruc,
+                razon_social=getattr(empresa, 'razon_social', '[CONFIGURAR RAZÓN SOCIAL]'),
+                direccion_establecimiento='[CONFIGURAR DIRECCIÓN]',
+                correo='configurar@empresa.com',
+                telefono='0000000000'
+            )
+            try:
+                # Guardar sin crear segunda fila con mismo valor_iva (único)
+                opciones.save()
+                created = True
+            except ValidationError as e:
+                messages.error(request, f'Error creando configuración inicial: {e}')
+                return redirect('inventario:configuracionGeneral')
         if created:
-            messages.info(request, 'Se ha creado una nueva configuración de empresa. Por favor, complete los datos.')
-        
+            messages.info(request, 'Configuración creada. Complete los datos y cargue la firma.')
+
         form = FirmaElectronicaForm(instance=opciones)
         aviso_caducidad = self._obtener_aviso_caducidad(opciones)
         
@@ -5164,8 +5199,39 @@ class FirmaElectronicaView(LoginRequiredMixin, View):
         return render(request, 'inventario/opciones/firma_electronica.html', contexto)
     
     def post(self, request):
-        # Usar get_or_create para asegurar que existe una instancia
-        opciones, created = Opciones.objects.get_or_create(pk=1)
+        opciones = Opciones.objects.first()
+        if not opciones:
+            empresa = Empresa.objects.first()
+            if not empresa or not getattr(empresa, 'ruc', None) or len(empresa.ruc) != 13:
+                messages.error(request, 'No existe configuración válida. Configure empresa primero.')
+                return redirect('inventario:configuracionGeneral')
+            opciones = Opciones(
+                empresa=empresa,
+                identificacion=empresa.ruc,
+                razon_social=getattr(empresa, 'razon_social', '[CONFIGURAR RAZÓN SOCIAL]'),
+                direccion_establecimiento='[CONFIGURAR DIRECCIÓN]',
+                correo='configurar@empresa.com',
+                telefono='0000000000'
+            )
+            try:
+                opciones.save()
+            except ValidationError as e:
+                messages.error(request, f'Error creando configuración inicial: {e}')
+                return redirect('inventario:configuracionGeneral')
+        # Asegurar RUC válido antes de procesar firma
+        if opciones.identificacion == '0000000000000':
+            empresa = opciones.empresa or Empresa.objects.first()
+            if empresa and getattr(empresa, 'ruc', None) and len(empresa.ruc) == 13:
+                opciones.identificacion = empresa.ruc
+                try:
+                    opciones.save()
+                except ValidationError as e:
+                    messages.error(request, f'Error validando RUC: {e}')
+                    return redirect('inventario:configuracionGeneral')
+            else:
+                messages.error(request, 'RUC inválido. Actualice configuración general primero.')
+                return redirect('inventario:configuracionGeneral')
+
         form = FirmaElectronicaForm(request.POST, request.FILES, instance=opciones)
         
         if form.is_valid():
