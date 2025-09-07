@@ -163,9 +163,9 @@ class EmitirProforma(LoginRequiredMixin, View):
         
         # Obtener empresa activa
         empresa_id = request.session.get('empresa_activa')
-        if not empresa_id:
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return redirect('inventario:seleccionar_empresa')
-        
+
         empresa = Empresa.objects.get(id=empresa_id)
         
         # Verificar si es una solicitud AJAX para guardar proforma
@@ -451,7 +451,7 @@ class VerProforma(LoginRequiredMixin, View):
 def ride_proforma(request, p):
     """Descarga PDF de PROFORMA usando el generador dedicado (similar al RIDE)."""
     empresa_id = request.session.get('empresa_activa')
-    if not empresa_id:
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
         return redirect('inventario:seleccionar_empresa')
 
     # Cargar proforma con relaciones
@@ -1121,7 +1121,7 @@ class ListarProductos(LoginRequiredMixin, View):
         from django.db import models
 
         empresa_id = request.session.get("empresa_activa")
-        if empresa_id is None:
+        if empresa_id is None or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'No se ha seleccionado una empresa válida')
             return HttpResponseRedirect('/inventario/panel')
 
@@ -1145,19 +1145,19 @@ class AgregarProducto(LoginRequiredMixin, View):
 
     def post(self, request):
         empresa_id = request.session.get("empresa_activa")
-        empresa = None
-        if empresa_id:
-            try:
-                empresa = Empresa.objects.get(id=empresa_id)
-            except Empresa.DoesNotExist:
-                empresa = None
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            form = ProductoFormulario(request.POST)
+            messages.error(request, "No hay una empresa activa seleccionada.")
+            return render(request, 'inventario/producto/agregarProducto.html', {'form': form})
+        try:
+            empresa = Empresa.objects.get(id=empresa_id)
+        except Empresa.DoesNotExist:
+            form = ProductoFormulario(request.POST)
+            messages.error(request, "No hay una empresa activa seleccionada.")
+            return render(request, 'inventario/producto/agregarProducto.html', {'form': form})
 
         form = ProductoFormulario(request.POST, empresa=empresa)
         if form.is_valid():
-            if not empresa:
-                messages.error(request, "No hay una empresa activa seleccionada.")
-                return render(request, 'inventario/producto/agregarProducto.html', {'form': form})
-
             codigo = form.cleaned_data['codigo']
             codigo_barras = form.cleaned_data['codigo_barras']
             descripcion = form.cleaned_data['descripcion']
@@ -1256,7 +1256,7 @@ class ExportarProductos(LoginRequiredMixin, View):
 
     def post(self, request):
         empresa_id = request.session.get('empresa_activa')
-        if not empresa_id:
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'No se ha seleccionado una empresa.')
             return redirect('inventario:exportarProductos')
 
@@ -1358,6 +1358,8 @@ class EditarProducto(LoginRequiredMixin, View):
 def buscar_cliente(request):
     query = request.GET.get('q', '')
     empresa_id = request.session.get("empresa_activa")
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        return HttpResponseForbidden()
     clientes = Cliente.objects.filter(empresa_id=empresa_id, identificacion__icontains=query)[:5]
     resultados = [
         {
@@ -1384,7 +1386,7 @@ class ListarClientes(LoginRequiredMixin, View):
         from django.db import models
         # Obtiene la empresa activa desde la sesión
         empresa_id = request.session.get("empresa_activa")
-        if empresa_id is None:
+        if empresa_id is None or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'No se ha seleccionado una empresa válida')
             return HttpResponseRedirect('/inventario/panel')
 
@@ -1404,18 +1406,18 @@ class AgregarCliente(LoginRequiredMixin, View):
 
     def post(self, request):
         empresa_id = request.session.get("empresa_activa")
-        empresa = None
-        if empresa_id:
-            try:
-                empresa = Empresa.objects.get(id=empresa_id)
-            except Empresa.DoesNotExist:
-                empresa = None
-
-        form = ClienteFormulario(request.POST, empresa=empresa)
-
-        if not empresa:
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            form = ClienteFormulario(request.POST)
             messages.error(request, 'No hay una empresa activa seleccionada.')
             return render(request, 'inventario/cliente/agregarCliente.html', {'form': form})
+        try:
+            empresa = Empresa.objects.get(id=empresa_id)
+        except Empresa.DoesNotExist:
+            form = ClienteFormulario(request.POST)
+            messages.error(request, 'No hay una empresa activa seleccionada.')
+            return render(request, 'inventario/cliente/agregarCliente.html', {'form': form})
+
+        form = ClienteFormulario(request.POST, empresa=empresa)
 
         # Revisa si es valido:
         if form.is_valid():
@@ -1786,7 +1788,7 @@ def buscar_cliente(request):
     """
     try:
         empresa_id = request.session.get("empresa_activa")
-        if not empresa_id:
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return JsonResponse({'error': True, 'message': 'No se ha seleccionado una empresa válida'}, status=400)
 
         identificacion = request.GET.get('q', '').strip()
@@ -1925,16 +1927,13 @@ class EmitirFactura(LoginRequiredMixin, View):
 
             # Recuperar empresa activa desde la sesión
             empresa_id = request.session.get('empresa_activa')
-            if not empresa_id:
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
                 messages.error(request, 'No se ha seleccionado una empresa válida.')
                 return redirect('inventario:panel')
             try:
                 empresa = Empresa.objects.get(id=empresa_id)
             except Empresa.DoesNotExist:
                 messages.error(request, 'La empresa seleccionada no existe.')
-                return redirect('inventario:panel')
-            if not request.user.empresas.filter(id=empresa.id).exists():
-                messages.error(request, 'No tiene acceso a la empresa seleccionada.')
                 return redirect('inventario:panel')
 
             # Recuperar datos del cliente
@@ -2767,7 +2766,7 @@ class ListarFacturas(LoginRequiredMixin, View):
 
     def get(self, request):
         empresa_id = request.session.get("empresa_activa")
-        if empresa_id is None:
+        if empresa_id is None or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'No se ha seleccionado una empresa válida')
             return HttpResponseRedirect('/inventario/panel')
 
@@ -3319,6 +3318,9 @@ class ListarProveedores(LoginRequiredMixin, View):
     def get(self, request):
         from django.db import models
         empresa_id = request.session.get("empresa_activa")
+        if empresa_id is None or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'No se ha seleccionado una empresa válida')
+            return redirect('inventario:panel')
         proveedores = Proveedor.objects.filter(empresa_id=empresa_id)
         contexto = {'tabla': proveedores}
         contexto = complementarContexto(contexto, request.user)
@@ -3334,18 +3336,18 @@ class AgregarProveedor(LoginRequiredMixin, View):
 
     def post(self, request):
         empresa_id = request.session.get("empresa_activa")
-        empresa = None
-        if empresa_id:
-            try:
-                empresa = Empresa.objects.get(id=empresa_id)
-            except Empresa.DoesNotExist:
-                empresa = None
-
-        form = ProveedorFormulario(request.POST, empresa=empresa)
-
-        if not empresa:
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            form = ProveedorFormulario(request.POST)
             messages.error(request, 'No hay una empresa activa seleccionada.')
             return render(request, 'inventario/proveedor/agregarProveedor.html', {'form': form})
+        try:
+            empresa = Empresa.objects.get(id=empresa_id)
+        except Empresa.DoesNotExist:
+            form = ProveedorFormulario(request.POST)
+            messages.error(request, 'No hay una empresa activa seleccionada.')
+            return render(request, 'inventario/proveedor/agregarProveedor.html', {'form': form})
+
+        form = ProveedorFormulario(request.POST, empresa=empresa)
 
         if form.is_valid():
             # ✅ ACTUALIZADO: Usar nombres de campos correctos del formulario actualizado
@@ -4630,6 +4632,9 @@ class ListarProveedores(LoginRequiredMixin, View):
     def get(self, request):
         from django.db import models
         empresa_id = request.session.get("empresa_activa")
+        if empresa_id is None or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'No se ha seleccionado una empresa válida')
+            return redirect('inventario:panel')
         proveedores = Proveedor.objects.filter(empresa_id=empresa_id)
         contexto = {'tabla': proveedores}
         contexto = complementarContexto(contexto, request.user)
@@ -4646,18 +4651,18 @@ class AgregarProveedor(LoginRequiredMixin, View):
 
     def post(self, request):
         empresa_id = request.session.get("empresa_activa")
-        empresa = None
-        if empresa_id:
-            try:
-                empresa = Empresa.objects.get(id=empresa_id)
-            except Empresa.DoesNotExist:
-                empresa = None
-
-        form = ProveedorFormulario(request.POST, empresa=empresa)
-
-        if not empresa:
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            form = ProveedorFormulario(request.POST)
             messages.error(request, 'No hay una empresa activa seleccionada.')
             return render(request, 'inventario/proveedor/agregarProveedor.html', {'form': form})
+        try:
+            empresa = Empresa.objects.get(id=empresa_id)
+        except Empresa.DoesNotExist:
+            form = ProveedorFormulario(request.POST)
+            messages.error(request, 'No hay una empresa activa seleccionada.')
+            return render(request, 'inventario/proveedor/agregarProveedor.html', {'form': form})
+
+        form = ProveedorFormulario(request.POST, empresa=empresa)
 
         if form.is_valid():
             # ✅ ACTUALIZADO: Usar nombres de campos correctos del formulario actualizado
