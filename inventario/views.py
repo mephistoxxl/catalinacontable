@@ -56,6 +56,7 @@ from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 import random
 from .forms import FirmaElectronicaForm  # Asegúrate de tener este formulario
 from django.urls import reverse
+from .mixins import RequireEmpresaActivaMixin, require_empresa_activa
 
 logger = logging.getLogger(__name__)
 
@@ -65,14 +66,12 @@ logger = logging.getLogger(__name__)
 # =====================
 # Proformas (placeholders)
 # =====================
-class ListarProformas(LoginRequiredMixin, View):
+class ListarProformas(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
     login_url = '/inventario/login'
     redirect_field_name = None
 
     def get(self, request):
         empresa_id = request.session.get('empresa_activa')
-        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
-            return redirect('inventario:seleccionar_empresa')
 
         # Obtener proformas de la empresa activa
         from .models import Proforma
@@ -90,7 +89,7 @@ class ListarProformas(LoginRequiredMixin, View):
         return render(request, 'inventario/proforma/listarProformas.html', contexto)
 
 
-class EmitirProforma(LoginRequiredMixin, View):
+class EmitirProforma(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
     login_url = '/inventario/login'
     redirect_field_name = None
 
@@ -103,8 +102,6 @@ class EmitirProforma(LoginRequiredMixin, View):
 
             # Verificar empresa activa
             empresa_id = request.session.get('empresa_activa')
-            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
-                return redirect('inventario:seleccionar_empresa')
 
             # Requerir token firmado en la URL (emitido por LoginProformador)
             token = request.GET.get('t')
@@ -448,11 +445,10 @@ class VerProforma(LoginRequiredMixin, View):
         return render(request, 'inventario/proforma/verProforma.html', contexto)
 
 
+@require_empresa_activa
 def ride_proforma(request, p):
     """Descarga PDF de PROFORMA usando el generador dedicado (similar al RIDE)."""
     empresa_id = request.session.get('empresa_activa')
-    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
-        return redirect('inventario:seleccionar_empresa')
 
     # Cargar proforma con relaciones
     from decimal import Decimal, ROUND_HALF_UP
@@ -1355,11 +1351,10 @@ class EditarProducto(LoginRequiredMixin, View):
 #Fin de vista------------------------------------------------------------------------------------#
 
 # Búsqueda de Clientes
+@require_empresa_activa
 def buscar_cliente(request):
     query = request.GET.get('q', '')
     empresa_id = request.session.get("empresa_activa")
-    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
-        return HttpResponseForbidden()
     clientes = Cliente.objects.filter(empresa_id=empresa_id, identificacion__icontains=query)[:5]
     resultados = [
         {
@@ -2546,17 +2541,13 @@ class DetallesFactura(LoginRequiredMixin, View):
         return mapping.get(iva_percent, '0')  # Default 0% si no se encuentra
 
 # Función mejorada para buscar productos
+@require_empresa_activa
 def buscar_producto(request):
     """
     Busca productos y servicios por código exacto o parcial.
     """
     try:
         empresa_id = request.session.get("empresa_activa")
-        if empresa_id is None:
-            return JsonResponse({'error': 'Empresa no seleccionada'}, status=400)
-
-        if not request.user.is_authenticated or not request.user.empresas.filter(id=empresa_id).exists():
-            return HttpResponseForbidden("Usuario no autorizado")
 
         codigo = request.GET.get('q', '').strip()
         listar_todos = request.GET.get('all') in ('1', 'true', 'True')
@@ -2793,6 +2784,7 @@ class ListarFacturas(LoginRequiredMixin, View):
 # Vista para consultar estado individual de una factura en el SRI ------------------------------#
 @csrf_exempt
 @require_http_methods(["POST"])
+@require_empresa_activa
 def consultar_estado_sri(request, factura_id):
     """
     Vista para consultar el estado individual de una factura en el SRI
@@ -2801,8 +2793,6 @@ def consultar_estado_sri(request, factura_id):
     try:
         # Obtener la factura de la empresa activa
         empresa_id = request.session.get('empresa_activa')
-        if not request.user.empresas.filter(id=empresa_id).exists():
-            raise Http404("Empresa no válida")
         factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         # Verificar que tenga clave de acceso
@@ -5680,6 +5670,7 @@ def validar_facturador(request):
 
 # ✅ NUEVAS VISTAS PARA INTEGRACIÓN SRI COMPLETA
 @csrf_exempt
+@require_empresa_activa
 def enviar_documento_sri(request, factura_id):
     """Envía una factura al SRI y devuelve el estado de recepción."""
     if request.method != 'POST':
@@ -5692,8 +5683,6 @@ def enviar_documento_sri(request, factura_id):
         from inventario.sri.integracion_django import SRIIntegration
 
         empresa_id = request.session.get('empresa_activa')
-        if not request.user.empresas.filter(id=empresa_id).exists():
-            raise Http404("Empresa no válida")
         factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
 
         integration = SRIIntegration()
@@ -5731,6 +5720,7 @@ def enviar_documento_sri(request, factura_id):
         })
 
 @csrf_exempt
+@require_empresa_activa
 def autorizar_documento_sri(request, factura_id):
     """
     Vista para autorizar un documento electrónico en el SRI
@@ -5743,11 +5733,9 @@ def autorizar_documento_sri(request, factura_id):
     
     try:
         from inventario.sri.integracion_django import SRIIntegration
-        
+
         # Verificar que la factura existe y pertenece a la empresa activa
         empresa_id = request.session.get('empresa_activa')
-        if not request.user.empresas.filter(id=empresa_id).exists():
-            raise Http404("Empresa no válida")
         factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         # Procesar factura en el SRI
@@ -5787,6 +5775,7 @@ def autorizar_documento_sri(request, factura_id):
 
 
 @csrf_exempt
+@require_empresa_activa
 def consultar_estado_sri(request, factura_id):
     """
     Vista para consultar el estado de un documento en el SRI
@@ -5799,11 +5788,9 @@ def consultar_estado_sri(request, factura_id):
     
     try:
         from inventario.sri.integracion_django import SRIIntegration
-        
+
         # Verificar que la factura existe y pertenece a la empresa activa
         empresa_id = request.session.get('empresa_activa')
-        if not request.user.empresas.filter(id=empresa_id).exists():
-            raise Http404("Empresa no válida")
         factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         if not factura.clave_acceso:
@@ -5847,6 +5834,7 @@ def consultar_estado_sri(request, factura_id):
 
 
 @csrf_exempt
+@require_empresa_activa
 def enviar_factura_email(request, factura_id):
     """Envía la factura autorizada al correo del cliente."""
     if request.method != 'POST':
@@ -5859,8 +5847,6 @@ def enviar_factura_email(request, factura_id):
         from inventario.sri.integracion_django import SRIIntegration
 
         empresa_id = request.session.get('empresa_activa')
-        if not request.user.empresas.filter(id=empresa_id).exists():
-            raise Http404("Empresa no válida")
         factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
 
         integration = SRIIntegration()
