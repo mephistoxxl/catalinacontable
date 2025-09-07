@@ -177,6 +177,16 @@ else:
         }
     }
 
+# Mantiene las conexiones de base de datos abiertas durante 10 minutos
+CONN_MAX_AGE = 600
+
+# Ajustes de seguridad aplicados solo en producción
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+
 
 # Password validation
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators
