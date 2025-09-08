@@ -867,7 +867,7 @@ class Panel(LoginRequiredMixin, View):
 #Maneja la salida del usuario------------------------------------------------------#
 class Salir(LoginRequiredMixin, View):
     #Sale de la sesion actual
-    login_url = 'inventario/login'
+    login_url = '/inventario/login'
     redirect_field_name = None
 
     def get(self, request):
@@ -881,7 +881,7 @@ class Salir(LoginRequiredMixin, View):
 
 #Muestra el perfil del usuario logeado actualmente---------------------------------#
 class Perfil(LoginRequiredMixin, View):
-    login_url = 'inventario/login'
+    login_url = '/inventario/login'
     redirect_field_name = None
 
     #se accede al modo adecuado y se valida al usuario actual para ver si puede modificar al otro usuario-
