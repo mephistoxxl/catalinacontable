@@ -12,12 +12,11 @@ from django.views import View
 #autentificacion de usuario e inicio de sesion
 from django.contrib.auth import authenticate, login, logout
 #verifica si el usuario esta logeado
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from .forms import SecuenciaFormulario  # Asumiendo que existe un formulario llamado SecuenciaFormulario
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.views import View
-from django.contrib.auth.mixins import LoginRequiredMixin
 from .models import Secuencia
 from .forms import SecuenciaFormulario
 #modelos
@@ -50,6 +49,11 @@ from .proforma.ride_proformgenerator import ProformaRIDEGenerator
 import os
 from pathlib import Path
 from django.conf import settings
+# Integración con Django REST Framework
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.throttling import UserRateThrottle
 # ===== AGREGAR ESTOS IMPORTS AL INICIO DE views.py =====
 
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
@@ -799,7 +803,10 @@ class SeleccionarEmpresa(LoginRequiredMixin, View):
 
 
 # API para obtener empresas de un usuario por identificación
-class EmpresasPorUsuario(View):
+class EmpresasPorUsuario(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+
     def get(self, request, identificacion):
         try:
             usuario = Usuario.objects.get(username=identificacion)
@@ -807,7 +814,7 @@ class EmpresasPorUsuario(View):
             data = [{'id': e.id, 'razon_social': e.razon_social} for e in empresas]
         except Usuario.DoesNotExist:
             data = []
-        return JsonResponse({'empresas': data})
+        return Response({'empresas': data})
 
 
 #Panel de inicio y vista principal------------------------------------------------#
@@ -1100,9 +1107,10 @@ class Eliminar(LoginRequiredMixin, View):
 
 
 #Muestra una lista de 10 productos por pagina----------------------------------------#
-class ListarProductos(LoginRequiredMixin, View):
+class ListarProductos(PermissionRequiredMixin, View):
     login_url = '/inventario/login'
     redirect_field_name = None
+    permission_required = 'inventario.view_producto'
 
     def get(self, request):
         from django.db import models
