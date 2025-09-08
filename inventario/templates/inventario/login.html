@@ -56,6 +56,7 @@
                         {{ form.empresa.label }}
                     </label>
                     {{ form.empresa }}
+                    <p id="empresa-error" class="text-xs text-red-600 mt-1 hidden"></p>
                 </div>
 
                 <!-- Password Field -->
@@ -125,9 +126,18 @@
                     const ident = identInput.value.trim();
                     if (!ident) return;
                     fetch(`/inventario/api/empresas/${ident}/`)
-                        .then(response => response.json())
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            return response.json();
+                        })
                         .then(data => {
                             empresaSelect.innerHTML = '';
+                            const errorMsg = document.getElementById('empresa-error');
+                            if (errorMsg) {
+                                errorMsg.classList.add('hidden');
+                            }
                             data.empresas.forEach(emp => {
                                 const option = document.createElement('option');
                                 option.value = emp.id;
@@ -154,6 +164,22 @@
                                 if (hiddenInput) {
                                     hiddenInput.remove();
                                 }
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error fetching companies:', error);
+                            empresaSelect.innerHTML = '';
+                            empresaSelect.disabled = true;
+                            const hiddenInput = document.getElementById('empresa_hidden');
+                            if (hiddenInput) {
+                                hiddenInput.remove();
+                            }
+                            const errorMsg = document.getElementById('empresa-error');
+                            if (errorMsg) {
+                                errorMsg.textContent = 'No se pudieron cargar las empresas.';
+                                errorMsg.classList.remove('hidden');
+                            } else {
+                                alert('No se pudieron cargar las empresas.');
                             }
                         });
                 };
