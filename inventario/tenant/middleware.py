@@ -24,8 +24,17 @@ class TenantMiddleware(MiddlewareMixin):
         return response
 
     def _resolve_tenant(self, request):
-        host = request.get_host().split(':')[0]
-        subdomain = host.split('.')[0] if '.' in host else None
+        path_parts = [p for p in request.path.strip("/").split("/") if p]
+        if path_parts:
+            slug = path_parts[0]
+            tenant = (
+                Empresa.objects.filter(id=slug).first()
+                or Empresa.objects.filter(ruc=slug).first()
+            )
+            if tenant:
+                return tenant
+        host = request.get_host().split(":")[0]
+        subdomain = host.split(".")[0] if "." in host else None
         if subdomain and subdomain not in ("www", "localhost"):
             tenant = Empresa.objects.filter(ruc=subdomain).first()
             if tenant:
