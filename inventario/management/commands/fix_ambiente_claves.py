@@ -36,9 +36,6 @@ class Command(BaseCommand):
         regen_xml = options.get("regen_xml", False)
         only = options.get("only")
 
-        ambiente = obtener_ambiente_sri()
-        self.stdout.write(self.style.NOTICE(f"Ambiente actual: {ambiente} ({'PRUEBAS' if ambiente=='1' else 'PRODUCCIÓN'})"))
-
         qs = Factura.objects.all()
         if only:
             qs = qs.filter(id=only)
@@ -51,15 +48,17 @@ class Command(BaseCommand):
             self.stdout.write("No hay facturas candidatas.")
             return
 
+        ambiente_actual = obtener_ambiente_sri(qs.first().empresa if total else None)
+        self.stdout.write(self.style.NOTICE(f"Ambiente actual: {ambiente_actual} ({'PRUEBAS' if ambiente_actual=='1' else 'PRODUCCIÓN'})"))
+
         self.stdout.write(f"Facturas a revisar: {total}")
 
         afectados = 0
         corregidos = 0
         errores = 0
 
-        integration = SRIIntegration()
-
         for factura in qs.iterator():
+            ambiente = obtener_ambiente_sri(factura.empresa)
             clave = getattr(factura, "clave_acceso", None)
             if not clave or len(clave) < 24:
                 continue
@@ -81,6 +80,7 @@ class Command(BaseCommand):
 
                     if regen_xml:
                         try:
+                            integration = SRIIntegration(empresa=factura.empresa)
                             xml_path = integration.generar_xml_factura(factura, validar_xsd=True)
                             self.stdout.write(self.style.SUCCESS(f"  ↳ XML regenerado y validado: {xml_path}"))
                         except Exception as e:

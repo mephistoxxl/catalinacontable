@@ -220,7 +220,7 @@ class SRIXMLGenerator:
             logger.info(f"📄 Generando XML con {factura.formas_pago.count()} formas de pago")
             
             # Verificar/forzar ambiente consistente (usar helper central)
-            ambiente = obtener_ambiente_sri()  # '1' o '2'
+            ambiente = obtener_ambiente_sri(emisor.empresa)  # '1' o '2'
             if emisor.tipo_ambiente != ambiente:
                 logger.warning(f"Desfase de ambiente en Opciones.tipo_ambiente='{emisor.tipo_ambiente}' vs helper='{ambiente}'. Usando '{ambiente}'.")
                 emisor.tipo_ambiente = ambiente
@@ -280,7 +280,7 @@ class SRIXMLGenerator:
         info_tributaria = ET.SubElement(root, 'infoTributaria')
 
         # Ambiente del comprobante: debe coincidir con el de la clave de acceso
-        ambiente = obtener_ambiente_sri()
+        ambiente = obtener_ambiente_sri(emisor.empresa)
         ET.SubElement(info_tributaria, 'ambiente').text = ambiente
         ET.SubElement(info_tributaria, 'tipoEmision').text = emisor.tipo_emision
         ET.SubElement(info_tributaria, 'razonSocial').text = self._limpiar_texto(emisor.razon_social)

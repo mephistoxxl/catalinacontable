@@ -11,6 +11,7 @@ from inventario.models import Factura, DetalleFactura, Opciones
 from .sri_client import SRIClient
 from .xml_generator import SRIXMLGenerator
 from .pdf_firmador import PDFFirmador
+from .ambiente import obtener_ambiente_sri
 
 logger = logging.getLogger(__name__)
 
@@ -19,15 +20,14 @@ class SRIIntegration:
     Clase de integración para conectar Django con el SRI
     """
     
-    def __init__(self):
-        """Inicializa la integración con configuración desde Opciones"""
-        # 🔄 SINCRONIZAR con Opciones.tipo_ambiente
+    def __init__(self, empresa=None, tenant=None):
+        """Inicializa la integración con el ambiente de la empresa"""
+        if empresa is None and tenant is not None:
+            empresa = tenant
+
         try:
-            opciones = Opciones.objects.first()
-            if opciones and opciones.tipo_ambiente:
-                self.ambiente = 'produccion' if opciones.tipo_ambiente == '2' else 'pruebas'
-            else:
-                self.ambiente = 'pruebas'
+            ambiente = obtener_ambiente_sri(empresa)
+            self.ambiente = 'produccion' if ambiente == '2' else 'pruebas'
         except Exception:
             self.ambiente = 'pruebas'
 

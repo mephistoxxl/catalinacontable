@@ -54,7 +54,8 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('=== DIAGNÓSTICO SRI ==='))
         
         try:
-            integration = SRIIntegration()
+            empresa = Factura.objects.first().empresa if Factura.objects.exists() else None
+            integration = SRIIntegration(empresa=empresa)
             estado = integration.cliente.verificar_servicio()
 
             self.stdout.write(f"Ambiente: {integration.ambiente}")
@@ -74,8 +75,8 @@ class Command(BaseCommand):
         try:
             factura = Factura.objects.get(id=factura_id)
             self.stdout.write(f"Procesando factura: {factura.numero_factura}")
-            
-            integration = SRIIntegration()
+
+            integration = SRIIntegration(empresa=factura.empresa)
             
             if solo_consultar:
                 resultado = integration.consultar_estado_factura(factura_id)
@@ -96,13 +97,12 @@ class Command(BaseCommand):
             return
             
         self.stdout.write(f"Procesando {facturas.count()} facturas con estado {estado}")
-        
-        integration = SRIIntegration()
-        
+
         for factura in facturas:
             self.stdout.write(f"  - {factura.numero_factura}...")
-            
+
             try:
+                integration = SRIIntegration(empresa=factura.empresa)
                 if solo_consultar:
                     resultado = integration.consultar_estado_factura(factura.id)
                 else:
@@ -122,16 +122,15 @@ class Command(BaseCommand):
             return
             
         self.stdout.write(f"Procesando {facturas.count()} facturas pendientes")
-        
-        integration = SRIIntegration()
-        
+
         exitosas = 0
         errores = 0
-        
+
         for factura in facturas:
             self.stdout.write(f"  - {factura.numero_factura}...")
-            
+
             try:
+                integration = SRIIntegration(empresa=factura.empresa)
                 if solo_consultar:
                     resultado = integration.consultar_estado_factura(factura.id)
                 else:

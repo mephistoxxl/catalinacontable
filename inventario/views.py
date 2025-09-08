@@ -2797,7 +2797,7 @@ def consultar_estado_sri(request, factura_id):
         from .sri.integracion_django import SRIIntegration
         
         # Crear instancia de integración
-        integration = SRIIntegration()
+        integration = SRIIntegration(empresa=request.tenant)
         
         # Consultar estado
         resultado = integration.consultar_autorizacion(factura.clave_acceso)
@@ -5673,7 +5673,7 @@ def enviar_documento_sri(request, factura_id):
         empresa_id = getattr(request.tenant, 'id', None)
         factura = get_object_or_404(Factura, id=factura_id)
 
-        integration = SRIIntegration()
+        integration = SRIIntegration(empresa=request.tenant)
         resultado = integration.enviar_factura(factura_id)
 
         if resultado.get('success'):
@@ -5727,7 +5727,7 @@ def autorizar_documento_sri(request, factura_id):
         factura = get_object_or_404(Factura, id=factura_id)
         
         # Procesar factura en el SRI
-        integration = SRIIntegration()
+        integration = SRIIntegration(empresa=request.tenant)
         resultado = integration.procesar_factura(factura_id)
         
         if resultado['success']:
@@ -5788,7 +5788,7 @@ def consultar_estado_sri(request, factura_id):
             })
         
         # Consultar estado en el SRI
-        integration = SRIIntegration()
+        integration = SRIIntegration(empresa=request.tenant)
         resultado = integration.consultar_estado_factura(factura_id)
         
         if resultado['success']:
@@ -5837,7 +5837,7 @@ def enviar_factura_email(request, factura_id):
         empresa_id = getattr(request.tenant, 'id', None)
         factura = get_object_or_404(Factura, id=factura_id)
 
-        integration = SRIIntegration()
+        integration = SRIIntegration(empresa=request.tenant)
 
         # Revalidar autorización si faltan datos
         if not factura.numero_autorizacion or not factura.fecha_autorizacion:
@@ -5899,7 +5899,7 @@ def sincronizar_masivo_sri(request):
         errores = 0
         rechazadas = 0
         
-        integration = SRIIntegration()
+        integration = SRIIntegration(empresa=request.tenant)
         resultados = []
         
         for factura in facturas_pendientes[:50]:  # Limitar a 50 para evitar timeout
@@ -5991,7 +5991,7 @@ def validar_xml_factura(request, factura_id):
                 'message': 'La factura no tiene clave de acceso generada'
             })
         
-        integration = SRIIntegration()
+        integration = SRIIntegration(empresa=request.tenant)
         
         try:
             # Generar XML con validación
@@ -6046,7 +6046,7 @@ def reenviar_factura_sri(request, factura_id):
         factura = get_object_or_404(Factura, id=factura_id)
         
         # Reenviar factura
-        integration = SRIIntegration()
+        integration = SRIIntegration(empresa=request.tenant)
         resultado = integration.reenviar_factura(factura_id)
         
         if resultado['success']:
@@ -6091,7 +6091,7 @@ def generar_xml_factura_view(request, factura_id):
         factura = get_object_or_404(Factura, id=factura_id)
         
         # Generar XML
-        integration = SRIIntegration()
+        integration = SRIIntegration(empresa=request.tenant)
         xml_path = integration.generar_xml_factura(factura)
         
         # Leer el XML generado

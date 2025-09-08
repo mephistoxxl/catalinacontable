@@ -67,8 +67,23 @@ class Empresa(models.Model):
     )
     razon_social = models.CharField(max_length=300)
 
+    AMBIENTE_CHOICES = [
+        ('1', 'Pruebas'),
+        ('2', 'Producción'),
+    ]
+    tipo_ambiente = models.CharField(
+        max_length=1,
+        choices=AMBIENTE_CHOICES,
+        default='1',
+        help_text='Ambiente: 1=Pruebas, 2=Producción',
+    )
+
     def __str__(self):
         return f"{self.razon_social} ({self.ruc})"
+
+    @property
+    def ambiente_descripcion(self):
+        return 'PRUEBAS' if self.tipo_ambiente == '1' else 'PRODUCCIÓN'
 
 
 class UsuarioEmpresa(models.Model):
