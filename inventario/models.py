@@ -1,6 +1,6 @@
 from django.db import models
 from decimal import Decimal, ROUND_HALF_UP
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, Group
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.core.validators import (
     MinValueValidator,
@@ -14,6 +14,9 @@ import datetime
 from django.utils import timezone
 from .crypto_utils import EncryptedCharField
 from .tenant.queryset import TenantManager
+# Señales para asignar roles por defecto
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 # MODELOS
 
 # --------------------------------USUARIO------------------------------------------------
@@ -55,6 +58,14 @@ class Usuario(AbstractUser):
         elif tipo == 'usuario':
             usuarios = usuarios.filter(is_superuser=False)
         return int(usuarios.distinct().count())
+
+
+@receiver(post_save, sender=Usuario)
+def assign_default_group(sender, instance, created, **kwargs):
+    if created:
+        group_name = 'Administrador' if instance.is_superuser else 'Usuario'
+        group, _ = Group.objects.get_or_create(name=group_name)
+        instance.groups.add(group)
 
 from django.core.exceptions import ValidationError  # ← Y ESTA TAMBIÉN
 
