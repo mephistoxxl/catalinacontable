@@ -620,7 +620,7 @@ class Cliente(models.Model):
         blank=False,
     )
     tipoIdentificacion = models.CharField(max_length=2, choices=TIPO_IDENTIFICACION_CHOICES)
-    identificacion = models.CharField(max_length=13, unique=True)
+    identificacion = models.CharField(max_length=13)
     razon_social = models.CharField(max_length=200)
     nombre_comercial = models.CharField(max_length=200, blank=True, null=True)
     direccion = models.CharField(max_length=200)
@@ -691,10 +691,8 @@ class Factura(models.Model):
         null=False,
         blank=False,
     )
-    # Relación con el cliente usando su identificación
-    # En la base actual la FK fue creada accidentalmente apuntando a identificacion.
-    # Hacemos explícito to_field para alinear ORM con el constraint real.
-    cliente = models.ForeignKey('Cliente', to_field='identificacion', db_column='cliente_id', on_delete=models.CASCADE)
+    # Relación con el cliente
+    cliente = models.ForeignKey('Cliente', on_delete=models.CASCADE)
 
     # Almacén relacionado con la factura
     almacen = models.ForeignKey('Almacen', on_delete=models.CASCADE, null=True, blank=True)
@@ -3187,7 +3185,7 @@ class Servicio(models.Model):
         ('8', 'IVA Diferenciado')
     ]
 
-    codigo = models.CharField(max_length=20, unique=True)
+    codigo = models.CharField(max_length=20)
     descripcion = models.TextField(blank=True)
     iva = models.CharField(max_length=10, choices=tiposIVA, default='2')
     precio1 = models.DecimalField(max_digits=10, decimal_places=2)
@@ -3202,6 +3200,9 @@ class Servicio(models.Model):
     class Meta:
         verbose_name = "Servicio"
         verbose_name_plural = "Servicios"
+        constraints = [
+            models.UniqueConstraint(fields=['empresa', 'codigo'], name='unique_codigo_servicio_por_empresa')
+        ]
 
 
 # -----------------------------------PROFORMA-----------------------------------------
