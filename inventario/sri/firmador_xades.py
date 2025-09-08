@@ -90,7 +90,7 @@ def firmar_xml_con_endesive(xml_path: str, xml_firmado_path: str) -> bool:
 
     # Cargar PKCS#12 (p12/pfx)
     try:
-        with open(opciones.firma_electronica.path, "rb") as pf:
+        with opciones.firma_electronica.open("rb") as pf:
             p12_bytes = pf.read()
         private_key, certificate, addl = pkcs12.load_key_and_certificates(
             p12_bytes, (opciones.password_firma or "").encode("utf-8")

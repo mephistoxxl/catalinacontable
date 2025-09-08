@@ -14,6 +14,8 @@ import datetime
 from django.utils import timezone
 from .crypto_utils import EncryptedCharField
 from .tenant.queryset import TenantManager
+# Almacenamiento personalizado para firmas electrónicas cifradas
+from .storage import EncryptedFirmaStorage
 # Señales para asignar roles por defecto
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -131,6 +133,7 @@ class Opciones(models.Model):
     ]
     # === FIRMA ELECTRÓNICA (SUPER SEGURO) ===
     firma_electronica = models.FileField(
+        storage=EncryptedFirmaStorage(),
         upload_to='firmas/',
         null=True,
         blank=True,

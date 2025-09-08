@@ -124,6 +124,7 @@ urlpatterns = [
     # Firma Electrónica
     path('configuracion/firma-electronica/', FirmaElectronicaView.as_view(), name='firma_electronica'),
     path('configuracion/firma-electronica/eliminar/', views.EliminarFirmaElectronicaView.as_view(), name='eliminar_firma_electronica'),
+    path('configuracion/firma-electronica/descargar/', views.DescargarFirmaElectronicaView.as_view(), name='descargar_firma_electronica'),
 
     # Servicios
     path('listarServicios', views.ListarServicios.as_view(), name='listarServicios'),

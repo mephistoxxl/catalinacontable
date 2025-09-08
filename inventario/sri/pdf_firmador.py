@@ -51,7 +51,7 @@ class PDFFirmador:
             raise Exception('Firma electrónica o contraseña no configuradas en Opciones')
         
         try:
-            with open(self.opciones.firma_electronica.path, 'rb') as f:
+            with self.opciones.firma_electronica.open('rb') as f:
                 p12_data = f.read()
             
             private_key, certificate, additional_certs = pkcs12.load_key_and_certificates(
