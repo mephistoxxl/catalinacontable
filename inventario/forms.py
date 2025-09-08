@@ -33,10 +33,16 @@ class LoginFormulario(forms.Form):
 
     empresa = forms.ModelChoiceField(
         label="Empresa",
-        queryset=Empresa.objects.all(),
+        queryset=Empresa.objects.none(),
         required=False,
         widget=forms.Select(attrs={'class': 'form-control underlined', 'id': 'empresa'})
     )
+
+    def __init__(self, *args, **kwargs):
+        empresas = kwargs.pop('empresas', None)
+        super().__init__(*args, **kwargs)
+        if empresas is not None:
+            self.fields['empresa'].queryset = empresas
 
     password = forms.CharField(
         label="Contraseña",
