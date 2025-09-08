@@ -12,12 +12,25 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 
 import os
 from dotenv import load_dotenv
+
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+
 load_dotenv()
 
 # Seguridad y configuración sensible desde .env
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 # Tiempo de espera por defecto para los servicios del SRI (en segundos)
 SRI_TIMEOUT = int(os.environ.get('SRI_TIMEOUT', 30))
+
+# Configuración de monitoreo con Sentry
+SENTRY_DSN = os.environ.get('SENTRY_DSN')
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=float(os.environ.get('SENTRY_TRACES_SAMPLE_RATE', 0.0)),
+    )
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -34,19 +47,36 @@ import os
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# ✅ CONFIGURACIÓN DE LOGGING (ACTUALIZADA PARA SUPRIMIR ZEEP DEBUG)
+# ✅ CONFIGURACIÓN DE LOGGING (ROTACIÓN, JSON Y TENANT)
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'json': {
+            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+            'fmt': '%(asctime)s %(levelname)s %(name)s %(tenant_id)s %(message)s',
+        },
+    },
+    'filters': {
+        'tenant_context': {
+            '()': 'inventario.tenant.logging.TenantContextFilter',
+        },
+    },
     'handlers': {
         'file': {
             'level': 'INFO',
-            'class': 'logging.FileHandler',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': 'facturas.log',
+            'when': 'midnight',
+            'backupCount': 7,
+            'formatter': 'json',
+            'filters': ['tenant_context'],
         },
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
+            'formatter': 'json',
+            'filters': ['tenant_context'],
         },
     },
     'loggers': {
