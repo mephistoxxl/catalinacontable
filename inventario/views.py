@@ -53,8 +53,8 @@ from django.conf import settings
 # Integración con Django REST Framework
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.throttling import UserRateThrottle
+from rest_framework.permissions import AllowAny
+from rest_framework.throttling import AnonRateThrottle
 # ===== AGREGAR ESTOS IMPORTS AL INICIO DE views.py =====
 
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
@@ -805,8 +805,8 @@ class SeleccionarEmpresa(LoginRequiredMixin, View):
 
 # API para obtener empresas de un usuario por identificación
 class EmpresasPorUsuario(APIView):
-    permission_classes = [IsAuthenticated]
-    throttle_classes = [UserRateThrottle]
+    permission_classes = [AllowAny]
+    throttle_classes = [AnonRateThrottle]
 
     def get(self, request, identificacion):
         try:
