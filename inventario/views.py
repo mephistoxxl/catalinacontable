@@ -5306,6 +5306,22 @@ class EliminarFirmaElectronicaView(LoginRequiredMixin, View):
         return HttpResponseRedirect(reverse('inventario:firma_electronica'))
 
 
+class DescargarFirmaElectronicaView(LoginRequiredMixin, View):
+    """Serve el archivo de firma electrónica sólo a usuarios autorizados."""
+    login_url = '/inventario/login'
+    redirect_field_name = None
+
+    def get(self, request):
+        opciones = Opciones.objects.first()
+        if not opciones or not opciones.firma_electronica:
+            raise Http404("Archivo no disponible")
+        if not request.user.is_staff:
+            return HttpResponseForbidden("No autorizado")
+        file_obj = opciones.firma_electronica.open('rb')
+        filename = os.path.basename(opciones.firma_electronica.name)
+        return FileResponse(file_obj, as_attachment=True, filename=filename)
+
+
 from .models import Servicio
 from .forms import ServicioFormulario
 from django.urls import reverse_lazy

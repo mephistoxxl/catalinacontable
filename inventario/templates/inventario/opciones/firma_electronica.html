@@ -152,7 +152,7 @@
                         <!-- Archivo actual -->
                         <label class="text-sm lg:col-span-2 font-medium text-gray-700 lg:text-right">Archivo:</label>
                         <div class="lg:col-span-4">
-                            <a href="{{ form.instance.firma_electronica.url }}" target="_blank" 
+                            <a href="{% url 'inventario:descargar_firma_electronica' %}" target="_blank"
                                class="inline-flex items-center text-gray-600 hover:text-gray-800 text-sm">
                                 <i class="fa fa-download mr-1"></i>
                                 {{ form.instance.firma_electronica.name }}

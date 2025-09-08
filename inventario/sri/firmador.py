@@ -52,7 +52,7 @@ def firmar_xml_xades_experimental(xml_path, xml_firmado_path):
     if not opciones:
         raise Exception('Firma electrónica o contraseña no configuradas en Opciones')
     
-    with open(opciones.firma_electronica.path, 'rb') as f:
+    with opciones.firma_electronica.open('rb') as f:
         p12_data = f.read()
     
     from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, NoEncryption

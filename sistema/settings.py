@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 
 import os
 from dotenv import load_dotenv
+from cryptography.fernet import Fernet
 
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
@@ -46,6 +47,11 @@ import os
 # ✅ CONFIGURACIÓN DE MEDIOS (NUEVA O VERIFICAR)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Directorio separado y seguro para certificados de firma electrónica
+FIRMAS_ROOT = os.path.join(BASE_DIR, 'firmas_secure')
+# Clave utilizada para cifrar los archivos de firma; debe definirse en variables de entorno en producción
+FIRMAS_KEY = os.environ.get('FIRMAS_KEY', Fernet.generate_key())
 
 # ✅ CONFIGURACIÓN DE LOGGING (ROTACIÓN, JSON Y TENANT)
 LOGGING = {
