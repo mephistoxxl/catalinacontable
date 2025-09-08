@@ -1,6 +1,7 @@
 from functools import wraps
 from django.shortcuts import redirect
 from django.http import HttpResponseForbidden
+from .models import Empresa
 
 
 def require_empresa_activa(view_func):
@@ -25,3 +26,14 @@ class RequireEmpresaActivaMixin:
         if not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden('No pertenece a esta empresa')
         return super().dispatch(request, *args, **kwargs)
+
+
+def get_empresa_activa(request):
+    """Helper to retrieve the active Empresa instance from session."""
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id:
+        return None
+    try:
+        return Empresa.objects.get(id=empresa_id)
+    except Empresa.DoesNotExist:
+        return None

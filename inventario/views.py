@@ -61,7 +61,7 @@ from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 import random
 from .forms import FirmaElectronicaForm  # Asegúrate de tener este formulario
 from django.urls import reverse
-from .mixins import RequireEmpresaActivaMixin, require_empresa_activa
+from .mixins import RequireEmpresaActivaMixin, require_empresa_activa, get_empresa_activa
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +120,7 @@ class EmitirProforma(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
             if not facturador:
                 messages.error(request, 'El facturador no existe o no está activo.')
                 return redirect('inventario:login_proformador')
-            empresa = request.tenant
+            empresa = get_empresa_activa(request)
             if hasattr(facturador, 'empresa_id') and facturador.empresa_id and facturador.empresa_id != empresa.id:
                 messages.error(request, 'El facturador no pertenece a la empresa activa. Inicie sesión nuevamente.')
                 return redirect('inventario:login_proformador')
@@ -159,7 +159,7 @@ class EmitirProforma(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
         from django.utils import timezone
         
         # Obtener empresa activa
-        empresa = request.tenant
+        empresa = get_empresa_activa(request)
         if not empresa or not request.user.empresas.filter(id=empresa.id).exists():
             return redirect('inventario:seleccionar_empresa')
         
@@ -367,7 +367,7 @@ class VerProforma(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request, p):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return redirect('inventario:seleccionar_empresa')
 
@@ -445,7 +445,7 @@ class VerProforma(LoginRequiredMixin, View):
 @require_empresa_activa
 def ride_proforma(request, p):
     """Descarga PDF de PROFORMA usando el generador dedicado (similar al RIDE)."""
-    empresa_id = getattr(request.tenant, 'id', None)
+    empresa_id = request.session.get('empresa_activa')
 
     # Cargar proforma con relaciones
     from decimal import Decimal, ROUND_HALF_UP
@@ -715,14 +715,14 @@ class Login(View):
                 # 1) Empresa enviada explícitamente y válida
                 if empresa and logeado.empresas.filter(id=empresa.id).exists():
                     login(request, logeado)
-                    request.tenant = empresa
+                    request.session['empresa_activa'] = empresa.id
                     return HttpResponseRedirect('/inventario/panel')
                 # Primer inicio con empresa indicada: si el usuario no tiene empresas aún, vincularlo
                 if empresa and logeado.empresas.count() == 0:
                     try:
                         UsuarioEmpresa.objects.get_or_create(usuario=logeado, empresa=empresa)
                         login(request, logeado)
-                        request.tenant = empresa
+                        request.session['empresa_activa'] = empresa.id
                         return HttpResponseRedirect('/inventario/panel')
                     except Exception:
                         pass
@@ -733,13 +733,13 @@ class Login(View):
                         emp_ruc = Empresa.objects.get(ruc=identificacion)
                         if logeado.empresas.filter(id=emp_ruc.id).exists():
                             login(request, logeado)
-                            request.tenant = emp_ruc
+                            request.session['empresa_activa'] = emp_ruc.id
                             return HttpResponseRedirect('/inventario/panel')
                         # Primer inicio: si el usuario no tiene empresas, vincular a esta
                         if logeado.empresas.count() == 0:
                             UsuarioEmpresa.objects.get_or_create(usuario=logeado, empresa=emp_ruc)
                             login(request, logeado)
-                            request.tenant = emp_ruc
+                            request.session['empresa_activa'] = emp_ruc.id
                             return HttpResponseRedirect('/inventario/panel')
                     except Empresa.DoesNotExist:
                         pass
@@ -749,7 +749,7 @@ class Login(View):
                 if empresas_usuario.count() == 1:
                     unica = empresas_usuario.first()
                     login(request, logeado)
-                    request.tenant = unica
+                    request.session['empresa_activa'] = unica.id
                     return HttpResponseRedirect('/inventario/panel')
                 elif empresas_usuario.count() > 1:
                     login(request, logeado)
@@ -786,14 +786,14 @@ class SeleccionarEmpresa(LoginRequiredMixin, View):
         empresas = request.user.empresas.all()
         if empresas.count() <= 1:
             if empresas.exists():
-                request.tenant = empresas.first()
+                request.session['empresa_activa'] = empresas.first().id
             return HttpResponseRedirect('/inventario/panel')
         return render(request, 'inventario/seleccionar_empresa.html', {'empresas': empresas})
 
     def post(self, request):
         empresa_id = request.POST.get('empresa_id')
         if empresa_id and request.user.empresas.filter(id=empresa_id).exists():
-            request.tenant = Empresa.objects.get(id=empresa_id)
+            request.session['empresa_activa'] = int(empresa_id)
             return HttpResponseRedirect('/inventario/panel')
         empresas = request.user.empresas.all()
         contexto = {'empresas': empresas, 'error': 'Seleccione una empresa válida'}
@@ -828,7 +828,7 @@ class Panel(LoginRequiredMixin, View):
     def get(self, request):
         from datetime import date
 
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return redirect('inventario:seleccionar_empresa')
 
@@ -871,6 +871,7 @@ class Salir(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
+        request.session.pop('empresa_activa', None)
         logout(request)
         return HttpResponseRedirect('/inventario/login')
 
@@ -1053,7 +1054,7 @@ class Eliminar(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request, modo, p):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden()
 
@@ -1116,7 +1117,7 @@ class ListarProductos(PermissionRequiredMixin, View):
     def get(self, request):
         from django.db import models
 
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if empresa_id is None or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'No se ha seleccionado una empresa válida')
             return HttpResponseRedirect('/inventario/panel')
@@ -1140,7 +1141,7 @@ class AgregarProducto(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             form = ProductoFormulario(request.POST)
             messages.error(request, "No hay una empresa activa seleccionada.")
@@ -1251,7 +1252,7 @@ class ExportarProductos(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'No se ha seleccionado una empresa.')
             return redirect('inventario:exportarProductos')
@@ -1299,7 +1300,7 @@ class EditarProducto(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request, p):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden()
 
@@ -1336,7 +1337,7 @@ class EditarProducto(LoginRequiredMixin, View):
             return render(request, 'inventario/producto/agregarProducto.html', {'form': form})
 
     def get(self, request, p):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden()
 
@@ -1354,7 +1355,7 @@ class EditarProducto(LoginRequiredMixin, View):
 @require_empresa_activa
 def buscar_cliente(request):
     query = request.GET.get('q', '')
-    empresa_id = getattr(request.tenant, 'id', None)
+    empresa_id = request.session.get('empresa_activa')
     clientes = Cliente.objects.filter(identificacion__icontains=query)[:5]
     resultados = [
         {
@@ -1380,7 +1381,7 @@ class ListarClientes(LoginRequiredMixin, View):
     def get(self, request):
         from django.db import models
         # Obtiene la empresa activa desde la sesión
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if empresa_id is None or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'No se ha seleccionado una empresa válida')
             return HttpResponseRedirect('/inventario/panel')
@@ -1400,7 +1401,7 @@ class AgregarCliente(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             form = ClienteFormulario(request.POST)
             messages.error(request, 'No hay una empresa activa seleccionada.')
@@ -1782,7 +1783,7 @@ def buscar_cliente(request):
     Si no existe en la base de datos consulta la API externa y crea el registro.
     """
     try:
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return JsonResponse({'error': True, 'message': 'No se ha seleccionado una empresa válida'}, status=400)
 
@@ -1921,7 +1922,7 @@ class EmitirFactura(LoginRequiredMixin, View):
                 return redirect('inventario:login_facturador')
 
             # Recuperar empresa activa desde la sesión
-            empresa_id = getattr(request.tenant, 'id', None)
+            empresa_id = request.session.get('empresa_activa')
             if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
                 messages.error(request, 'No se ha seleccionado una empresa válida.')
                 return redirect('inventario:panel')
@@ -2547,7 +2548,7 @@ def buscar_producto(request):
     Busca productos y servicios por código exacto o parcial.
     """
     try:
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
 
         codigo = request.GET.get('q', '').strip()
         listar_todos = request.GET.get('all') in ('1', 'true', 'True')
@@ -2754,7 +2755,7 @@ class ListarFacturas(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if empresa_id is None or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'No se ha seleccionado una empresa válida')
             return HttpResponseRedirect('/inventario/panel')
@@ -2790,7 +2791,7 @@ def consultar_estado_sri(request, factura_id):
     """
     try:
         # Obtener la factura de la empresa activa
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         factura = get_object_or_404(Factura, id=factura_id)
         
         # Verificar que tenga clave de acceso
@@ -2806,7 +2807,7 @@ def consultar_estado_sri(request, factura_id):
         from .sri.integracion_django import SRIIntegration
         
         # Crear instancia de integración
-        integration = SRIIntegration(empresa=request.tenant)
+        integration = SRIIntegration(empresa=get_empresa_activa(request))
         
         # Consultar estado
         resultado = integration.consultar_autorizacion(factura.clave_acceso)
@@ -2989,7 +2990,7 @@ class VerFactura(LoginRequiredMixin, View):
     def get(self, request, p):
         try:
             # Obtener la factura de la empresa activa
-            empresa_id = getattr(request.tenant, 'id', None)
+            empresa_id = request.session.get('empresa_activa')
             if not request.user.empresas.filter(id=empresa_id).exists():
                 raise Http404("Empresa no válida")
             factura = get_object_or_404(Factura, id=p)
@@ -3129,7 +3130,7 @@ class VerFactura(LoginRequiredMixin, View):
     def post(self, request, p):
         """Permite descargar el RIDE (PDF) o el XML SRI - SIEMPRE FIRMA EL PDF"""
         try:
-            empresa_id = getattr(request.tenant, 'id', None)
+            empresa_id = request.session.get('empresa_activa')
             if not request.user.empresas.filter(id=empresa_id).exists():
                 raise Http404("Empresa no válida")
             factura = get_object_or_404(Factura, id=p)
@@ -3243,7 +3244,7 @@ class GenerarFacturaPDF(LoginRequiredMixin, View):
         from django.conf import settings
         import os
 
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not request.user.empresas.filter(id=empresa_id).exists():
             raise Http404("Empresa no válida")
         factura = get_object_or_404(Factura, id=p)
@@ -3305,7 +3306,7 @@ class ListarProveedores(LoginRequiredMixin, View):
 
     def get(self, request):
         from django.db import models
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if empresa_id is None or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'No se ha seleccionado una empresa válida')
             return redirect('inventario:panel')
@@ -3323,7 +3324,7 @@ class AgregarProveedor(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             form = ProveedorFormulario(request.POST)
             messages.error(request, 'No hay una empresa activa seleccionada.')
@@ -3585,7 +3586,7 @@ class DetallesPedido(LoginRequiredMixin, View):
     def get(self, request):
         cedula = request.session.get('id_proveedor')
         productos = request.session.get('form_details')
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         PedidoFormulario = formset_factory(
             DetallesPedidoFormulario,
             extra=productos,
@@ -3601,7 +3602,7 @@ class DetallesPedido(LoginRequiredMixin, View):
         cedula = request.session.get('id_proveedor')
         productos = request.session.get('form_details')
 
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         PedidoFormulario = formset_factory(
             DetallesPedidoFormulario,
             extra=productos,
@@ -3809,7 +3810,7 @@ class CrearUsuario(LoginRequiredMixin, View):
             password = form.cleaned_data['password']
             rep_password = form.cleaned_data['rep_password']
             level = form.cleaned_data['level']
-            empresa_id = getattr(request.tenant, 'id', None)
+            empresa_id = request.session.get('empresa_activa')
             try:
                 empresa = Empresa.objects.get(id=empresa_id)
             except Empresa.DoesNotExist:
@@ -4204,7 +4205,7 @@ class CrearFacturador(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'Seleccione una empresa válida.')
             return redirect('inventario:seleccionar_empresa')
@@ -4215,7 +4216,7 @@ class CrearFacturador(LoginRequiredMixin, View):
         return render(request, 'inventario/opciones/facturador_form.html', contexto)
 
     def post(self, request):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'Seleccione una empresa válida.')
             return redirect('inventario:seleccionar_empresa')
@@ -4255,7 +4256,7 @@ class ListarFacturadores(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'Seleccione una empresa válida.')
             return redirect('inventario:seleccionar_empresa')
@@ -4272,7 +4273,7 @@ class EditarFacturador(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request, id):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'Seleccione una empresa válida.')
             return redirect('inventario:seleccionar_empresa')
@@ -4289,7 +4290,7 @@ class EditarFacturador(LoginRequiredMixin, View):
         return render(request, 'inventario/opciones/editar_facturador.html', contexto)
 
     def post(self, request, id):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'Seleccione una empresa válida.')
             return redirect('inventario:seleccionar_empresa')
@@ -4335,7 +4336,7 @@ class EliminarFacturador(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request, id):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'Seleccione una empresa válida.')
             return redirect('inventario:seleccionar_empresa')
@@ -4490,7 +4491,7 @@ class RideView(LoginRequiredMixin, View):
     def get(self, request, p):
         try:
             # Obtener la factura de la empresa activa
-            empresa_id = getattr(request.tenant, 'id', None)
+            empresa_id = request.session.get('empresa_activa')
             if not request.user.empresas.filter(id=empresa_id).exists():
                 raise Http404("Empresa no válida")
             factura = get_object_or_404(Factura, id=p)
@@ -4626,7 +4627,7 @@ class ListarProveedores(LoginRequiredMixin, View):
 
     def get(self, request):
         from django.db import models
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if empresa_id is None or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'No se ha seleccionado una empresa válida')
             return redirect('inventario:panel')
@@ -4645,7 +4646,7 @@ class AgregarProveedor(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             form = ProveedorFormulario(request.POST)
             messages.error(request, 'No hay una empresa activa seleccionada.')
@@ -4750,7 +4751,7 @@ class ExportarProveedores(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         form = ExportarProveedoresFormulario(request.POST)
         if form.is_valid():
             request.session['proveedoresExportados'] = True
@@ -5341,7 +5342,7 @@ class ListarServicios(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden("No tienes acceso a esta empresa")
         servicios = Servicio.objects.filter(empresa_id=empresa_id).order_by('-fecha_creacion')
@@ -5356,7 +5357,7 @@ class AgregarServicio(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden("No tienes acceso a esta empresa")
         codigo_nuevo = generar_codigo_servicio()
@@ -5366,7 +5367,7 @@ class AgregarServicio(LoginRequiredMixin, View):
         return render(request, 'inventario/servicios/agregarServicio.html', contexto)
 
     def post(self, request):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden("No tienes acceso a esta empresa")
         form = ServicioFormulario(request.POST)
@@ -5384,7 +5385,7 @@ class EditarServicio(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request, p):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden("No tienes acceso a esta empresa")
         servicio = get_object_or_404(Servicio, pk=p)
@@ -5394,7 +5395,7 @@ class EditarServicio(LoginRequiredMixin, View):
         return render(request, 'inventario/servicios/agregarServicio.html', contexto)
 
     def post(self, request, p):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden("No tienes acceso a esta empresa")
         servicio = get_object_or_404(Servicio, pk=p)
@@ -5412,7 +5413,7 @@ class EliminarServicio(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request, p):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden("No tienes acceso a esta empresa")
         servicio = get_object_or_404(Servicio, pk=p)
@@ -5480,7 +5481,7 @@ class FormasPagoView(LoginRequiredMixin, View):
 
     def get(self, request, factura_id):
         # Obtener la factura de la empresa activa
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not request.user.empresas.filter(id=empresa_id).exists():
             raise Http404("Empresa no válida")
         factura = get_object_or_404(Factura, id=factura_id)
@@ -5510,7 +5511,7 @@ class GuardarFormaPagoView(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request, factura_id):
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not request.user.empresas.filter(id=empresa_id).exists():
             raise Http404("Empresa no válida")
         factura = get_object_or_404(Factura, id=factura_id)
@@ -5703,10 +5704,10 @@ def enviar_documento_sri(request, factura_id):
     try:
         from inventario.sri.integracion_django import SRIIntegration
 
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         factura = get_object_or_404(Factura, id=factura_id)
 
-        integration = SRIIntegration(empresa=request.tenant)
+        integration = SRIIntegration(empresa=get_empresa_activa(request))
         resultado = integration.enviar_factura(factura_id)
 
         if resultado.get('success'):
@@ -5756,11 +5757,11 @@ def autorizar_documento_sri(request, factura_id):
         from inventario.sri.integracion_django import SRIIntegration
 
         # Verificar que la factura existe y pertenece a la empresa activa
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         factura = get_object_or_404(Factura, id=factura_id)
         
         # Procesar factura en el SRI
-        integration = SRIIntegration(empresa=request.tenant)
+        integration = SRIIntegration(empresa=get_empresa_activa(request))
         resultado = integration.procesar_factura(factura_id)
         
         if resultado['success']:
@@ -5811,7 +5812,7 @@ def consultar_estado_sri(request, factura_id):
         from inventario.sri.integracion_django import SRIIntegration
 
         # Verificar que la factura existe y pertenece a la empresa activa
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         factura = get_object_or_404(Factura, id=factura_id)
         
         if not factura.clave_acceso:
@@ -5821,7 +5822,7 @@ def consultar_estado_sri(request, factura_id):
             })
         
         # Consultar estado en el SRI
-        integration = SRIIntegration(empresa=request.tenant)
+        integration = SRIIntegration(empresa=get_empresa_activa(request))
         resultado = integration.consultar_estado_factura(factura_id)
         
         if resultado['success']:
@@ -5867,10 +5868,10 @@ def enviar_factura_email(request, factura_id):
     try:
         from inventario.sri.integracion_django import SRIIntegration
 
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         factura = get_object_or_404(Factura, id=factura_id)
 
-        integration = SRIIntegration(empresa=request.tenant)
+        integration = SRIIntegration(empresa=get_empresa_activa(request))
 
         # Revalidar autorización si faltan datos
         if not factura.numero_autorizacion or not factura.fecha_autorizacion:
@@ -5932,7 +5933,7 @@ def sincronizar_masivo_sri(request):
         errores = 0
         rechazadas = 0
         
-        integration = SRIIntegration(empresa=request.tenant)
+        integration = SRIIntegration(empresa=get_empresa_activa(request))
         resultados = []
         
         for factura in facturas_pendientes[:50]:  # Limitar a 50 para evitar timeout
@@ -6013,7 +6014,7 @@ def validar_xml_factura(request, factura_id):
         from inventario.sri.integracion_django import SRIIntegration
         
         # Verificar que la factura existe y pertenece a la empresa activa
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not request.user.empresas.filter(id=empresa_id).exists():
             raise Http404("Empresa no válida")
         factura = get_object_or_404(Factura, id=factura_id)
@@ -6024,7 +6025,7 @@ def validar_xml_factura(request, factura_id):
                 'message': 'La factura no tiene clave de acceso generada'
             })
         
-        integration = SRIIntegration(empresa=request.tenant)
+        integration = SRIIntegration(empresa=get_empresa_activa(request))
         
         try:
             # Generar XML con validación
@@ -6073,13 +6074,13 @@ def reenviar_factura_sri(request, factura_id):
         from inventario.sri.integracion_django import SRIIntegration
         
         # Verificar que la factura existe y pertenece a la empresa activa
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not request.user.empresas.filter(id=empresa_id).exists():
             raise Http404("Empresa no válida")
         factura = get_object_or_404(Factura, id=factura_id)
         
         # Reenviar factura
-        integration = SRIIntegration(empresa=request.tenant)
+        integration = SRIIntegration(empresa=get_empresa_activa(request))
         resultado = integration.reenviar_factura(factura_id)
         
         if resultado['success']:
@@ -6118,13 +6119,13 @@ def generar_xml_factura_view(request, factura_id):
         from inventario.sri.integracion_django import SRIIntegration
         
         # Verificar que la factura existe y pertenece a la empresa activa
-        empresa_id = getattr(request.tenant, 'id', None)
+        empresa_id = request.session.get('empresa_activa')
         if not request.user.empresas.filter(id=empresa_id).exists():
             raise Http404("Empresa no válida")
         factura = get_object_or_404(Factura, id=factura_id)
         
         # Generar XML
-        integration = SRIIntegration(empresa=request.tenant)
+        integration = SRIIntegration(empresa=get_empresa_activa(request))
         xml_path = integration.generar_xml_factura(factura)
         
         # Leer el XML generado
