@@ -150,6 +150,8 @@ CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if 
 SECURE_REFERRER_POLICY = os.environ.get('SECURE_REFERRER_POLICY', 'same-origin')
 SECURE_CONTENT_TYPE_NOSNIFF = os.environ.get('SECURE_CONTENT_TYPE_NOSNIFF', 'True') == 'True'
 SECURE_BROWSER_XSS_FILTER = os.environ.get('SECURE_BROWSER_XSS_FILTER', 'True') == 'True'
+# Permite forzar HTTPS mediante una variable de entorno dedicada
+FORCE_SSL = os.environ.get('FORCE_SSL', 'False').lower() == 'true'
 
 # Application definition
 
@@ -230,7 +232,12 @@ CONN_MAX_AGE = 600
 
 # Ajustes de seguridad aplicados solo en producción
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    # Redirigir a HTTPS solo si se especifica explícitamente
+    SECURE_SSL_REDIRECT = FORCE_SSL
+    if FORCE_SSL:
+        # Reconoce el encabezado enviado por el proxy para detectar HTTPS
+        SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000
