@@ -47,4 +47,7 @@ class TenantMiddleware(MiddlewareMixin):
                 Empresa.objects.filter(id=header_value).first()
                 or Empresa.objects.filter(ruc=header_value).first()
             )
+        empresa_id = request.session.get("empresa_activa")
+        if empresa_id:
+            return Empresa.objects.filter(id=empresa_id).first()
         return None
