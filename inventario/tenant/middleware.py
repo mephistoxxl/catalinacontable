@@ -27,10 +27,12 @@ class TenantMiddleware(MiddlewareMixin):
         path_parts = [p for p in request.path.strip("/").split("/") if p]
         if path_parts:
             slug = path_parts[0]
-            tenant = (
-                Empresa.objects.filter(id=slug).first()
-                or Empresa.objects.filter(ruc=slug).first()
-            )
+            tenant = None
+            if slug.isdigit():
+                tenant = (
+                    Empresa.objects.filter(id=int(slug)).first()
+                    or Empresa.objects.filter(ruc=slug).first()
+                )
             if tenant:
                 return tenant
         host = request.get_host().split(":")[0]
