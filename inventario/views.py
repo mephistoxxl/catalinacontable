@@ -36,6 +36,7 @@ from django.core.management import call_command
 from django.core import serializers
 #permite acceder de manera mas facil a los ficheros
 from django.core.files.storage import FileSystemStorage
+from django.db import IntegrityError
 import re
 from datetime import date
 from django.views.decorators.csrf import csrf_exempt
@@ -4235,7 +4236,8 @@ class CrearFacturador(LoginRequiredMixin, View):
 
                 messages.success(request, f'Facturador {facturador.nombres} creado exitosamente.')
                 return redirect('inventario:listar_facturadores')
-
+            except IntegrityError:
+                messages.error(request, 'La contraseña ya está en uso.')
             except Exception as e:
                 print(f"Error al crear facturador: {e}")
                 messages.error(request, f'Error al crear el facturador: {str(e)}')
@@ -4304,21 +4306,28 @@ class EditarFacturador(LoginRequiredMixin, View):
         form = FacturadorForm(data, instance=facturador)
 
         if form.is_valid():
-            # Guarda los cambios si el formulario es válido
-            form.save()
-            messages.success(request, 'Facturador actualizado exitosamente.')
-            return redirect('inventario:listar_facturadores')
+            try:
+                # Guarda los cambios si el formulario es válido
+                form.save()
+                messages.success(request, 'Facturador actualizado exitosamente.')
+                return redirect('inventario:listar_facturadores')
+            except IntegrityError:
+                messages.error(request, 'La contraseña ya está en uso.')
+            except Exception as e:
+                print(e)
+                messages.error(request, f'Error al actualizar el facturador: {str(e)}')
         else:
             # Muestra los errores en la consola para depuración
             print(form.errors)
             messages.error(request, 'Revise los datos proporcionados. Hay errores en el formulario.')
-            # Reenvía el formulario con los errores al usuario
-            contexto = {
-                'form': form,
-                'facturador': facturador
-            }
-            contexto = complementarContexto(contexto, request.user)
-            return render(request, 'inventario/opciones/editar_facturador.html', contexto)
+
+        # Reenvía el formulario con errores o después de una excepción
+        contexto = {
+            'form': form,
+            'facturador': facturador
+        }
+        contexto = complementarContexto(contexto, request.user)
+        return render(request, 'inventario/opciones/editar_facturador.html', contexto)
 
 # Eliminar Facturador
 class EliminarFacturador(LoginRequiredMixin, View):

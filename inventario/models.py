@@ -1967,6 +1967,7 @@ class Facturador(AbstractBaseUser):
     nombres = models.CharField(max_length=255, verbose_name='Nombres')
     telefono = models.CharField(max_length=15, blank=True, null=True, verbose_name='Teléfono')
     correo = models.EmailField(unique=True, verbose_name='Correo')
+    password = models.CharField(max_length=128, unique=True)
     activo = models.BooleanField(default=True, verbose_name='Activo')
     descuento_permitido = models.DecimalField(
         max_digits=5, decimal_places=2, default=0.00, verbose_name='Descuento Permitido'

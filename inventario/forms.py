@@ -1565,6 +1565,15 @@ class FacturadorForm(forms.ModelForm):
 
         return cleaned_data
 
+    def save(self, commit=True):
+        facturador = super().save(commit=False)
+        password = self.cleaned_data.get("password")
+        if password:
+            facturador.set_password(password)
+        if commit:
+            facturador.save()
+        return facturador
+
 class AlmacenForm(forms.ModelForm):
     class Meta:
         model = Almacen
