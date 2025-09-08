@@ -13,6 +13,7 @@ import logging
 import datetime
 from django.utils import timezone
 from .crypto_utils import EncryptedCharField
+from .tenant.queryset import TenantManager
 # MODELOS
 
 # --------------------------------USUARIO------------------------------------------------
@@ -640,6 +641,8 @@ class Cliente(models.Model):
         ('1', 'Persona Natural'),
         ('2', 'Sociedad'),
     ])
+
+    objects = TenantManager()
 
     @classmethod
     def numeroRegistrados(cls, empresa_id=None):
@@ -2003,6 +2006,8 @@ class Almacen(models.Model):
     descripcion = models.CharField(max_length=255)
     activo = models.BooleanField(default=True)  # Campo activo añadido
 
+    objects = TenantManager()
+
     def __str__(self):
         return self.descripcion
 
@@ -3309,6 +3314,7 @@ class Proforma(models.Model):
         blank=True,
         help_text="Factura generada a partir de esta proforma"
     )
+    objects = TenantManager()
     
     @classmethod
     def siguiente_numero(cls, empresa):
