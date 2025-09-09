@@ -11,10 +11,51 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterField(
-            model_name='cliente',
-            name='cedula',
-            field=models.CharField(max_length=13, unique=True),
+        # Alter the column type in-place to avoid dropping the unique index used by FK
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunSQL(
+                    sql=(
+                        """
+                        DO $$
+                        BEGIN
+                            IF EXISTS (
+                                SELECT 1 FROM information_schema.columns
+                                WHERE table_schema = 'public'
+                                  AND table_name = 'inventario_cliente'
+                                  AND column_name = 'cedula'
+                            ) THEN
+                                EXECUTE 'ALTER TABLE inventario_cliente ALTER COLUMN cedula TYPE varchar(13)';
+                            END IF;
+                        END
+                        $$;
+                        """
+                    ),
+                    reverse_sql=(
+                        """
+                        DO $$
+                        BEGIN
+                            IF EXISTS (
+                                SELECT 1 FROM information_schema.columns
+                                WHERE table_schema = 'public'
+                                  AND table_name = 'inventario_cliente'
+                                  AND column_name = 'cedula'
+                            ) THEN
+                                EXECUTE 'ALTER TABLE inventario_cliente ALTER COLUMN cedula TYPE varchar(12)';
+                            END IF;
+                        END
+                        $$;
+                        """
+                    ),
+                ),
+            ],
+            state_operations=[
+                migrations.AlterField(
+                    model_name='cliente',
+                    name='cedula',
+                    field=models.CharField(max_length=13, unique=True),
+                ),
+            ],
         ),
         migrations.AlterField(
             model_name='secuencia',

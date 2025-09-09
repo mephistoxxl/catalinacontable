@@ -64,7 +64,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='factura',
             name='cliente',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventario.Cliente', to_field='cedula'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventario.Cliente'),
         ),
         migrations.AlterField(
             model_name='factura',
@@ -79,7 +79,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='pedido',
             name='proveedor',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventario.Proveedor', to_field='cedula'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventario.Proveedor'),
         ),
         migrations.AddField(
             model_name='detallepedido',

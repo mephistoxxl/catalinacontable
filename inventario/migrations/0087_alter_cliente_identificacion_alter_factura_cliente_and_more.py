@@ -12,16 +12,16 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AlterField(
-            model_name="cliente",
-            name="identificacion",
-            field=models.CharField(max_length=13),
-        ),
-        migrations.AlterField(
             model_name="factura",
             name="cliente",
             field=models.ForeignKey(
                 on_delete=django.db.models.deletion.CASCADE, to="inventario.cliente"
             ),
+        ),
+        migrations.AlterField(
+            model_name="cliente",
+            name="identificacion",
+            field=models.CharField(max_length=13),
         ),
         migrations.AlterField(
             model_name="servicio",
