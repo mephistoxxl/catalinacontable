@@ -694,21 +694,32 @@ def ride_proforma(request, p):
 class Login(View):
     #Si el usuario ya envio el formulario por metodo post
     def post(self, request):
-        # Crea una instancia del formulario y la llena con los datos:
-        form = LoginFormulario(request.POST)
+        # Crea una instancia del formulario y la llena con los datos.
+        # Se pasa un queryset de empresas para permitir la validación del
+        # campo `empresa`, pero la selección de una empresa continúa siendo
+        # opcional gracias a `required=False` en el formulario.
+        form = LoginFormulario(request.POST, empresas=Empresa.objects.all())
         # Revisa si es valido:
         if form.is_valid():
             identificacion = form.cleaned_data['identificacion']
             clave = form.cleaned_data['password']
-            # Intentar obtener empresa desde POST directamente (select o hidden),
-            # ya que el queryset del formulario puede estar vacío inicialmente
-            empresa = None
-            empresa_id = request.POST.get('empresa') or request.POST.get('empresa_hidden')
-            if empresa_id and str(empresa_id).isdigit():
-                try:
-                    empresa = Empresa.objects.get(id=int(empresa_id))
-                except Empresa.DoesNotExist:
-                    empresa = None
+
+            # Obtener la empresa seleccionada en el formulario (si la hay).
+            # Si no se seleccionó ninguna, el formulario sigue siendo válido
+            # porque el campo es opcional.
+            empresa = form.cleaned_data.get('empresa')
+
+            # Compatibilidad: si el frontend envía un campo oculto
+            # `empresa_hidden`, usarlo en caso de que no exista selección
+            # explícita en el formulario.
+            if not empresa:
+                empresa_id = request.POST.get('empresa_hidden')
+                if empresa_id and str(empresa_id).isdigit():
+                    try:
+                        empresa = Empresa.objects.get(id=int(empresa_id))
+                    except Empresa.DoesNotExist:
+                        empresa = None
+
             logeado = authenticate(request, username=identificacion, password=clave)
 
             if logeado is not None:
@@ -770,7 +781,8 @@ class Login(View):
         if request.user.is_authenticated == True:
             return HttpResponseRedirect('/inventario/panel')
 
-        form = LoginFormulario()
+        # Mostrar el formulario con el listado completo de empresas disponibles.
+        form = LoginFormulario(empresas=Empresa.objects.all())
         return render(request, 'inventario/login.html', {'form': form})
 
 
