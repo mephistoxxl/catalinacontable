@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 import os
 from dotenv import load_dotenv
 from cryptography.fernet import Fernet
+import dj_database_url
 
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
@@ -203,23 +204,12 @@ WSGI_APPLICATION = 'sistema.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
 
-# Configuración de base de datos dual (SQLite/PostgreSQL)
-USE_POSTGRESQL = os.environ.get('USE_POSTGRESQL', 'False').lower() == 'true'
-
-if USE_POSTGRESQL:
-    # Configuración PostgreSQL
+# Configuración de base de datos usando DATABASE_URL o SQLite por defecto
+if os.environ.get('DATABASE_URL'):
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.environ.get('DB_NAME', 'sisfact_db'),
-            'USER': os.environ.get('DB_USER', 'postgres'),
-            'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
-            'HOST': os.environ.get('DB_HOST', 'localhost'),
-            'PORT': os.environ.get('DB_PORT', '5432'),
-        }
+        'default': dj_database_url.config(conn_max_age=600, ssl_require=True)
     }
 else:
-    # Configuración SQLite (por defecto)
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
