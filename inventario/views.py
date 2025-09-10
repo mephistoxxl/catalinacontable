@@ -3988,8 +3988,9 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
     redirect_field_name = None
     
     def get(self, request):
-        # Obtener empresa (simplificado: primera). Ajustar si se maneja multiempresa por usuario
-        empresa = Empresa.objects.first()
+        # Obtener la empresa activa desde la sesión
+        empresa_id = request.session.get('empresa_activa')
+        empresa = Empresa.objects.filter(id=empresa_id).first()
         # Intentar obtener configuración ligada a la empresa
         conf = None
         if empresa:
@@ -4041,7 +4042,8 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
         return render(request, 'inventario/opciones/configuracion.html', contexto)
     
     def post(self, request):
-        empresa = Empresa.objects.first()
+        empresa_id = request.session.get('empresa_activa')
+        empresa = Empresa.objects.filter(id=empresa_id).first()
         conf = None
         if empresa:
             conf = Opciones.objects.filter(empresa=empresa).first()
@@ -4078,9 +4080,10 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
             imagen = request.FILES.get('imagen')
             if imagen:
                 conf.imagen = imagen
+            conf.empresa = empresa
             conf.save()
             messages.success(request, 'Configuración actualizada exitosamente!')
-            return HttpResponseRedirect('/inventario/configuracionGeneral')
+            return redirect('inventario:panel')
         contexto = complementarContexto({'form': form, 'configuracion': conf}, request.user)
         return render(request, 'inventario/opciones/configuracion.html', contexto)
 #Fin de vista--------------------------------------------------------------------------------
