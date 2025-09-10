@@ -1190,9 +1190,10 @@ class OpcionesFormulario(forms.Form):
         label='RUC/Identificación',
         max_length=13,  # Cambiar de 20 a 13
         widget=forms.TextInput(attrs={
-            'id': 'identificacion', 
+            'id': 'identificacion',
             'class': 'form-control',
-            'placeholder': 'RUC de 13 dígitos'
+            'placeholder': 'RUC de 13 dígitos',
+            'readonly': True,
         }),
     )
     

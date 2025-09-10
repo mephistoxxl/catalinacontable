@@ -4014,8 +4014,12 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
 
         # Usar el formulario con instance para evitar set manual campo por campo
         # Como OpcionesFormulario es forms.Form (no ModelForm) cargamos valores vía initial
+        identificacion = conf.identificacion
+        if not identificacion or identificacion == '0000000000000':
+            identificacion = getattr(empresa, 'ruc', None) or request.user.username
+
         initial = {
-            'identificacion': conf.identificacion,
+            'identificacion': identificacion,
             'razon_social': conf.razon_social,
             'nombre_comercial': conf.nombre_comercial,
             'correo': conf.correo,
