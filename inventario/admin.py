@@ -7,7 +7,15 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.text import capfirst
 
 from .forms import LoginFormulario
-from .models import Usuario
+from .models import Usuario, Empresa
+
+
+class RootAdminSite(AdminSite):
+    def has_permission(self, request):  # type: ignore[override]
+        return request.user.is_active and request.user.is_superuser
+
+
+root_admin_site = RootAdminSite(name="root_admin")
 
 
 class TenantAdminSite(AdminSite):
@@ -161,13 +169,21 @@ class UsuarioAdmin(UserAdmin):
 
 tenant_admin_site.register(Usuario, UsuarioAdmin)
 
+root_admin_site.register(Usuario, UserAdmin)
+root_admin_site.register(Empresa)
+
 
 for model in apps.get_app_config("inventario").get_models():
-    if model is Usuario:
+    if model in (Usuario, Empresa):
         continue
     if any(f.name == "empresa" for f in model._meta.fields):
         admin_class = type(f"{model.__name__}Admin", (TenantModelAdmin,), {})
         try:
             tenant_admin_site.register(model, admin_class)
+        except admin.sites.AlreadyRegistered:
+            pass
+    else:
+        try:
+            root_admin_site.register(model)
         except admin.sites.AlreadyRegistered:
             pass
