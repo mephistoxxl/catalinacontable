@@ -508,7 +508,7 @@ async function consultarRUC(ruc) {
     hideMessage();
     
     try {
-        const response = await fetch(`/inventario/consultar-ruc/?ruc=${ruc}`, {
+        const response = await fetch(`/inventario/consultar-identificacion/?identificacion=${ruc}&tipo=04`, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
