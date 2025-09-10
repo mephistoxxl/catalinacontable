@@ -727,14 +727,18 @@ class Login(View):
                 if empresa and logeado.empresas.filter(id=empresa.id).exists():
                     login(request, logeado)
                     request.session['empresa_activa'] = empresa.id
-                    return HttpResponseRedirect('/inventario/panel')
+                    if Opciones.objects.filter(empresa=empresa).exists():
+                        return HttpResponseRedirect('/inventario/panel')
+                    return redirect('inventario:configuracionGeneral')
                 # Primer inicio con empresa indicada: si el usuario no tiene empresas aún, vincularlo
                 if empresa and logeado.empresas.count() == 0:
                     try:
                         UsuarioEmpresa.objects.get_or_create(usuario=logeado, empresa=empresa)
                         login(request, logeado)
                         request.session['empresa_activa'] = empresa.id
-                        return HttpResponseRedirect('/inventario/panel')
+                        if Opciones.objects.filter(empresa=empresa).exists():
+                            return HttpResponseRedirect('/inventario/panel')
+                        return redirect('inventario:configuracionGeneral')
                     except Exception:
                         pass
 
@@ -745,13 +749,17 @@ class Login(View):
                         if logeado.empresas.filter(id=emp_ruc.id).exists():
                             login(request, logeado)
                             request.session['empresa_activa'] = emp_ruc.id
-                            return HttpResponseRedirect('/inventario/panel')
+                            if Opciones.objects.filter(empresa=emp_ruc).exists():
+                                return HttpResponseRedirect('/inventario/panel')
+                            return redirect('inventario:configuracionGeneral')
                         # Primer inicio: si el usuario no tiene empresas, vincular a esta
                         if logeado.empresas.count() == 0:
                             UsuarioEmpresa.objects.get_or_create(usuario=logeado, empresa=emp_ruc)
                             login(request, logeado)
                             request.session['empresa_activa'] = emp_ruc.id
-                            return HttpResponseRedirect('/inventario/panel')
+                            if Opciones.objects.filter(empresa=emp_ruc).exists():
+                                return HttpResponseRedirect('/inventario/panel')
+                            return redirect('inventario:configuracionGeneral')
                     except Empresa.DoesNotExist:
                         pass
 
@@ -761,7 +769,9 @@ class Login(View):
                     unica = empresas_usuario.first()
                     login(request, logeado)
                     request.session['empresa_activa'] = unica.id
-                    return HttpResponseRedirect('/inventario/panel')
+                    if Opciones.objects.filter(empresa=unica).exists():
+                        return HttpResponseRedirect('/inventario/panel')
+                    return redirect('inventario:configuracionGeneral')
                 elif empresas_usuario.count() > 1:
                     login(request, logeado)
                     return HttpResponseRedirect('/inventario/seleccionar_empresa/')
@@ -805,8 +815,11 @@ class SeleccionarEmpresa(LoginRequiredMixin, View):
     def post(self, request):
         empresa_id = request.POST.get('empresa_id')
         if empresa_id and request.user.empresas.filter(id=empresa_id).exists():
-            request.session['empresa_activa'] = int(empresa_id)
-            return HttpResponseRedirect('/inventario/panel')
+            empresa = request.user.empresas.get(id=empresa_id)
+            request.session['empresa_activa'] = empresa.id
+            if Opciones.objects.filter(empresa=empresa).exists():
+                return HttpResponseRedirect('/inventario/panel')
+            return redirect('inventario:configuracionGeneral')
         empresas = request.user.empresas.all()
         contexto = {'empresas': empresas, 'error': 'Seleccione una empresa válida'}
         return render(request, 'inventario/seleccionar_empresa.html', contexto)
@@ -843,6 +856,8 @@ class Panel(LoginRequiredMixin, View):
         empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return redirect('inventario:seleccionar_empresa')
+        if not Opciones.objects.filter(empresa_id=empresa_id).exists():
+            return redirect('inventario:configuracionGeneral')
 
         #Recupera los datos del usuario despues del login
         contexto = {
