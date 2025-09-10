@@ -100,7 +100,7 @@
                                     {{ form.identificacion.errors }}
                                     <div class="flex items-center">
                                         <div class="flex-1">
-                                            {{ form.identificacion|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-gray-500 focus:ring-1 focus:ring-gray-500" }}
+                                            {{ form.identificacion|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs bg-gray-100 cursor-not-allowed" }}
                                         </div>
                                         <button type="button" id="buscar-ruc" class="inline-flex items-center px-3 py-1.5 bg-gray-800 text-white text-xs font-medium rounded-md hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-600 transition-colors duration-200 ml-1">
                                             <i class="fa fa-search mr-1"></i>
@@ -328,42 +328,18 @@
 </div>
 
 <script>
-// ===== FUNCIÓN DE TEST SIMPLE =====
+// Función simple para consultar el RUC utilizando el valor del campo de solo lectura
 function consultarRUCSimple() {
-    console.log('=== FUNCIÓN DE TEST LLAMADA ===');
-    
-    // Intentar diferentes IDs posibles para el campo RUC
-    let rucInput = document.getElementById('id_identificacion');
+    const rucInput = document.getElementById('id_identificacion');
     if (!rucInput) {
-        rucInput = document.querySelector('input[name="identificacion"]');
-    }
-    if (!rucInput) {
-        rucInput = document.querySelector('input[id*="identificacion"]');
-    }
-    
-    console.log('Campo RUC encontrado:', !!rucInput);
-    if (rucInput) {
-        console.log('ID del campo:', rucInput.id);
-        console.log('Name del campo:', rucInput.name);
-        
-        const ruc = rucInput.value.trim();
-        console.log('RUC ingresado:', ruc);
-        
-        if (ruc.length === 13) {
-            // Llamar a la función original
-            consultarRUC(ruc);
-        } else {
-            alert(`El RUC debe tener 13 dígitos. Actual: ${ruc.length} dígitos`);
-        }
-    } else {
-        console.error('No se encontró el campo de RUC');
-        // Mostrar todos los inputs para debug
-        const allInputs = document.querySelectorAll('input');
-        console.log('Todos los inputs encontrados:');
-        allInputs.forEach((input, index) => {
-            console.log(`${index}: id="${input.id}", name="${input.name}", type="${input.type}"`);
-        });
         alert('Error: No se encontró el campo de RUC');
+        return;
+    }
+    const ruc = rucInput.value.trim();
+    if (ruc.length === 13) {
+        consultarRUC(ruc);
+    } else {
+        alert(`El RUC debe tener 13 dígitos. Actual: ${ruc.length} dígitos`);
     }
 }
 
@@ -598,39 +574,12 @@ async function consultarRUC(ruc) {
 
 // ===== CONFIGURAR EVENTOS CUANDO EL DOM ESTÉ LISTO =====
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('=== DOM LOADED - CONFIGURANDO EVENTOS ===');
-    
-    // TEST: Verificar que elementos existen
     const botonBuscar = document.getElementById('buscar-ruc');
-    
-    // Buscar el input de RUC de forma más flexible
-    let inputRUC = document.getElementById('id_identificacion');
-    if (!inputRUC) {
-        inputRUC = document.querySelector('input[name="identificacion"]');
-    }
-    if (!inputRUC) {
-        inputRUC = document.querySelector('input[id*="identificacion"]');
-    }
-    
-    console.log('Botón buscar encontrado:', !!botonBuscar);
-    console.log('Input RUC encontrado:', !!inputRUC);
-    if (inputRUC) {
-        console.log('ID del input RUC:', inputRUC.id);
-        console.log('Name del input RUC:', inputRUC.name);
-    }
-    
     if (botonBuscar) {
-        console.log('✅ Configurando event listener para botón buscar');
-        
         botonBuscar.addEventListener('click', function(e) {
-            console.log('=== CLICK DETECTADO ===');
             e.preventDefault();
-            e.stopPropagation();
-            
             consultarRUCSimple();
         });
-    } else {
-        console.error('❌ No se encontró el botón de búsqueda RUC');
     }
 
     // ===== RESTO DE FUNCIONALIDAD ORIGINAL =====
