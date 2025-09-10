@@ -15,9 +15,10 @@ Including another URLconf
 """
 from django.urls import path, include
 from django.views.generic import RedirectView
-from inventario.admin import tenant_admin_site
+from inventario.admin import tenant_admin_site, root_admin_site
 
 urlpatterns = [
+    path('admin/', root_admin_site.urls),
     path('<str:tenant>/admin/', tenant_admin_site.urls),
     path('inventario/', include('inventario.urls')),
     path('', RedirectView.as_view(url='/inventario/login')),
