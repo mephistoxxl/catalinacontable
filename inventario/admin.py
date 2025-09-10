@@ -21,6 +21,13 @@ root_admin_site = RootAdminSite(name="root_admin")
 class TenantAdminSite(AdminSite):
     """Admin site that removes the ``tenant`` kwarg from admin views."""
 
+    def has_permission(self, request):  # type: ignore[override]
+        user = request.user
+        tenant = getattr(request, "tenant", None)
+        return user.is_active and user.is_staff and (
+            user.is_superuser or tenant in user.empresas.all()
+        )
+
     def admin_view(self, view, cacheable=False):  # type: ignore[override]
         base_view = super().admin_view(view, cacheable)
 
