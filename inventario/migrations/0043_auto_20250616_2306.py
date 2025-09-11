@@ -90,9 +90,4 @@ class Migration(migrations.Migration):
             name='tipo_regimen',
             field=models.CharField(choices=[('GENERAL', 'Régimen General'), ('RIMPE', 'RIMPE - Emprendedores')], default='GENERAL', help_text='Tipo de régimen tributario', max_length=20),
         ),
-        migrations.AlterField(
-            model_name='opciones',
-            name='valor_iva',
-            field=models.IntegerField(default=12, help_text='Porcentaje de IVA vigente en Ecuador', unique=True),
-        ),
     ]

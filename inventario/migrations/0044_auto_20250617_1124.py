@@ -24,9 +24,4 @@ class Migration(migrations.Migration):
             name='tipo_emision',
             field=models.CharField(default='1', help_text='Tipo emisión: 1=Normal (único permitido en método offline)', max_length=1),
         ),
-        migrations.AlterField(
-            model_name='opciones',
-            name='valor_iva',
-            field=models.IntegerField(default=15, help_text='Porcentaje de IVA vigente en Ecuador', unique=True),
-        ),
     ]

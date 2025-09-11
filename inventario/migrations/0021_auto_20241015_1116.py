@@ -64,9 +64,4 @@ class Migration(migrations.Migration):
             name='tipo_regimen',
             field=models.CharField(choices=[('1', 'General'), ('2', 'RIMPE - EMPRENDEDORES')], default='1', max_length=20),
         ),
-        migrations.AlterField(
-            model_name='opciones',
-            name='valor_iva',
-            field=models.IntegerField(default=12, unique=True),
-        ),
     ]
