@@ -171,7 +171,11 @@ class UsuarioAdmin(UserAdmin):
         tenant = getattr(request, "tenant", None)
         if tenant is None:
             return qs.none()
-        return qs.filter(empresas=tenant, is_superuser=False)
+        return (
+            qs.filter(empresas=tenant, is_superuser=False)
+            .exclude(is_staff=True)
+            .exclude(groups__name="Administrador")
+        )
 
     def get_form(self, request, obj=None, **kwargs):  # type: ignore[override]
         form = super().get_form(request, obj, **kwargs)
@@ -205,6 +209,8 @@ class UsuarioAdmin(UserAdmin):
         if not has_perm:
             return False
         if obj is not None and not request.user.is_superuser:
+            if obj.is_staff or obj.is_superuser:
+                return False
             tenant = getattr(request, "tenant", None)
             if tenant is not None and tenant not in obj.empresas.all():
                 return False
@@ -215,6 +221,8 @@ class UsuarioAdmin(UserAdmin):
         if not has_perm:
             return False
         if obj is not None and not request.user.is_superuser:
+            if obj.is_staff or obj.is_superuser:
+                return False
             tenant = getattr(request, "tenant", None)
             if tenant is not None and tenant not in obj.empresas.all():
                 return False

@@ -16,6 +16,12 @@ class UsuarioAdminQuerysetTests(TestCase):
             username="super", email="super@example.com", password="pass"
         )
         self.superuser.empresas.add(self.empresa)
+        self.staff_user = get_user_model().objects.create_user(
+            username="staff", email="staff@example.com", password="pass"
+        )
+        self.staff_user.is_staff = True
+        self.staff_user.save()
+        self.staff_user.empresas.add(self.empresa)
         self.user = get_user_model().objects.create_user(
             username="normal", email="user@example.com", password="pass"
         )
@@ -28,6 +34,13 @@ class UsuarioAdminQuerysetTests(TestCase):
         qs = self.usuario_admin.get_queryset(request)
         self.assertIn(self.user, qs)
         self.assertNotIn(self.superuser, qs)
+
+    def test_staff_excluded_from_queryset(self):
+        request = self.factory.get("/")
+        request.tenant = self.empresa
+        qs = self.usuario_admin.get_queryset(request)
+        self.assertIn(self.user, qs)
+        self.assertNotIn(self.staff_user, qs)
 
 
 class UsuarioAdminPermissionsTests(TestCase):
@@ -50,6 +63,18 @@ class UsuarioAdminPermissionsTests(TestCase):
         )
         self.admin_user.user_permissions.set(perms)
         self.admin_user.empresas.add(self.empresa1)
+
+        self.staff_obj = User.objects.create_user(
+            username="staff_obj", email="staffobj@example.com", password="pass"
+        )
+        self.staff_obj.is_staff = True
+        self.staff_obj.save()
+        self.staff_obj.empresas.add(self.empresa1)
+
+        self.superuser_obj = User.objects.create_superuser(
+            username="super_obj", email="superobj@example.com", password="pass"
+        )
+        self.superuser_obj.empresas.add(self.empresa1)
 
         self.user_empresa1 = User.objects.create_user(
             username="user1", email="user1@example.com", password="pass"
@@ -106,4 +131,22 @@ class UsuarioAdminPermissionsTests(TestCase):
         )
         self.assertFalse(
             self.usuario_admin.has_delete_permission(request, obj=self.user_empresa2)
+        )
+
+    def test_cannot_modify_staff_user(self):
+        request = self._get_request()
+        self.assertFalse(
+            self.usuario_admin.has_change_permission(request, obj=self.staff_obj)
+        )
+        self.assertFalse(
+            self.usuario_admin.has_delete_permission(request, obj=self.staff_obj)
+        )
+
+    def test_cannot_modify_superuser(self):
+        request = self._get_request()
+        self.assertFalse(
+            self.usuario_admin.has_change_permission(request, obj=self.superuser_obj)
+        )
+        self.assertFalse(
+            self.usuario_admin.has_delete_permission(request, obj=self.superuser_obj)
         )
