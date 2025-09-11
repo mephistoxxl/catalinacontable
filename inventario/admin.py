@@ -171,7 +171,7 @@ class UsuarioAdmin(UserAdmin):
         tenant = getattr(request, "tenant", None)
         if tenant is None:
             return qs.none()
-        return qs.filter(empresas=tenant)
+        return qs.filter(empresas=tenant, is_superuser=False)
 
 
 tenant_admin_site.register(Usuario, UsuarioAdmin)
