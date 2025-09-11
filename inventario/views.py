@@ -3027,7 +3027,10 @@ class VerFactura(LoginRequiredMixin, View):
             
             # Obtener las opciones generales de la empresa
             try:
-                opciones = Opciones.objects.first()
+                empresa = getattr(factura, 'empresa', None)
+                opciones = Opciones.objects.for_tenant(empresa).first()
+                if not opciones and empresa:
+                    opciones = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
             except Opciones.DoesNotExist:
                 opciones = None
             
@@ -3189,7 +3192,10 @@ class VerFactura(LoginRequiredMixin, View):
                 try:
                     # Obtener detalles y opciones necesarias
                     detalles = DetalleFactura.objects.filter(factura=factura)
-                    opciones = Opciones.objects.first()
+                    empresa = getattr(factura, 'empresa', None)
+                    opciones = Opciones.objects.for_tenant(empresa).first()
+                    if not opciones and empresa:
+                        opciones = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
                     
                     # Generar directorio si no existe
                     os.makedirs(pdf_dir, exist_ok=True)
@@ -3288,7 +3294,10 @@ class GenerarFacturaPDF(LoginRequiredMixin, View):
         try:
             # Obtener detalles y opciones necesarias
             detalles = DetalleFactura.objects.filter(factura=factura)
-            opciones = Opciones.objects.first()
+            empresa = getattr(factura, 'empresa', None)
+            opciones = Opciones.objects.for_tenant(empresa).first()
+            if not opciones and empresa:
+                opciones = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
             
             # Generar directorio si no existe
             os.makedirs(pdf_dir, exist_ok=True)
@@ -3787,7 +3796,10 @@ class GenerarPedidoPDF(LoginRequiredMixin, View):
 
     def get(self, request, p):
         pedido = Pedido.objects.get(id=p)
-        general = Opciones.objects.get(id=1)
+        empresa = getattr(pedido, 'empresa', None)
+        general = Opciones.objects.for_tenant(empresa).first()
+        if not general and empresa:
+            general = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
         detalles = DetallePedido.objects.filter(id_pedido_id=p)
 
         data = {
@@ -4535,7 +4547,10 @@ class RideView(LoginRequiredMixin, View):
             
             # Obtener las opciones generales de la empresa
             try:
-                opciones = Opciones.objects.first()
+                empresa = getattr(factura, 'empresa', None)
+                opciones = Opciones.objects.for_tenant(empresa).first()
+                if not opciones and empresa:
+                    opciones = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
             except Opciones.DoesNotExist:
                 opciones = None
             
@@ -5195,11 +5210,14 @@ class FirmaElectronicaView(LoginRequiredMixin, View):
     redirect_field_name = None
     
     def get(self, request):
-        # Obtener instancia existente (NO forzar pk=1 para evitar duplicados por unique valor_iva / identificacion)
-        opciones = Opciones.objects.first()
+        empresa = getattr(request, 'tenant', None)
+        if not empresa:
+            empresa_id = request.session.get('empresa_activa')
+            empresa = Empresa.objects.filter(id=empresa_id).first()
+
+        opciones = Opciones.objects.for_tenant(empresa).first()
         created = False
         if not opciones:
-            empresa = Empresa.objects.first()
             if not empresa or not getattr(empresa, 'ruc', None) or len(empresa.ruc) != 13:
                 messages.error(request, 'No existe configuración y el RUC de la empresa no es válido. Configure empresa primero.')
                 return redirect('inventario:configuracionGeneral')
@@ -5212,7 +5230,6 @@ class FirmaElectronicaView(LoginRequiredMixin, View):
                 telefono='0000000000'
             )
             try:
-                # Guardar sin crear segunda fila con mismo valor_iva (único)
                 opciones.save()
                 created = True
             except ValidationError as e:
@@ -5234,9 +5251,13 @@ class FirmaElectronicaView(LoginRequiredMixin, View):
         return render(request, 'inventario/opciones/firma_electronica.html', contexto)
     
     def post(self, request):
-        opciones = Opciones.objects.first()
+        empresa = getattr(request, 'tenant', None)
+        if not empresa:
+            empresa_id = request.session.get('empresa_activa')
+            empresa = Empresa.objects.filter(id=empresa_id).first()
+
+        opciones = Opciones.objects.for_tenant(empresa).first()
         if not opciones:
-            empresa = Empresa.objects.first()
             if not empresa or not getattr(empresa, 'ruc', None) or len(empresa.ruc) != 13:
                 messages.error(request, 'No existe configuración válida. Configure empresa primero.')
                 return redirect('inventario:configuracionGeneral')
@@ -5328,7 +5349,13 @@ class EliminarFirmaElectronicaView(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request):
-        opciones = Opciones.objects.get(pk=1)
+        empresa = getattr(request, 'tenant', None)
+        if not empresa:
+            empresa_id = request.session.get('empresa_activa')
+            empresa = Empresa.objects.filter(id=empresa_id).first()
+        opciones = Opciones.objects.for_tenant(empresa).first()
+        if not opciones and empresa:
+            opciones = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
         eliminado = False
         if opciones.firma_electronica:
             # Intenta borrar el archivo físico usando el método delete()
@@ -5356,7 +5383,11 @@ class DescargarFirmaElectronicaView(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
-        opciones = Opciones.objects.first()
+        empresa = getattr(request, 'tenant', None)
+        if not empresa:
+            empresa_id = request.session.get('empresa_activa')
+            empresa = Empresa.objects.filter(id=empresa_id).first()
+        opciones = Opciones.objects.for_tenant(empresa).first()
         if not opciones or not opciones.firma_electronica:
             raise Http404("Archivo no disponible")
         if not request.user.is_staff:

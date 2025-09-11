@@ -164,11 +164,8 @@ class Opciones(models.Model):
         logger.info("Guardando instancia Opciones...")
         is_new_file = False
         if self.pk:
-            try:
-                old = Opciones.objects.get(pk=self.pk)
-                if old.firma_electronica != self.firma_electronica:
-                    is_new_file = True
-            except Opciones.DoesNotExist:
+            old = Opciones.objects.for_tenant(self.empresa).filter(pk=self.pk).first()
+            if old and old.firma_electronica != self.firma_electronica:
                 is_new_file = True
         else:
             is_new_file = True
@@ -338,6 +335,8 @@ class Opciones(models.Model):
         help_text='Tipo emisión: 1=Normal (único permitido en método offline)'
     )
 
+    objects = TenantManager()
+
     # MÉTODOS ÚTILES PARA XML:
     @property
     def ambiente_descripcion(self):
@@ -384,11 +383,8 @@ def save(self, *args, **kwargs):
     logger = logging.getLogger(__name__)
     is_new_file = False
     if self.pk:
-        try:
-            old = Opciones.objects.get(pk=self.pk)
-            if old.firma_electronica != self.firma_electronica:
-                is_new_file = True
-        except Opciones.DoesNotExist:
+        old = Opciones.objects.for_tenant(self.empresa).filter(pk=self.pk).first()
+        if old and old.firma_electronica != self.firma_electronica:
             is_new_file = True
     else:
         is_new_file = True
@@ -998,9 +994,12 @@ class Factura(models.Model):
         
         # ✅ CORREGIDO: Validar RUC desde configuración (13 dígitos)
         try:
-            opciones = Opciones.objects.first()
-            if not opciones or not opciones.identificacion or opciones.identificacion == '0000000000000':
-                raise ValueError("RUC no configurado correctamente en Opciones")
+            opciones = Opciones.objects.for_tenant(self.empresa).first()
+            if not opciones:
+                if self.empresa:
+                    opciones = Opciones.objects.create(empresa=self.empresa, identificacion=self.empresa.ruc)
+                else:
+                    raise ValueError("RUC no configurado correctamente en Opciones")
             ruc_emisor = opciones.identificacion.zfill(13)
         except Exception as e:
             logger = logging.getLogger(__name__)
@@ -1011,7 +1010,9 @@ class Factura(models.Model):
         # ✅ Ambiente desde configuración (1 dígito)
         # 1 = Pruebas, 2 = Producción
         try:
-            opciones = Opciones.objects.first()
+            opciones = Opciones.objects.for_tenant(self.empresa).first()
+            if not opciones and self.empresa:
+                opciones = Opciones.objects.create(empresa=self.empresa, identificacion=self.empresa.ruc)
             if opciones and opciones.tipo_ambiente in ['1', '2']:
                 tipo_ambiente = opciones.tipo_ambiente
             else:
@@ -1300,7 +1301,9 @@ class Factura(models.Model):
             errores.append("Faltan calcular totales de impuestos")
         
         # Verificar configuración de empresa
-        opciones = Opciones.objects.first()
+        opciones = Opciones.objects.for_tenant(self.empresa).first()
+        if not opciones and self.empresa:
+            opciones = Opciones.objects.create(empresa=self.empresa, identificacion=self.empresa.ruc)
         if (not opciones or
             getattr(opciones, 'identificacion', '0000000000000') == '0000000000000' or
             '[CONFIGURAR' in getattr(opciones, 'razon_social', '') or

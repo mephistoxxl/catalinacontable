@@ -627,7 +627,10 @@ class ProformaRIDEGenerator:
 
             # Fallback a datos de empresa si faltan teléfono/correo del vendedor
             from inventario.models import Opciones
-            empresa_config = Opciones.objects.first()
+            empresa = getattr(proforma, 'empresa', None)
+            empresa_config = Opciones.objects.for_tenant(empresa).first()
+            if not empresa_config and empresa:
+                empresa_config = Opciones.objects.create(empresa=empresa, identificacion=getattr(empresa, 'ruc', '0000000000000'))
             empresa_telefono = getattr(empresa_config, 'telefono', None) if empresa_config else None
             empresa_correo = getattr(empresa_config, 'correo', None) if empresa_config else None
 
@@ -846,7 +849,10 @@ class ProformaRIDEGenerator:
             detalles = []
 
         # Opciones por empresa
-        opciones = Opciones.objects.filter(empresa=getattr(proforma, 'empresa', None)).first() or Opciones.objects.first()
+        empresa = getattr(proforma, 'empresa', None)
+        opciones = Opciones.objects.for_tenant(empresa).first()
+        if not opciones and empresa:
+            opciones = Opciones.objects.create(empresa=empresa, identificacion=getattr(empresa, 'ruc', '0000000000000'))
 
         # Salida
         if output_dir is None:

@@ -2,6 +2,7 @@
 
 from .models import Producto, Opciones
 from decimal import Decimal
+from .tenant.queryset import get_current_tenant
 
 
 def obtenerIdProducto(descripcion):
@@ -16,19 +17,23 @@ def productoTieneIva(idProducto):
     
     return resultado
 
-def sacarIva(elemento):
-    iva = Opciones.objects.get(id=1)
-    ivaSacado =  iva.valor_iva/100
-    resultado = elemento + (elemento * Decimal(ivaSacado))  
-    return resultado    
+def sacarIva(elemento, empresa=None):
+    empresa = empresa or get_current_tenant()
+    iva = Opciones.objects.for_tenant(empresa).first()
+    if not iva and empresa:
+        iva = Opciones.objects.create(empresa=empresa, identificacion=getattr(empresa, 'ruc', '0000000000000'))
+    ivaSacado = iva.valor_iva / 100
+    resultado = elemento + (elemento * Decimal(ivaSacado))
+    return resultado
 
-def ivaActual(modo):
+def ivaActual(modo, empresa=None):
+    empresa = empresa or get_current_tenant()
+    iva = Opciones.objects.for_tenant(empresa).first()
+    if not iva and empresa:
+        iva = Opciones.objects.create(empresa=empresa, identificacion=getattr(empresa, 'ruc', '0000000000000'))
     if modo == 'valor':
-        iva = Opciones.objects.get(id=1)    
         return iva.valor_iva
-
     elif modo == 'objeto':
-        iva = Opciones.objects.get(id=1)    
         return iva
 
 def obtenerProducto(idProducto):
