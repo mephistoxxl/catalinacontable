@@ -286,15 +286,8 @@ class Opciones(models.Model):
         help_text='Número de resolución de agente de retención'
     )
     
-    # CONFIGURACIÓN FACTURACIÓN
-    valor_iva = models.IntegerField(
-        default=15,
-        unique=True,  # Debe ser único porque es referenciado por ForeignKey (to_field='valor_iva')
-        help_text='Porcentaje de IVA vigente en Ecuador'
-    )
-    
     moneda = models.CharField(
-        max_length=20, 
+        max_length=20,
         default='DOLAR',
         help_text='Moneda oficial (DOLAR para Ecuador)'
     )
@@ -1735,7 +1728,6 @@ class Pedido(models.Model):
     fecha = models.DateField()
     sub_monto = models.DecimalField(max_digits=20, decimal_places=2)
     monto_general = models.DecimalField(max_digits=20, decimal_places=2)
-    iva = models.ForeignKey(Opciones, to_field='valor_iva', on_delete=models.CASCADE)
     presente = models.BooleanField(null=True)
 
     @classmethod

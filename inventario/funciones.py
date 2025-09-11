@@ -1,8 +1,6 @@
 #----------------------------FUNCIONES DE AYUDA Y COMPLEMENTO--------------------------------------------------
 
-from .models import Producto, Opciones
-from decimal import Decimal
-from .tenant.queryset import get_current_tenant
+from .models import Producto
 
 
 def obtenerIdProducto(descripcion):
@@ -11,33 +9,8 @@ def obtenerIdProducto(descripcion):
 
     return resultado
 
-def productoTieneIva(idProducto):
-    iva = Producto.objects.get(id=idProducto)
-    resultado = iva.tiene_iva
-    
-    return resultado
-
-def sacarIva(elemento, empresa=None):
-    empresa = empresa or get_current_tenant()
-    iva = Opciones.objects.for_tenant(empresa).first()
-    if not iva and empresa:
-        iva = Opciones.objects.create(empresa=empresa, identificacion=getattr(empresa, 'ruc', '0000000000000'))
-    ivaSacado = iva.valor_iva / 100
-    resultado = elemento + (elemento * Decimal(ivaSacado))
-    return resultado
-
-def ivaActual(modo, empresa=None):
-    empresa = empresa or get_current_tenant()
-    iva = Opciones.objects.for_tenant(empresa).first()
-    if not iva and empresa:
-        iva = Opciones.objects.create(empresa=empresa, identificacion=getattr(empresa, 'ruc', '0000000000000'))
-    if modo == 'valor':
-        return iva.valor_iva
-    elif modo == 'objeto':
-        return iva
-
 def obtenerProducto(idProducto):
-    producto = Producto.objects.get(id=idProducto)      
+    producto = Producto.objects.get(id=idProducto)
     return producto
 
 

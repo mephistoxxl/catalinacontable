@@ -3254,11 +3254,24 @@ class GenerarFactura(LoginRequiredMixin, View):
         response['Content-Disposition'] = 'attachment; filename="%s"' % nombre_factura
         writer = csv.writer(response)
 
-        writer.writerow(['Producto', 'Cantidad', 'Sub-total', 'Total',
-                         'Porcentaje IVA utilizado: %s' % (factura.iva.valor_iva)])
+        writer.writerow(['Producto', 'Cantidad', 'Sub-total', 'Total', 'IVA %'])
 
-        for producto in detalles:
-            writer.writerow([producto.id_producto.descripcion, producto.cantidad, producto.sub_total, producto.total])
+        MAPEO_IVA = {
+            '0': 0.00, '5': 5.00, '2': 12.00, '10': 13.00,
+            '3': 14.00, '4': 15.00, '6': 0.00, '7': 0.00, '8': 8.00
+        }
+
+        for detalle in detalles:
+            if hasattr(detalle, 'producto') and detalle.producto:
+                iva_percent = detalle.producto.get_porcentaje_iva_real()
+                descripcion = detalle.producto.descripcion
+            elif hasattr(detalle, 'servicio') and detalle.servicio:
+                iva_percent = MAPEO_IVA.get(detalle.servicio.iva, 0.00)
+                descripcion = detalle.servicio.descripcion
+            else:
+                iva_percent = 0.00
+                descripcion = ''
+            writer.writerow([descripcion, detalle.cantidad, detalle.sub_total, detalle.total, iva_percent])
 
         writer.writerow(['Total general:', '', '', factura.monto_general])
 
@@ -3685,21 +3698,17 @@ class DetallesPedido(LoginRequiredMixin, View):
 
             #--Saca el monto general
             for index, element in enumerate(subtotal):
-                if productoTieneIva(id_producto[index]):
-                    nuevoPrecio = sacarIva(element)
-                    monto_general += nuevoPrecio
-                    total_general.append(nuevoPrecio)
-                else:
-                    monto_general += element
-                    total_general.append(element)
+                producto = obtenerProducto(id_producto[index])
+                porcentaje = Decimal(str(producto.get_porcentaje_iva_real())) / 100
+                nuevoPrecio = element + (element * porcentaje)
+                monto_general += nuevoPrecio
+                total_general.append(nuevoPrecio)
 
             from datetime import date
 
             proveedor = Proveedor.objects.get(identificacion_proveedor=cedula)
-            iva = ivaActual('objeto')
             presente = False
             pedido = Pedido(proveedor=proveedor, fecha=date.today(), sub_monto=sub_monto, monto_general=monto_general,
-                            iva=iva,
                             presente=presente)
 
             pedido.save()
@@ -3776,11 +3785,11 @@ class GenerarPedido(LoginRequiredMixin, View):
         response['Content-Disposition'] = 'attachment; filename="%s"' % nombre_pedido
         writer = csv.writer(response)
 
-        writer.writerow(['Producto', 'Cantidad', 'Sub-total', 'Total',
-                         'Porcentaje IVA utilizado: %s' % (pedido.iva.valor_iva)])
+        writer.writerow(['Producto', 'Cantidad', 'Sub-total', 'Total', 'IVA %'])
 
         for producto in detalles:
-            writer.writerow([producto.id_producto.descripcion, producto.cantidad, producto.sub_total, producto.total])
+            iva_percent = producto.id_producto.get_porcentaje_iva_real()
+            writer.writerow([producto.id_producto.descripcion, producto.cantidad, producto.sub_total, producto.total, iva_percent])
 
         writer.writerow(['Total general:', '', '', pedido.monto_general])
 
@@ -3808,7 +3817,6 @@ class GenerarPedidoPDF(LoginRequiredMixin, View):
             'nombre_proveedor': pedido.proveedor.nombre + " " + pedido.proveedor.apellido,
             'cedula_proveedor': pedido.proveedor.cedula,
             'id_reporte': pedido.id,
-            'iva': pedido.iva.valor_iva,
             'detalles': detalles,
             'modo': 'pedido',
             'general': general
@@ -4050,7 +4058,6 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
             'correo': conf.correo,
             'telefono': conf.telefono,
             'moneda': conf.moneda,
-            'valor_iva': conf.valor_iva,
             'nombre_negocio': conf.nombre_negocio,
             'direccion_establecimiento': conf.direccion_establecimiento,
             'mensaje_factura': conf.mensaje_factura,
@@ -4096,7 +4103,6 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
             conf.obligado = form.cleaned_data.get('obligado')
             conf.tipo_regimen = form.cleaned_data.get('tipo_regimen')
             conf.moneda = form.cleaned_data.get('moneda')
-            conf.valor_iva = form.cleaned_data.get('valor_iva')
             conf.mensaje_factura = form.cleaned_data.get('mensaje_factura')
             conf.nombre_negocio = form.cleaned_data.get('nombre_negocio')
             conf.es_contribuyente_especial = form.cleaned_data.get('es_contribuyente_especial')
@@ -4605,7 +4611,6 @@ def adapt_opciones(opciones):
         'tipo_ambiente': getattr(opciones, 'tipo_ambiente', '1'),
         'tipo_emision': getattr(opciones, 'tipo_emision', '1'),
         'moneda': getattr(opciones, 'moneda', 'DOLAR'),
-        'valor_iva': getattr(opciones, 'valor_iva', 15),
     }
 
 def adapt_cliente(cliente):

@@ -38,7 +38,7 @@ class Command(BaseCommand):
                     "direccion_establecimiento": "AV. DEMO Y CALLE FALSA 123",
                     "correo": "demo@empresa.com",
                     "telefono": "0990000000",
-                    # valores por defecto ya cubren: valor_iva=15, tipo_ambiente="1"
+                    # valores por defecto ya cubren: tipo_ambiente="1"
                 },
             )
 
