@@ -1,5 +1,6 @@
 from django.test import RequestFactory, TestCase
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 
 from .admin import UsuarioAdmin, tenant_admin_site
 from .models import Empresa
@@ -44,7 +45,22 @@ class UsuarioAdminPermissionsTests(TestCase):
         )
         self.admin_user.is_staff = True
         self.admin_user.save()
+        perms = Permission.objects.filter(
+            codename__in=["change_usuario", "delete_usuario"]
+        )
+        self.admin_user.user_permissions.set(perms)
         self.admin_user.empresas.add(self.empresa1)
+
+        self.user_empresa1 = User.objects.create_user(
+            username="user1", email="user1@example.com", password="pass"
+        )
+        self.user_empresa1.empresas.add(self.empresa1)
+
+        self.user_empresa2 = User.objects.create_user(
+            username="user2", email="user2@example.com", password="pass"
+        )
+        self.user_empresa2.empresas.add(self.empresa2)
+
         self.usuario_admin = UsuarioAdmin(User, tenant_admin_site)
 
     def _get_request(self):
@@ -73,3 +89,21 @@ class UsuarioAdminPermissionsTests(TestCase):
         new_user.empresas.add(self.empresa2)
         self.usuario_admin.save_model(request, new_user, form=None, change=False)
         self.assertEqual(list(new_user.empresas.all()), [self.empresa1])
+
+    def test_change_permission_respects_empresa(self):
+        request = self._get_request()
+        self.assertTrue(
+            self.usuario_admin.has_change_permission(request, obj=self.user_empresa1)
+        )
+        self.assertFalse(
+            self.usuario_admin.has_change_permission(request, obj=self.user_empresa2)
+        )
+
+    def test_delete_permission_respects_empresa(self):
+        request = self._get_request()
+        self.assertTrue(
+            self.usuario_admin.has_delete_permission(request, obj=self.user_empresa1)
+        )
+        self.assertFalse(
+            self.usuario_admin.has_delete_permission(request, obj=self.user_empresa2)
+        )
