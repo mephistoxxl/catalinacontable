@@ -3995,9 +3995,6 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
         conf = None
         if empresa:
             conf = Opciones.objects.filter(empresa=empresa).first()
-        # Si no existe para la empresa, tomar cualquier existente (legacy sin empresa asociada)
-        if not conf:
-            conf = Opciones.objects.first()
         # Crear automática si no existe nada
         if not conf and empresa:
             conf = Opciones.objects.create(
@@ -4015,9 +4012,11 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
 
         # Usar el formulario con instance para evitar set manual campo por campo
         # Como OpcionesFormulario es forms.Form (no ModelForm) cargamos valores vía initial
-        identificacion = conf.identificacion
-        if not identificacion or identificacion == '0000000000000':
-            identificacion = getattr(empresa, 'ruc', None) or request.user.username
+        identificacion = getattr(empresa, 'ruc', None)
+        if conf.identificacion and conf.identificacion != '0000000000000':
+            identificacion = conf.identificacion
+        if not identificacion:
+            identificacion = request.user.username
 
         initial = {
             'identificacion': identificacion,
@@ -4047,8 +4046,6 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
         conf = None
         if empresa:
             conf = Opciones.objects.filter(empresa=empresa).first()
-        if not conf:
-            conf = Opciones.objects.first()
         if not conf and empresa:
             conf = Opciones.objects.create(
                 empresa=empresa,
@@ -4058,6 +4055,9 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
                 correo='configurar@empresa.com',
                 telefono='0000000000'
             )
+        if not conf:
+            messages.error(request, 'No hay empresa ni configuración creada.')
+            return HttpResponseRedirect('/')
         form = OpcionesFormulario(request.POST, request.FILES)
         if form.is_valid():
             # Asignar manual porque no es ModelForm
