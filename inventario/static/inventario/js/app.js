@@ -1648,16 +1648,8 @@ function validarTodo(tipo)
 	if(tipo == 'opciones')
 	{
 		let moneda = document.getElementById('moneda')
-		let valor_iva = document.getElementById('valor_iva')	
-		let mensaje_factura = document.getElementById('mensaje_factura')
-		let nombre_negocio = document.getElementById('nombre_negocio')	
-
-		if( (isNaN(parseFloat(valor_iva.value)) ) )
-		{
-			error = true
-			mensaje += "<p class='" + claseErrores +"'>" +
-			 "-En el campo de IVA solo pueden ir digitos. </p>"			
-		}
+                let mensaje_factura = document.getElementById('mensaje_factura')
+                let nombre_negocio = document.getElementById('nombre_negocio')
 
 		if( (moneda.value.length) > 20 )
 		{

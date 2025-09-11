@@ -216,11 +216,11 @@
             <td><strong>$ 0.00</strong></td>
         </tr>
         <tr>
-            <td><strong>SUBTOTAL {{ opciones.valor_iva }}%:</strong></td>
+            <td><strong>SUBTOTAL IVA:</strong></td>
             <td><strong>$ {{ factura.base_imponible|floatformat:2 }}</strong></td>
         </tr>
         <tr>
-            <td><strong>IVA {{ opciones.valor_iva }}%:</strong></td>
+            <td><strong>IVA:</strong></td>
             <td><strong>$ {{ factura.monto_general|sub:factura.sub_monto|floatformat:2 }}</strong></td>
         </tr>
         <tr>
