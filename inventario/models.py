@@ -360,7 +360,7 @@ class Opciones(models.Model):
         if '[CONFIGURAR' in self.direccion_establecimiento:
             raise ValidationError('Debe configurar la dirección')
         
-        if self.correo == 'pendiente@empresa.com':
+        if self.pk and self.correo == 'pendiente@empresa.com':
             raise ValidationError('Debe configurar un email válido')
         
         # Validar campos condicionales
