@@ -10,7 +10,6 @@
     </object>
     <object model="inventario.opciones" pk="1">
         <field name="moneda" type="CharField">bs</field>
-        <field name="valor_iva" type="IntegerField">16</field>
         <field name="nombre_negocio" type="CharField"><None></None></field>
         <field name="mensaje_factura" type="TextField"><None></None></field>
     </object>
@@ -65,42 +64,36 @@
         <field name="fecha" type="DateField">2016-02-11</field>
         <field name="sub_monto" type="DecimalField">80.00</field>
         <field name="monto_general" type="DecimalField">80.00</field>
-        <field name="iva" rel="ManyToOneRel" to="inventario.opciones">16</field>
     </object>
     <object model="inventario.factura" pk="6">
         <field name="cliente" rel="ManyToOneRel" to="inventario.cliente">2617816489</field>
         <field name="fecha" type="DateField">2016-02-11</field>
         <field name="sub_monto" type="DecimalField">312.00</field>
         <field name="monto_general" type="DecimalField">361.92</field>
-        <field name="iva" rel="ManyToOneRel" to="inventario.opciones">16</field>
     </object>
     <object model="inventario.factura" pk="8">
         <field name="cliente" rel="ManyToOneRel" to="inventario.cliente">2617816489</field>
         <field name="fecha" type="DateField">2016-02-11</field>
         <field name="sub_monto" type="DecimalField">216.00</field>
         <field name="monto_general" type="DecimalField">250.56</field>
-        <field name="iva" rel="ManyToOneRel" to="inventario.opciones">16</field>
     </object>
     <object model="inventario.factura" pk="10">
         <field name="cliente" rel="ManyToOneRel" to="inventario.cliente">2617816489</field>
         <field name="fecha" type="DateField">2016-02-11</field>
         <field name="sub_monto" type="DecimalField">108.00</field>
         <field name="monto_general" type="DecimalField">125.28</field>
-        <field name="iva" rel="ManyToOneRel" to="inventario.opciones">16</field>
     </object>
     <object model="inventario.factura" pk="11">
         <field name="cliente" rel="ManyToOneRel" to="inventario.cliente">2617816489</field>
         <field name="fecha" type="DateField">2016-02-11</field>
         <field name="sub_monto" type="DecimalField">392.00</field>
         <field name="monto_general" type="DecimalField">454.72</field>
-        <field name="iva" rel="ManyToOneRel" to="inventario.opciones">16</field>
     </object>
     <object model="inventario.factura" pk="14">
         <field name="cliente" rel="ManyToOneRel" to="inventario.cliente">2617816489</field>
         <field name="fecha" type="DateField">2016-02-12</field>
         <field name="sub_monto" type="DecimalField">624.00</field>
         <field name="monto_general" type="DecimalField">659.84</field>
-        <field name="iva" rel="ManyToOneRel" to="inventario.opciones">16</field>
     </object>
     <object model="inventario.detallefactura" pk="1">
         <field name="id_factura" rel="ManyToOneRel" to="inventario.factura">5</field>
@@ -185,7 +178,6 @@
         <field name="fecha" type="DateField">2016-02-12</field>
         <field name="sub_monto" type="DecimalField">56.00</field>
         <field name="monto_general" type="DecimalField">64.96</field>
-        <field name="iva" rel="ManyToOneRel" to="inventario.opciones">16</field>
         <field name="presente" type="BooleanField">True</field>
     </object>
     <object model="inventario.pedido" pk="4">
@@ -193,7 +185,6 @@
         <field name="fecha" type="DateField">2016-02-11</field>
         <field name="sub_monto" type="DecimalField">70.00</field>
         <field name="monto_general" type="DecimalField">81.20</field>
-        <field name="iva" rel="ManyToOneRel" to="inventario.opciones">16</field>
         <field name="presente" type="BooleanField">True</field>
     </object>
     <object model="inventario.detallepedido" pk="4">

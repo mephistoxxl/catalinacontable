@@ -148,7 +148,6 @@
       "imagen": "logos/LOGO_MQV6vxX.jpg",
       "es_agente_retencion": false,
       "numero_agente_retencion": null,
-      "valor_iva": 15,
       "moneda": "USD",
       "nombre_negocio": "Mi negocio",
       "mensaje_factura": "l",
