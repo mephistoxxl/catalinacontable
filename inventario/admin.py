@@ -200,6 +200,26 @@ class UsuarioAdmin(UserAdmin):
             if tenant is not None:
                 obj.empresas.set([tenant])
 
+    def has_change_permission(self, request, obj=None):  # type: ignore[override]
+        has_perm = super().has_change_permission(request, obj)
+        if not has_perm:
+            return False
+        if obj is not None and not request.user.is_superuser:
+            tenant = getattr(request, "tenant", None)
+            if tenant is not None and tenant not in obj.empresas.all():
+                return False
+        return True
+
+    def has_delete_permission(self, request, obj=None):  # type: ignore[override]
+        has_perm = super().has_delete_permission(request, obj)
+        if not has_perm:
+            return False
+        if obj is not None and not request.user.is_superuser:
+            tenant = getattr(request, "tenant", None)
+            if tenant is not None and tenant not in obj.empresas.all():
+                return False
+        return True
+
 
 tenant_admin_site.register(Usuario, UsuarioAdmin)
 class RootUserAdmin(UserAdmin):
