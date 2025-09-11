@@ -1,13 +1,17 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.admin import AdminSite
 from django.apps import apps
 from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth import get_user_model
+from django import forms
 from django.template.response import TemplateResponse
 from django.urls import NoReverseMatch, reverse
 from django.utils.text import capfirst
+from django.conf import settings
+from django.core.mail import send_mail
 
 from .forms import LoginFormulario
-from .models import Usuario, Empresa
+from .models import Usuario, Empresa, UsuarioEmpresa
 
 
 class RootAdminSite(AdminSite):
@@ -159,6 +163,53 @@ class TenantModelAdmin(admin.ModelAdmin):
         return qs.filter(empresa=tenant)
 
 
+class EmpresaAdminForm(forms.ModelForm):
+    username = forms.CharField(max_length=150)
+    email = forms.EmailField()
+    password = forms.CharField(required=False, widget=forms.PasswordInput)
+
+    class Meta:
+        model = Empresa
+        fields = "__all__"
+
+
+class EmpresaAdmin(admin.ModelAdmin):
+    form = EmpresaAdminForm
+
+    def get_form(self, request, obj=None, **kwargs):  # type: ignore[override]
+        form = super().get_form(request, obj, **kwargs)
+        if obj is not None:
+            for field in ["username", "email", "password"]:
+                form.base_fields[field].required = False
+        return form
+
+    def save_model(self, request, obj, form, change):  # type: ignore[override]
+        creating = not change
+        super().save_model(request, obj, form, change)
+        if creating:
+            User = get_user_model()
+            username = form.cleaned_data.get("username")
+            email = form.cleaned_data.get("email")
+            password = form.cleaned_data.get("password") or User.objects.make_random_password()
+            usuario = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+            )
+            UsuarioEmpresa.objects.create(usuario=usuario, empresa=obj)
+            send_mail(
+                "Credenciales de acceso",
+                f"Usuario: {username}\nContraseña: {password}",
+                getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@example.com"),
+                [email],
+                fail_silently=True,
+            )
+            messages.info(
+                request,
+                f"Usuario {username} creado. Se enviaron las credenciales a {email}.",
+            )
+
+
 class UsuarioAdmin(UserAdmin):
     add_form = LoginFormulario
     model = Usuario
@@ -251,7 +302,7 @@ class RootUserAdmin(UserAdmin):
 
 
 root_admin_site.register(Usuario, RootUserAdmin)
-root_admin_site.register(Empresa)
+root_admin_site.register(Empresa, EmpresaAdmin)
 
 
 for model in apps.get_app_config("inventario").get_models():
