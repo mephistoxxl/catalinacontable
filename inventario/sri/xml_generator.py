@@ -217,7 +217,7 @@ class SRIXMLGenerator:
             if (getattr(emisor, 'identificacion', '0000000000000') == '0000000000000' or 
                 '[CONFIGURAR' in getattr(emisor, 'razon_social', '') or
                 '[CONFIGURAR' in getattr(emisor, 'direccion_establecimiento', '') or
-                getattr(emisor, 'correo', 'configurar@empresa.com') == 'configurar@empresa.com' or
+                getattr(emisor, 'correo', 'pendiente@empresa.com') == 'pendiente@empresa.com' or
                 getattr(emisor, 'telefono', '0000000000') == '0000000000'):
                 raise ValueError("La configuración de empresa está incompleta")
             
@@ -247,7 +247,7 @@ class SRIXMLGenerator:
                 if (getattr(emisor, 'identificacion', '0000000000000') == '0000000000000' or 
                     '[CONFIGURAR' in getattr(emisor, 'razon_social', '') or
                     '[CONFIGURAR' in getattr(emisor, 'direccion_establecimiento', '') or
-                    getattr(emisor, 'correo', 'configurar@empresa.com') == 'configurar@empresa.com' or
+                    getattr(emisor, 'correo', 'pendiente@empresa.com') == 'pendiente@empresa.com' or
                     getattr(emisor, 'telefono', '0000000000') == '0000000000'):
                     raise ValueError("La configuración de empresa está incompleta")
             

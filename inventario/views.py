@@ -4026,7 +4026,7 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
                 razon_social='PENDIENTE',
                 nombre_comercial='PENDIENTE',
                 direccion_establecimiento='PENDIENTE',
-                correo='configurar@empresa.com',
+                correo='pendiente@empresa.com',
                 telefono='0000000000',
             )
 
@@ -4078,7 +4078,7 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
                 razon_social='PENDIENTE',
                 nombre_comercial='PENDIENTE',
                 direccion_establecimiento='PENDIENTE',
-                correo='configurar@empresa.com',
+                correo='pendiente@empresa.com',
                 telefono='0000000000',
             )
         if not conf:
@@ -5244,7 +5244,7 @@ class FirmaElectronicaView(LoginRequiredMixin, View):
                 identificacion=empresa.ruc,
                 razon_social=getattr(empresa, 'razon_social', '[CONFIGURAR RAZÓN SOCIAL]'),
                 direccion_establecimiento='[CONFIGURAR DIRECCIÓN]',
-                correo='configurar@empresa.com',
+                correo='pendiente@empresa.com',
                 telefono='0000000000'
             )
             try:
@@ -5284,7 +5284,7 @@ class FirmaElectronicaView(LoginRequiredMixin, View):
                 identificacion=empresa.ruc,
                 razon_social=getattr(empresa, 'razon_social', '[CONFIGURAR RAZÓN SOCIAL]'),
                 direccion_establecimiento='[CONFIGURAR DIRECCIÓN]',
-                correo='configurar@empresa.com',
+                correo='pendiente@empresa.com',
                 telefono='0000000000'
             )
             try:
