@@ -369,54 +369,14 @@ class Opciones(models.Model):
         
         if self.es_agente_retencion and not self.numero_agente_retencion:
             raise ValidationError('Si es agente de retención, debe ingresar el número de resolución')
-        
+
         # Limpiar campos condicionales si no aplican
         if not self.es_contribuyente_especial:
             self.numero_contribuyente_especial = None
-        
+
         if not self.es_agente_retencion:
             self.numero_agente_retencion = None
-    
-def save(self, *args, **kwargs):
-    import logging
-    import os
-    logger = logging.getLogger(__name__)
-    is_new_file = False
-    if self.pk:
-        old = Opciones.objects.for_tenant(self.empresa).filter(pk=self.pk).first()
-        if old and old.firma_electronica != self.firma_electronica:
-            is_new_file = True
-    else:
-        is_new_file = True
 
-    # Guarda primero para asegurar que el archivo esté en disco
-    super().save(*args, **kwargs)
-
-    # Solo procesar si hay archivo y contraseña, y si el archivo es nuevo o la fecha no está
-    if self.firma_electronica and self.password_firma and (is_new_file or not self.fecha_caducidad_firma):
-        try:
-            from cryptography.hazmat.primitives.serialization import pkcs12
-            from cryptography.hazmat.backends import default_backend
-            if os.path.exists(self.firma_electronica.path):
-                with self.firma_electronica.open('rb') as f:
-                    p12_data = f.read()
-                password = self.password_firma.encode()
-                private_key, certificate, additional_certificates = pkcs12.load_key_and_certificates(
-                    p12_data, password, backend=default_backend()
-                )
-                if certificate:
-                    self.fecha_caducidad_firma = certificate.not_valid_after.date()
-                    # Actualiza solo la fecha sin recursión infinita
-                    Opciones.objects.filter(pk=self.pk).update(fecha_caducidad_firma=self.fecha_caducidad_firma)
-            else:
-                logger.error("El archivo de firma electrónica no existe en disco.")
-        except Exception as e:
-            logger.error(f"Error procesando la firma electrónica: {e}")
-            # No actualiza la fecha si hay error
-            pass
-        self.full_clean()
-        super().save(*args, **kwargs)
-    
     @property
     def esta_configurado(self):
         """Verifica si la empresa está completamente configurada"""
