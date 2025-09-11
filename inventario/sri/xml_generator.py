@@ -205,9 +205,13 @@ class SRIXMLGenerator:
             
             # Obtener datos del emisor desde Opciones
             from inventario.models import Opciones
-            emisor = Opciones.objects.first()
+            empresa = getattr(factura, 'empresa', None)
+            emisor = Opciones.objects.for_tenant(empresa).first()
             if not emisor:
-                raise ValueError("No existe configuración de empresa (Opciones)")
+                if empresa:
+                    emisor = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
+                else:
+                    raise ValueError("No existe configuración de empresa (Opciones)")
             
             # Verificar configuración del emisor
             if (getattr(emisor, 'identificacion', '0000000000000') == '0000000000000' or 

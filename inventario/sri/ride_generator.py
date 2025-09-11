@@ -478,7 +478,10 @@ class RIDEGenerator:
             
             # Obtener configuración de empresa
             from inventario.models import Opciones
-            empresa_config = Opciones.objects.first()
+            empresa = getattr(factura, 'empresa', None)
+            empresa_config = Opciones.objects.for_tenant(empresa).first()
+            if not empresa_config and empresa:
+                empresa_config = Opciones.objects.create(empresa=empresa, identificacion=getattr(empresa, 'ruc', '0000000000000'))
             empresa_telefono = getattr(empresa_config, 'telefono', 'N/A') if empresa_config else 'N/A'
             empresa_correo = getattr(empresa_config, 'correo', 'N/A') if empresa_config else 'N/A'
             
@@ -663,7 +666,10 @@ class RIDEGenerator:
         from inventario.models import Opciones
         
         detalles = factura.detallefactura_set.all()
-        opciones = Opciones.objects.first()
+        empresa = getattr(factura, 'empresa', None)
+        opciones = Opciones.objects.for_tenant(empresa).first()
+        if not opciones and empresa:
+            opciones = Opciones.objects.create(empresa=empresa, identificacion=getattr(empresa, 'ruc', '0000000000000'))
         
         # Generar nombre de archivo y ruta
         if output_dir is None:

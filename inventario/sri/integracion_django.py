@@ -504,14 +504,20 @@ class SRIIntegration:
         tipo_comprobante = '01'  # Factura
         
         # Obtener RUC desde configuración
-        opciones = Opciones.objects.first()
-        if not opciones or not opciones.identificacion:
-            raise ValueError("RUC no configurado en Opciones")
+        empresa = getattr(factura, 'empresa', None)
+        opciones = Opciones.objects.for_tenant(empresa).first()
+        if not opciones:
+            if empresa:
+                opciones = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
+            else:
+                raise ValueError("RUC no configurado en Opciones")
         ruc = opciones.identificacion.zfill(13)
         
         # 🔄 SINCRONIZAR con Opciones.tipo_ambiente
         try:
-            opciones = Opciones.objects.first()
+            opciones = Opciones.objects.for_tenant(empresa).first()
+            if not opciones and empresa:
+                opciones = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
             if opciones and opciones.tipo_ambiente in ['1', '2']:
                 ambiente = opciones.tipo_ambiente
             else:
@@ -756,7 +762,10 @@ class SRIIntegration:
                 pdf_content = pdf_file.read()
             
             # Obtener RUC para organizar archivos
-            opciones = Opciones.objects.first()
+            empresa = getattr(factura, 'empresa', None)
+            opciones = Opciones.objects.for_tenant(empresa).first()
+            if not opciones and empresa:
+                opciones = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
             ruc = opciones.identificacion if opciones else 'sin_ruc'
             
             # Guardar RIDE
@@ -793,9 +802,13 @@ class SRIIntegration:
                 if factura.estado_sri != 'AUTORIZADA':
                     return {'success': False, 'message': 'La factura no está autorizada'}
 
-            opciones = Opciones.objects.first()
+            empresa = getattr(factura, 'empresa', None)
+            opciones = Opciones.objects.for_tenant(empresa).first()
             if not opciones:
-                return {'success': False, 'message': 'No se encontraron opciones de empresa'}
+                if empresa:
+                    opciones = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
+                else:
+                    return {'success': False, 'message': 'No se encontraron opciones de empresa'}
 
             # Asegurar existencia de RIDE autorizado
             if not getattr(factura, 'ride_autorizado'):
