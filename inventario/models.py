@@ -61,6 +61,11 @@ class Usuario(AbstractUser):
             usuarios = usuarios.filter(is_superuser=False)
         return int(usuarios.distinct().count())
 
+    def delete(self, *args, **kwargs):  # type: ignore[override]
+        if getattr(self, "is_protected", False):
+            raise PermissionDenied("Cannot delete a protected user.")
+        return super().delete(*args, **kwargs)
+
 
 @receiver(post_save, sender=Usuario)
 def assign_default_group(sender, instance, created, **kwargs):
@@ -69,7 +74,7 @@ def assign_default_group(sender, instance, created, **kwargs):
         group, _ = Group.objects.get_or_create(name=group_name)
         instance.groups.add(group)
 
-from django.core.exceptions import ValidationError  # ← Y ESTA TAMBIÉN
+from django.core.exceptions import ValidationError, PermissionDenied  # ← Y ESTA TAMBIÉN
 
 
 class Empresa(models.Model):

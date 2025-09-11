@@ -175,8 +175,27 @@ class UsuarioAdmin(UserAdmin):
 
 
 tenant_admin_site.register(Usuario, UsuarioAdmin)
+class RootUserAdmin(UserAdmin):
+    """User admin for the root site protecting the root user."""
 
-root_admin_site.register(Usuario, UserAdmin)
+    def _is_root(self, obj):
+        return obj and (
+            getattr(obj, "is_protected", False)
+            or getattr(obj, "username", "") == "root"
+        )
+
+    def has_delete_permission(self, request, obj=None):  # type: ignore[override]
+        if self._is_root(obj):
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def has_change_permission(self, request, obj=None):  # type: ignore[override]
+        if self._is_root(obj):
+            return False
+        return super().has_change_permission(request, obj)
+
+
+root_admin_site.register(Usuario, RootUserAdmin)
 root_admin_site.register(Empresa)
 
 
