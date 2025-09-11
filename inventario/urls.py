@@ -130,10 +130,11 @@ urlpatterns = [
     path('listarServicios', views.ListarServicios.as_view(), name='listarServicios'),
     path('agregarServicio', views.AgregarServicio.as_view(), name='agregarServicio'),
     path('editarServicio/<int:p>', views.EditarServicio.as_view(), name='editarServicio'),
-    path('eliminarServicio/<int:p>', views.EliminarServicio.as_view(), name='eliminarServicio'), 
-    
+    path('eliminarServicio/<int:p>', views.EliminarServicio.as_view(), name='eliminarServicio'),
+
     #para consultar RUC empresa
     path('buscar_empresa/', views.buscar_empresa, name='buscar_empresa'),
+    path('api/empresa/<str:ruc>/', views.empresa_api, name='empresa_api'),
 
     # ✅ NUEVAS URLs PARA INTEGRACIÓN SRI COMPLETA
     path('sri/enviar/<int:factura_id>/', views.enviar_documento_sri, name='enviar_documento_sri'),

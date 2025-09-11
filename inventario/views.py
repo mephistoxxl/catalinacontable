@@ -4000,23 +4000,36 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
     redirect_field_name = None
     
     def get(self, request):
-        # Obtener la empresa activa desde la sesión
+        # Obtener la empresa activa desde la sesión o crearla
         empresa_id = request.session.get('empresa_activa')
         empresa = Empresa.objects.filter(id=empresa_id).first()
+        if not empresa:
+            ruc_usuario = request.user.username
+            if re.fullmatch(r"\d{13}", ruc_usuario):
+                empresa = Empresa.objects.create(
+                    ruc=ruc_usuario,
+                    razon_social="PENDIENTE",
+                )
+                UsuarioEmpresa.objects.get_or_create(usuario=request.user, empresa=empresa)
+                request.session['empresa_activa'] = empresa.id
+
         # Intentar obtener configuración ligada a la empresa
         conf = None
         if empresa:
             conf = Opciones.objects.filter(empresa=empresa).first()
+
         # Crear automática si no existe nada
         if not conf and empresa:
             conf = Opciones.objects.create(
                 empresa=empresa,
                 identificacion=getattr(empresa, 'ruc', '0000000000000') or '0000000000000',
-                razon_social=getattr(empresa, 'razon_social', '[CONFIGURAR RAZÓN SOCIAL]'),
-                direccion_establecimiento='[CONFIGURAR DIRECCIÓN]',
-                correo='configurar@empresa.com',
-                telefono='0000000000'
+                razon_social='PENDIENTE',
+                nombre_comercial='PENDIENTE',
+                direccion_establecimiento='PENDIENTE',
+                correo='',
+                telefono='',
             )
+
         # Si aún no hay (ni empresa), error simple
         if not conf:
             messages.error(request, 'No hay empresa ni configuración creada.')
@@ -4062,10 +4075,11 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
             conf = Opciones.objects.create(
                 empresa=empresa,
                 identificacion=getattr(empresa, 'ruc', '0000000000000') or '0000000000000',
-                razon_social=getattr(empresa, 'razon_social', '[CONFIGURAR RAZÓN SOCIAL]'),
-                direccion_establecimiento='[CONFIGURAR DIRECCIÓN]',
-                correo='configurar@empresa.com',
-                telefono='0000000000'
+                razon_social='PENDIENTE',
+                nombre_comercial='PENDIENTE',
+                direccion_establecimiento='PENDIENTE',
+                correo='',
+                telefono='',
             )
         if not conf:
             messages.error(request, 'No hay empresa ni configuración creada.')
@@ -4094,6 +4108,10 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
                 conf.imagen = imagen
             conf.empresa = empresa
             conf.save()
+            if empresa:
+                empresa.ruc = conf.identificacion
+                empresa.razon_social = conf.razon_social or 'PENDIENTE'
+                empresa.save(update_fields=['ruc', 'razon_social'])
             messages.success(request, 'Configuración actualizada exitosamente!')
             return redirect('inventario:panel')
         contexto = complementarContexto({'form': form, 'configuracion': conf}, request.user)
@@ -5484,7 +5502,42 @@ class EliminarServicio(LoginRequiredMixin, View):
         servicio = get_object_or_404(Servicio, pk=p)
         servicio.delete()
         return redirect('inventario:listarServicios')
-    
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def empresa_api(request, ruc):
+    """Endpoint para consultar información de una empresa por RUC."""
+    if not ruc:
+        return JsonResponse({'error': True, 'message': 'El RUC es requerido'}, status=400)
+    try:
+        from services import consultar_identificacion as servicio_consultar_identificacion
+        resultado = servicio_consultar_identificacion(ruc)
+
+        razon_social = resultado.get('razon_social', '')
+        nombre_comercial = resultado.get('nombre_comercial', '')
+        direccion = resultado.get('direccion', '')
+        tipo_regimen = resultado.get('tipo_regimen')
+        obligado_contabilidad = resultado.get('obligado_contabilidad', 'NO')
+
+        respuesta = {
+            'error': False,
+            'razon_social': razon_social,
+            'nombre_comercial': nombre_comercial,
+            'direccion': direccion,
+            'correo': resultado.get('email', ''),
+            'telefono': resultado.get('telefono', ''),
+            'obligado_contabilidad': obligado_contabilidad,
+            'actividad_economica': resultado.get('actividad_economica', ''),
+        }
+        if tipo_regimen:
+            respuesta['tipo_regimen'] = tipo_regimen
+
+        return JsonResponse(respuesta, status=resultado.get('status_code', 200))
+    except Exception as e:
+        logger.error(f"Error en empresa_api: {e}")
+        return JsonResponse({'error': True, 'message': f'Error consultando API externa: {e}'}, status=500)
+
 
 @csrf_exempt
 @require_http_methods(["GET"])
