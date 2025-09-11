@@ -43,7 +43,7 @@ class Migration(migrations.Migration):
                 ('fecha', models.DateField()),
                 ('sub_monto', models.DecimalField(decimal_places=2, max_digits=9)),
                 ('monto_general', models.DecimalField(decimal_places=2, max_digits=9)),
-                ('iva', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventario.Opciones', to_field='valor_iva')),
+                ('iva', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventario.Opciones')),
             ],
         ),
         migrations.CreateModel(
@@ -69,7 +69,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='factura',
             name='iva',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventario.Opciones', to_field='valor_iva'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventario.Opciones'),
         ),
         migrations.AlterField(
             model_name='producto',
