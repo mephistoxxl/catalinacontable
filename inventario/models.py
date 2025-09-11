@@ -230,8 +230,8 @@ class Opciones(models.Model):
     )
     
     correo = models.EmailField(
-        max_length=100, 
-        default='configurar@empresa.com',
+        max_length=100,
+        default='pendiente@empresa.com',
         help_text='Email principal de su empresa'
     )
     
@@ -360,7 +360,7 @@ class Opciones(models.Model):
         if '[CONFIGURAR' in self.direccion_establecimiento:
             raise ValidationError('Debe configurar la dirección')
         
-        if self.correo == 'configurar@empresa.com':
+        if self.correo == 'pendiente@empresa.com':
             raise ValidationError('Debe configurar un email válido')
         
         # Validar campos condicionales
@@ -424,7 +424,7 @@ def save(self, *args, **kwargs):
             self.identificacion != '0000000000000' and
             '[CONFIGURAR' not in self.razon_social and
             '[CONFIGURAR' not in self.direccion_establecimiento and
-            self.correo != 'configurar@empresa.com' and
+            self.correo != 'pendiente@empresa.com' and
             self.telefono != '0000000000'
         )
     
@@ -1308,7 +1308,7 @@ class Factura(models.Model):
             getattr(opciones, 'identificacion', '0000000000000') == '0000000000000' or
             '[CONFIGURAR' in getattr(opciones, 'razon_social', '') or
             '[CONFIGURAR' in getattr(opciones, 'direccion_establecimiento', '') or
-            getattr(opciones, 'correo', 'configurar@empresa.com') == 'configurar@empresa.com' or
+            getattr(opciones, 'correo', 'pendiente@empresa.com') == 'pendiente@empresa.com' or
             getattr(opciones, 'telefono', '0000000000') == '0000000000'):
             errores.append("Falta configurar datos de la empresa")
         
