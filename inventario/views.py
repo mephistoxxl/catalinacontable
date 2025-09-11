@@ -4026,8 +4026,8 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
                 razon_social='PENDIENTE',
                 nombre_comercial='PENDIENTE',
                 direccion_establecimiento='PENDIENTE',
-                correo='',
-                telefono='',
+                correo='configurar@empresa.com',
+                telefono='0000000000',
             )
 
         # Si aún no hay (ni empresa), error simple
@@ -4078,8 +4078,8 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
                 razon_social='PENDIENTE',
                 nombre_comercial='PENDIENTE',
                 direccion_establecimiento='PENDIENTE',
-                correo='',
-                telefono='',
+                correo='configurar@empresa.com',
+                telefono='0000000000',
             )
         if not conf:
             messages.error(request, 'No hay empresa ni configuración creada.')
