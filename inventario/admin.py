@@ -173,6 +173,33 @@ class UsuarioAdmin(UserAdmin):
             return qs.none()
         return qs.filter(empresas=tenant, is_superuser=False)
 
+    def get_form(self, request, obj=None, **kwargs):  # type: ignore[override]
+        form = super().get_form(request, obj, **kwargs)
+        if not request.user.is_superuser:
+            for field in ["is_superuser", "groups", "user_permissions"]:
+                if field in form.base_fields:
+                    form.base_fields.pop(field)
+        return form
+
+    def formfield_for_manytomany(self, db_field, request, **kwargs):  # type: ignore[override]
+        if db_field.name == "empresas":
+            tenant = getattr(request, "tenant", None)
+            if tenant is not None:
+                kwargs["queryset"] = Empresa.objects.filter(pk=tenant.pk)
+                kwargs["initial"] = [tenant]
+                form_field = super().formfield_for_manytomany(db_field, request, **kwargs)
+                if not request.user.is_superuser:
+                    form_field.disabled = True
+                return form_field
+        return super().formfield_for_manytomany(db_field, request, **kwargs)
+
+    def save_model(self, request, obj, form, change):  # type: ignore[override]
+        super().save_model(request, obj, form, change)
+        if not obj.is_superuser:
+            tenant = getattr(request, "tenant", None)
+            if tenant is not None:
+                obj.empresas.set([tenant])
+
 
 tenant_admin_site.register(Usuario, UsuarioAdmin)
 class RootUserAdmin(UserAdmin):
