@@ -152,6 +152,7 @@ SECURE_REFERRER_POLICY = os.environ.get('SECURE_REFERRER_POLICY', 'same-origin')
 SECURE_CONTENT_TYPE_NOSNIFF = os.environ.get('SECURE_CONTENT_TYPE_NOSNIFF', 'True') == 'True'
 SECURE_BROWSER_XSS_FILTER = os.environ.get('SECURE_BROWSER_XSS_FILTER', 'True') == 'True'
 # Permite forzar HTTPS mediante una variable de entorno dedicada
+# Establecer en True solo en entornos con HTTPS
 FORCE_SSL = os.environ.get('FORCE_SSL', 'False').lower() == 'true'
 
 # Application definition
@@ -229,8 +230,8 @@ if not DEBUG:
         # Reconoce el encabezado enviado por el proxy para detectar HTTPS
         SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = FORCE_SSL
+    CSRF_COOKIE_SECURE = FORCE_SSL
     SECURE_HSTS_SECONDS = 31536000
 
 
