@@ -21,5 +21,5 @@ urlpatterns = [
     path('admin/', root_admin_site.urls),
     path('<str:tenant>/admin/', tenant_admin_site.urls),
     path('inventario/', include('inventario.urls')),
-    path('', RedirectView.as_view(url='/inventario/login')),
+    path('', RedirectView.as_view(pattern_name='inventario:login', permanent=False)),
 ]
