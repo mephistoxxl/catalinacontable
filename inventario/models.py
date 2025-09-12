@@ -68,11 +68,16 @@ class Usuario(AbstractUser):
 
 
 @receiver(post_save, sender=Usuario)
-def assign_default_group(sender, instance, created, **kwargs):
-    if created:
-        group_name = 'Administrador' if instance.is_superuser else 'Usuario'
-        group, _ = Group.objects.get_or_create(name=group_name)
-        instance.groups.add(group)
+def assign_default_group(sender, instance, **kwargs):
+    """Ensure the user belongs to the proper default group.
+
+    Every time a ``Usuario`` is saved we clear its current groups and assign
+    the appropriate default one based on the ``is_superuser`` flag. This keeps
+    the group membership in sync even when ``is_superuser`` changes.
+    """
+    group_name = "Administrador" if instance.is_superuser else "Usuario"
+    group, _ = Group.objects.get_or_create(name=group_name)
+    instance.groups.set([group])
 
 from django.core.exceptions import ValidationError, PermissionDenied  # ← Y ESTA TAMBIÉN
 
