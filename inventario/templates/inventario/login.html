@@ -8,18 +8,18 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
-<body class="bg-white h-screen flex items-center justify-center p-2 overflow-hidden">
+<body class="bg-white min-h-screen flex items-center justify-center p-2">
     <div class="w-full max-w-sm">
         <!-- Logo -->
-        <div class="w-full border-t border-l border-r border-black rounded-t-3xl p-4 text-center bg-black">
+        <div class="w-full border-t border-l border-r border-black rounded-t-3xl p-2 text-center bg-black">
             {% load static %}
-            <img src="{% static 'inventario/assets/logo/logo2.png' %}" alt="Logo" class="mx-auto h-28 w-auto">
+            <img src="{% static 'inventario/assets/logo/logo2.png' %}" alt="Logo" class="mx-auto h-16 w-auto">
             <h2 class="mt-2 text-xl font-bold text-white">ALP FACT</h2>
             <p class="text-sm text-gray-300">Inicia sesión para continuar</p>
         </div>
 
         <!-- Login Card -->
-        <div class="bg-white rounded-b-3xl shadow-xl p-4">
+        <div class="bg-white rounded-b-3xl shadow-xl p-2">
             {% if messages %}
             <div class="space-y-2 mb-2">
                 {% for message in messages %}
@@ -50,7 +50,7 @@
                 </ul>
             </div>
             {% endif %}
-            <form id="login-form" method="POST" class="space-y-6">
+            <form id="login-form" method="POST" class="space-y-4">
                 {% csrf_token %}
                 
                 <!-- Identification Field -->
@@ -62,7 +62,7 @@
                     <input type="text"
                            name="{{ form.identificacion.name }}"
                            id="{{ form.identificacion.id_for_label }}"
-                           class="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent transition duration-200 text-sm"
+                           class="w-full px-3 py-1 border border-gray-300 bg-white rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent transition duration-200 text-sm"
                            placeholder="Ingrese su identificación"
                            required>
                     {% if form.identificacion.errors %}
@@ -100,7 +100,7 @@
                     <input type="password" 
                            name="{{ form.password.name }}" 
                            id="{{ form.password.id_for_label }}" 
-                           class="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent transition duration-200 text-sm"
+                           class="w-full px-3 py-1 border border-gray-300 bg-white rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent transition duration-200 text-sm"
                            placeholder="Ingrese su contraseña"
                            required>
                     {% if form.password.errors %}
@@ -125,7 +125,7 @@
 
                 <!-- Submit Button -->
                 <button type="submit" 
-                        class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition duration-200 transform hover:scale-105 text-sm rounded-xl">
+                        class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-1.5 px-3 rounded-lg transition duration-200 transform hover:scale-105 text-sm rounded-xl">
                     <i class="fas fa-sign-in-alt mr-1"></i>
                     Iniciar sesión
                 </button>
