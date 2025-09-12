@@ -28,7 +28,17 @@ class Usuario(AbstractUser):
     email = models.EmailField(max_length=100, unique=True)
     first_name = models.CharField(max_length=40)
     last_name = models.CharField(max_length=60)
-    nivel = models.IntegerField(null=True)
+    ROOT = 2
+    ADMIN = 1
+    USER = 0
+
+    NIVELES = [
+        (ROOT, "Raíz"),
+        (ADMIN, "Administrador"),
+        (USER, "Usuario"),
+    ]
+
+    nivel = models.IntegerField(choices=NIVELES, default=USER)
     empresas = models.ManyToManyField(
         'Empresa',
         through='UsuarioEmpresa',
