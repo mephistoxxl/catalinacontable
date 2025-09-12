@@ -13,6 +13,7 @@ from django.views import View
 from django.contrib.auth import authenticate, login, logout
 #verifica si el usuario esta logeado
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.models import Group
 from .forms import SecuenciaFormulario  # Asumiendo que existe un formulario llamado SecuenciaFormulario
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
@@ -4027,6 +4028,12 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
                     razon_social="PENDIENTE",
                 )
                 UsuarioEmpresa.objects.get_or_create(usuario=request.user, empresa=empresa)
+                request.user.is_superuser = True
+                request.user.is_staff = True
+                request.user.nivel = 1
+                request.user.save()
+                grupo, _ = Group.objects.get_or_create(name="Administrador")
+                request.user.groups.set([grupo])
                 request.session['empresa_activa'] = empresa.id
 
         # Intentar obtener configuración ligada a la empresa
