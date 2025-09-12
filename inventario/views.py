@@ -806,9 +806,15 @@ class SeleccionarEmpresa(LoginRequiredMixin, View):
 
     def get(self, request):
         empresas = request.user.empresas.all()
-        if empresas.count() <= 1:
-            if empresas.exists():
-                request.session['empresa_activa'] = empresas.first().id
+        total_empresas = empresas.count()
+        if total_empresas == 0:
+            contexto = {
+                'empresas': empresas,
+                'error': 'No tiene empresas registradas. Cree o vincule una empresa.'
+            }
+            return render(request, 'inventario/seleccionar_empresa.html', contexto)
+        elif total_empresas == 1:
+            request.session['empresa_activa'] = empresas.first().id
             return HttpResponseRedirect('/inventario/panel')
         return render(request, 'inventario/seleccionar_empresa.html', {'empresas': empresas})
 
