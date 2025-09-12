@@ -926,7 +926,7 @@ class Perfil(LoginRequiredMixin, View):
             editandoSuperAdmin = False
 
             if p == 1:
-                if request.user.nivel != Usuario.ROOT:
+                if request.user.nivel != 2:
                     messages.error(request,
                                    'No puede editar el perfil del administrador por no tener los permisos suficientes')
                     return HttpResponseRedirect('/inventario/perfil/ver/%s' % p)
@@ -938,7 +938,7 @@ class Perfil(LoginRequiredMixin, View):
 
                 else:
                     if perf.is_superuser == True:
-                        if request.user.nivel == Usuario.ROOT:
+                        if request.user.nivel == 2:
                             pass
 
                         elif perf.id != request.user.id:
@@ -947,10 +947,10 @@ class Perfil(LoginRequiredMixin, View):
                             return HttpResponseRedirect('/inventario/perfil/ver/%s' % p)
 
             if editandoSuperAdmin:
-                form = UsuarioFormulario(user=request.user)
+                form = UsuarioFormulario()
                 form.fields['level'].disabled = True
             else:
-                form = UsuarioFormulario(user=request.user)
+                form = UsuarioFormulario()
 
             #Me pregunto si habia una manera mas facil de hacer esto, solo necesitaba hacer que el formulario-
             #-apareciera lleno de una vez, pero arrojaba User already exists y no pasaba de form.is_valid()
@@ -970,7 +970,7 @@ class Perfil(LoginRequiredMixin, View):
         elif modo == 'clave':
             perf = Usuario.objects.get(id=p)
             if p == 1:
-                if request.user.nivel != Usuario.ROOT:
+                if request.user.nivel != 2:
                     messages.error(request,
                                    'No puede cambiar la clave del administrador por no tener los permisos suficientes')
                     return HttpResponseRedirect('/inventario/perfil/ver/%s' % p)
@@ -982,7 +982,7 @@ class Perfil(LoginRequiredMixin, View):
 
                 else:
                     if perf.is_superuser == True:
-                        if request.user.nivel == Usuario.ROOT:
+                        if request.user.nivel == 2:
                             pass
 
                         elif perf.id != request.user.id:
@@ -1006,7 +1006,7 @@ class Perfil(LoginRequiredMixin, View):
     def post(self, request, modo, p):
         if modo == 'editar':
             # Crea una instancia del formulario y la llena con los datos:
-            form = UsuarioFormulario(request.POST, user=request.user)
+            form = UsuarioFormulario(request.POST)
             # Revisa si es valido:
 
             if form.is_valid():
@@ -1015,7 +1015,7 @@ class Perfil(LoginRequiredMixin, View):
                 if p != 1:
                     level = form.cleaned_data['level']
                     perf.nivel = level
-                    perf.is_superuser = level in (Usuario.ADMIN, Usuario.ROOT)
+                    perf.is_superuser = level
 
                 identificacion = form.cleaned_data['identificacion']
                 nombre_completo = form.cleaned_data['nombre_completo']
@@ -1032,7 +1032,7 @@ class Perfil(LoginRequiredMixin, View):
 
                 perf.save()
 
-                form = UsuarioFormulario(user=request.user)
+                form = UsuarioFormulario()
                 messages.success(request, 'Actualizado exitosamente el perfil de ID %s.' % p)
                 request.session['perfilProcesado'] = True
                 return HttpResponseRedirect("/inventario/perfil/ver/%s" % perf.id)
@@ -3846,7 +3846,7 @@ class CrearUsuario(LoginRequiredMixin, View):
 
     def get(self, request):
         if request.user.is_superuser:
-            form = NuevoUsuarioFormulario(user=request.user)
+            form = NuevoUsuarioFormulario()
             #Envia al usuario el formulario para que lo llene
             contexto = {'form': form, 'modo': request.session.get('usuarioCreado')}
             contexto = complementarContexto(contexto, request.user)
@@ -3856,7 +3856,7 @@ class CrearUsuario(LoginRequiredMixin, View):
             return HttpResponseRedirect('/inventario/panel')
 
     def post(self, request):
-        form = NuevoUsuarioFormulario(request.POST, user=request.user)
+        form = NuevoUsuarioFormulario(request.POST)
         if form.is_valid():
             identificacion = form.cleaned_data['identificacion']
             nombre_completo = form.cleaned_data['nombre_completo']
@@ -3895,25 +3895,17 @@ class CrearUsuario(LoginRequiredMixin, View):
                 messages.error(request, "El correo '%s' ya existe. eliga otro!" % email)
 
             if error == 0:
-                if level == Usuario.USER:
+                if level == '0':
                     nuevoUsuario = Usuario(username=identificacion, email=email)
-                    nivel = Usuario.USER
-                elif level == Usuario.ADMIN:
+                    nivel = 0
+                elif level == '1':
                     nuevoUsuario = Usuario(
                         username=identificacion,
                         email=email,
                         is_superuser=True,
                         is_staff=True,
                     )
-                    nivel = Usuario.ADMIN
-                elif level == Usuario.ROOT:
-                    nuevoUsuario = Usuario(
-                        username=identificacion,
-                        email=email,
-                        is_superuser=True,
-                        is_staff=True,
-                    )
-                    nivel = Usuario.ROOT
+                    nivel = 1
 
                 nuevoUsuario.first_name = nombre_completo
                 nuevoUsuario.last_name = ''
@@ -4038,7 +4030,7 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
                 UsuarioEmpresa.objects.get_or_create(usuario=request.user, empresa=empresa)
                 request.user.is_superuser = True
                 request.user.is_staff = True
-                request.user.nivel = Usuario.ADMIN
+                request.user.nivel = 1
                 request.user.save()
                 grupo, _ = Group.objects.get_or_create(name="Administrador")
                 request.user.groups.set([grupo])

@@ -1031,6 +1031,8 @@ class ProveedorFormulario(forms.ModelForm):
 
 
 class UsuarioFormulario(forms.Form):
+    niveles =  [ ('1','Administrador'),('0','Usuario') ]
+
     identificacion = forms.CharField(
         label = "Identificación",
         max_length=13,
@@ -1052,13 +1054,14 @@ class UsuarioFormulario(forms.Form):
         'id':'email','class':'form-control','type':'email','value':''} )
         )
 
-    level = forms.TypedChoiceField(
+    level =  forms.CharField(
         required=False,
         label="Nivel de acceso",
-        coerce=int,
-        choices=[],
-        widget=forms.Select(attrs={'placeholder': 'El nivel de acceso', 'id':'level','class':'form-control','value':''})
-    )
+        max_length=2,
+        widget=forms.Select(choices=niveles,attrs={'placeholder': 'El nivel de acceso',
+        'id':'level','class':'form-control','value':''}
+        )
+        )
 
     empresa = forms.ModelChoiceField(
         label="Empresa",
@@ -1067,17 +1070,9 @@ class UsuarioFormulario(forms.Form):
         widget=forms.Select(attrs={'id':'empresa','class':'form-control'})
     )
 
-    def __init__(self, *args, user=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        choices = [
-            (Usuario.ADMIN, 'Administrador'),
-            (Usuario.USER, 'Usuario'),
-        ]
-        if user and user.nivel == Usuario.ROOT:
-            choices.insert(0, (Usuario.ROOT, 'Raiz'))
-        self.fields['level'].choices = choices
-
 class NuevoUsuarioFormulario(forms.Form):
+    niveles =  [ ('1','Administrador'),('0','Usuario') ]
+
     identificacion = forms.CharField(
         label = "Identificación",
         max_length=13,
@@ -1125,22 +1120,13 @@ class NuevoUsuarioFormulario(forms.Form):
         ),
     )
 
-    level = forms.TypedChoiceField(
+    level =  forms.CharField(
         label="Nivel de acceso",
-        coerce=int,
-        choices=[],
-        widget=forms.Select(attrs={'placeholder': 'El nivel de acceso', 'id':'level','class':'form-control','value':''})
-    )
-
-    def __init__(self, *args, user=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        choices = [
-            (Usuario.ADMIN, 'Administrador'),
-            (Usuario.USER, 'Usuario'),
-        ]
-        if user and user.nivel == Usuario.ROOT:
-            choices.insert(0, (Usuario.ROOT, 'Raiz'))
-        self.fields['level'].choices = choices
+        max_length=2,
+        widget=forms.Select(choices=niveles,attrs={'placeholder': 'El nivel de acceso',
+        'id':'level','class':'form-control','value':''}
+        )
+        )
 
 
 
