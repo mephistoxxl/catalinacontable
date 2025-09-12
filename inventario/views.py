@@ -3924,13 +3924,15 @@ class CrearUsuario(LoginRequiredMixin, View):
 
 
 #Lista todos los usuarios actuales--------------------------------------------------------------#
-class ListarUsuarios(LoginRequiredMixin, View):
+class ListarUsuarios(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
     login_url = '/inventario/login'
     redirect_field_name = None
 
     def get(self, request):
-        usuarios = Usuario.objects.all()
-        #Envia al usuario el formulario para que lo llene
+        empresa = get_empresa_activa(request)
+        usuarios = Usuario.objects.filter(empresas=empresa)
+        if not request.user.is_superuser:
+            usuarios = usuarios.filter(is_superuser=False)
         contexto = {'tabla': usuarios}
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/usuario/listarUsuarios.html', contexto)
