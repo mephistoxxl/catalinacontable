@@ -321,7 +321,7 @@
 <script>
 // Función simple para consultar el RUC utilizando el valor del campo de solo lectura
 function consultarRUCSimple() {
-    const rucInput = document.getElementById('id_identificacion');
+    const rucInput = document.getElementById('{{ form.identificacion.id_for_label }}');
     if (!rucInput) {
         alert('Error: No se encontró el campo de RUC');
         return;
