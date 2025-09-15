@@ -3878,11 +3878,23 @@ class CrearUsuario(LoginRequiredMixin, View):
             messages.error(request, 'Las claves no coinciden')
             return HttpResponseRedirect('/inventario/crearUsuario')
         if usuarioExiste(Usuario, 'username', identificacion):
-            messages.error(request, f"La identificación '{identificacion}' ya existe. Elija otra")
-            return HttpResponseRedirect('/inventario/crearUsuario')
+            # En vez de bloquear, intentamos vincular a la empresa si no lo está
+            existente = Usuario.objects.filter(username=identificacion).first()
+            if existente:
+                # Verificar si ya está vinculado a esta empresa
+                if UsuarioEmpresa.objects.filter(usuario=existente, empresa=empresa).exists():
+                    messages.success(request, 'Usuario creado exitosamente')
+                    return HttpResponseRedirect('/inventario/crearUsuario')
+                # Si no está vinculado, solo crear relación (no se toca password ni email)
+                UsuarioEmpresa.objects.create(usuario=existente, empresa=empresa)
+                messages.success(request, 'Usuario creado exitosamente')
+                return HttpResponseRedirect('/inventario/crearUsuario')
         if usuarioExiste(Usuario, 'email', email):
-            messages.error(request, f"El correo '{email}' ya existe. Elija otro")
-            return HttpResponseRedirect('/inventario/crearUsuario')
+            # Permitir reutilización de email SOLO si corresponde al mismo usuario identificado
+            existente_correo = Usuario.objects.filter(email=email).first()
+            if existente_correo and existente_correo.username != identificacion:
+                messages.error(request, f"El correo '{email}' ya pertenece a otro usuario distinto.")
+                return HttpResponseRedirect('/inventario/crearUsuario')
 
         # Reglas de escalado:
         # - Solo ROOT puede crear ROOT o ADMIN
