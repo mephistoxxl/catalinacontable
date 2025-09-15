@@ -4343,6 +4343,12 @@ class CrearFacturador(LoginRequiredMixin, View):
 
         if form.is_valid():
             try:
+                # Empresa activa obligatoria
+                empresa_id = request.session.get('empresa_activa')
+                empresa = Empresa.objects.filter(id=empresa_id).first()
+                if not empresa or not request.user.empresas.filter(id=empresa.id).exists():
+                    messages.error(request, 'Seleccione una empresa válida antes de crear facturadores.')
+                    return redirect('inventario:seleccionar_empresa')
                 # Crear el facturador usando el manager personalizado
                 facturador = Facturador.objects.create_facturador(
                     nombres=form.cleaned_data['nombres'],
@@ -4351,6 +4357,7 @@ class CrearFacturador(LoginRequiredMixin, View):
                     password=form.cleaned_data['password'],  # Se encriptará automáticamente
                     descuento_permitido=form.cleaned_data.get('descuento_permitido', 0.00),
                     activo=form.cleaned_data.get('activo', True),
+                    empresa=empresa,
                 )
 
                 messages.success(request, f'Facturador {facturador.nombres} creado exitosamente.')
@@ -4380,6 +4387,8 @@ class ListarFacturadores(LoginRequiredMixin, View):
             return redirect('inventario:seleccionar_empresa')
 
         facturadores = Facturador.objects.filter(empresa_id=empresa_id)
+    # Limpieza opcional: si existen facturadores huérfanos (empresa NULL) y el usuario es admin, se podrían reclamar
+    # (De momento solo los ignoramos)
         contexto = {'facturadores': facturadores}
         contexto = complementarContexto(contexto, request.user)
         # Asegúrate de que la plantilla esté en la ruta correcta
