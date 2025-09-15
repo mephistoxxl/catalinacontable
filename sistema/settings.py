@@ -203,19 +203,44 @@ TEMPLATES = [
 WSGI_APPLICATION = 'sistema.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/2.1/ref/settings/#databases
+# Database (solo PostgreSQL)
+# Elimina completamente cualquier fallback a SQLite.
+# Formas soportadas:
+# 1. Usar DATABASE_URL (Heroku / contenedores): postgres://USER:PASSWORD@HOST:PORT/DBNAME
+# 2. Usar variables individuales: PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD (o DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD)
 
-# Configuración de base de datos usando DATABASE_URL o SQLite por defecto
-if os.environ.get('DATABASE_URL'):
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL:
     DATABASES = {
-        'default': dj_database_url.config(conn_max_age=600, ssl_require=True)
+        'default': dj_database_url.config(conn_max_age=600, ssl_require=os.environ.get('DB_SSL_REQUIRE', 'false').lower() == 'true')
     }
 else:
+    # Construcción explícita vía variables. Acepta prefijos DB_ o PG.
+    db_host = os.environ.get('DB_HOST') or os.environ.get('PGHOST')
+    db_port = os.environ.get('DB_PORT') or os.environ.get('PGPORT') or '5432'
+    db_name = os.environ.get('DB_NAME') or os.environ.get('PGDATABASE')
+    db_user = os.environ.get('DB_USER') or os.environ.get('PGUSER')
+    db_password = os.environ.get('DB_PASSWORD') or os.environ.get('PGPASSWORD')
+
+    missing = [k for k,v in [
+        ('DB_HOST/PGHOST', db_host),
+        ('DB_NAME/PGDATABASE', db_name),
+        ('DB_USER/PGUSER', db_user),
+        ('DB_PASSWORD/PGPASSWORD', db_password),
+    ] if not v]
+    if missing:
+        raise Exception(f"Configuración PostgreSQL incompleta. Faltan: {', '.join(missing)}. Define DATABASE_URL o variables DB_/PG_.")
+
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': os.path.join(BASE_DIR, 'BDD.sqlite3'),
+            'ENGINE': 'django.db.backends.postgresql',
+            'HOST': db_host,
+            'PORT': db_port,
+            'NAME': db_name,
+            'USER': db_user,
+            'PASSWORD': db_password,
+            'CONN_MAX_AGE': 600,
         }
     }
 

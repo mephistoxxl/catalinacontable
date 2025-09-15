@@ -100,19 +100,16 @@ def consultar_identificacion(identificacion: str) -> Dict[str, Union[str, bool]]
         api_message = data.get('message', 'Error desconocido de la API') if api_error else ''
 
         # Extraer dirección del primer establecimiento si existe
-        direccion = ''
         establecimientos = data.get('establecimientos', [])
-        if tipo_identificacion == 'RUC' and establecimientos:
-            direccion = establecimientos[0].get('direccionCompleta', '')
-            nombre_comercial = establecimientos[0].get(
-                'nombreFantasiaComercial', ''
-            )
-        else:
-            nombre_comercial = ''
-            if tipo_identificacion == 'CEDULA':
-                direccion = data.get('calleDomicilio', data.get('direccion', ''))
+        nombre_comercial = ''
+        if tipo_identificacion == 'RUC':
+            if establecimientos:
+                direccion = establecimientos[0].get('direccionCompleta', '')
+                nombre_comercial = establecimientos[0].get('nombreFantasiaComercial', '')
             else:
-                direccion = data.get('direccionDomicilio', data.get('direccion', ''))
+                direccion = data.get('calleDomicilio', data.get('direccion', ''))
+        else:
+            direccion = data.get('direccionDomicilio', data.get('direccion', ''))
 
         # Mapear la respuesta al formato esperado
         tipo_contribuyente = data.get('tipoContribuyente')
