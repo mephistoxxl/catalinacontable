@@ -3882,11 +3882,33 @@ class CrearUsuario(LoginRequiredMixin, View):
             existente = Usuario.objects.filter(username=identificacion).first()
             if existente:
                 # Verificar si ya está vinculado a esta empresa
-                if UsuarioEmpresa.objects.filter(usuario=existente, empresa=empresa).exists():
+                rel = UsuarioEmpresa.objects.filter(usuario=existente, empresa=empresa).first()
+                if rel:
+                    # Ya vinculado: actualizar overrides si se suministran
+                    nivel_form = level
+                    if request.user.nivel == Usuario.ADMIN:
+                        # ADMIN no puede escalar a ADMIN/ROOT en override si el destino sería mayor que USER
+                        if nivel_form != Usuario.USER:
+                            nivel_form = Usuario.USER
+                    # Guardar overrides solo si cambian
+                    if rel.nivel_empresa != nivel_form:
+                        rel.nivel_empresa = nivel_form
+                    # Email override: si difiere del base y del existente
+                    if email and email != existente.email:
+                        rel.email_empresa = email
+                    rel.save()
                     messages.success(request, 'Usuario creado exitosamente')
                     return HttpResponseRedirect('/inventario/crearUsuario')
-                # Si no está vinculado, solo crear relación (no se toca password ni email)
-                UsuarioEmpresa.objects.create(usuario=existente, empresa=empresa)
+                # Crear nueva relación con overrides
+                nivel_form = level
+                if request.user.nivel == Usuario.ADMIN and nivel_form != Usuario.USER:
+                    nivel_form = Usuario.USER
+                rel = UsuarioEmpresa.objects.create(
+                    usuario=existente,
+                    empresa=empresa,
+                    nivel_empresa=nivel_form if nivel_form != existente.nivel else None,
+                    email_empresa=email if email != existente.email else None,
+                )
                 messages.success(request, 'Usuario creado exitosamente')
                 return HttpResponseRedirect('/inventario/crearUsuario')
         if usuarioExiste(Usuario, 'email', email):
@@ -3909,7 +3931,7 @@ class CrearUsuario(LoginRequiredMixin, View):
 
         nuevoUsuario = Usuario(
             username=identificacion,
-            email=email,
+            email=email,  # base; podría diferir por empresa con override futuro
         )
         nuevoUsuario.first_name = nombre_completo
         nuevoUsuario.last_name = ''
@@ -3919,7 +3941,13 @@ class CrearUsuario(LoginRequiredMixin, View):
         nuevoUsuario.is_superuser = False  # Nunca desde esta vista
         nuevoUsuario.set_password(password)
         nuevoUsuario.save()
-        UsuarioEmpresa.objects.create(usuario=nuevoUsuario, empresa=empresa)
+        # Crear relación con overrides (si el nivel difiere del global o email distinto se repetirá igual)
+        UsuarioEmpresa.objects.create(
+            usuario=nuevoUsuario,
+            empresa=empresa,
+            nivel_empresa=None,  # para nuevo usuario el nivel global ya refleja intención
+            email_empresa=None,  # se puede agregar override luego
+        )
         messages.success(request, 'Usuario creado exitosamente')
         return HttpResponseRedirect('/inventario/crearUsuario')
 

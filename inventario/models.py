@@ -59,6 +59,27 @@ class Usuario(AbstractUser):
     def es_usuario(self):  # pragma: no cover
         return self.nivel == self.USER
 
+    # ---- Overrides efectivos por empresa ----
+    def get_nivel_efectivo(self, empresa):
+        """Devuelve el nivel efectivo considerando override en UsuarioEmpresa.
+        Si no hay relación o no hay override, retorna nivel global.
+        """
+        if not empresa:
+            return self.nivel
+        rel = self.usuarioempresa_set.filter(empresa=empresa).first()
+        if rel and rel.nivel_empresa is not None:
+            return rel.nivel_empresa
+        return self.nivel
+
+    def get_email_efectivo(self, empresa):
+        """Devuelve email override si existe para la empresa dada."""
+        if not empresa:
+            return self.email
+        rel = self.usuarioempresa_set.filter(empresa=empresa).first()
+        if rel and rel.email_empresa:
+            return rel.email_empresa
+        return self.email
+
     @classmethod
     def numeroRegistrados(cls, empresa_id=None):
         """Devuelve el número de usuarios registrados.
@@ -154,6 +175,10 @@ class Empresa(models.Model):
 class UsuarioEmpresa(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE)
+    # Overrides específicos por empresa
+    email_empresa = models.EmailField(null=True, blank=True, help_text="Correo específico para esta empresa (override opcional)")
+    nivel_empresa = models.IntegerField(null=True, blank=True, help_text="Rol específico en esta empresa (override de nivel global)")
+    alias = models.CharField(max_length=120, null=True, blank=True, help_text="Nombre/alias a mostrar en esta empresa")
 
     class Meta:
         unique_together = ('usuario', 'empresa')
