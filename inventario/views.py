@@ -3842,88 +3842,74 @@ class CrearUsuario(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
-        if request.user.is_superuser:
-            form = NuevoUsuarioFormulario(user=request.user)
-            #Envia al usuario el formulario para que lo llene
-            contexto = {'form': form, 'modo': request.session.get('usuarioCreado')}
-            contexto = complementarContexto(contexto, request.user)
-            return render(request, 'inventario/usuario/crearUsuario.html', contexto)
-        else:
-            messages.error(request, 'No tiene los permisos para crear un usuario nuevo')
+        # Permitir acceso a usuarios root o administradores de empresa (nivel ADMIN)
+        if not (hasattr(request.user, 'nivel') and (request.user.nivel in (Usuario.ADMIN, Usuario.ROOT))):
+            messages.error(request, 'No tiene permisos para crear usuarios')
             return HttpResponseRedirect('/inventario/panel')
+        form = NuevoUsuarioFormulario(user=request.user)
+        contexto = {'form': form, 'modo': request.session.get('usuarioCreado')}
+        contexto = complementarContexto(contexto, request.user)
+        return render(request, 'inventario/usuario/crearUsuario.html', contexto)
 
     def post(self, request):
+        if not (hasattr(request.user, 'nivel') and (request.user.nivel in (Usuario.ADMIN, Usuario.ROOT))):
+            messages.error(request, 'No tiene permisos para crear usuarios')
+            return HttpResponseRedirect('/inventario/panel')
         form = NuevoUsuarioFormulario(request.POST, user=request.user)
-        if form.is_valid():
-            identificacion = form.cleaned_data['identificacion']
-            nombre_completo = form.cleaned_data['nombre_completo']
-            email = form.cleaned_data['email']
-            password = form.cleaned_data['password']
-            rep_password = form.cleaned_data['rep_password']
-            level = form.cleaned_data['level']
-            empresa_id = request.session.get('empresa_activa')
-            try:
-                empresa = Empresa.objects.get(id=empresa_id)
-            except Empresa.DoesNotExist:
-                messages.error(request, 'No se ha seleccionado una empresa válida')
-                return HttpResponseRedirect('/inventario/crearUsuario')
+        if not form.is_valid():
+            messages.error(request, 'Formulario inválido')
+            return HttpResponseRedirect('/inventario/crearUsuario')
 
-            error = 0
+        identificacion = form.cleaned_data['identificacion']
+        nombre_completo = form.cleaned_data['nombre_completo']
+        email = form.cleaned_data['email']
+        password = form.cleaned_data['password']
+        rep_password = form.cleaned_data['rep_password']
+        level = form.cleaned_data['level']
+        empresa_id = request.session.get('empresa_activa')
+        try:
+            empresa = Empresa.objects.get(id=empresa_id)
+        except Empresa.DoesNotExist:
+            messages.error(request, 'No se ha seleccionado una empresa válida')
+            return HttpResponseRedirect('/inventario/crearUsuario')
 
-            if password == rep_password:
-                pass
+        # Validaciones básicas
+        if password != rep_password:
+            messages.error(request, 'Las claves no coinciden')
+            return HttpResponseRedirect('/inventario/crearUsuario')
+        if usuarioExiste(Usuario, 'username', identificacion):
+            messages.error(request, f"La identificación '{identificacion}' ya existe. Elija otra")
+            return HttpResponseRedirect('/inventario/crearUsuario')
+        if usuarioExiste(Usuario, 'email', email):
+            messages.error(request, f"El correo '{email}' ya existe. Elija otro")
+            return HttpResponseRedirect('/inventario/crearUsuario')
 
+        # Reglas de escalado:
+        # - Solo ROOT puede crear ROOT o ADMIN
+        # - ADMIN solo puede crear USER
+        if request.user.nivel == Usuario.ADMIN:
+            nivel_destino = Usuario.USER
+        else:  # ROOT
+            if level == Usuario.ROOT:
+                nivel_destino = Usuario.USER  # No permitir crear otro root por formulario
             else:
-                error = 1
-                messages.error(request, 'La clave y su repeticion tienen que coincidir')
+                nivel_destino = level
 
-            if usuarioExiste(Usuario, 'username', identificacion) is False:
-                pass
-
-            else:
-                error = 1
-                messages.error(request, "La identificación '%s' ya existe. eliga otra!" % identificacion)
-
-            if usuarioExiste(Usuario, 'email', email) is False:
-                pass
-
-            else:
-                error = 1
-                messages.error(request, "El correo '%s' ya existe. eliga otro!" % email)
-
-            if error == 0:
-                if level == Usuario.USER:
-                    nuevoUsuario = Usuario(username=identificacion, email=email)
-                    nivel = Usuario.USER
-                elif level == Usuario.ADMIN:
-                    nuevoUsuario = Usuario(
-                        username=identificacion,
-                        email=email,
-                        is_superuser=True,
-                        is_staff=True,
-                    )
-                    nivel = Usuario.ADMIN
-                elif level == Usuario.ROOT:
-                    nuevoUsuario = Usuario(
-                        username=identificacion,
-                        email=email,
-                        is_superuser=True,
-                        is_staff=True,
-                    )
-                    nivel = Usuario.ROOT
-
-                nuevoUsuario.first_name = nombre_completo
-                nuevoUsuario.last_name = ''
-                nuevoUsuario.nivel = nivel
-                nuevoUsuario.set_password(password)
-                nuevoUsuario.save()
-                UsuarioEmpresa.objects.create(usuario=nuevoUsuario, empresa=empresa)
-
-                messages.success(request, 'Usuario creado exitosamente')
-                return HttpResponseRedirect('/inventario/crearUsuario')
-
-            else:
-                return HttpResponseRedirect('/inventario/crearUsuario')
+        nuevoUsuario = Usuario(
+            username=identificacion,
+            email=email,
+        )
+        nuevoUsuario.first_name = nombre_completo
+        nuevoUsuario.last_name = ''
+        nuevoUsuario.nivel = nivel_destino
+        # Flags derivados
+        nuevoUsuario.is_staff = (nivel_destino == Usuario.ADMIN)
+        nuevoUsuario.is_superuser = False  # Nunca desde esta vista
+        nuevoUsuario.set_password(password)
+        nuevoUsuario.save()
+        UsuarioEmpresa.objects.create(usuario=nuevoUsuario, empresa=empresa)
+        messages.success(request, 'Usuario creado exitosamente')
+        return HttpResponseRedirect('/inventario/crearUsuario')
 
 
 #Fin de vista----------------------------------------------------------------------
@@ -4033,10 +4019,12 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
                     razon_social="PENDIENTE",
                 )
                 UsuarioEmpresa.objects.get_or_create(usuario=request.user, empresa=empresa)
-                request.user.is_superuser = True
+                # Promoción controlada: asignar ADMIN empresa sin superuser global
+                if getattr(request.user, 'nivel', Usuario.USER) != Usuario.ADMIN:
+                    request.user.nivel = Usuario.ADMIN
                 request.user.is_staff = True
-                request.user.nivel = Usuario.ADMIN
-                request.user.save()
+                request.user.is_superuser = False  # Nunca elevar aquí
+                request.user.save(update_fields=["nivel", "is_staff", "is_superuser"])
                 grupo, _ = Group.objects.get_or_create(name="Administrador")
                 request.user.groups.set([grupo])
                 request.session['empresa_activa'] = empresa.id

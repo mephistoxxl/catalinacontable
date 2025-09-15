@@ -196,6 +196,12 @@ class EmpresaAdmin(admin.ModelAdmin):
                 email=email,
                 password=password,
             )
+            # Ajustar nivel y flags (ADMIN empresa, no root)
+            if hasattr(usuario, 'nivel'):
+                usuario.nivel = getattr(usuario, 'ADMIN', 1)
+            usuario.is_staff = True  # Puede acceder al admin tenant
+            usuario.is_superuser = False  # No es superusuario global
+            usuario.save(update_fields=["nivel", "is_staff", "is_superuser"])
             UsuarioEmpresa.objects.create(usuario=usuario, empresa=obj)
             send_mail(
                 "Credenciales de acceso",

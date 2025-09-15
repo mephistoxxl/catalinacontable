@@ -46,6 +46,19 @@ class Usuario(AbstractUser):
         blank=True,
     )
 
+    # ---- Helpers de rol para lógica de permisos clara ----
+    @property
+    def es_root(self):  # pragma: no cover - simple helper
+        return self.nivel == self.ROOT
+
+    @property
+    def es_admin_empresa(self):  # pragma: no cover
+        return self.nivel == self.ADMIN
+
+    @property
+    def es_usuario(self):  # pragma: no cover
+        return self.nivel == self.USER
+
     @classmethod
     def numeroRegistrados(cls, empresa_id=None):
         """Devuelve el número de usuarios registrados.
@@ -79,15 +92,34 @@ class Usuario(AbstractUser):
 
 @receiver(post_save, sender=Usuario)
 def assign_default_group(sender, instance, **kwargs):
-    """Ensure the user belongs to the proper default group.
+    """Asigna un grupo por defecto según ``nivel`` sin sobre-escribir si ya coincide.
 
-    Every time a ``Usuario`` is saved we clear its current groups and assign
-    the appropriate default one based on the ``is_superuser`` flag. This keeps
-    the group membership in sync even when ``is_superuser`` changes.
+    Mapeo:
+        ROOT  -> "Root"
+        ADMIN -> "Administrador"
+        USER  -> "Usuario"
+    Solo mantiene exactamente UN grupo controlado. Si el usuario ya tiene
+    exactamente ese grupo no hace nada; si tiene otros grupos (personalizados)
+    no los elimina salvo que sean uno de los grupos gestionados y distinto al requerido.
     """
-    group_name = "Administrador" if instance.is_superuser else "Usuario"
-    group, _ = Group.objects.get_or_create(name=group_name)
-    instance.groups.set([group])
+    nivel_map = {
+        instance.ROOT: "Root",
+        instance.ADMIN: "Administrador",
+        instance.USER: "Usuario",
+    }
+    target = nivel_map.get(instance.nivel, "Usuario")
+    # Obtener o crear grupos gestionados
+    managed = {name: Group.objects.get_or_create(name=name)[0] for name in nivel_map.values()}
+    current = list(instance.groups.all())
+    # Si el usuario tiene exactamente el grupo correcto, salir
+    if len(current) == 1 and current[0].name == target:
+        return
+    # Remover únicamente grupos gestionados que no correspondan
+    for g in current:
+        if g.name in managed and g.name != target:
+            instance.groups.remove(g)
+    # Asegurar pertenencia al grupo objetivo
+    instance.groups.add(managed[target])
 
 from django.core.exceptions import ValidationError, PermissionDenied  # ← Y ESTA TAMBIÉN
 
