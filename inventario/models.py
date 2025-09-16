@@ -257,25 +257,35 @@ class Opciones(models.Model):
                     )
                 except ValueError as ve:
                     logger.error(f"Contraseña incorrecta para la firma electrónica: {ve}")
-                    from django.core.exceptions import ValidationError
                     raise ValidationError({'password_firma': 'La contraseña de la firma electrónica es incorrecta.'})
                 except Exception as e:
                     logger.error(f"Archivo de firma electrónica inválido o corrupto: {e}")
-                    from django.core.exceptions import ValidationError
                     raise ValidationError({'firma_electronica': 'El archivo de firma electrónica es inválido o está corrupto.'})
                 if certificate:
+                    # Validar uso de clave: debe permitir digitalSignature (o no tener restricción)
+                    try:
+                        from cryptography.x509.oid import ExtensionOID
+                        ku = certificate.extensions.get_extension_for_oid(ExtensionOID.KEY_USAGE).value
+                        # digital_signature debe ser True
+                        if hasattr(ku, 'digital_signature') and not ku.digital_signature:
+                            logger.error("Certificado sin permiso de digitalSignature (solo cifrado u otros usos).")
+                            raise ValidationError({'firma_electronica': 'El certificado no permite uso de firma digital (digitalSignature=FALSE). Solicite a la entidad emisora un certificado de FIRMA, no solo de cifrado.'})
+                    except ValidationError:
+                        raise
+                    except Exception:
+                        # Si no tiene extensión KeyUsage no bloqueamos, muchos certificados antiguos igual funcionan
+                        pass
+
                     self.fecha_caducidad_firma = certificate.not_valid_after.date()
                     logger.info(f"Fecha de caducidad extraída: {self.fecha_caducidad_firma}")
                     Opciones.objects.filter(pk=self.pk).update(fecha_caducidad_firma=self.fecha_caducidad_firma)
                 else:
                     logger.error("No se encontró certificado en el archivo de firma electrónica.")
-                    from django.core.exceptions import ValidationError
                     raise ValidationError({'firma_electronica': 'No se encontró certificado en el archivo de firma electrónica.'})
             except ValidationError as ve:
                 raise ve
             except Exception as e:
                 logger.error(f"Error inesperado extrayendo fecha de caducidad: {e}")
-                from django.core.exceptions import ValidationError
                 raise ValidationError({'__all__': 'No se pudo extraer la fecha de caducidad. Verifique el archivo y la contraseña.'})
     # Opcional: método para obtener la ruta segura del archivo
     def get_firma_path(self):
@@ -1918,7 +1928,12 @@ class Secuencia(models.Model):
         verbose_name = "Secuencia"
         verbose_name_plural = "Secuencias"
         db_table = 'inventario_secuencias'
-        unique_together = ('tipo_documento', 'establecimiento', 'punto_emision')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['empresa', 'tipo_documento', 'establecimiento', 'punto_emision'],
+                name='uniq_secuencia_empresa_doc_estab_punto'
+            )
+        ]
 
     def __str__(self):
         return f"{self.descripcion} - {self.tipo_documento} (Establecimiento: {self.establecimiento:03d}, Punto de Emisión: {self.punto_emision:03d})"
@@ -2253,18 +2268,24 @@ class FormaPago(models.Model):
             })
         
         # ✅ Validar que el total no exceda el total de la factura
-        if self.factura and self.total:
+        if self.factura and self.total is not None:
+            from decimal import Decimal, ROUND_HALF_UP
             total_otras_formas = self.factura.formas_pago.exclude(id=self.id).aggregate(
                 total=models.Sum('total')
-            )['total'] or 0
-            
-            total_con_esta = total_otras_formas + self.total
-            
-            if total_con_esta > self.factura.monto_general:
-                raise ValidationError({
-                    'total': f'El total de formas de pago (${total_con_esta}) '
-                           f'excede el total de la factura (${self.factura.monto_general})'
-                })
+            )['total'] or Decimal('0.00')
+            total_con_esta = (total_otras_formas + self.total).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            monto_factura = Decimal(self.factura.monto_general).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            # Tolerancia por redondeo: hasta 0.01
+            if total_con_esta > monto_factura:
+                diferencia = (total_con_esta - monto_factura)
+                if diferencia <= Decimal('0.01'):
+                    # Ajustar este pago restándole la diferencia mínima
+                    self.total = (self.total - diferencia).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    total_con_esta = monto_factura
+                else:
+                    raise ValidationError({
+                        'total': f'El total de formas de pago (${total_con_esta}) excede el total de la factura (${monto_factura})'
+                    })
     
     def save(self, *args, **kwargs):
         self.full_clean()

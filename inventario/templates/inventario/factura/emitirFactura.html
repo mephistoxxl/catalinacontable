@@ -348,38 +348,117 @@ document.addEventListener('DOMContentLoaded', function() {
 // Función de búsqueda de cliente
 function buscarCliente() {
     const cedula = document.getElementById('id_identificacion_cliente').value.trim();
-    
-    if (!cedula) {
-        alert('Por favor, ingrese una cédula o RUC para buscar.');
+    if(!cedula){
+        alert('Ingrese una identificación');
         return;
     }
-
-    fetch(`/inventario/buscar_cliente/?q=${cedula}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                alert(data.message || 'Cliente no encontrado.');
-                const nombreCliente = document.getElementById('id_nombre_cliente');
-                const clienteId = document.getElementById('cliente_id');
-                const correoCliente = document.getElementById('id_correo_cliente');
-                if (nombreCliente) nombreCliente.value = '';
-                if (clienteId) clienteId.value = '';
-                if (correoCliente) correoCliente.value = '';
+    fetch(`/inventario/api/clientes/buscar?q=${encodeURIComponent(cedula)}&exact=1`)
+        .then(r=>r.json())
+        .then(resp=>{
+            if(!resp.success){
+                return crearClienteAutomatico(cedula);
+            }
+            if(resp.exact){
+                completarClienteDesdeObjeto(resp.exact);
                 return;
             }
-
-            const nombreCliente = document.getElementById('id_nombre_cliente');
-            const clienteId = document.getElementById('cliente_id');
-            const correoCliente = document.getElementById('id_correo_cliente');
-            const nombreCompleto = data.nombre_comercial ? `${data.razon_social} ${data.nombre_comercial}` : data.razon_social;
-            if (nombreCliente) nombreCliente.value = nombreCompleto;
-            if (clienteId) clienteId.value = data.id;
-            if (correoCliente) correoCliente.value = data.correo || '';
+            if(resp.results && resp.results.length){
+                completarClienteDesdeObjeto(resp.results[0]);
+            } else {
+                crearClienteAutomatico(cedula);
+            }
         })
-        .catch(error => {
-            console.error('Error al buscar cliente:', error);
-            alert('Error de conexión al buscar cliente.');
+        .catch(err=>{
+            console.error('Fallo búsqueda API', err);
+            crearClienteAutomatico(cedula);
         });
 }
+
+function completarClienteDesdeObjeto(obj){
+    const nombreCliente = document.getElementById('id_nombre_cliente');
+    const clienteId = document.getElementById('cliente_id');
+    const correoCliente = document.getElementById('id_correo_cliente');
+    if(!obj){ limpiarCamposCliente(); return; }
+    const razon = obj.razon_social || obj.nombre_compuesto || obj.identificacion || '';
+    const nomCom = obj.nombre_comercial || '';
+    const nombreCompleto = nomCom ? `${razon} ${nomCom}`.trim() : razon;
+    if (nombreCliente) nombreCliente.value = nombreCompleto;
+    if (clienteId) clienteId.value = obj.id || '';
+    if (correoCliente && obj.correo !== undefined) correoCliente.value = obj.correo || '';
+    // Intentar enriquecer si razon social == identificacion
+    if(obj.id && razon && obj.identificacion && razon === obj.identificacion){
+        fetch(`/inventario/api/clientes/enriquecer?id=${obj.id}`)
+            .then(r=>r.json())
+            .then(data=>{
+                if(data.success && data.enriquecido && data.cliente){
+                    const c = data.cliente;
+                    const razon2 = c.razon_social || c.identificacion;
+                    const nomCom2 = c.nombre_comercial || '';
+                    const nombreCompleto2 = nomCom2 ? `${razon2} ${nomCom2}`.trim() : razon2;
+                    if (nombreCliente) nombreCliente.value = nombreCompleto2;
+                }
+            })
+            .catch(()=>{});
+    }
+}
+
+function limpiarCamposCliente(){
+    const nombreCliente = document.getElementById('id_nombre_cliente');
+    const clienteId = document.getElementById('cliente_id');
+    const correoCliente = document.getElementById('id_correo_cliente');
+    if (nombreCliente) nombreCliente.value = '';
+    if (clienteId) clienteId.value = '';
+    if (correoCliente) correoCliente.value = '';
+}
+
+function crearClienteAutomatico(identificacion){
+    if(!identificacion){
+        limpiarCamposCliente();
+        return;
+    }
+    // Paso 1: intentar obtener datos externos (si hay endpoint de consulta)
+    let tipo = '';
+    if(identificacion.length === 13) tipo = '04'; else if(identificacion.length === 10) tipo = '05';
+    const construirYCrear = (razon) => {
+        const razon_final = (razon && razon.trim()) ? razon.trim() : identificacion;
+        fetch('/inventario/api/clientes/crear', {
+            method: 'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({identificacion: identificacion, razon_social: razon_final})
+        })
+            .then(r=>r.json())
+            .then(resp=>{
+                if(resp.success && resp.cliente){
+                    completarClienteDesdeObjeto(resp.cliente);
+                } else {
+                    limpiarCamposCliente();
+                    alert(resp.message || 'No se pudo crear el cliente');
+                }
+            })
+            .catch(err=>{
+                console.error('Error creando cliente', err);
+                limpiarCamposCliente();
+                alert('Error creando cliente');
+            });
+    };
+    if(!tipo){
+        return construirYCrear('');
+    }
+    fetch(`/inventario/consultar-identificacion/?identificacion=${encodeURIComponent(identificacion)}&tipo=${tipo}`)
+        .then(r=>r.json())
+        .then(data=>{
+            if(!data.error){
+                // intentar diferentes campos que podría devolver el servicio
+                const razon = data.razonSocial || data.razon_social || data.nombre || data.name || '';
+                construirYCrear(razon);
+            } else {
+                construirYCrear('');
+            }
+        })
+        .catch(()=>{
+            construirYCrear('');
+        });
+}
+
 </script>
 {% endblock %}

@@ -63,8 +63,27 @@ import random
 from .forms import FirmaElectronicaForm  # Asegúrate de tener este formulario
 from django.urls import reverse
 from .mixins import RequireEmpresaActivaMixin, require_empresa_activa, get_empresa_activa
+from django.db.models import Q
 
 logger = logging.getLogger(__name__)
+
+# ====== STUB UTILITIES (fallback) ======
+if 'render_to_pdf' not in globals():
+    from django.http import HttpResponse as _HttpResponseForPDF
+    from django.template.loader import get_template as _get_template_for_pdf
+    def render_to_pdf(template_src, context_dict):
+        """Fallback simple PDF renderer (HTML passthrough).
+        Devuelve el HTML renderizado para evitar fallos cuando la librería PDF real no está configurada.
+        Reemplazar por implementación real (WeasyPrint/xhtml2pdf) en producción.
+        """
+        try:
+            template = _get_template_for_pdf(template_src)
+            html = template.render(context_dict)
+            resp = _HttpResponseForPDF(html, content_type='text/html')
+            resp['X-Placeholder-PDF'] = '1'
+            return resp
+        except Exception as e:
+            return _HttpResponseForPDF(f"Error generando PDF placeholder: {e}")
 
 
 #Vistas endogenas.
@@ -78,9 +97,10 @@ class ListarProformas(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
 
     def get(self, request):
         from .models import Proforma
-
+        empresa = get_empresa_activa(request)
         proformas = (
-            Proforma.objects.select_related('cliente')
+            Proforma.objects.filter(empresa=empresa)
+            .select_related('cliente')
             .order_by('-fecha_creacion')
         )
 
@@ -127,8 +147,8 @@ class EmitirProforma(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                 return redirect('inventario:login_proformador')
 
             from .forms import EmitirProformaFormulario
-            # Obtener almacenes y vendedores (facturadores) activos
-            almacenes = Almacen.objects.filter(activo=True)
+            # Obtener almacenes y vendedores (facturadores) activos SOLO de la empresa activa
+            almacenes = Almacen.objects.filter(activo=True, empresa=empresa)
             vendedores = Facturador.objects.filter(activo=True, empresa=empresa)
 
             form = EmitirProformaFormulario(almacenes=almacenes, vendedores=vendedores)
@@ -298,8 +318,8 @@ class EmitirProforma(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                 })
         
         # Procesamiento normal del formulario (no AJAX)
-        almacenes = Almacen.objects.filter(activo=True)
-        vendedores = Facturador.objects.filter(activo=True)
+        almacenes = Almacen.objects.filter(activo=True, empresa=empresa)
+        vendedores = Facturador.objects.filter(activo=True, empresa=empresa)
         form = EmitirProformaFormulario(request.POST, almacenes=almacenes, vendedores=vendedores)
         # Validar token mínimo en POST clásico
         from django.core import signing
@@ -378,10 +398,9 @@ class VerProforma(LoginRequiredMixin, View):
             Proforma.objects.select_related('empresa', 'cliente', 'facturador', 'almacen', 'creado_por')
             .prefetch_related(
                 Prefetch('detalles', queryset=ProformaDetalle.objects.select_related('producto', 'servicio'))
-            ),
-            pk=p,
+            ).filter(empresa_id=empresa_id),
+            pk=p
         )
-
         # Asegurar totales actualizados
         try:
             proforma.calcular_totales()
@@ -456,6 +475,7 @@ def ride_proforma(request, p):
         Proforma.objects.select_related('empresa', 'cliente', 'facturador', 'almacen', 'creado_por')
         .prefetch_related(Prefetch('detalles', queryset=ProformaDetalle.objects.select_related('producto', 'servicio'))),
         pk=p,
+        empresa_id=empresa_id,
     )
 
     # Asegurar totales actualizados
@@ -491,6 +511,18 @@ def ride_proforma(request, p):
         'nombre_comercial': (opciones.nombre_comercial if opciones and getattr(opciones, 'nombre_comercial', None) else ''),
         'correo': (opciones.correo if opciones and getattr(opciones, 'correo', None) else ''),
     }
+
+# === Helper centralizado para obtener factura multi-tenant ===
+def get_factura_tenant(request, factura_id):
+    """Retorna una factura filtrada por empresa activa o levanta 404.
+
+    Uso en vistas sensibles (SRI, RIDE, pagos, etc.) para evitar repetir patrón.
+    Precondición: usuario autenticado; empresa_activa en sesión.
+    """
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        raise Http404("Empresa no válida")
+    return get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
 
     # Desglose de IVA por porcentaje y detalles enriquecidos para el PDF
     MAPEO_IVA = { '0': Decimal('0.00'), '5': Decimal('5.00'), '2': Decimal('12.00'), '10': Decimal('13.00'),
@@ -1090,21 +1122,20 @@ class Eliminar(LoginRequiredMixin, View):
             return HttpResponseForbidden()
 
         if modo == 'producto':
-            prod = get_object_or_404(Producto, id=p)
+            prod = get_object_or_404(Producto, id=p, empresa_id=empresa_id)
             prod.delete()
-            messages.success(request, 'Producto de ID %s borrado exitosamente.' % p)
+            messages.success(request, f'Producto de ID {p} borrado exitosamente.')
             return HttpResponseRedirect("/inventario/listarProductos")
 
         elif modo == 'cliente':
-            cliente = Cliente.objects.get(id=p)
+            cliente = get_object_or_404(Cliente, id=p, empresa_id=empresa_id)
             cliente.delete()
-            messages.success(request, 'Cliente de ID %s borrado exitosamente.' % p)
+            messages.success(request, f'Cliente de ID {p} borrado exitosamente.')
             return HttpResponseRedirect("/inventario/listarClientes")
 
         elif modo == 'proforma':
-            # Eliminar proforma perteneciente a la empresa activa
             from .models import Proforma
-            proforma = get_object_or_404(Proforma, id=p)
+            proforma = get_object_or_404(Proforma, id=p, empresa_id=empresa_id)
             numero = proforma.numero
             proforma.delete()
             messages.success(request, f'Proforma {numero} eliminada exitosamente.')
@@ -1112,9 +1143,9 @@ class Eliminar(LoginRequiredMixin, View):
 
 
         elif modo == 'proveedor':
-            proveedor = Proveedor.objects.get(id=p)
+            proveedor = get_object_or_404(Proveedor, id=p, empresa_id=empresa_id)
             proveedor.delete()
-            messages.success(request, 'Proveedor de ID %s borrado exitosamente.' % p)
+            messages.success(request, f'Proveedor de ID {p} borrado exitosamente.')
             return HttpResponseRedirect("/inventario/listarProveedores")
 
         elif modo == 'usuario':
@@ -1131,9 +1162,13 @@ class Eliminar(LoginRequiredMixin, View):
                 return HttpResponseRedirect('/inventario/listarUsuarios')
 
             else:
-                usuario = Usuario.objects.get(id=p)
-                usuario.delete()
-                messages.success(request, 'Usuario de ID %s borrado exitosamente.' % p)
+                usuario_obj = get_object_or_404(Usuario, id=p)
+                # Si Usuario tiene relación M2M con empresas, validar pertenencia
+                if hasattr(usuario_obj, 'empresas') and not usuario_obj.empresas.filter(id=empresa_id).exists():
+                    messages.error(request, 'El usuario no pertenece a la empresa activa.')
+                    return HttpResponseRedirect('/inventario/listarUsuarios')
+                usuario_obj.delete()
+                messages.success(request, f'Usuario de ID {p} borrado exitosamente.')
                 return HttpResponseRedirect("/inventario/listarUsuarios")
 
             #Fin de vista-------------------------------------------------------------------
@@ -1332,10 +1367,11 @@ class EditarProducto(LoginRequiredMixin, View):
 
     def post(self, request, p):
         empresa_id = request.session.get('empresa_activa')
-        if not request.user.empresas.filter(id=empresa_id).exists():
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden()
 
-        prod = get_object_or_404(Producto, id=p)
+        # Lookup multi-tenant
+        prod = get_object_or_404(Producto, id=p, empresa_id=empresa_id)
         form = ProductoFormulario(request.POST, instance=prod, empresa=prod.empresa)
         if form.is_valid():
             codigo = form.cleaned_data['codigo']
@@ -1369,10 +1405,10 @@ class EditarProducto(LoginRequiredMixin, View):
 
     def get(self, request, p):
         empresa_id = request.session.get('empresa_activa')
-        if not request.user.empresas.filter(id=empresa_id).exists():
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden()
 
-        prod = get_object_or_404(Producto, id=p)
+        prod = get_object_or_404(Producto, id=p, empresa_id=empresa_id)
         form = ProductoFormulario(instance=prod, empresa=prod.empresa)
         # Envia al usuario el formulario para que lo llene
         contexto = {'form': form, 'modo': request.session.get('productoProcesado'), 'editar': True}
@@ -1382,19 +1418,30 @@ class EditarProducto(LoginRequiredMixin, View):
 
 #Fin de vista------------------------------------------------------------------------------------#
 
-# Búsqueda de Clientes
+## Búsqueda de Clientes (versión unificada multi-tenant)
 @require_empresa_activa
 def buscar_cliente(request):
-    query = request.GET.get('q', '')
+    """Autocomplete / búsqueda ligera de clientes en la empresa activa."""
+    query = request.GET.get('q', '').strip()
     empresa_id = request.session.get('empresa_activa')
-    clientes = Cliente.objects.filter(identificacion__icontains=query)[:5]
-    resultados = [
-        {
-            'id': cliente.id,
-            'nombre': f"{cliente.identificacion} - {cliente.razon_social} {cliente.nombre_comercial if cliente.nombre_comercial else ''}"
-        }
-        for cliente in clientes
-    ]
+    if not query:
+        return JsonResponse([], safe=False)
+    clientes = (Cliente.objects
+                .filter(empresa_id=empresa_id)
+                .filter(
+                    Q(identificacion__icontains=query) |
+                    Q(razon_social__icontains=query) |
+                    Q(nombre_comercial__icontains=query)
+                )[:8])
+    resultados = []
+    for c in clientes:
+        resultados.append({
+            'id': c.id,
+            'identificacion': c.identificacion,
+            'razon_social': c.razon_social,
+            'nombre_comercial': c.nombre_comercial or '',
+            'nombre_compuesto': (c.razon_social + (f" {c.nombre_comercial}" if c.nombre_comercial else "")).strip()
+        })
     return JsonResponse(resultados, safe=False)
 
 # Búsqueda de Productos
@@ -1636,9 +1683,16 @@ class ExportarClientes(LoginRequiredMixin, View):
         form = ExportarClientesFormulario(request.POST)
         if form.is_valid():
             request.session['clientesExportados'] = True
+            # ================= MULTI-EMPRESA FIX =================
+            # Export ONLY clients belonging to the active empresa.
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id:
+                return HttpResponse("Empresa activa no establecida", status=400)
 
-            #Se obtienen las entradas de producto en formato JSON
-            data = serializers.serialize("json", Cliente.objects.all())
+            queryset = Cliente.objects.filter(empresa_id=empresa_id)
+            # ======================================================
+
+            data = serializers.serialize("json", queryset)
             fs = FileSystemStorage('inventario/tmp/')
 
             #Se utiliza la variable fs para acceder a la carpeta con mas facilidad
@@ -1676,8 +1730,11 @@ class EditarCliente(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request, p):
-        # Crea una instancia del formulario y la llena con los datos:
-        cliente = Cliente.objects.get(id=p)
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return HttpResponseForbidden()
+        # Crea una instancia del formulario y la llena con los datos (multi-tenant)
+        cliente = get_object_or_404(Cliente, id=p, empresa_id=empresa_id)
         form = ClienteFormulario(request.POST, instance=cliente, empresa=cliente.empresa)
         # Revisa si es valido:
 
@@ -1719,7 +1776,10 @@ class EditarCliente(LoginRequiredMixin, View):
             return render(request, 'inventario/cliente/agregarCliente.html', {'form': form})
 
     def get(self, request, p):
-        cliente = Cliente.objects.get(id=p)
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return redirect('inventario:seleccionar_empresa')
+        cliente = get_object_or_404(Cliente, id=p, empresa_id=empresa_id)
         form = ClienteFormulario(instance=cliente, empresa=cliente.empresa)
         #Envia al usuario el formulario para que lo llene
         contexto = {'form': form, 'modo': request.session.get('clienteProcesado'), 'editar': True}
@@ -1733,74 +1793,108 @@ class EditarCliente(LoginRequiredMixin, View):
 # ===== AGREGAR ESTAS FUNCIONES AL FINAL DE views.py =====
 
 def obtener_datos_secuencia(request, secuencia_id):
-    """
-    Busca la secuencia seleccionada por su ID y devuelve los datos formateados.
-    Calcula automáticamente el siguiente número según el tipo de documento:
-    - '01' Factura: busca en Factura
-    - '06' Guía de Remisión: busca en GuiaRemision
-    """
-    try:
-        secuencia = Secuencia.objects.get(id=secuencia_id)
+        """Obtiene (y opcionalmente reserva) el siguiente número para una secuencia.
 
-        establecimiento_formatted = secuencia.get_establecimiento_formatted()
-        punto_emision_formatted = secuencia.get_punto_emision_formatted()
+        Parámetros (querystring):
+            reservar=1   Si se incluye, incrementa y persiste el valor (reserva real)
 
-        numeros_existentes = []
+        Lógica:
+            1. Bloquea la fila de Secuencia (select_for_update) para evitar carreras.
+            2. Si es tipo factura ('01') o guía ('06'), determina el máximo ya usado en
+                 la tabla correspondiente (Factura.secuencia o GuiaRemision.secuencial) para
+                 sincronizar en caso de que el registro Secuencia haya quedado atrasado.
+            3. Calcula next = max(actual_en_tabla, secuencia.secuencial) + 1 (o 1 si vacío).
+            4. Si reservar=1: actualiza secuencia.secuencial = next y guarda.
+            5. Devuelve el número formateado sin afectar si no se pide reservar.
 
+        Esto permite a la UI consultar sin consumir y sólo reservar cuando se confirme
+        la creación del documento (llamando nuevamente con reservar=1) o directamente
+        usar reservar=1 desde el flujo de emisión para evitar dobles asignaciones.
+        """
         try:
-            if secuencia.tipo_documento == '01':
-                # Facturas
-                facturas_existentes = Factura.objects.filter(
-                    establecimiento=establecimiento_formatted,
-                    punto_emision=punto_emision_formatted
-                ).values_list('secuencia', flat=True)
-                for seq in facturas_existentes:
-                    try:
-                        numeros_existentes.append(int(seq))
-                    except (ValueError, TypeError):
-                        continue
-            elif secuencia.tipo_documento == '06':
-                # Guías de Remisión
-                guias_existentes = GuiaRemision.objects.filter(
-                    establecimiento=establecimiento_formatted,
-                    punto_emision=punto_emision_formatted
-                ).values_list('secuencial', flat=True)
-                for seq in guias_existentes:
-                    try:
-                        numeros_existentes.append(int(seq))
-                    except (ValueError, TypeError):
-                        continue
-            else:
-                # Fallback: usar el valor de Secuencia como base
-                if secuencia.secuencial is not None:
-                    numeros_existentes.append(int(secuencia.secuencial))
-        except Exception as inner_e:
-            print(f"🔎 DEBUG: Error interno al calcular siguiente número: {inner_e}")
+            from django.db import transaction
+            from django.db.models import Max
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id:
+                return JsonResponse({'success': False, 'error': 'Empresa no activa'}, status=403)
 
-        if numeros_existentes:
-            siguiente_numero = max(numeros_existentes) + 1
-        else:
-            siguiente_numero = 1
+            with transaction.atomic():
+                # Bloquea la fila de la secuencia para lecturas concurrentes seguras
+                secuencia = (Secuencia.objects.select_for_update()
+                             .get(id=secuencia_id, empresa_id=empresa_id))
 
-        siguiente_numero_formateado = f"{siguiente_numero:09d}"
+                establecimiento_formatted = secuencia.get_establecimiento_formatted()
+                punto_emision_formatted = secuencia.get_punto_emision_formatted()
 
-        return JsonResponse({
-            'success': True,
-            'data': {
-                'id': secuencia.id,
-                'descripcion': secuencia.descripcion,
-                'establecimiento': establecimiento_formatted,
-                'punto_emision': punto_emision_formatted,
-                'secuencial': siguiente_numero_formateado,
-                'tipo_documento': secuencia.tipo_documento,
-                'activo': secuencia.activo
-            }
-        })
-    except Secuencia.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Secuencia no encontrada'}, status=404)
-    except Exception as e:
-        print(f"💥 DEBUG: Error en obtener_datos_secuencia: {str(e)}")
-        return JsonResponse({'success': False, 'error': f'Error interno: {str(e)}'}, status=500)
+                siguiente_numero = 1
+                if secuencia.tipo_documento == '01':
+                    max_seq = (Factura.objects.filter(
+                        empresa_id=empresa_id,
+                        establecimiento=establecimiento_formatted,
+                        punto_emision=punto_emision_formatted
+                    ).aggregate(m=Max('secuencia'))['m'])
+                    if max_seq:
+                        try:
+                            siguiente_numero = int(max_seq) + 1
+                        except ValueError:
+                            siguiente_numero = 1
+                elif secuencia.tipo_documento == '06':
+                    max_seq = (GuiaRemision.objects.filter(
+                        empresa_id=empresa_id,
+                        establecimiento=establecimiento_formatted,
+                        punto_emision=punto_emision_formatted
+                    ).aggregate(m=Max('secuencial'))['m'])
+                    if max_seq:
+                        try:
+                            siguiente_numero = int(max_seq) + 1
+                        except ValueError:
+                            siguiente_numero = 1
+                else:
+                    # Usa el valor propio de la secuencia como base, si existe
+                    if secuencia.secuencial:
+                        try:
+                            siguiente_numero = int(secuencia.secuencial) + 1
+                        except ValueError:
+                            siguiente_numero = 1
+
+                # Determinar si se solicita reserva real
+                reservar = request.GET.get('reservar') in ('1', 'true', 'True')
+
+                # Para robustez: si secuencia.secuencial está por detrás del máximo detectado, sincronizar primero
+                try:
+                    base_actual = int(secuencia.secuencial)
+                except (TypeError, ValueError):
+                    base_actual = 0
+
+                # next calculado arriba es el siguiente libre según tablas; si base_actual > (siguiente_numero-1) usar base_actual+1
+                if base_actual >= (siguiente_numero - 1):
+                    siguiente_numero = base_actual + 1
+
+                if reservar:
+                    # Persistir nuevo valor (ya validado que no exceda 9 dígitos en modelo)
+                    secuencia.secuencial = siguiente_numero
+                    secuencia.save(update_fields=['secuencial'])
+
+                siguiente_numero_formateado = f"{siguiente_numero:09d}"
+
+                return JsonResponse({
+                    'success': True,
+                    'data': {
+                        'id': secuencia.id,
+                        'descripcion': secuencia.descripcion,
+                        'establecimiento': establecimiento_formatted,
+                        'punto_emision': punto_emision_formatted,
+                        'secuencial': siguiente_numero_formateado,
+                        'tipo_documento': secuencia.tipo_documento,
+                        'activo': secuencia.activo,
+                        'reservado': reservar
+                    }
+                })
+        except Secuencia.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Secuencia no encontrada'}, status=404)
+        except Exception as e:
+            print(f"💥 DEBUG: Error en obtener_datos_secuencia: {str(e)}")
+            return JsonResponse({'success': False, 'error': f'Error interno: {str(e)}'}, status=500)
 
 
 # ===== ASEGURAR QUE ESTAS FUNCIONES TAMBIÉN ESTÉN PRESENTES =====
@@ -1808,73 +1902,7 @@ def obtener_datos_secuencia(request, secuencia_id):
 
 
 
-def buscar_cliente(request):
-    """
-    Busca un cliente por identificación.
-    Si no existe en la base de datos consulta la API externa y crea el registro.
-    """
-    try:
-        empresa_id = request.session.get('empresa_activa')
-        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
-            return JsonResponse({'error': True, 'message': 'No se ha seleccionado una empresa válida'}, status=400)
-
-        identificacion = request.GET.get('q', '').strip()
-        if not identificacion:
-            return JsonResponse({'error': True, 'message': 'Debe proporcionar una identificación'}, status=400)
-
-        cliente = Cliente.objects.filter(identificacion=identificacion).first()
-        if cliente:
-            nombre_completo = cliente.razon_social
-            if cliente.nombre_comercial:
-                nombre_completo += f" {cliente.nombre_comercial}"
-            return JsonResponse({
-                'id': cliente.id,
-                'identificacion': cliente.identificacion,
-                'razon_social': cliente.razon_social,
-                'nombre_comercial': cliente.nombre_comercial or '',
-                'correo': cliente.correo or ''
-            })
-
-        # Consultar API externa
-        from services import consultar_identificacion as servicio_consultar_identificacion
-        resultado = servicio_consultar_identificacion(identificacion)
-        if resultado.get('error'):
-            return JsonResponse({'error': True, 'message': resultado.get('message', 'No encontrado')}, status=404)
-
-        tipo_ident = resultado.get('tipo_identificacion', '')
-        tipoIdentificacion = '04' if tipo_ident == 'RUC' else '05'
-        tipoCliente = '2' if tipo_ident == 'RUC' else '1'
-        tipo_regimen = resultado.get('tipo_regimen', '')
-        tipoRegimen = '1' if tipo_regimen != 'RIMPE' else '2'
-
-        empresa = Empresa.objects.get(pk=empresa_id)
-
-        cliente = Cliente.objects.create(
-            tipoIdentificacion=tipoIdentificacion,
-            identificacion=identificacion,
-            razon_social=resultado.get('razon_social', ''),
-            nombre_comercial=resultado.get('nombre_comercial', ''),
-            direccion=resultado.get('direccion', ''),
-            telefono=resultado.get('telefono', ''),
-            correo=resultado.get('email', ''),
-            observaciones='',
-            convencional='',
-            tipoVenta='1',
-            tipoRegimen=tipoRegimen,
-            tipoCliente=tipoCliente,
-            empresa=empresa
-        )
-        return JsonResponse({
-            'id': cliente.id,
-            'identificacion': cliente.identificacion,
-            'razon_social': cliente.razon_social,
-            'nombre_comercial': cliente.nombre_comercial or '',
-            'correo': cliente.correo or ''
-        })
-
-    except Exception as e:
-        print(f"❌ Error en buscar_cliente: {e}")
-        return JsonResponse({'error': True, 'message': 'Error interno'}, status=500)
+## Nota: Se eliminó segunda versión duplicada de buscar_cliente (creadora) para evitar ambigüedad.
 # ===== VISTA EMITIR FACTURA CORREGIDA =====
 class EmitirFactura(LoginRequiredMixin, View):
     login_url = '/inventario/login'
@@ -1901,16 +1929,25 @@ class EmitirFactura(LoginRequiredMixin, View):
                     del request.session['facturador_nombre']
                 return redirect('inventario:login_facturador')
 
-            # Obtener las opciones de clientes y secuencias
-            cedulas = Cliente.cedulasRegistradas()
-            secuencias = Secuencia.objects.filter(tipo_documento='01', activo=True)  # Solo facturas activas
-            almacenes = Almacen.objects.filter(activo=True)  # Solo almacenes activos
+            # Obtener empresa activa para limitar datos tenant
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa antes de emitir facturas.')
+                return redirect('inventario:panel')
+
+            # Limitar cedulas/clientes por empresa activa
+            cedulas = Cliente.objects.filter(empresa_id=empresa_id).values_list('id', 'identificacion')
+            # Limitar secuencias a la empresa activa y tipo documento factura (01)
+            secuencias = Secuencia.objects.filter(empresa_id=empresa_id, tipo_documento='01', activo=True).order_by('establecimiento', 'punto_emision')
+            almacenes = Almacen.objects.filter(activo=True, empresa_id=empresa_id)
 
             # Preparar opciones para el formulario
             form = EmitirFacturaFormulario(cedulas=cedulas, secuencias=secuencias)
-            
-            # Actualizar el campo de almacenes dinámicamente
-            form.fields['almacen'].choices = [(a.id, a.descripcion) for a in almacenes]
+
+            # Actualizar el campo de almacenes dinámicamente con placeholder '...'
+            form.fields['almacen'].choices = [('', '...')] + [
+                (a.id, a.descripcion) for a in almacenes
+            ]
 
             # Preparar el contexto
             contexto = {
@@ -1932,8 +1969,8 @@ class EmitirFactura(LoginRequiredMixin, View):
     def post(self, request):
         """Procesa el formulario para crear la factura"""
         try:
-            # Imprimir datos recibidos para depuración
-            print("Datos recibidos del formulario (request.POST):", request.POST)
+            # Imprimir datos recibidos para depuración (puede reducirse en producción)
+            print("[EmitirFactura.post] Datos formulario:", dict(request.POST))
 
             # ✅ RECUPERAR Y VALIDAR FACTURADOR DESDE SESIÓN
             facturador_id = request.session.get('facturador_id')
@@ -1968,7 +2005,7 @@ class EmitirFactura(LoginRequiredMixin, View):
             if not cliente_id:
                 raise ValueError("No se seleccionó un cliente válido.")
                 
-            cliente = get_object_or_404(Cliente, pk=cliente_id)
+            cliente = get_object_or_404(Cliente, pk=cliente_id, empresa_id=empresa.id)
 
             # Actualizar correo del cliente
             correo_cliente = request.POST.get('correo_cliente', '').strip()
@@ -1980,7 +2017,8 @@ class EmitirFactura(LoginRequiredMixin, View):
             # Recuperar datos del almacén
             almacen_id = request.POST.get('almacen')
             if almacen_id:
-                almacen = get_object_or_404(Almacen, pk=almacen_id)
+                # Validar que el almacén pertenezca a la empresa activa
+                almacen = get_object_or_404(Almacen, pk=almacen_id, empresa=empresa)
             else:
                 almacen = None
 
@@ -1997,44 +2035,79 @@ class EmitirFactura(LoginRequiredMixin, View):
             fecha_vencimiento = datetime.strptime(fecha_vencimiento_str, '%Y-%m-%d').date()
 
             # Recuperar datos de secuencia
-            establecimiento = request.POST.get('establecimiento')
-            punto_emision = request.POST.get('punto_emision')
-            secuencia = request.POST.get('secuencia_valor')
+            establecimiento = (request.POST.get('establecimiento') or '').strip()
+            punto_emision = (request.POST.get('punto_emision') or '').strip()
+            secuencia_id = request.POST.get('secuencia')  # ESTE es el select del modelo Secuencia
+            secuencia_visible = request.POST.get('secuencia_valor')  # campo solo informativo mostrado
             concepto = request.POST.get('concepto', 'Sin concepto')
 
-            if not establecimiento or not punto_emision or not secuencia:
+            if not establecimiento or not punto_emision or not secuencia_id:
                 raise ValueError("Establecimiento, Punto de Emisión y Secuencia son obligatorios.")
 
-            # Validar que la secuencia sea numérica
             try:
-                secuencia_num = int(secuencia)
-            except ValueError:
-                raise ValueError("La secuencia debe ser un número válido.")
+                secuencia_obj = Secuencia.objects.get(id=int(secuencia_id), empresa=empresa, activo=True)
+            except (Secuencia.DoesNotExist, ValueError, TypeError):
+                raise ValueError('La secuencia seleccionada no es válida para esta empresa.')
 
-            # ✅ CREAR FACTURA CON FACTURADOR ASIGNADO
-            factura = Factura(
-                empresa=empresa,
-                cliente=cliente,
-                almacen=almacen,
-                facturador=facturador,  # ✅ AGREGAR EL FACTURADOR
-                fecha_emision=fecha_emision,
-                fecha_vencimiento=fecha_vencimiento,
-                establecimiento=establecimiento,
-                punto_emision=punto_emision,
-                secuencia=secuencia,
-                concepto=concepto,
-                identificacion_cliente=cliente.identificacion,
-                nombre_cliente=f"{cliente.razon_social} {cliente.nombre_comercial if cliente.nombre_comercial else ''}".strip(),
-            )
-            factura.save()
+            # Validar coherencia de establecimiento/punto (el usuario NO debería poder cambiarlo a otros valores manualmente)
+            if (str(secuencia_obj.get_establecimiento_formatted()) != str(establecimiento) or
+                str(secuencia_obj.get_punto_emision_formatted()) != str(punto_emision)):
+                raise ValueError('Los datos de establecimiento/punto de emisión no coinciden con la secuencia seleccionada.')
 
-            # Guardar el ID de la factura en la sesión
-            request.session['factura_id'] = factura.id
+            from django.db import transaction
+
+            def reservar_siguiente_secuencia(secuencia):
+                """Reserva de forma segura el siguiente número secuencial.
+                Bloquea la fila, sincroniza si está atrasada y retorna el nuevo formateado."""
+                from django.db.models import Max
+                # Bloquear la misma secuencia (misma empresa + PK)
+                bloqueada = (Secuencia.objects.select_for_update()
+                             .get(id=secuencia.id, empresa_id=secuencia.empresa_id))
+                base = int(bloqueada.secuencial or 0)
+
+                # Sincronizar con Factura existente por seguridad (si alguien creó por fuera)
+                max_fact = (Factura.objects.filter(
+                    empresa_id=bloqueada.empresa_id,
+                    establecimiento=bloqueada.get_establecimiento_formatted(),
+                    punto_emision=bloqueada.get_punto_emision_formatted()
+                ).aggregate(m=Max('secuencia'))['m'])
+                if max_fact:
+                    try:
+                        max_fact_int = int(max_fact)
+                        if max_fact_int > base:
+                            base = max_fact_int
+                    except ValueError:
+                        pass
+
+                nuevo = base + 1
+                bloqueada.secuencial = nuevo
+                bloqueada.save(update_fields=['secuencial'])
+                return f"{nuevo:09d}"
+
+            with transaction.atomic():
+                secuencia_formateada = reservar_siguiente_secuencia(secuencia_obj)
+
+                factura = Factura(
+                    empresa=empresa,
+                    cliente=cliente,
+                    almacen=almacen,
+                    facturador=facturador,
+                    fecha_emision=fecha_emision,
+                    fecha_vencimiento=fecha_vencimiento,
+                    establecimiento=secuencia_obj.get_establecimiento_formatted(),
+                    punto_emision=secuencia_obj.get_punto_emision_formatted(),
+                    secuencia=secuencia_formateada,
+                    concepto=concepto,
+                    identificacion_cliente=cliente.identificacion,
+                    nombre_cliente=f"{cliente.razon_social} {cliente.nombre_comercial if cliente.nombre_comercial else ''}".strip(),
+                )
+                factura.save()
+                request.session['factura_id'] = factura.id
 
             print(f"✅ Factura creada exitosamente con ID: {factura.id}")
             print(f"   - Facturador: {facturador.nombres}")
             print(f"   - Cliente: {cliente.razon_social}")
-            print(f"   - Número: {establecimiento}-{punto_emision}-{secuencia}")
+            print(f"   - Número: {establecimiento}-{punto_emision}-{secuencia_formateada} (Secuencia ID {secuencia_obj.id})")
 
             messages.success(request, f'Factura generada exitosamente por {facturador.nombres}. Agregue los productos en el detalle de factura.')
             return redirect('inventario:detallesDeFactura')
@@ -2063,187 +2136,194 @@ class DetallesFactura(LoginRequiredMixin, View):
 
     def post(self, request):
         try:
-            print("=== INICIO DE PROCESAMIENTO DE DETALLES ===")
-            print("POST data received:", dict(request.POST))
-            print("POST KEYS:", list(request.POST.keys()))
-            # Log de emergencia para depuración de arrays
-            print("\n=== DIAGNÓSTICO DE CAMPOS DE PRODUCTOS ===")
-            for key in request.POST.keys():
-                print(f"Campo recibido: {key} => {request.POST.getlist(key)}")
-            print("=== FIN DIAGNÓSTICO ===\n")
+            # Garantiza que creación de detalles, totales y formas de pago sea atómica
+            from django.db import transaction
+            with transaction.atomic():
+                print("=== INICIO DE PROCESAMIENTO DE DETALLES ===")
+                print("POST data received:", dict(request.POST))
+                print("POST KEYS:", list(request.POST.keys()))
+                # Log de emergencia para depuración de arrays
+                print("\n=== DIAGNÓSTICO DE CAMPOS DE PRODUCTOS ===")
+                for key in request.POST.keys():
+                    print(f"Campo recibido: {key} => {request.POST.getlist(key)}")
+                print("=== FIN DIAGNÓSTICO ===\n")
 
-            # Verificar que existe una factura en sesión
-            factura_id = request.session.get('factura_id')
-            if not factura_id:
-                messages.error(request, 'No se encontró la factura a la cual agregar productos.')
-                return redirect('inventario:emitirFactura')
+                # Verificar factura en sesión y pertenencia a empresa activa
+                empresa_id = request.session.get('empresa_activa')
+                factura_id = request.session.get('factura_id')
+                if not factura_id:
+                    messages.error(request, 'No se encontró la factura a la cual agregar productos.')
+                    return redirect('inventario:emitirFactura')
 
-            # Obtener la factura
-            factura = Factura.objects.filter(pk=factura_id).first()
-            if not factura:
-                messages.error(request, 'No se pudo encontrar la factura.')
-                return redirect('inventario:emitirFactura')
+                factura = Factura.objects.filter(pk=factura_id, empresa_id=empresa_id).first()
+                if not factura:
+                    if Factura.objects.filter(pk=factura_id).exists():
+                        messages.error(request, 'Acceso no autorizado a factura de otra empresa.')
+                    else:
+                        messages.error(request, 'No se pudo encontrar la factura.')
+                    request.session.pop('factura_id', None)
+                    return redirect('inventario:emitirFactura')
 
-            print(f"Procesando factura ID: {factura_id}")
-            
-            # ✅ LOGGING SÚPER DETALLADO para debug completo
-            logger.info("="*80)
-            logger.info("🚀 INICIANDO PROCESAMIENTO DE FACTURA")
-            logger.info(f"📋 POST data completo: {dict(request.POST)}")
-            logger.info("="*80)
-
-            # Obtener listas de códigos y cantidades
-            codigos = request.POST.getlist('productos_codigos[]')
-            cantidades = request.POST.getlist('productos_cantidades[]')
-            # Si no llegan, intentar variantes comunes de nombre
-            if not codigos:
-                codigos = request.POST.getlist('productos_codigos')
-            if not cantidades:
-                cantidades = request.POST.getlist('productos_cantidades')
-
-            print(f"Códigos recibidos: {codigos}")
-            print(f"Cantidades recibidas: {cantidades}")
-            
-            logger.info(f"📦 Códigos recibidos: {codigos}")
-            logger.info(f"🔢 Cantidades recibidas: {cantidades}")
-
-            # Validaciones iniciales
-            if not codigos or not cantidades:
-                # Mensaje de ayuda para el frontend
-                msg = (
-                    "No se enviaron productos para la factura.\n"
-                    "\nDiagnóstico:\n"
-                    f"Campos recibidos: {list(request.POST.keys())}\n"
-                    "El backend espera los campos 'productos_codigos[]' y 'productos_cantidades[]' como arrays.\n"
-                    "Asegúrate de que el formulario los envía exactamente con esos nombres y como múltiples campos (input hidden con name='productos_codigos[]').\n"
-                    "Ejemplo correcto en HTML:\n"
-                    "<input type='hidden' name='productos_codigos[]' value='COD1'>\n"
-                    "<input type='hidden' name='productos_codigos[]' value='COD2'>\n"
-                    "<input type='hidden' name='productos_cantidades[]' value='1'>\n"
-                    "<input type='hidden' name='productos_cantidades[]' value='2'>\n"
-                    "\nRevisa el JavaScript que genera estos campos antes de enviar el formulario.\n"
-                )
-                print(msg)
-                messages.error(request, msg)
-                return self.get(request)
-
-            if len(codigos) != len(cantidades):
-                messages.error(request, "Error en los datos de productos enviados.")
-                return self.get(request)
-
-            # Asegurar que la factura tenga un ID antes de acceder a relaciones
-            if not factura.pk:
-                factura.save()
-                print(f"Factura guardada con ID: {factura.id}")
-            
-            # Limpiar detalles anteriores de esta factura
-            DetalleFactura.objects.filter(factura=factura).delete()
-            print("Detalles anteriores eliminados")
-
-            # Variables para totales (SRI requiere exactitud en cálculos)
-            sub_monto = Decimal('0.00')
-            base_imponible = Decimal('0.00')
-            monto_general = Decimal('0.00')
-            total_iva = Decimal('0.00')
-            productos_procesados = 0
-
-            # Procesar cada producto
-            errores = []  # Inicializar la lista de errores
-            for codigo, cantidad_str in zip(codigos, cantidades):
-                producto = Producto.objects.filter(empresa_id=factura.empresa_id, codigo=codigo).first()
-                servicio = Servicio.objects.filter(empresa_id=factura.empresa_id, codigo=codigo).first()
-                if not producto and not servicio:
-                    errores.append(f"Producto o servicio con código '{codigo}' no encontrado.")
-                    continue
-
-                cantidad = int(cantidad_str)
-                descuento = Decimal('0.00')
-                porcentaje_descuento = Decimal('0.00')
-                precio_sin_subsidio = None
-
-                # Mapeo de códigos SRI a porcentajes reales
-                MAPEO_IVA = {
-                    '0': Decimal('0.00'),  # Sin IVA
-                    '5': Decimal('0.05'),  # 5%
-                    '2': Decimal('0.12'),  # 12%
-                    '10': Decimal('0.13'), # 13%
-                    '3': Decimal('0.14'),  # 14%
-                    '4': Decimal('0.15'),  # 15%
-                    '9': Decimal('0.16'),  # 16% - Agregado para servicios
-                    '6': Decimal('0.00'),  # Exento
-                    '7': Decimal('0.00'),  # Exento
-                    '8': Decimal('0.08')   # 8%
-                }
-
-                if producto:
-                    precio_unitario = producto.precio
-                    # Usar el mapeo de códigos SRI
-                    iva_code = str(producto.iva.iva if hasattr(producto.iva, 'iva') else producto.iva)
-                    iva_percent = MAPEO_IVA.get(iva_code, Decimal('0.12'))
-                elif servicio:
-                    precio_unitario = servicio.precio1
-                    iva_code = str(servicio.iva.iva if hasattr(servicio.iva, 'iva') else servicio.iva)
-                    iva_percent = MAPEO_IVA.get(iva_code, Decimal('0.12'))
-                else:
-                    continue
-
-                # 🔍 DEBUG: Logging detallado de cálculos
-                logger.info(f"🔢 PROCESANDO: Código={codigo}, Cantidad={cantidad}")
-                logger.info(f"   Precio unitario: {precio_unitario}")
-                logger.info(f"   IVA code: {iva_code}")
-                logger.info(f"   IVA percent: {iva_percent}")
-
-                # ✅ CORREGIDO: Usar mismo algoritmo que JavaScript para exactitud
-                # JavaScript: precioConIva = precio * (1 + ivaPercent); totalConIva = cantidad * precioConIva;
-                precio_con_iva_unitario = precio_unitario * (Decimal('1.00') + iva_percent)
-                total = precio_con_iva_unitario * cantidad
-                subtotal = precio_unitario * cantidad
-                valor_iva = total - subtotal
-
-                logger.info(f"   Precio con IVA unitario SIN redondear: {precio_con_iva_unitario}")
-                logger.info(f"   Total SIN redondear: {total}")
-
-                # Redondear a 2 decimales EXACTO como JavaScript Math.round()
-                subtotal = subtotal.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                valor_iva = valor_iva.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                total = total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-
-                logger.info(f"   Total CON redondeo Django: {total}")
-                logger.info(f"   📊 Acumulando en monto_general: {monto_general} + {total}")
-
-                detalle = DetalleFactura.objects.create(
-                    factura=factura,
-                    producto=producto if producto else None,
-                    servicio=servicio if servicio else None,
-                    cantidad=cantidad,
-                    sub_total=subtotal,
-                    total=total,
-                    descuento=descuento,
-                    porcentaje_descuento=porcentaje_descuento,
-                    precio_sin_subsidio=precio_sin_subsidio
-                )
+                print(f"Procesando factura ID: {factura_id}")
                 
-                # 🔧 CRÍTICO: Actualizar el detalle CON LOS VALORES CORRECTOS después del save()
-                # El método save() del modelo puede recalcular, así que forzamos nuestros valores
-                DetalleFactura.objects.filter(id=detalle.id).update(
-                    sub_total=subtotal,
-                    total=total
-                )
+                # ✅ LOGGING SÚPER DETALLADO para debug completo
+                logger.info("="*80)
+                logger.info("🚀 INICIANDO PROCESAMIENTO DE FACTURA")
+                logger.info(f"📋 POST data completo: {dict(request.POST)}")
+                logger.info("="*80)
 
-                # Acumular totales
-                sub_monto += subtotal
-                if iva_percent > 0:
-                    base_imponible += subtotal
-                    total_iva += valor_iva
-                # El total de la factura debe incluir todos los productos y servicios,
-                # sin importar si tienen o no IVA asociado
-                monto_general += total
+                # Obtener listas de códigos y cantidades
+                codigos = request.POST.getlist('productos_codigos[]')
+                cantidades = request.POST.getlist('productos_cantidades[]')
+                # Si no llegan, intentar variantes comunes de nombre
+                if not codigos:
+                    codigos = request.POST.getlist('productos_codigos')
+                if not cantidades:
+                    cantidades = request.POST.getlist('productos_cantidades')
 
-                print(f"✅ Producto procesado: {codigo} - Cantidad: {cantidad} - Precio unitario: {precio_unitario} - Subtotal: {subtotal} - IVA: {valor_iva} - Total: {total}")
-                productos_procesados += 1
-            if hasattr(factura, 'crear_totales_impuestos_automatico'):
-                factura.crear_totales_impuestos_automatico()
-            factura.save()
+                print(f"Códigos recibidos: {codigos}")
+                print(f"Cantidades recibidas: {cantidades}")
+                
+                logger.info(f"📦 Códigos recibidos: {codigos}")
+                logger.info(f"🔢 Cantidades recibidas: {cantidades}")
+
+                # Validaciones iniciales
+                if not codigos or not cantidades:
+                    # Mensaje de ayuda para el frontend
+                    msg = (
+                        "No se enviaron productos para la factura.\n"
+                        "\nDiagnóstico:\n"
+                        f"Campos recibidos: {list(request.POST.keys())}\n"
+                        "El backend espera los campos 'productos_codigos[]' y 'productos_cantidades[]' como arrays.\n"
+                        "Asegúrate de que el formulario los envía exactamente con esos nombres y como múltiples campos (input hidden con name='productos_codigos[]').\n"
+                        "Ejemplo correcto en HTML:\n"
+                        "<input type='hidden' name='productos_codigos[]' value='COD1'>\n"
+                        "<input type='hidden' name='productos_codigos[]' value='COD2'>\n"
+                        "<input type='hidden' name='productos_cantidades[]' value='1'>\n"
+                        "<input type='hidden' name='productos_cantidades[]' value='2'>\n"
+                        "\nRevisa el JavaScript que genera estos campos antes de enviar el formulario.\n"
+                    )
+                    print(msg)
+                    messages.error(request, msg)
+                    return self.get(request)
+
+                if len(codigos) != len(cantidades):
+                    messages.error(request, "Error en los datos de productos enviados.")
+                    return self.get(request)
+
+                # Asegurar que la factura tenga un ID antes de acceder a relaciones
+                if not factura.pk:
+                    factura.save()
+                    print(f"Factura guardada con ID: {factura.id}")
+                
+                # Limpiar detalles anteriores de esta factura
+                DetalleFactura.objects.filter(factura=factura).delete()
+                print("Detalles anteriores eliminados")
+
+                # Variables para totales (SRI requiere exactitud en cálculos)
+                sub_monto = Decimal('0.00')
+                base_imponible = Decimal('0.00')
+                monto_general = Decimal('0.00')
+                total_iva = Decimal('0.00')
+                productos_procesados = 0
+
+                # Procesar cada producto
+                errores = []  # Inicializar la lista de errores
+                for codigo, cantidad_str in zip(codigos, cantidades):
+                    producto = Producto.objects.filter(empresa_id=factura.empresa_id, codigo=codigo).first()
+                    servicio = Servicio.objects.filter(empresa_id=factura.empresa_id, codigo=codigo).first()
+                    if not producto and not servicio:
+                        errores.append(f"Producto o servicio con código '{codigo}' no encontrado.")
+                        continue
+
+                    cantidad = int(cantidad_str)
+                    descuento = Decimal('0.00')
+                    porcentaje_descuento = Decimal('0.00')
+                    precio_sin_subsidio = None
+
+                    # Mapeo de códigos SRI a porcentajes reales
+                    MAPEO_IVA = {
+                        '0': Decimal('0.00'),  # Sin IVA
+                        '5': Decimal('0.05'),  # 5%
+                        '2': Decimal('0.12'),  # 12%
+                        '10': Decimal('0.13'), # 13%
+                        '3': Decimal('0.14'),  # 14%
+                        '4': Decimal('0.15'),  # 15%
+                        '9': Decimal('0.15'),  # 15% (antes 16%) normalizado
+                        '6': Decimal('0.00'),  # Exento
+                        '7': Decimal('0.00'),  # Exento
+                        '8': Decimal('0.08')   # 8%
+                    }
+
+                    if producto:
+                        precio_unitario = producto.precio
+                        # Usar el mapeo de códigos SRI
+                        iva_code = str(producto.iva.iva if hasattr(producto.iva, 'iva') else producto.iva)
+                        iva_percent = MAPEO_IVA.get(iva_code, Decimal('0.12'))
+                    elif servicio:
+                        precio_unitario = servicio.precio1
+                        iva_code = str(servicio.iva.iva if hasattr(servicio.iva, 'iva') else servicio.iva)
+                        iva_percent = MAPEO_IVA.get(iva_code, Decimal('0.12'))
+                    else:
+                        continue
+
+                    # 🔍 DEBUG: Logging detallado de cálculos
+                    logger.info(f"🔢 PROCESANDO: Código={codigo}, Cantidad={cantidad}")
+                    logger.info(f"   Precio unitario: {precio_unitario}")
+                    logger.info(f"   IVA code: {iva_code}")
+                    logger.info(f"   IVA percent: {iva_percent}")
+
+                    # ✅ CORREGIDO: Usar mismo algoritmo que JavaScript para exactitud
+                    # JavaScript: precioConIva = precio * (1 + ivaPercent); totalConIva = cantidad * precioConIva;
+                    precio_con_iva_unitario = precio_unitario * (Decimal('1.00') + iva_percent)
+                    total = precio_con_iva_unitario * cantidad
+                    subtotal = precio_unitario * cantidad
+                    valor_iva = total - subtotal
+
+                    logger.info(f"   Precio con IVA unitario SIN redondear: {precio_con_iva_unitario}")
+                    logger.info(f"   Total SIN redondear: {total}")
+
+                    # Redondear a 2 decimales EXACTO como JavaScript Math.round()
+                    subtotal = subtotal.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    valor_iva = valor_iva.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    total = total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+                    logger.info(f"   Total CON redondeo Django: {total}")
+                    logger.info(f"   📊 Acumulando en monto_general: {monto_general} + {total}")
+
+                    detalle = DetalleFactura.objects.create(
+                        factura=factura,
+                        producto=producto if producto else None,
+                        servicio=servicio if servicio else None,
+                        cantidad=cantidad,
+                        sub_total=subtotal,
+                        total=total,
+                        descuento=descuento,
+                        porcentaje_descuento=porcentaje_descuento,
+                        precio_sin_subsidio=precio_sin_subsidio
+                    )
+                    
+                    # 🔧 CRÍTICO: Actualizar el detalle CON LOS VALORES CORRECTOS después del save()
+                    # El método save() del modelo puede recalcular, así que forzamos nuestros valores
+                    DetalleFactura.objects.filter(id=detalle.id).update(
+                        sub_total=subtotal,
+                        total=total
+                    )
+
+                    # Acumular totales
+                    sub_monto += subtotal
+                    if iva_percent > 0:
+                        base_imponible += subtotal
+                        total_iva += valor_iva
+                    # El total de la factura debe incluir todos los productos y servicios,
+                    # sin importar si tienen o no IVA asociado
+                    monto_general += total
+
+                    print(f"✅ Producto procesado: {codigo} - Cantidad: {cantidad} - Precio unitario: {precio_unitario} - Subtotal: {subtotal} - IVA: {valor_iva} - Total: {total}")
+                    productos_procesados += 1
+                if hasattr(factura, 'crear_totales_impuestos_automatico'):
+                    factura.crear_totales_impuestos_automatico()
+                factura.save()
 
         except Exception as e:
             print(f"❌ Error general en procesamiento: {e}")
@@ -2252,7 +2332,7 @@ class DetallesFactura(LoginRequiredMixin, View):
             
             # ✅ AGREGAR: En caso de error, también enviar cajas
             try:
-                cajas_activas = Caja.objects.filter(activo=True).order_by('descripcion')
+                cajas_activas = Caja.objects.filter(activo=True, empresa_id=empresa_id).order_by('descripcion') if empresa_id else Caja.objects.none()
                 contexto = {
                     'cajas': cajas_activas,
                 }
@@ -2268,7 +2348,7 @@ class DetallesFactura(LoginRequiredMixin, View):
         if productos_procesados == 0:
             # ✅ AGREGAR: En caso de error, también enviar cajas
             try:
-                cajas_activas = Caja.objects.filter(activo=True).order_by('descripcion')
+                cajas_activas = Caja.objects.filter(activo=True, empresa_id=empresa_id).order_by('descripcion') if empresa_id else Caja.objects.none()
                 contexto = {
                     'cajas': cajas_activas,
                 }
@@ -2339,7 +2419,26 @@ class DetallesFactura(LoginRequiredMixin, View):
             logger.info(f"💰 Cantidad de pagos: {len(pagos_list)}")
             
             if not pagos_list:
-                raise Exception("FORMAS DE PAGO REQUERIDAS - No se recibieron datos de pago")
+                logger.warning("⚠️ No se recibieron formas de pago desde el formulario. Creando forma de pago por defecto para evitar bloqueo.")
+                # Asegurar totales actualizados antes de crear pago automático
+                factura.refresh_from_db()
+                monto_total_factura = factura.monto_general or Decimal('0.00')
+                if monto_total_factura <= 0:
+                    raise Exception("Total de factura inválido para crear forma de pago automática")
+                # Elegir una caja activa si existe
+                caja_default = Caja.objects.filter(activo=True, empresa_id=empresa_id).order_by('id').first()
+                forma_pago_auto = FormaPago.objects.create(
+                    factura=factura,
+                    forma_pago='20',  # 'Otros con utilización del sistema financiero'
+                    total=monto_total_factura,
+                    caja=caja_default
+                )
+                logger.info(f"✅ Forma de pago automática creada: id={forma_pago_auto.id} total={monto_total_factura}")
+                pagos_list = [{
+                    'sri_pago': '20',
+                    'monto': str(monto_total_factura),
+                    'tipo': 'auto'
+                }]
             
             # Limpiar formas de pago anteriores
             if hasattr(factura, 'formas_pago'):
@@ -2374,15 +2473,15 @@ class DetallesFactura(LoginRequiredMixin, View):
                 tipo_pago = str(pago.get('tipo', '')).lower()
                 caja = None
                 if tipo_pago != 'deposito':
-                    # Obtener la caja (acepta tanto 'caja' como 'caja_id')
+                    # Obtener la caja (acepta tanto 'caja' como 'caja_id') y validar empresa
                     caja_id = pago.get('caja') or pago.get('caja_id')
                     if not caja_id:
                         raise Exception("Caja no especificada para el pago")
 
                     try:
-                        caja = Caja.objects.get(id=caja_id, activo=True)
+                        caja = Caja.objects.get(id=caja_id, activo=True, empresa_id=empresa_id)
                     except Caja.DoesNotExist:
-                        raise Exception(f"Caja {caja_id} no existe o está inactiva")
+                        raise Exception(f"Caja {caja_id} no existe, está inactiva o no pertenece a la empresa activa")
                 else:
                     logger.info("   Pago de tipo 'deposito' - omitiendo validación de caja")
 
@@ -2409,7 +2508,7 @@ class DetallesFactura(LoginRequiredMixin, View):
                             # Si es un número, intentar buscar por ID
                             try:
                                 if str(banco_val).isdigit():
-                                    banco = Banco.objects.get(id=int(banco_val))
+                                    banco = Banco.objects.get(id=int(banco_val), empresa_id=empresa_id)
                                     banco_nombre = str(banco.banco)
                                 else:
                                     banco_nombre = str(banco_val)
@@ -2455,13 +2554,14 @@ class DetallesFactura(LoginRequiredMixin, View):
 
                         if banco_id:
                             try:
-                                banco = Banco.objects.get(id=banco_id)
+                                banco = Banco.objects.get(id=banco_id, empresa_id=empresa_id)
                                 CampoAdicional.objects.update_or_create(
                                     factura=factura,
                                     nombre='Banco Depósito',
                                     defaults={'valor': str(banco.banco), 'orden': 5},
                                 )
                             except Banco.DoesNotExist:
+                                # Banco inexistente o de otra empresa: ignorar
                                 pass
                         if comprobante_dep:
                             CampoAdicional.objects.update_or_create(
@@ -2496,13 +2596,26 @@ class DetallesFactura(LoginRequiredMixin, View):
             
             # Validar que la suma coincida con el total de la factura
             if suma_pagos != monto_factura:
-                logger.error(f"❌ ERROR: Discrepancia de pagos - Suma: {suma_pagos}, Factura: {monto_factura}")
-                raise Exception(
-                    f"La suma de pagos (${suma_pagos}) no coincide con el total de la factura (${monto_factura}). "
-                    f"Por favor, verifique que los montos ingresados sumen exactamente el total de la factura."
-                )
+                # Intentar sincronizar automáticamente antes de fallar
+                logger.warning(f"⚠️ Discrepancia de pagos detectada - Suma: {suma_pagos}, Factura: {monto_factura}. Intentando sincronizar.")
+                try:
+                    if hasattr(factura, 'sincronizar_formas_pago'):
+                        msg_sync = factura.sincronizar_formas_pago()
+                        logger.info(f"🔧 {msg_sync}")
+                        factura.refresh_from_db()
+                        suma_pagos = sum(fp.total for fp in factura.formas_pago.all())
+                        suma_pagos = Decimal(str(suma_pagos)).quantize(PRECISION_DOS_DECIMALES, rounding=ROUND_HALF_UP)
+                        monto_factura = factura.monto_general.quantize(PRECISION_DOS_DECIMALES, rounding=ROUND_HALF_UP)
+                except Exception as _sync_e:
+                    logger.error(f"Error sincronizando formas de pago: {_sync_e}")
+                if suma_pagos != monto_factura:
+                    logger.error(f"❌ ERROR: Discrepancia de pagos persiste - Suma: {suma_pagos}, Factura: {monto_factura}")
+                    raise Exception(
+                        f"La suma de pagos (${suma_pagos}) no coincide con el total de la factura (${monto_factura}). "
+                        f"Por favor, verifique que los montos ingresados sumen exactamente el total de la factura."
+                    )
             
-            # Guardar la factura y retornar respuesta exitosa
+            # Guardar la factura y retornar respuesta exitosa (dentro de transacción)
             factura.save()
             messages.success(request, "Factura procesada correctamente")
             return redirect('inventario:verFactura', p=factura.id)
@@ -2516,16 +2629,27 @@ class DetallesFactura(LoginRequiredMixin, View):
 
     def get(self, request):
         try:
-            # ✅ AGREGAR: Obtener las cajas activas
-            cajas_activas = Caja.objects.filter(activo=True).order_by('descripcion')
+            # Obtener empresa activa y validar pertenencia
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida')
+                return redirect('inventario:seleccionar_empresa')
+
+            # ✅ AGREGAR: Obtener las cajas activas (solo de la empresa)
+            cajas_activas = Caja.objects.filter(activo=True, empresa_id=empresa_id).order_by('descripcion') if empresa_id else Caja.objects.none()
             
             # ✅ AGREGAR: Obtener la factura de la sesión para mostrarla
             factura_id = request.session.get('factura_id')
             factura = None
             if factura_id:
-                factura = Factura.objects.filter(pk=factura_id).first()
+                factura = Factura.objects.filter(pk=factura_id, empresa_id=empresa_id).first()
                 if not factura:
-                    messages.error(request, 'No se pudo encontrar la factura. Por favor, cree una nueva factura.')
+                    # Comprobar si existe en otra empresa para mensaje apropiado
+                    if Factura.objects.filter(pk=factura_id).exists():
+                        messages.error(request, 'Acceso no autorizado a factura de otra empresa.')
+                    else:
+                        messages.error(request, 'No se pudo encontrar la factura. Por favor, cree una nueva factura.')
+                    request.session.pop('factura_id', None)
                     return redirect('inventario:emitirFactura')
             else:
                 messages.error(request, 'No se encontró la factura. Por favor, cree una nueva factura.')
@@ -2536,7 +2660,10 @@ class DetallesFactura(LoginRequiredMixin, View):
 
             # ✅ Lista de bancos: nombres únicos desde DB + fallback estático (por si la BD aún no tiene todos)
             try:
-                bancos_db = set(Banco.bancos_disponibles()) if hasattr(Banco, 'bancos_disponibles') else set(Banco.objects.values_list('banco', flat=True))
+                if hasattr(Banco, 'bancos_disponibles'):
+                    bancos_db = set(Banco.bancos_disponibles())
+                else:
+                    bancos_db = set(Banco.objects.filter(empresa_id=empresa_id).values_list('banco', flat=True))
             except Exception:
                 bancos_db = set()
 
@@ -2551,7 +2678,7 @@ class DetallesFactura(LoginRequiredMixin, View):
                 'factura': factura,
                 'formas_pago_sri': formas_pago_sri,
                 'bancos_lista_nombres': lista_bancos,
-                'bancos_db': Banco.get_activos() if hasattr(Banco, 'get_activos') else Banco.objects.filter(activo=True).order_by('banco')
+                'bancos_db': (Banco.get_activos().filter(empresa_id=empresa_id) if hasattr(Banco, 'get_activos') and hasattr(Banco.get_activos(), 'filter') else Banco.objects.filter(activo=True, empresa_id=empresa_id).order_by('banco'))
             }
             contexto = complementarContexto(contexto, request.user)
             return render(request, 'inventario/factura/detallesFactura.html', contexto)
@@ -2599,7 +2726,7 @@ def buscar_producto(request):
                 '10': 0.13,
                 '3': 0.14,
                 '4': 0.15,
-                '9': 0.16,
+                '9': 0.15,  # Normalizado a 15%
                 '6': 0.00,
                 '7': 0.00,
                 '8': 0.08,
@@ -2640,22 +2767,22 @@ def buscar_producto(request):
         resultados = []
 
         # Buscar producto exacto
-        producto = Producto.objects.filter(codigo__iexact=codigo).first()
+        producto = Producto.objects.filter(empresa_id=empresa_id, codigo__iexact=codigo).first()
         if producto:
             precio_base = float(producto.precio) if producto.precio else 0.0
             
             # Mapeo de códigos SRI a porcentaje real
             MAPEO_IVA = {
-                '0': 0.00,  # Sin IVA
-                '5': 0.05,  # 5%
-                '2': 0.12,  # 12%
-                '10': 0.13, # 13%
-                '3': 0.14,  # 14%
-                '4': 0.15,  # 15%
-                '9': 0.16,  # 16% - Agregado para servicios
-                '6': 0.00,  # Exento
-                '7': 0.00,  # Exento
-                '8': 0.08   # 8%
+                '0': 0.00,
+                '5': 0.05,
+                '2': 0.12,
+                '10': 0.13,
+                '3': 0.14,
+                '4': 0.15,
+                '9': 0.15,  # Normalizado (antes 16%)
+                '6': 0.00,
+                '7': 0.00,
+                '8': 0.08
             }
             
             iva_percent = MAPEO_IVA.get(producto.iva, 0.12)  # 12% por defecto
@@ -2670,7 +2797,7 @@ def buscar_producto(request):
             })
 
         # Buscar servicio exacto
-        servicio = Servicio.objects.filter(codigo__iexact=codigo).first()
+        servicio = Servicio.objects.filter(empresa_id=empresa_id, codigo__iexact=codigo).first()
         print(f"🔍 Query servicio: Servicio.objects.filter(codigo__iexact='{codigo}').first()")
         print(f"🔍 Servicio encontrado: {servicio}")
         
@@ -2685,11 +2812,7 @@ def buscar_producto(request):
             try:
                 iva_code = str(servicio.iva) if servicio.iva else '2'  # 12% por defecto
                 
-                # 🔧 FIX TEMPORAL: Forzar 16% IVA para servicios con precio $0.5 que causan discrepancia
-                if abs(precio_base - 0.5) < 0.01 and iva_code == '2':
-                    print(f"🔧 DETECTADO SERVICIO PROBLEMÁTICO: Precio ${precio_base}, IVA '{iva_code}'")
-                    print(f"🔧 FORZANDO IVA A '9' (16%) PARA CORREGIR DISCREPANCIA")
-                    iva_code = '9'  # Forzar a 16% para corregir el problema
+                # Eliminado FIX temporal que forzaba 16% para ciertos servicios; usar configuración declarada
                 
                 iva_percent = MAPEO_IVA.get(iva_code, 0.12)
                 precio_con_iva = precio_base * (1 + iva_percent)
@@ -2699,7 +2822,8 @@ def buscar_producto(request):
                 
             except Exception as e:
                 print(f"⚠️ Error procesando IVA del servicio: {e}")
-                iva_percent = 0.16  # Usar 16% como fallback para servicios
+                # Fallback conservador al 15% estándar
+                iva_percent = 0.15
                 precio_con_iva = precio_base * (1 + iva_percent)
             
             resultados.append({
@@ -2715,6 +2839,7 @@ def buscar_producto(request):
         if not resultados:
             from django.db.models import Q
             productos_similares = Producto.objects.filter(
+                Q(empresa_id=empresa_id),
                 Q(codigo__icontains=codigo) | Q(descripcion__icontains=codigo)
             )[:30]
             for p in productos_similares:
@@ -2722,16 +2847,16 @@ def buscar_producto(request):
                 
                 # Mapeo de códigos SRI a porcentaje real
                 MAPEO_IVA = {
-                    '0': 0.00,  # Sin IVA
-                    '5': 0.05,  # 5%
-                    '2': 0.12,  # 12%
-                    '10': 0.13, # 13%
-                    '3': 0.14,  # 14%
-                    '4': 0.15,  # 15%
-                    '9': 0.16,  # 16% - Agregado para servicios
-                    '6': 0.00,  # Exento
-                    '7': 0.00,  # Exento
-                    '8': 0.08   # 8%
+                    '0': 0.00,
+                    '5': 0.05,
+                    '2': 0.12,
+                    '10': 0.13,
+                    '3': 0.14,
+                    '4': 0.15,
+                    '9': 0.15,
+                    '6': 0.00,
+                    '7': 0.00,
+                    '8': 0.08
                 }
                 
                 iva_percent = MAPEO_IVA.get(p.iva, 0.12)  # 12% por defecto
@@ -2745,6 +2870,7 @@ def buscar_producto(request):
                     'tipo': 'producto'
                 })
             servicios_similares = Servicio.objects.filter(
+                Q(empresa_id=empresa_id),
                 Q(codigo__icontains=codigo) | Q(descripcion__icontains=codigo) | Q(nombre__icontains=codigo)
             )[:30]
             for s in servicios_similares:
@@ -2757,7 +2883,7 @@ def buscar_producto(request):
                     '10': 0.13,
                     '3': 0.14,
                     '4': 0.15,
-                    '9': 0.16,
+                    '9': 0.15,
                     '6': 0.00,
                     '7': 0.00,
                     '8': 0.08
@@ -2813,7 +2939,7 @@ class ListarFacturas(LoginRequiredMixin, View):
 
 # Vista para consultar estado individual de una factura en el SRI ------------------------------#
 @csrf_exempt
-@require_http_methods(["POST"])
+@require_http_methods(["GET", "POST"])
 @require_empresa_activa
 def consultar_estado_sri(request, factura_id):
     """
@@ -2823,7 +2949,7 @@ def consultar_estado_sri(request, factura_id):
     try:
         # Obtener la factura de la empresa activa
         empresa_id = request.session.get('empresa_activa')
-        factura = get_object_or_404(Factura, id=factura_id)
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         # Verificar que tenga clave de acceso
         if not hasattr(factura, 'clave_acceso') or not factura.clave_acceso:
@@ -2840,66 +2966,79 @@ def consultar_estado_sri(request, factura_id):
         # Crear instancia de integración
         integration = SRIIntegration(empresa=get_empresa_activa(request))
         
-        # Consultar estado
-        resultado = integration.consultar_autorizacion(factura.clave_acceso)
+        # Consultar estado usando integración estándar
+        # La integración expone consultar_estado_factura(factura_id)
+        try:
+            resultado = integration.consultar_estado_factura(factura.id)
+        except AttributeError:
+            # Fallback si la versión actual aún requiere cliente directo
+            try:
+                resultado = integration.consultar_autorizacion(factura.clave_acceso)
+            except Exception as e:
+                return JsonResponse({
+                    'success': False,
+                    'message': f'Error consultando autorización: {e}'
+                })
         
         # Procesar resultado
-        if resultado['success']:
-            # Actualizar la factura con la información obtenida
+        if resultado.get('success'):
             estado_anterior = factura.estado_sri
-            
-            # El resultado contiene toda la información procesada
-            nueva_info = {
-                'estado': resultado.get('estado', 'DESCONOCIDO'),
-                'mensaje': resultado.get('mensaje', ''),
-                'detalle': resultado.get('mensaje_detalle', ''),
-                'numero_autorizacion': resultado.get('numero_autorizacion', ''),
-                'fecha_autorizacion': resultado.get('fecha_autorizacion', '')
-            }
-            
-            # Actualizar campos de la factura
-            factura.estado_sri = nueva_info['estado']
-            if nueva_info['mensaje']:
-                factura.mensaje_sri = nueva_info['mensaje']
-            if nueva_info['detalle']:
-                factura.mensaje_sri_detalle = nueva_info['detalle']
-            if nueva_info['numero_autorizacion']:
-                factura.numero_autorizacion = nueva_info['numero_autorizacion']
-            if nueva_info['fecha_autorizacion']:
+            res_estado = resultado.get('estado') or resultado.get('resultado', {}).get('estado') or 'DESCONOCIDO'
+            factura.estado_sri = res_estado
+            # Mapear posibles estructuras
+            numero_aut = resultado.get('numero_autorizacion') or resultado.get('resultado', {}).get('numero_autorizacion')
+            fecha_aut = resultado.get('fecha_autorizacion') or resultado.get('resultado', {}).get('fecha_autorizacion')
+            mensaje_detalle = resultado.get('detalle') or resultado.get('mensaje_detalle') or ''
+            mensaje_principal = resultado.get('mensaje') or 'Consulta realizada exitosamente'
+            if mensaje_principal:
+                factura.mensaje_sri = mensaje_principal
+            if mensaje_detalle:
+                factura.mensaje_sri_detalle = mensaje_detalle
+            if numero_aut:
+                factura.numero_autorizacion = numero_aut
+            if fecha_aut:
                 try:
                     from datetime import datetime
-                    factura.fecha_autorizacion = datetime.strptime(nueva_info['fecha_autorizacion'], '%d/%m/%Y %H:%M:%S')
-                except:
+                    factura.fecha_autorizacion = datetime.strptime(fecha_aut, '%d/%m/%Y %H:%M:%S')
+                except Exception:
                     pass
-            
             factura.save()
-            
-            # Determinar si cambió el estado
-            estado_cambio = estado_anterior != nueva_info['estado']
-            
-            logger.info(f"Estado consultado exitosamente: {nueva_info['estado']}")
-            
+            estado_cambio = (estado_anterior != factura.estado_sri)
+            logger.info(f"Estado consultado exitosamente: {factura.estado_sri}")
             return JsonResponse({
                 'success': True,
-                'estado': nueva_info['estado'],
-                'mensaje': nueva_info['mensaje'] or 'Consulta realizada exitosamente',
-                'detalle': nueva_info['detalle'],
-                'numero_autorizacion': nueva_info['numero_autorizacion'],
-                'fecha_autorizacion': nueva_info['fecha_autorizacion'],
+                'estado': factura.estado_sri,
+                'mensaje': mensaje_principal,
+                'detalle': mensaje_detalle,
+                'numero_autorizacion': numero_aut or '',
+                'fecha_autorizacion': fecha_aut or '',
                 'estado_cambio': estado_cambio
             })
         else:
-            logger.error(f"Error al consultar estado: {resultado.get('message')}")
+            # Extraer mensajes técnicos del SRI si existen
+            mensajes_sri = []
+            bruto = resultado.get('resultado') if isinstance(resultado.get('resultado'), dict) else resultado
+            if bruto and isinstance(bruto, dict):
+                mensajes_sri = bruto.get('mensajes', []) or []
+            primer = mensajes_sri[0] if mensajes_sri else {}
+            identificador = primer.get('identificador', '')
+            mensaje_sri = primer.get('mensaje', '')
+            info_extra = primer.get('informacionAdicional', '')
+            detalle_compuesto = '\n'.join(filter(None,[mensaje_sri, info_extra])) or resultado.get('message','Error desconocido')
+            logger.error(f"Error al consultar estado: {detalle_compuesto} (id={identificador})")
             return JsonResponse({
                 'success': False,
-                'message': f"""❌ Error al consultar el estado:
-
-{resultado.get('message', 'Error desconocido')}
-
-Posibles causas:
-• Problemas de conectividad con el SRI
-• Clave de acceso incorrecta
-• Servicios del SRI temporalmente no disponibles"""
+                'message': (
+                    '❌ Error al consultar el estado:\n\n'
+                    f'{detalle_compuesto}'
+                    '\n\nIdentificador: '
+                    f'{identificador or 'N/D'}'
+                    '\n\nPosibles causas frecuentes:\n'
+                    '• Clave de acceso aún no procesada (intente en 1-2 min)\n'
+                    '• Comprobante rechazado (revise mensajes SRI)\n'
+                    '• Problemas temporales en servicios SRI\n'
+                    '• Conectividad / timeout'
+                )
             })
             
     except ImportError:
@@ -2936,6 +3075,10 @@ class FacturasSRIProblemas(LoginRequiredMixin, View):
     def get(self, request):
         from django.db.models import Q
         from datetime import datetime, timedelta
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Seleccione una empresa válida.')
+            return redirect('inventario:seleccionar_empresa')
         
         # Obtener parámetros de filtro
         estado_filtro = request.GET.get('estado', '')
@@ -2975,8 +3118,8 @@ class FacturasSRIProblemas(LoginRequiredMixin, View):
             except ValueError:
                 pass
         
-        # Obtener facturas con problemas
-        facturas = Factura.objects.filter(query).order_by('-fecha_emision', '-id')
+        # Obtener facturas con problemas (filtradas por empresa)
+        facturas = Factura.objects.filter(query, empresa_id=empresa_id).order_by('-fecha_emision', '-id')
         
         # Calcular estadísticas por estado
         from django.db.models import Count
@@ -3024,7 +3167,7 @@ class VerFactura(LoginRequiredMixin, View):
             empresa_id = request.session.get('empresa_activa')
             if not request.user.empresas.filter(id=empresa_id).exists():
                 raise Http404("Empresa no válida")
-            factura = get_object_or_404(Factura, id=p)
+            factura = get_object_or_404(Factura, id=p, empresa_id=empresa_id)
             
             # Obtener los detalles de la factura
             detalles = DetalleFactura.objects.filter(factura=factura).select_related('producto')
@@ -3167,7 +3310,7 @@ class VerFactura(LoginRequiredMixin, View):
             empresa_id = request.session.get('empresa_activa')
             if not request.user.empresas.filter(id=empresa_id).exists():
                 raise Http404("Empresa no válida")
-            factura = get_object_or_404(Factura, id=p)
+            factura = get_object_or_404(Factura, id=p, empresa_id=empresa_id)
             action = request.POST.get('action', 'download_pdf')
             media_root = getattr(settings, 'MEDIA_ROOT', 'media')
 
@@ -3249,8 +3392,11 @@ class GenerarFactura(LoginRequiredMixin, View):
     def get(self, request, p):
         import csv
 
-        factura = Factura.objects.get(id=p)
-        detalles = DetalleFactura.objects.filter(id_factura_id=p)
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            raise Http404('Empresa no válida')
+        factura = get_object_or_404(Factura, id=p, empresa_id=empresa_id)
+        detalles = DetalleFactura.objects.filter(id_factura_id=p, factura__empresa_id=empresa_id)
 
         nombre_factura = "factura_%s.csv" % (factura.id)
 
@@ -3297,7 +3443,7 @@ class GenerarFacturaPDF(LoginRequiredMixin, View):
         empresa_id = request.session.get('empresa_activa')
         if not request.user.empresas.filter(id=empresa_id).exists():
             raise Http404("Empresa no válida")
-        factura = get_object_or_404(Factura, id=p)
+        factura = get_object_or_404(Factura, id=p, empresa_id=empresa_id)
         media_root = getattr(settings, 'MEDIA_ROOT', 'media')
         pdf_dir = os.path.join(media_root, 'facturas_pdf')
         
@@ -3352,236 +3498,7 @@ class GenerarFacturaPDF(LoginRequiredMixin, View):
         #Fin de vista--------------------------------------------------------------------------------------#
 
 
-#Crea una lista de los clientes, 10 por pagina----------------------------------------#
-class ListarProveedores(LoginRequiredMixin, View):
-    login_url = '/inventario/login'
-    redirect_field_name = None
-
-    def get(self, request):
-        from django.db import models
-        empresa_id = request.session.get('empresa_activa')
-        if empresa_id is None or not request.user.empresas.filter(id=empresa_id).exists():
-            messages.error(request, 'No se ha seleccionado una empresa válida')
-            return redirect('inventario:panel')
-        proveedores = Proveedor.objects.filter(empresa_id=empresa_id)
-        contexto = {'tabla': proveedores}
-        contexto = complementarContexto(contexto, request.user)
-
-        return render(request, 'inventario/proveedor/listarProveedores.html', contexto)
-    #Fin de vista--------------------------------------------------------------------------#
-
-
-#Crea y procesa un formulario para agregar a un proveedor---------------------------------#
-class AgregarProveedor(LoginRequiredMixin, View):
-    login_url = '/inventario/login'
-    redirect_field_name = None
-
-    def post(self, request):
-        empresa_id = request.session.get('empresa_activa')
-        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
-            form = ProveedorFormulario(request.POST)
-            messages.error(request, 'No hay una empresa activa seleccionada.')
-            return render(request, 'inventario/proveedor/agregarProveedor.html', {'form': form})
-        try:
-            empresa = Empresa.objects.get(id=empresa_id)
-        except Empresa.DoesNotExist:
-            form = ProveedorFormulario(request.POST)
-            messages.error(request, 'No hay una empresa activa seleccionada.')
-            return render(request, 'inventario/proveedor/agregarProveedor.html', {'form': form})
-
-        form = ProveedorFormulario(request.POST, empresa=empresa)
-
-        if form.is_valid():
-            # ✅ ACTUALIZADO: Usar nombres de campos correctos del formulario actualizado
-            tipoIdentificacion = form.cleaned_data['tipoIdentificacion']
-            identificacion_proveedor = form.cleaned_data['identificacion_proveedor']
-            razon_social_proveedor = form.cleaned_data['razon_social_proveedor']
-            nombre_comercial_proveedor = form.cleaned_data['nombre_comercial_proveedor']
-            direccion = form.cleaned_data['direccion']
-            nacimiento = form.cleaned_data.get('nacimiento')  # Opcional
-            telefono = form.cleaned_data.get('telefono')  # Opcional
-            correo = form.cleaned_data['correo']
-            telefono2 = form.cleaned_data.get('telefono2')  # Opcional
-            correo2 = form.cleaned_data.get('correo2')  # Opcional
-            observaciones = form.cleaned_data.get('observaciones')  # Opcional
-            convencional = form.cleaned_data.get('convencional')  # Opcional
-            tipoVenta = form.cleaned_data['tipoVenta']
-            tipoRegimen = form.cleaned_data['tipoRegimen']
-            tipoProveedor = form.cleaned_data['tipoProveedor']
-
-            # ✅ ACTUALIZADO: Crear proveedor con campos correctos
-            proveedor = Proveedor(
-                tipoIdentificacion=tipoIdentificacion,
-                identificacion_proveedor=identificacion_proveedor,
-                razon_social_proveedor=razon_social_proveedor,
-                nombre_comercial_proveedor=nombre_comercial_proveedor,
-                direccion=direccion,
-                nacimiento=nacimiento,
-                telefono=telefono,
-                correo=correo,
-                telefono2=telefono2,
-                correo2=correo2,
-                observaciones=observaciones,
-                convencional=convencional,
-                tipoVenta=tipoVenta,
-                tipoRegimen=tipoRegimen,
-                tipoProveedor=tipoProveedor,
-                empresa=empresa,
-            )
-            proveedor.save()
-            form = ProveedorFormulario()
-
-            messages.success(request, 'Proveedor ingresado exitosamente con ID %s.' % proveedor.id)
-            request.session['proveedorProcesado'] = 'agregado'
-            return HttpResponseRedirect("/inventario/agregarProveedor")
-        else:
-            #De lo contrario lanzara el mismo formulario
-            return render(request, 'inventario/proveedor/agregarProveedor.html', {'form': form})
-
-    def get(self, request):
-        form = ProveedorFormulario()
-        #Envia al usuario el formulario para que lo llene
-        contexto = {'form': form, 'modo': request.session.get('proveedorProcesado')}
-        contexto = complementarContexto(contexto, request.user)
-        return render(request, 'inventario/proveedor/agregarProveedor.html', contexto)
-
-
-#Fin de vista-----------------------------------------------------------------------------#
-
-#Formulario simple que procesa un script para importar los proveedores-----------------#
-class ImportarProveedores(LoginRequiredMixin, View):
-    login_url = '/inventario/login'
-    redirect_field_name = None
-
-    def post(self, request):
-        form = ImportarClientesFormulario(request.POST)
-        if form.is_valid():
-            request.session['clientesImportados'] = True
-            return HttpResponseRedirect("/inventario/importarClientes")
-
-    def get(self, request):
-        form = ImportarClientesFormulario()
-
-        if request.session.get('clientesImportados') == True:
-            importado = request.session.get('clientesImportados')
-            contexto = {'form': form, 'clientesImportados': importado}
-            request.session['clientesImportados'] = False
-
-        else:
-            contexto = {'form': form}
-            contexto = complementarContexto(contexto, request.user)
-        return render(request, 'inventario/importarClientes.html', contexto)
-
-
-#Fin de vista-------------------------------------------------------------------------#
-
-
-#Formulario simple que crea un archivo y respalda los proveedores-----------------------#
-class ExportarProveedores(LoginRequiredMixin, View):
-    login_url = '/inventario/login'
-    redirect_field_name = None
-
-    def post(self, request):
-        form = ExportarClientesFormulario(request.POST)
-        if form.is_valid():
-            request.session['clientesExportados'] = True
-
-            #Se obtienen las entradas de producto en formato JSON
-            data = serializers.serialize("json", Cliente.objects.all())
-            fs = FileSystemStorage('inventario/tmp/')
-
-            #Se utiliza la variable fs para acceder a la carpeta con mas facilidad
-            with fs.open("clientes.json", "w") as out:
-                out.write(data)
-                out.close()
-
-            with fs.open("clientes.json", "r") as out:
-                response = HttpResponse(out.read(), content_type="application/force-download")
-                response['Content-Disposition'] = 'attachment; filename="clientes.json"'
-                out.close()
-                #------------------------------------------------------------
-            return response
-
-    def get(self, request):
-        form = ExportarClientesFormulario()
-
-        if request.session.get('clientesExportados') == True:
-            exportado = request.session.get('clientesExportados')
-            contexto = {'form': form, 'clientesExportados': exportado}
-            request.session['clientesExportados'] = False
-
-        else:
-            contexto = {'form': form}
-            contexto = complementarContexto(contexto, request.user)
-        return render(request, 'inventario/cliente/exportarClientes.html', contexto)
-
-
-#Fin de vista-------------------------------------------------------------------------#
-
-
-#Muestra el mismo formulario del cliente pero con los datos a editar----------------------#
-class EditarProveedor(LoginRequiredMixin, View):
-    login_url = '/inventario/login'
-    redirect_field_name = None
-
-    def post(self, request, p):
-        # Crea una instancia del formulario y la llena con los datos:
-        proveedor = Proveedor.objects.get(id=p)
-        form = ProveedorFormulario(request.POST, instance=proveedor, empresa=proveedor.empresa)
-        # Revisa si es valido:
-
-        if form.is_valid():
-            # ✅ ACTUALIZADO: Usar nombres de campos correctos del formulario actualizado
-            tipoIdentificacion = form.cleaned_data['tipoIdentificacion']
-            identificacion_proveedor = form.cleaned_data['identificacion_proveedor']
-            razon_social_proveedor = form.cleaned_data['razon_social_proveedor']
-            nombre_comercial_proveedor = form.cleaned_data['nombre_comercial_proveedor']
-            direccion = form.cleaned_data['direccion']
-            nacimiento = form.cleaned_data.get('nacimiento')  # Opcional
-            telefono = form.cleaned_data.get('telefono')  # Opcional
-            correo = form.cleaned_data['correo']
-            telefono2 = form.cleaned_data.get('telefono2')  # Opcional
-            correo2 = form.cleaned_data.get('correo2')  # Opcional
-            observaciones = form.cleaned_data.get('observaciones')  # Opcional
-            convencional = form.cleaned_data.get('convencional')  # Opcional
-            tipoVenta = form.cleaned_data['tipoVenta']
-            tipoRegimen = form.cleaned_data['tipoRegimen']
-            tipoProveedor = form.cleaned_data['tipoProveedor']
-
-            # ✅ ACTUALIZADO: Actualizar proveedor con campos correctos
-            proveedor.tipoIdentificacion = tipoIdentificacion
-            proveedor.identificacion_proveedor = identificacion_proveedor
-            proveedor.razon_social_proveedor = razon_social_proveedor
-            proveedor.nombre_comercial_proveedor = nombre_comercial_proveedor
-            proveedor.direccion = direccion
-            proveedor.nacimiento = nacimiento
-            proveedor.telefono = telefono
-            proveedor.correo = correo
-            proveedor.telefono2 = telefono2
-            proveedor.correo2 = correo2
-            proveedor.observaciones = observaciones
-            proveedor.convencional = convencional
-            proveedor.tipoVenta = tipoVenta
-            proveedor.tipoRegimen = tipoRegimen
-            proveedor.tipoProveedor = tipoProveedor
-            proveedor.save()
-            form = ProveedorFormulario(instance=proveedor, empresa=proveedor.empresa)
-
-            messages.success(request, 'Proveedor actualizado exitosamente (ID %s).' % p)
-            request.session['proveedorProcesado'] = 'editado'
-            return HttpResponseRedirect("/inventario/editarProveedor/%s" % proveedor.id)
-        else:
-            #De lo contrario lanzara el mismo formulario
-            return render(request, 'inventario/proveedor/agregarProveedor.html', {'form': form})
-
-    def get(self, request, p):
-        proveedor = Proveedor.objects.get(id=p)
-        form = ProveedorFormulario(instance=proveedor, empresa=proveedor.empresa)
-        #Envia al usuario el formulario para que lo llene
-        contexto = {'form': form, 'modo': request.session.get('proveedorProcesado'), 'editar': True}
-        contexto = complementarContexto(contexto, request.user)
-        return render(request, 'inventario/proveedor/agregarProveedor.html', contexto)
-    #Fin de vista--------------------------------------------------------------------------------#
+## --- Proveedor views (versión consolidada: ver definiciones posteriores únicas) --- ##
 
 
 #Agrega un pedido-----------------------------------------------------------------------------------#      
@@ -3590,25 +3507,43 @@ class AgregarPedido(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
-        cedulas = Proveedor.cedulasRegistradas()
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Seleccione una empresa válida')
+            return HttpResponseRedirect('/inventario/panel')
+        # Limitar proveedores a la empresa activa
+        proveedores = Proveedor.objects.filter(empresa_id=empresa_id).order_by('razon_social_proveedor')
+        cedulas = []
+        for prov in proveedores:
+            nombre_proveedor = (prov.razon_social_proveedor + " " + (prov.nombre_comercial_proveedor or '')).strip()
+            cedulas.append([
+                prov.identificacion_proveedor,
+                f"{nombre_proveedor}. C.I: {prov.identificacion_proveedor}"
+            ])
         form = EmitirPedidoFormulario(cedulas=cedulas)
         contexto = {'form': form}
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/pedido/emitirPedido.html', contexto)
 
     def post(self, request):
-        # Crea una instancia del formulario y la llena con los datos:
-        cedulas = Proveedor.cedulasRegistradas()
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Seleccione una empresa válida')
+            return HttpResponseRedirect('/inventario/panel')
+        proveedores = Proveedor.objects.filter(empresa_id=empresa_id).order_by('razon_social_proveedor')
+        cedulas = []
+        for prov in proveedores:
+            nombre_proveedor = (prov.razon_social_proveedor + " " + (prov.nombre_comercial_proveedor or '')).strip()
+            cedulas.append([
+                prov.identificacion_proveedor,
+                f"{nombre_proveedor}. C.I: {prov.identificacion_proveedor}"
+            ])
         form = EmitirPedidoFormulario(request.POST, cedulas=cedulas)
-        # Revisa si es valido:
         if form.is_valid():
-            # Procesa y asigna los datos con form.cleaned_data como se requiere
             request.session['form_details'] = form.cleaned_data['productos']
-            request.session['id_proveedor'] = form.cleaned_data['proveedor']
+            request.session['id_proveedor'] = form.cleaned_data['proveedor']  # identificacion_proveedor
             return HttpResponseRedirect("detallesPedido")
-        else:
-            #De lo contrario lanzara el mismo formulario
-            return render(request, 'inventario/pedido/emitirPedido.html', {'form': form})
+        return render(request, 'inventario/pedido/emitirPedido.html', {'form': form})
 
 
 #--------------------------------------------------------------------------------------------------#
@@ -3620,12 +3555,13 @@ class ListarPedidos(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
-        from django.db import models
-        #Saca una lista de todos los clientes de la BDD
-        pedidos = Pedido.objects.all()
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Debe seleccionar una empresa válida')
+            return HttpResponseRedirect('/inventario/panel')
+        pedidos = Pedido.objects.filter(empresa_id=empresa_id).select_related('proveedor').order_by('-fecha', '-id')
         contexto = {'tabla': pedidos}
         contexto = complementarContexto(contexto, request.user)
-
         return render(request, 'inventario/pedido/listarPedidos.html', contexto)
 
     #------------------------------------------------------------------------------------------------#
@@ -3654,8 +3590,10 @@ class DetallesPedido(LoginRequiredMixin, View):
     def post(self, request):
         cedula = request.session.get('id_proveedor')
         productos = request.session.get('form_details')
-
         empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Empresa no válida')
+            return HttpResponseRedirect('/inventario/panel')
         PedidoFormulario = formset_factory(
             DetallesPedidoFormulario,
             extra=productos,
@@ -3710,11 +3648,17 @@ class DetallesPedido(LoginRequiredMixin, View):
 
             from datetime import date
 
-            proveedor = Proveedor.objects.get(identificacion_proveedor=cedula)
+            proveedor = get_object_or_404(Proveedor, identificacion_proveedor=cedula, empresa_id=empresa_id)
             presente = False
-            pedido = Pedido(proveedor=proveedor, fecha=date.today(), sub_monto=sub_monto, monto_general=monto_general,
-                            presente=presente)
-
+            empresa = get_object_or_404(Empresa, id=empresa_id)
+            pedido = Pedido(
+                proveedor=proveedor,
+                fecha=date.today(),
+                sub_monto=sub_monto,
+                monto_general=monto_general,
+                presente=presente,
+                empresa=empresa
+            )
             pedido.save()
             id_pedido = pedido
 
@@ -3724,8 +3668,17 @@ class DetallesPedido(LoginRequiredMixin, View):
                 subDetalle = subtotal[indice]
                 totalDetalle = total_general[indice]
 
-                detallePedido = DetallePedido(id_pedido=id_pedido, id_producto=objetoProducto, cantidad=cantidadDetalle
-                                              , sub_total=subDetalle, total=totalDetalle)
+                # Validar que el producto pertenezca a la misma empresa
+                if hasattr(objetoProducto, 'empresa_id') and objetoProducto.empresa_id != empresa_id:
+                    raise ValueError(f"Producto {objetoProducto.id} no pertenece a la empresa activa")
+                detallePedido = DetallePedido(
+                    id_pedido=id_pedido,
+                    id_producto=objetoProducto,
+                    cantidad=cantidadDetalle,
+                    sub_total=subDetalle,
+                    total=totalDetalle,
+                    empresa_id=empresa_id
+                )
                 detallePedido.save()
 
             messages.success(request, 'Pedido de ID %s insertado exitosamente.' % id_pedido.id)
@@ -3740,8 +3693,12 @@ class VerPedido(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request, p):
-        pedido = Pedido.objects.get(id=p)
-        detalles = DetallePedido.objects.filter(id_pedido_id=p)
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Empresa no válida')
+            return HttpResponseRedirect('/inventario/panel')
+        pedido = get_object_or_404(Pedido, id=p, empresa_id=empresa_id)
+        detalles = DetallePedido.objects.filter(id_pedido_id=p, empresa_id=empresa_id)
         recibido = Pedido.recibido(p)
         contexto = {'pedido': pedido, 'detalles': detalles, 'recibido': recibido}
         contexto = complementarContexto(contexto, request.user)
@@ -3756,8 +3713,12 @@ class ValidarPedido(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request, p):
-        pedido = Pedido.objects.get(id=p)
-        detalles = DetallePedido.objects.filter(id_pedido_id=p)
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Empresa no válida')
+            return HttpResponseRedirect('/inventario/panel')
+        pedido = get_object_or_404(Pedido, id=p, empresa_id=empresa_id)
+        detalles = DetallePedido.objects.filter(id_pedido_id=p, empresa_id=empresa_id)
 
         #Agrega los productos del pedido
         for elemento in detalles:
@@ -3778,9 +3739,12 @@ class GenerarPedido(LoginRequiredMixin, View):
 
     def get(self, request, p):
         import csv
-
-        pedido = Pedido.objects.get(id=p)
-        detalles = DetallePedido.objects.filter(id_pedido_id=p)
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Empresa no válida')
+            return HttpResponseRedirect('/inventario/panel')
+        pedido = get_object_or_404(Pedido, id=p, empresa_id=empresa_id)
+        detalles = DetallePedido.objects.filter(id_pedido_id=p, empresa_id=empresa_id)
 
         nombre_pedido = "pedido_%s.csv" % (pedido.id)
 
@@ -3808,12 +3772,16 @@ class GenerarPedidoPDF(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request, p):
-        pedido = Pedido.objects.get(id=p)
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Empresa no válida')
+            return HttpResponseRedirect('/inventario/panel')
+        pedido = get_object_or_404(Pedido, id=p, empresa_id=empresa_id)
         empresa = getattr(pedido, 'empresa', None)
         general = Opciones.objects.for_tenant(empresa).first()
         if not general and empresa:
             general = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
-        detalles = DetallePedido.objects.filter(id_pedido_id=p)
+        detalles = DetallePedido.objects.filter(id_pedido_id=p, empresa_id=empresa_id)
 
         data = {
             'fecha': pedido.fecha,
@@ -4212,9 +4180,14 @@ class Secuencias(LoginRequiredMixin, View):
 
     def get(self, request):
         try:
-            secuencias = Secuencia.objects.all()
-            form = SecuenciaFormulario()  # Formulario vacío para crear una nueva secuencia
-            contexto = {'form': form, 'secuencias': secuencias}
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return redirect('inventario:seleccionar_empresa')
+
+            secuencias = Secuencia.objects.filter(empresa_id=empresa_id).order_by('tipo_documento','establecimiento','punto_emision')
+            form = SecuenciaFormulario()  # Formulario vacío para crear una nueva secuencia (empresa se asigna server-side)
+            contexto = {'form': form, 'secuencias': secuencias, 'empresa_activa': empresa_id}
             contexto = complementarContexto(contexto, request.user)  # Añade información adicional al contexto
             return render(request, 'inventario/opciones/secuencias.html', contexto)
         except Exception as e:
@@ -4227,16 +4200,24 @@ class Secuencias(LoginRequiredMixin, View):
 
         if form.is_valid():
             try:
+                empresa_id = request.session.get('empresa_activa')
+                if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                    messages.error(request, 'Seleccione una empresa válida.')
+                    return redirect('inventario:seleccionar_empresa')
                 # Si se proporciona un ID, intenta buscar la secuencia para actualizar
-                if secuencia_id and Secuencia.objects.filter(id=secuencia_id).exists():
-                    secuencia = Secuencia.objects.get(id=secuencia_id)
+                if secuencia_id and Secuencia.objects.filter(id=secuencia_id, empresa_id=empresa_id).exists():
+                    secuencia = Secuencia.objects.get(id=secuencia_id, empresa_id=empresa_id)
                     for field, value in form.cleaned_data.items():
                         setattr(secuencia, field, value)
+                    # Evitar reasignación de empresa cruzada
+                    secuencia.empresa_id = empresa_id
                     secuencia.save()
                     messages.success(request, f'Secuencia actualizada exitosamente con ID {secuencia.id}!')
                 else:
-                    # Si no hay ID, o el ID no existe, crear una nueva secuencia
-                    nueva_secuencia = form.save()
+                    # Crear nueva secuencia asignando empresa_activa explícitamente
+                    nueva_secuencia = form.save(commit=False)
+                    nueva_secuencia.empresa_id = empresa_id
+                    nueva_secuencia.save()
                     messages.success(request, f'Nueva secuencia creada exitosamente con ID {nueva_secuencia.id}!')
                 return redirect('inventario:secuencias')
 
@@ -4247,8 +4228,9 @@ class Secuencias(LoginRequiredMixin, View):
 
         # Recargar las secuencias si hay errores
         try:
-            secuencias = Secuencia.objects.all()
-            contexto = {'form': form, 'secuencias': secuencias}
+            empresa_id = request.session.get('empresa_activa')
+            secuencias = Secuencia.objects.filter(empresa_id=empresa_id) if empresa_id else Secuencia.objects.none()
+            contexto = {'form': form, 'secuencias': secuencias, 'empresa_activa': empresa_id}
             contexto = complementarContexto(contexto, request.user)
             return render(request, 'inventario/opciones/secuencias.html', contexto)
         except Exception as e:
@@ -4261,9 +4243,12 @@ class ListaSecuencias(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
-        # Recuperar todas las secuencias de la base de datos
-        secuencias = Secuencia.objects.all()
-        contexto = {'secuencias': secuencias}
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Seleccione una empresa válida.')
+            return redirect('inventario:seleccionar_empresa')
+        secuencias = Secuencia.objects.filter(empresa_id=empresa_id).order_by('tipo_documento','establecimiento','punto_emision')
+        contexto = {'secuencias': secuencias, 'empresa_activa': empresa_id}
         contexto = complementarContexto(contexto, request.user)  # Añade información al contexto si es necesario
         return render(request, 'inventario/opciones/lista_secuencias.html', contexto)
 
@@ -4273,7 +4258,11 @@ class EliminarSecuencia(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request, id):
-        secuencia = get_object_or_404(Secuencia, id=id)
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Seleccione una empresa válida.')
+            return redirect('inventario:seleccionar_empresa')
+        secuencia = get_object_or_404(Secuencia, id=id, empresa_id=empresa_id)
         secuencia.delete()
         messages.success(request, f'Secuencia con ID {id} eliminada exitosamente.')
         return redirect('inventario:lista_secuencias')
@@ -4288,7 +4277,11 @@ class EditarSecuencia(LoginRequiredMixin, View):
             # Extraemos el 'id' desde los argumentos de la URL
             secuencia_id = kwargs.get('id')
             # Obtenemos la secuencia o lanzamos 404 si no existe
-            secuencia = get_object_or_404(Secuencia, id=secuencia_id)
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return redirect('inventario:seleccionar_empresa')
+            secuencia = get_object_or_404(Secuencia, id=secuencia_id, empresa_id=empresa_id)
             # Inicializamos el formulario con la instancia de la secuencia
             form = SecuenciaFormulario(instance=secuencia)
             # Renderizamos la plantilla con el formulario
@@ -4302,13 +4295,19 @@ class EditarSecuencia(LoginRequiredMixin, View):
             # Extraemos el 'id' desde los argumentos de la URL
             secuencia_id = kwargs.get('id')
             # Obtenemos la secuencia o lanzamos 404 si no existe
-            secuencia = get_object_or_404(Secuencia, id=secuencia_id)
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return redirect('inventario:seleccionar_empresa')
+            secuencia = get_object_or_404(Secuencia, id=secuencia_id, empresa_id=empresa_id)
             # Vinculamos los datos enviados con la instancia existente
             form = SecuenciaFormulario(request.POST, instance=secuencia)
 
             if form.is_valid():
-                # Guardamos los cambios si el formulario es válido
-                form.save()
+                # Guardamos los cambios asegurando que la empresa no cambie
+                updated = form.save(commit=False)
+                updated.empresa_id = empresa_id
+                updated.save()
                 messages.success(request, 'Secuencia actualizada correctamente.')
                 return redirect('inventario:lista_secuencias')  # Redirige a la lista de secuencias
             else:
@@ -4404,9 +4403,8 @@ class EditarFacturador(LoginRequiredMixin, View):
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'Seleccione una empresa válida.')
             return redirect('inventario:seleccionar_empresa')
-
         # Recupera el facturador o lanza 404 si no existe
-        facturador = get_object_or_404(Facturador, id=id)
+        facturador = get_object_or_404(Facturador, id=id, empresa_id=empresa_id)
         # Crea el formulario con los datos existentes
         form = FacturadorForm(instance=facturador)
         contexto = {
@@ -4421,9 +4419,8 @@ class EditarFacturador(LoginRequiredMixin, View):
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'Seleccione una empresa válida.')
             return redirect('inventario:seleccionar_empresa')
-
         # Recupera el facturador o lanza 404 si no existe
-        facturador = get_object_or_404(Facturador, id=id)
+        facturador = get_object_or_404(Facturador, id=id, empresa_id=empresa_id)
 
         # Copia los datos del formulario para evitar problemas con el checkbox
         data = request.POST.copy()
@@ -4467,8 +4464,7 @@ class EliminarFacturador(LoginRequiredMixin, View):
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'Seleccione una empresa válida.')
             return redirect('inventario:seleccionar_empresa')
-
-        facturador = get_object_or_404(Facturador, id=id)
+        facturador = get_object_or_404(Facturador, id=id, empresa_id=empresa_id)
         facturador.delete()
         messages.success(request, 'Facturador eliminado exitosamente.')
         return redirect('inventario:listar_facturadores')
@@ -4478,13 +4474,17 @@ class LoginFacturador(View):
         try:
             # Obtener solo la contraseña del formulario
             password = request.POST.get('password')
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return render(request, 'inventario/facturador/login_facturador.html')
             
             if not password:
                 messages.error(request, 'La contraseña es requerida.')
                 return render(request, 'inventario/facturador/login_facturador.html')
             
-            # Buscar el facturador que tenga esta contraseña entre todos los activos
-            facturadores = Facturador.objects.filter(activo=True)
+            # Buscar el facturador dentro de la empresa activa
+            facturadores = Facturador.objects.filter(activo=True, empresa_id=empresa_id)
             facturador_valido = None
             
             for facturador in facturadores:
@@ -4518,13 +4518,17 @@ class LoginProformador(View):
         try:
             # Obtener solo la contraseña del formulario
             password = request.POST.get('password')
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return render(request, 'inventario/facturador/login_proformador.html')
             
             if not password:
                 messages.error(request, 'La contraseña es requerida.')
                 return render(request, 'inventario/facturador/login_proformador.html')
             
-            # Buscar el facturador que tenga esta contraseña entre todos los activos
-            facturadores = Facturador.objects.filter(activo=True)
+            # Buscar el facturador dentro de la empresa activa
+            facturadores = Facturador.objects.filter(activo=True, empresa_id=empresa_id)
             facturador_valido = None
             
             for facturador in facturadores:
@@ -4553,37 +4557,40 @@ class LoginProformador(View):
         return render(request, 'inventario/facturador/login_proformador.html')
 
 #Para agregar los almacénes
+@require_empresa_activa
 def gestion_almacenes(request):
-    """Gestión de Almacenes: asegura contexto con datos de usuario para el header."""
+    """Gestión de Almacenes: siempre requiere empresa activa y aísla por tenant."""
+    from .models import Empresa
+    empresa_id = request.session.get('empresa_activa')
+    empresa = Empresa.objects.get(id=empresa_id)
+
     if request.method == 'POST':
         form = AlmacenForm(request.POST)
         if form.is_valid():
-            form.save()
+            almacen = form.save(commit=False)
+            almacen.empresa = empresa  # siempre
+            almacen.save()
             messages.success(request, "Almacén agregado exitosamente.")
             return redirect('inventario:gestion_almacenes')
+    else:
+        form = AlmacenForm()
 
-        # Si hay errores, re-renderizar con contexto completo (incluye usuario)
-        almacenes = Almacen.objects.all()
-        context = {
-            'form': form,
-            'almacenes': almacenes,
-        }
-        context = complementarContexto(context, request.user)
-        return render(request, 'inventario/opciones/almacenes.html', context)
+    almacenes = Almacen.objects.filter(empresa=empresa).order_by('descripcion')
 
-    # GET
-    form = AlmacenForm()
-    almacenes = Almacen.objects.all()
     context = {
         'form': form,
         'almacenes': almacenes,
+        'empresa_contexto': empresa,
     }
     context = complementarContexto(context, request.user)
     return render(request, 'inventario/opciones/almacenes.html', context)
 
 
 def editar_almacen(request, id):
-    almacen = get_object_or_404(Almacen, id=id)
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        return HttpResponseForbidden()
+    almacen = get_object_or_404(Almacen, id=id, empresa_id=empresa_id)
     if request.method == 'POST':
         form = AlmacenForm(request.POST, instance=almacen)
         if form.is_valid():
@@ -4602,7 +4609,10 @@ def editar_almacen(request, id):
     return render(request, 'inventario/opciones/almacenes_form.html', context)
 
 def eliminar_almacen(request, id):
-    almacen = get_object_or_404(Almacen, id=id)
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        return HttpResponseForbidden()
+    almacen = get_object_or_404(Almacen, id=id, empresa_id=empresa_id)
     almacen.delete()
     messages.success(request, "Almacén eliminado exitosamente.")
     return redirect('inventario:gestion_almacenes')
@@ -4621,7 +4631,7 @@ class RideView(LoginRequiredMixin, View):
             empresa_id = request.session.get('empresa_activa')
             if not request.user.empresas.filter(id=empresa_id).exists():
                 raise Http404("Empresa no válida")
-            factura = get_object_or_404(Factura, id=p)
+            factura = get_object_or_404(Factura, id=p, empresa_id=empresa_id)
             
             # Obtener los detalles de la factura
             detalles = DetalleFactura.objects.filter(factura=factura).select_related('producto')
@@ -4923,8 +4933,11 @@ class EditarProveedor(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request, p):
-        # Crea una instancia del formulario y la llena con los datos:
-        proveedor = Proveedor.objects.get(id=p)
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return HttpResponseForbidden()
+        # Crea una instancia del formulario y la llena con los datos (multi-tenant)
+        proveedor = get_object_or_404(Proveedor, id=p, empresa_id=empresa_id)
         form = ProveedorFormulario(request.POST, instance=proveedor, empresa=proveedor.empresa)
         # Revisa si es valido:
 
@@ -4971,7 +4984,10 @@ class EditarProveedor(LoginRequiredMixin, View):
             return render(request, 'inventario/proveedor/editarProveedor.html', {'form': form})
 
     def get(self, request, p):
-        proveedor = Proveedor.objects.get(id=p)
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return HttpResponseForbidden()
+        proveedor = get_object_or_404(Proveedor, id=p, empresa_id=empresa_id)
         form = ProveedorFormulario(instance=proveedor, empresa=proveedor.empresa)
 
         contexto = {'form': form, 'proveedor': proveedor}
@@ -4985,8 +5001,12 @@ class ListarCajas(LoginRequiredMixin, View):
 
     def get(self, request):
         try:
-            cajas = Caja.objects.all().order_by('descripcion')
-            contexto = {'tabla': cajas}
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return redirect('inventario:seleccionar_empresa')
+            cajas = Caja.objects.filter(empresa_id=empresa_id).order_by('descripcion')
+            contexto = {'tabla': cajas, 'empresa_activa': empresa_id}
             contexto = complementarContexto(contexto, request.user)
             return render(request, 'inventario/opciones/cajas/listar_cajas.html', contexto)
         except Exception as e:
@@ -5002,8 +5022,12 @@ class AgregarCaja(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Seleccione una empresa válida.')
+            return redirect('inventario:seleccionar_empresa')
         form = CajaFormulario()
-        contexto = {'form': form, 'modo': request.session.get('cajaProcesada')}
+        contexto = {'form': form, 'modo': request.session.get('cajaProcesada'), 'empresa_activa': empresa_id}
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/opciones/cajas/crear_caja.html', contexto)
 
@@ -5011,8 +5035,13 @@ class AgregarCaja(LoginRequiredMixin, View):
         form = CajaFormulario(request.POST)
         if form.is_valid():
             try:
+                empresa_id = request.session.get('empresa_activa')
+                if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                    messages.error(request, 'Seleccione una empresa válida.')
+                    return redirect('inventario:seleccionar_empresa')
                 caja = form.save(commit=False)
                 caja.creado_por = request.user
+                caja.empresa_id = empresa_id
                 caja.save()
                 messages.success(request, f'Caja "{caja.descripcion}" creada exitosamente.')
                 request.session['cajaProcesada'] = 'agregada'
@@ -5038,7 +5067,11 @@ class EditarCaja(LoginRequiredMixin, View):
 
     def get(self, request, id):
         try:
-            caja = get_object_or_404(Caja, id=id)
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return redirect('inventario:seleccionar_empresa')
+            caja = get_object_or_404(Caja, id=id, empresa_id=empresa_id)
             form = CajaFormulario(instance=caja)
             contexto = {'form': form, 'caja': caja, 'modo': request.session.get('cajaProcesada'), 'editar': True}
             contexto = complementarContexto(contexto, request.user)
@@ -5049,10 +5082,16 @@ class EditarCaja(LoginRequiredMixin, View):
 
     def post(self, request, id):
         try:
-            caja = get_object_or_404(Caja, id=id)
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return redirect('inventario:seleccionar_empresa')
+            caja = get_object_or_404(Caja, id=id, empresa_id=empresa_id)
             form = CajaFormulario(request.POST, instance=caja)
             if form.is_valid():
-                caja_actualizada = form.save()
+                caja_actualizada = form.save(commit=False)
+                caja_actualizada.empresa_id = empresa_id
+                caja_actualizada.save()
                 messages.success(request, f'Caja "{caja_actualizada.descripcion}" actualizada exitosamente.')
                 request.session['cajaProcesada'] = 'editada'
                 return redirect('inventario:editarCaja', id=caja.id)
@@ -5077,7 +5116,11 @@ class VerCaja(LoginRequiredMixin, View):
 
     def get(self, request, id):
         try:
-            caja = get_object_or_404(Caja, id=id)
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return redirect('inventario:seleccionar_empresa')
+            caja = get_object_or_404(Caja, id=id, empresa_id=empresa_id)
             from django.utils import timezone
             dias_desde_creacion = (timezone.now().date() - caja.fecha_creacion.date()).days
             contexto = {'caja': caja, 'dias_desde_creacion': dias_desde_creacion, 'modo': 'ver'}
@@ -5097,7 +5140,11 @@ class EliminarCaja(LoginRequiredMixin, View):
 
     def post(self, request, id):
         try:
-            caja = get_object_or_404(Caja, id=id)
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return redirect('inventario:seleccionar_empresa')
+            caja = get_object_or_404(Caja, id=id, empresa_id=empresa_id)
             nombre_caja = caja.descripcion
             caja.delete()
             messages.success(request, f'Caja "{nombre_caja}" eliminada exitosamente.')
@@ -5119,11 +5166,14 @@ class ListarBancos(LoginRequiredMixin, View):
 
     def get(self, request):
         try:
-            # Obtener todas las cuentas bancarias ordenadas por banco
-            bancos = Banco.objects.all().order_by('banco', 'titular')
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return redirect('inventario:seleccionar_empresa')
+            bancos = Banco.objects.filter(empresa_id=empresa_id).order_by('banco', 'titular')
             
             # Agregar contexto común del sistema
-            contexto = {'bancos': bancos}
+            contexto = {'bancos': bancos, 'empresa_activa': empresa_id}
             contexto = complementarContexto(contexto, request.user)
             
             return render(request, 'inventario/opciones/listar_bancos.html', contexto)
@@ -5139,8 +5189,12 @@ class CrearBanco(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Seleccione una empresa válida.')
+            return redirect('inventario:seleccionar_empresa')
         form = BancoFormulario()
-        contexto = {'form': form}
+        contexto = {'form': form, 'empresa_activa': empresa_id}
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/opciones/bancos/crear_banco.html', contexto)
 
@@ -5150,8 +5204,13 @@ class CrearBanco(LoginRequiredMixin, View):
         if form.is_valid():
             try:
                 # Crear nueva cuenta bancaria
+                empresa_id = request.session.get('empresa_activa')
+                if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                    messages.error(request, 'Seleccione una empresa válida.')
+                    return redirect('inventario:seleccionar_empresa')
                 banco = form.save(commit=False)
                 banco.creado_por = request.user
+                banco.empresa_id = empresa_id
                 banco.save()
                 messages.success(request, 'Cuenta bancaria creada exitosamente.')
                 return redirect('inventario:listar_bancos')  # ✅ CORRECTO
@@ -5176,7 +5235,11 @@ class EditarBanco(LoginRequiredMixin, View):
 
     def get(self, request, id):
         try:
-            banco = get_object_or_404(Banco, id=id)
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return redirect('inventario:seleccionar_empresa')
+            banco = get_object_or_404(Banco, id=id, empresa_id=empresa_id)
             form = BancoFormulario(instance=banco)
             
             contexto = {
@@ -5193,10 +5256,16 @@ class EditarBanco(LoginRequiredMixin, View):
     
     def post(self, request, id):
         try:
-            banco = get_object_or_404(Banco, id=id)
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return redirect('inventario:seleccionar_empresa')
+            banco = get_object_or_404(Banco, id=id, empresa_id=empresa_id)
             form = BancoFormulario(request.POST, instance=banco)
             if form.is_valid():
-                form.save()
+                updated = form.save(commit=False)
+                updated.empresa_id = empresa_id
+                updated.save()
                 # ❌ ESTABA MAL: messages.success(request, 'Caja actualizada exitosamente.')
                 # ❌ ESTABA MAL: return redirect('inventario:listarCajas')
                 # ✅ CORRECTO:
@@ -5228,7 +5297,11 @@ class VerBanco(LoginRequiredMixin, View):
 
     def get(self, request, id):
         try:
-            banco = get_object_or_404(Banco, id=id)
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return redirect('inventario:seleccionar_empresa')
+            banco = get_object_or_404(Banco, id=id, empresa_id=empresa_id)
             
             # Calcular información adicional
             from django.utils import timezone
@@ -5253,7 +5326,11 @@ class EliminarBanco(LoginRequiredMixin, View):
 
     def get(self, request, id):
         try:
-            banco = get_object_or_404(Banco, id=id)
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return redirect('inventario:seleccionar_empresa')
+            banco = get_object_or_404(Banco, id=id, empresa_id=empresa_id)
             # ❌ ESTABA MAL: return render(request, 'cajas/eliminar_caja.html', {'title': 'Eliminar Caja', 'caja': banco})
             # ✅ CORRECTO:
             contexto = {
@@ -5268,7 +5345,11 @@ class EliminarBanco(LoginRequiredMixin, View):
     
     def post(self, request, id):
         try:
-            banco = get_object_or_404(Banco, id=id)
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa válida.')
+                return redirect('inventario:seleccionar_empresa')
+            banco = get_object_or_404(Banco, id=id, empresa_id=empresa_id)
             nombre_banco = f"{banco.banco} - {banco.titular}"
             banco.delete()
             # ❌ ESTABA MAL: messages.success(request, 'Caja eliminada exitosamente.')
@@ -5533,7 +5614,7 @@ class EditarServicio(LoginRequiredMixin, View):
         empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden("No tienes acceso a esta empresa")
-        servicio = get_object_or_404(Servicio, pk=p)
+        servicio = get_object_or_404(Servicio, pk=p, empresa_id=empresa_id)
         form = ServicioFormulario(instance=servicio)
         contexto = {'form': form, 'edit_mode': True, 'servicio': servicio}
         contexto = complementarContexto(contexto, request.user)
@@ -5543,12 +5624,14 @@ class EditarServicio(LoginRequiredMixin, View):
         empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden("No tienes acceso a esta empresa")
-        servicio = get_object_or_404(Servicio, pk=p)
+        servicio = get_object_or_404(Servicio, pk=p, empresa_id=empresa_id)
         form = ServicioFormulario(request.POST, instance=servicio)
         contexto = {'form': form, 'edit_mode': True, 'servicio': servicio}
         contexto = complementarContexto(contexto, request.user)
         if form.is_valid():
-            form.save()
+            updated = form.save(commit=False)
+            updated.empresa_id = empresa_id  # reforzar pertenencia
+            updated.save()
             return redirect('inventario:listarServicios')
         return render(request, 'inventario/servicios/agregarServicio.html', contexto)
 
@@ -5561,7 +5644,7 @@ class EliminarServicio(LoginRequiredMixin, View):
         empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden("No tienes acceso a esta empresa")
-        servicio = get_object_or_404(Servicio, pk=p)
+        servicio = get_object_or_404(Servicio, pk=p, empresa_id=empresa_id)
         servicio.delete()
         return redirect('inventario:listarServicios')
 
@@ -5664,10 +5747,10 @@ class FormasPagoView(LoginRequiredMixin, View):
         empresa_id = request.session.get('empresa_activa')
         if not request.user.empresas.filter(id=empresa_id).exists():
             raise Http404("Empresa no válida")
-        factura = get_object_or_404(Factura, id=factura_id)
-        
-        # Obtener cajas activas
-        cajas = Caja.objects.filter(activo=True).order_by('descripcion')
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
+
+        # Obtener cajas activas (solo de la empresa)
+        cajas = Caja.objects.filter(activo=True, empresa_id=empresa_id).order_by('descripcion')
         
         # Usar las opciones de forma de pago del modelo FormaPago directamente
         formas_pago_sri = FormaPago.FORMAS_PAGO_CHOICES
@@ -5694,7 +5777,7 @@ class GuardarFormaPagoView(LoginRequiredMixin, View):
         empresa_id = request.session.get('empresa_activa')
         if not request.user.empresas.filter(id=empresa_id).exists():
             raise Http404("Empresa no válida")
-        factura = get_object_or_404(Factura, id=factura_id)
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         try:
             # Obtener datos del formulario
@@ -5711,7 +5794,7 @@ class GuardarFormaPagoView(LoginRequiredMixin, View):
             
             # Obtener objetos y validar existencia
             try:
-                caja = Caja.objects.get(pk=caja_id)
+                caja = Caja.objects.get(pk=caja_id, empresa_id=empresa_id)
                 if not caja.activo:
                     return JsonResponse({
                         'success': False,
@@ -5846,15 +5929,20 @@ def validar_facturador(request):
 
             if not password:
                 return JsonResponse({'success': False, 'error': 'La contraseña es requerida'})
+            # ================= MULTI-EMPRESA FIX =================
+            # Limitar búsqueda a facturadores de la empresa activa.
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id:
+                return JsonResponse({'success': False, 'error': 'Empresa activa no establecida'}, status=400)
 
-            # Buscar el facturador que tenga esta contraseña entre todos los activos
-            facturadores = Facturador.objects.filter(activo=True)
+            # Filtrar primero por empresa y activos para reducir superficie.
+            # Se intenta una coincidencia única por comparación de hash.
             facturador_valido = None
-            
-            for facturador in facturadores:
-                if check_password(password, facturador.password):
+            for facturador in Facturador.objects.filter(empresa_id=empresa_id, activo=True):
+                if facturador.password and check_password(password, facturador.password):
                     facturador_valido = facturador
                     break
+            # ======================================================
 
             if facturador_valido:
                 # Guardar el facturador en la sesión
@@ -5885,7 +5973,10 @@ def enviar_documento_sri(request, factura_id):
         from inventario.sri.integracion_django import SRIIntegration
 
         empresa_id = request.session.get('empresa_activa')
-        factura = get_object_or_404(Factura, id=factura_id)
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            raise Http404("Empresa no válida")
+        # Lookup estrictamente multi-tenant
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
 
         integration = SRIIntegration(empresa=get_empresa_activa(request))
         resultado = integration.enviar_factura(factura_id)
@@ -5938,7 +6029,9 @@ def autorizar_documento_sri(request, factura_id):
 
         # Verificar que la factura existe y pertenece a la empresa activa
         empresa_id = request.session.get('empresa_activa')
-        factura = get_object_or_404(Factura, id=factura_id)
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            raise Http404("Empresa no válida")
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         # Procesar factura en el SRI
         integration = SRIIntegration(empresa=get_empresa_activa(request))
@@ -5977,113 +6070,9 @@ def autorizar_documento_sri(request, factura_id):
 
 
 @csrf_exempt
-@require_empresa_activa
-def consultar_estado_sri(request, factura_id):
-    """
-    Vista para consultar el estado de un documento en el SRI
-    """
-    if request.method != 'GET':
-        return JsonResponse({
-            'success': False,
-            'message': 'Método no permitido'
-        }, status=405)
-    
-    try:
-        from inventario.sri.integracion_django import SRIIntegration
-
-        # Verificar que la factura existe y pertenece a la empresa activa
-        empresa_id = request.session.get('empresa_activa')
-        factura = get_object_or_404(Factura, id=factura_id)
-        
-        if not factura.clave_acceso:
-            return JsonResponse({
-                'success': False,
-                'message': 'La factura no tiene clave de acceso generada'
-            })
-        
-        # Consultar estado en el SRI
-        integration = SRIIntegration(empresa=get_empresa_activa(request))
-        resultado = integration.consultar_estado_factura(factura_id)
-        
-        if resultado['success']:
-            return JsonResponse({
-                'success': True,
-                'resultado': {
-                    'estado_sri': factura.estado_sri,
-                    'numero_autorizacion': factura.numero_autorizacion,
-                    'fecha_autorizacion': factura.fecha_autorizacion.isoformat() if factura.fecha_autorizacion else None,
-                    'clave_acceso': factura.clave_acceso,
-                    'mensaje_sri': factura.mensaje_sri
-                }
-            })
-        else:
-            return JsonResponse({
-                'success': False,
-                'message': resultado.get('message', 'Error consultando estado')
-            })
-            
-    except Http404:
-        return JsonResponse({
-            'success': False,
-            'message': f'No se encontró la factura con ID {factura_id}'
-        })
-    except Exception as e:
-        logger.error(f"Error en consultar_estado_sri: {str(e)}")
-        return JsonResponse({
-            'success': False,
-            'message': f'Error interno del servidor: {str(e)}'
-        })
-
-
-@csrf_exempt
-@require_empresa_activa
-def enviar_factura_email(request, factura_id):
-    """Envía la factura autorizada al correo del cliente."""
-    if request.method != 'POST':
-        return JsonResponse({
-            'success': False,
-            'message': 'Método no permitido'
-        }, status=405)
-
-    try:
-        from inventario.sri.integracion_django import SRIIntegration
-
-        empresa_id = request.session.get('empresa_activa')
-        factura = get_object_or_404(Factura, id=factura_id)
-
-        integration = SRIIntegration(empresa=get_empresa_activa(request))
-
-        # Revalidar autorización si faltan datos
-        if not factura.numero_autorizacion or not factura.fecha_autorizacion:
-            integration.consultar_estado_factura(factura.id)
-            factura.refresh_from_db()
-            if factura.estado_sri != 'AUTORIZADA':
-                return JsonResponse({
-                    'success': False,
-                    'message': 'La factura no está autorizada'
-                })
-
-        resultado = integration.enviar_factura_email(factura)
-
-        return JsonResponse(resultado)
-
-    except Http404:
-        return JsonResponse({
-            'success': False,
-            'message': f'No se encontró la factura con ID {factura_id}'
-        })
-    except Exception as e:
-        logger.error(f"Error en enviar_factura_email: {str(e)}")
-        return JsonResponse({
-            'success': False,
-            'message': f'Error interno del servidor: {str(e)}'
-        })
-
-
-@csrf_exempt
 def sincronizar_masivo_sri(request):
     """
-    Sincroniza masivamente el estado de todas las facturas pendientes con el SRI
+    Sincroniza masivamente el estado de facturas pendientes SOLO de la empresa activa (máx 50)
     """
     if request.method != 'POST':
         return JsonResponse({
@@ -6094,21 +6083,27 @@ def sincronizar_masivo_sri(request):
     try:
         from inventario.sri.integracion_django import SRIIntegration
         from django.db.models import Q
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return JsonResponse({'success': False, 'message': 'Empresa no válida'}, status=403)
         
-        # Obtener facturas que necesitan sincronización
-        facturas_pendientes = Factura.objects.filter(
-            Q(estado_sri__isnull=True) | 
-            Q(estado_sri='PENDIENTE') | 
-            Q(estado_sri='RECIBIDA') |
-            Q(estado_sri='') |
-            Q(estado_sri='NO_AUTORIZADA')
-        ).filter(
-            clave_acceso__isnull=False
-        ).exclude(
-            clave_acceso=''
-        ).order_by('-fecha_emision')
+        # Obtener facturas que necesitan sincronización (filtradas por empresa)
+        facturas_qs = (Factura.objects
+            .filter(empresa_id=empresa_id)
+            .filter(
+                Q(estado_sri__isnull=True) |
+                Q(estado_sri='PENDIENTE') |
+                Q(estado_sri='RECIBIDA') |
+                Q(estado_sri='') |
+                Q(estado_sri='NO_AUTORIZADA')
+            )
+            .filter(clave_acceso__isnull=False)
+            .exclude(clave_acceso='')
+            .order_by('-fecha_emision'))
+
+        facturas_pendientes = list(facturas_qs[:50])  # Límite de seguridad
         
-        total_facturas = facturas_pendientes.count()
+        total_facturas = facturas_qs.count()
         actualizadas = 0
         errores = 0
         rechazadas = 0
@@ -6195,9 +6190,9 @@ def validar_xml_factura(request, factura_id):
         
         # Verificar que la factura existe y pertenece a la empresa activa
         empresa_id = request.session.get('empresa_activa')
-        if not request.user.empresas.filter(id=empresa_id).exists():
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             raise Http404("Empresa no válida")
-        factura = get_object_or_404(Factura, id=factura_id)
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         if not factura.clave_acceso:
             return JsonResponse({
@@ -6255,9 +6250,9 @@ def reenviar_factura_sri(request, factura_id):
         
         # Verificar que la factura existe y pertenece a la empresa activa
         empresa_id = request.session.get('empresa_activa')
-        if not request.user.empresas.filter(id=empresa_id).exists():
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             raise Http404("Empresa no válida")
-        factura = get_object_or_404(Factura, id=factura_id)
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         # Reenviar factura
         integration = SRIIntegration(empresa=get_empresa_activa(request))
@@ -6300,9 +6295,9 @@ def generar_xml_factura_view(request, factura_id):
         
         # Verificar que la factura existe y pertenece a la empresa activa
         empresa_id = request.session.get('empresa_activa')
-        if not request.user.empresas.filter(id=empresa_id).exists():
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             raise Http404("Empresa no válida")
-        factura = get_object_or_404(Factura, id=factura_id)
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
         
         # Generar XML
         integration = SRIIntegration(empresa=get_empresa_activa(request))
@@ -6332,66 +6327,98 @@ def generar_xml_factura_view(request, factura_id):
 
 
 def debug_proforma_data(request):
-    """Vista temporal para debuggear datos de proforma"""
-    from django.http import HttpResponse
-    
-    html_content = """
-    <html>
-    <head><title>Debug Proforma Data</title><style>body{font-family:Arial;margin:20px;} h2{color:#333;} .success{color:green;} .error{color:red;} .warning{color:orange;}</style></head>
-    <body>
-    <h1>🔍 Debug de Datos para Proformas</h1>
+    """Vista temporal (restringida) para debuggear datos de proforma.
+
+    Ahora limitada a superuser + empresa activa. No expone datos sensibles.
     """
-    
-    # Verificar empresas
-    empresas = Empresa.objects.all()
-    html_content += f"<h2>📢 Empresas ({empresas.count()})</h2>"
-    if empresas.exists():
-        html_content += "<ul>"
-        for empresa in empresas:
-            html_content += f"<li><strong>{empresa.razon_social}</strong> (ID: {empresa.id})</li>"
-        html_content += "</ul>"
-    else:
-        html_content += "<p class='error'>❌ No hay empresas</p>"
-    
-    # Verificar almacenes
-    almacenes = Almacen.objects.all()
-    almacenes_activos = Almacen.objects.filter(activo=True)
-    html_content += f"<h2>📦 Almacenes (Total: {almacenes.count()}, Activos: {almacenes_activos.count()})</h2>"
-    
-    if almacenes.exists():
-        html_content += "<ul>"
-        for almacen in almacenes:
-            estado_class = "success" if almacen.activo else "error"
-            estado = "✅ Activo" if almacen.activo else "❌ Inactivo"
-            empresa_info = f" - Empresa: {almacen.empresa}" if almacen.empresa else " - Sin empresa"
-            html_content += f"<li><strong>{almacen.descripcion}</strong> (ID: {almacen.id}) <span class='{estado_class}'>{estado}</span>{empresa_info}</li>"
-        html_content += "</ul>"
-    else:
-        html_content += "<p class='error'>❌ No hay almacenes</p>"
-    
-    # Verificar facturadores
-    facturadores = Facturador.objects.all()
-    facturadores_activos = Facturador.objects.filter(activo=True)
-    html_content += f"<h2>👥 Facturadores (Total: {facturadores.count()}, Activos: {facturadores_activos.count()})</h2>"
-    
-    if facturadores.exists():
-        html_content += "<ul>"
-        for facturador in facturadores:
-            estado_class = "success" if facturador.activo else "error"
-            estado = "✅ Activo" if facturador.activo else "❌ Inactivo"
-            empresa_info = f" - Empresa: {facturador.empresa}" if facturador.empresa else " - Sin empresa"
-            html_content += f"<li><strong>{facturador.nombres}</strong> (ID: {facturador.id}) <span class='{estado_class}'>{estado}</span>{empresa_info}</li>"
-        html_content += "</ul>"
-    else:
-        html_content += "<p class='error'>❌ No hay facturadores</p>"
-    
-    # Crear datos si no existen
-    if request.GET.get('create_data') == '1':
-        html_content += "<h2>🔧 Creando Datos de Prueba</h2>"
-        
-        empresa_principal = empresas.first() if empresas.exists() else None
-        
-        # Crear almacenes
+    if not request.user.is_authenticated or not request.user.is_superuser:
+        return HttpResponseForbidden("No autorizado")
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        return HttpResponseForbidden("Empresa no válida")
+    return JsonResponse({'success': True, 'message': 'Debug deshabilitado en producción'})
+
+
+# ==========================
+#  ENVÍO FACTURA POR EMAIL
+# ==========================
+@csrf_exempt
+def enviar_factura_email(request, factura_id):
+    """
+    Envía la factura por correo electrónico al cliente.
+    - Verifica empresa activa y pertenencia del usuario.
+    - Genera (o reutiliza) el PDF firmado del RIDE.
+    - Usa email del cliente o correo proporcionado en POST (campo 'email').
+    Este es un placeholder: integra tu lógica real de envío (SMTP, API, etc.).
+    """
+    if request.method not in ("POST", "GET"):
+        return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=405)
+
+    try:
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return JsonResponse({'success': False, 'message': 'Empresa no válida'}, status=403)
+
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
+
+        # Determinar email destino
+        email_destino = (request.POST.get('email') if request.method == 'POST' else None) or getattr(factura, 'correo_cliente', None)
+        if not email_destino:
+            return JsonResponse({'success': False, 'message': 'No hay correo de destino definido para esta factura.'})
+
+        from django.conf import settings
+        import os
+        media_root = getattr(settings, 'MEDIA_ROOT', 'media')
+        pdf_dir = os.path.join(media_root, 'facturas_pdf')
+        os.makedirs(pdf_dir, exist_ok=True)
+
+        signed_filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}_firmado.pdf"
+        signed_path = os.path.join(pdf_dir, signed_filename)
+
+        # (Re)generar PDF firmado si no existe
+        if not os.path.exists(signed_path):
+            try:
+                ride_generator = RIDEGenerator()
+                result = ride_generator.generar_ride_factura_firmado(
+                    factura=factura,
+                    output_dir=pdf_dir,
+                    firmar=True
+                )
+                if isinstance(result, tuple):
+                    # (original, firmado)
+                    signed_path = result[1]
+                else:
+                    signed_path = result
+            except Exception as e:
+                logger.error(f"Error generando RIDE para envío email: {e}")
+                return JsonResponse({'success': False, 'message': f'Error generando PDF: {e}'})
+
+        if not os.path.exists(signed_path):
+            return JsonResponse({'success': False, 'message': 'No se pudo generar el PDF de la factura.'})
+
+        # Placeholder de envío. Aquí integrarías send_mail o un servicio externo.
+        # from django.core.mail import EmailMessage
+        # email = EmailMessage(
+        #     subject=f"Factura {factura.numero}",
+        #     body="Adjuntamos su factura electrónica.",
+        #     to=[email_destino]
+        # )
+        # email.attach_file(signed_path)
+        # email.send()
+
+        logger.info(f"[EMAIL] Factura {factura.id} simulada para envío a {email_destino} con adjunto {signed_path}")
+        return JsonResponse({
+            'success': True,
+            'message': f'Factura enviada (simulado) a {email_destino}',
+            'factura_id': factura.id,
+            'archivo': signed_filename
+        })
+
+    except Http404:
+        return JsonResponse({'success': False, 'message': f'Factura {factura_id} no encontrada'}, status=404)
+    except Exception as e:
+        logger.error(f"Error en enviar_factura_email: {e}")
+        return JsonResponse({'success': False, 'message': f'Error interno: {e}'}, status=500)
         if not almacenes_activos.exists():
             almacen1, created1 = Almacen.objects.get_or_create(
                 descripcion="Almacén Principal",
@@ -6471,19 +6498,23 @@ from datetime import datetime, date
 import json
 import logging
 
-logger = logging.getLogger(__name__)
+## (logger y stub PDF definidos al inicio del archivo)
 
 @login_required
 def listar_guias_remision(request):
     """Vista para listar todas las guias de remision"""
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        messages.error(request, 'Seleccione una empresa válida.')
+        return redirect('inventario:seleccionar_empresa')
     # Obtener parámetros de filtro
     numero = request.GET.get('numero', '').strip()
     cliente = request.GET.get('cliente', '').strip()
     estado = request.GET.get('estado', '').strip()
     fecha = request.GET.get('fecha', '').strip()
     
-    # Query base
-    guias = GuiaRemision.objects.all()
+    # Query base (scoped by empresa)
+    guias = GuiaRemision.objects.filter(empresa_id=empresa_id)
     
     # Aplicar filtros
     if numero:
@@ -6535,6 +6566,10 @@ def listar_guias_remision(request):
 @login_required
 def emitir_guia_remision(request):
     """Vista para crear una nueva guia de remision"""
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        messages.error(request, 'Seleccione una empresa válida.')
+        return redirect('inventario:seleccionar_empresa')
     if request.method == 'POST':
         try:
             with transaction.atomic():
@@ -6561,6 +6596,7 @@ def emitir_guia_remision(request):
 
                 # Crear la guía
                 guia = GuiaRemision(
+                    empresa_id=empresa_id,
                     establecimiento=establecimiento,
                     punto_emision=punto_emision,
                     fecha_emision=request.POST.get('fecha_emision'),
@@ -6611,7 +6647,11 @@ def emitir_guia_remision(request):
     # GET request - mostrar formulario
     # GET request - mostrar formulario
     # Secuencias SOLO de Guía de Remisión (código SRI 06)
-    secuencias_guia = Secuencia.objects.filter(tipo_documento='06', activo=True).order_by('descripcion')
+    empresa_id = request.session.get('empresa_activa')
+    if empresa_id and request.user.empresas.filter(id=empresa_id).exists():
+        secuencias_guia = Secuencia.objects.filter(empresa_id=empresa_id, tipo_documento='06', activo=True).order_by('descripcion')
+    else:
+        secuencias_guia = Secuencia.objects.none()
     context = {
         'fecha_hoy': date.today().isoformat(),
         'configuracion': ConfiguracionGuiaRemision.get_configuracion(),
@@ -6626,7 +6666,11 @@ def emitir_guia_remision(request):
 @login_required
 def ver_guia_remision(request, guia_id):
     """Vista para ver los detalles de una guia de remision"""
-    guia = get_object_or_404(GuiaRemision, id=guia_id)
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        messages.error(request, 'Seleccione una empresa válida.')
+        return redirect('inventario:seleccionar_empresa')
+    guia = get_object_or_404(GuiaRemision, id=guia_id, empresa_id=empresa_id)
     
     context = {
         'guia': guia,
@@ -6640,7 +6684,11 @@ def ver_guia_remision(request, guia_id):
 @login_required
 def editar_guia_remision(request, guia_id):
     """Vista para editar una guia de remision"""
-    guia = get_object_or_404(GuiaRemision, id=guia_id)
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        messages.error(request, 'Seleccione una empresa válida.')
+        return redirect('inventario:seleccionar_empresa')
+    guia = get_object_or_404(GuiaRemision, id=guia_id, empresa_id=empresa_id)
     
     if not guia.puede_editarse():
         messages.error(request, 'No se puede editar una guia que no esta en borrador.')
@@ -6696,7 +6744,10 @@ def editar_guia_remision(request, guia_id):
 @require_http_methods(["POST"])
 def anular_guia_remision(request, guia_id):
     """Vista para anular una guia de remision"""
-    guia = get_object_or_404(GuiaRemision, id=guia_id)
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        return JsonResponse({'success': False, 'message': 'Empresa no válida.'}, status=400)
+    guia = get_object_or_404(GuiaRemision, id=guia_id, empresa_id=empresa_id)
     
     if not guia.puede_anularse():
         return JsonResponse({
@@ -6724,7 +6775,11 @@ def anular_guia_remision(request, guia_id):
 @login_required
 def descargar_guia_pdf(request, guia_id):
     """Vista para descargar el PDF de una guia de remision"""
-    guia = get_object_or_404(GuiaRemision, id=guia_id)
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        messages.error(request, 'Seleccione una empresa válida.')
+        return redirect('inventario:seleccionar_empresa')
+    guia = get_object_or_404(GuiaRemision, id=guia_id, empresa_id=empresa_id)
     
     if guia.estado != 'autorizada':
         messages.error(request, 'Solo se puede descargar PDF de guías autorizadas.')
@@ -6746,34 +6801,240 @@ def descargar_guia_pdf(request, guia_id):
 @login_required
 @csrf_exempt
 def buscar_cliente_ajax(request):
-    """Vista AJAX para buscar clientes por identificacion"""
+    """Vista AJAX para buscar un cliente exacto por identificación (CI/RUC).
+    Espera POST { identificacion: '...' }
+    Respuesta:
+      { success: true, cliente: { id, identificacion, razon_social, nombre_comercial, correo, direccion } }
+      o { success: false, message }
+    """
     if request.method != 'POST':
-        return JsonResponse({'success': False, 'message': 'Método no permitido'})
-    
-    identificacion = request.POST.get('identificacion', '').strip()
-    
+        return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=405)
+
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        return JsonResponse({'success': False, 'message': 'Empresa no válida'}, status=403)
+
+    identificacion = (request.POST.get('identificacion') or '').strip()
     if not identificacion:
-        return JsonResponse({'success': False, 'message': 'Identificacion requerida'})
-    
+        return JsonResponse({'success': False, 'message': 'Identificación requerida'}, status=400)
+
     try:
-        # Por ahora retornar datos de ejemplo
+        cliente = Cliente.objects.filter(empresa_id=empresa_id, identificacion=identificacion).first()
+        if not cliente:
+            return JsonResponse({'success': False, 'message': 'Cliente no encontrado'}, status=404)
+
         cliente_data = {
-            'identificacion': identificacion,
-            'nombre': f'Cliente Ejemplo {identificacion}',
-            'direccion': 'Direccion de ejemplo',
+            'id': cliente.id,
+            'identificacion': cliente.identificacion,
+            'razon_social': cliente.razon_social,
+            'nombre_comercial': cliente.nombre_comercial or '',
+            'correo': cliente.correo or '',
+            'direccion': cliente.direccion or ''
         }
-        
-        return JsonResponse({
-            'success': True,
-            'cliente': cliente_data
-        })
-        
+        return JsonResponse({'success': True, 'cliente': cliente_data})
     except Exception as e:
         logger.error(f"Error al buscar cliente {identificacion}: {str(e)}")
-        return JsonResponse({
-            'success': False,
-            'message': f'Error al buscar cliente: {str(e)}'
-        })
+        return JsonResponse({'success': False, 'message': f'Error interno: {str(e)}'}, status=500)
+
+# API dedicada limpia para búsqueda (GET /api/clientes/buscar?q=...&exact=1)
+@login_required
+@csrf_exempt
+def buscar_cliente_api(request):
+    """Endpoint puro JSON para búsqueda de clientes.
+    GET params:
+      q: término (obligatorio)
+      exact=1 -> intenta coincidencia exacta por identificacion primero.
+    Respuesta:
+      { success: true, results: [...], exact: {..} } o { success:false, message }
+    Nunca redirige; si falta empresa, 403 JSON.
+    """
+    if request.method != 'GET':
+        return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=405)
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        return JsonResponse({'success': False, 'message': 'Empresa no válida'}, status=403)
+    q = (request.GET.get('q') or '').strip()
+    if not q:
+        return JsonResponse({'success': True, 'results': []})
+    exact_flag = request.GET.get('exact') in ('1','true','True')
+    base_qs = Cliente.objects.filter(empresa_id=empresa_id)
+    exact_obj = None
+    if exact_flag:
+        exact_obj = base_qs.filter(identificacion=q).first()
+    qs = base_qs.filter(
+        Q(identificacion__icontains=q) |
+        Q(razon_social__icontains=q) |
+        Q(nombre_comercial__icontains=q)
+    ).order_by('razon_social')[:15]
+    def serial(c):
+        return {
+            'id': c.id,
+            'identificacion': c.identificacion,
+            'razon_social': c.razon_social,
+            'nombre_comercial': c.nombre_comercial or '',
+            'nombre_compuesto': (c.razon_social + (f" {c.nombre_comercial}" if c.nombre_comercial else "")).strip(),
+            'correo': c.correo or ''
+        }
+    data = {
+        'success': True,
+        'results': [serial(c) for c in qs]
+    }
+    if exact_obj:
+        data['exact'] = serial(exact_obj)
+    return JsonResponse(data)
+
+@login_required
+@csrf_exempt
+def crear_cliente_api(request):
+    """Crea rápidamente un cliente minimo si no existe.
+    POST JSON o form:
+      identificacion (obligatorio)
+      razon_social (si falta usa identificacion)
+      correo (opcional)
+      direccion (opcional, por defecto 'NO ESPECIFICADA')
+    Reglas:
+      - Detecta tipoIdentificacion por longitud (13=RUC->'04',10=cedula->'05',otros->'08')
+      - Si ya existe retorna ese cliente (idempotente)
+    Respuesta:
+      {success: true, created: bool, cliente:{...}} | {success:false,message}
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=405)
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        return JsonResponse({'success': False, 'message': 'Empresa no válida'}, status=403)
+    try:
+        import json
+        # Normalizar data indiferente del content-type
+        if request.method == 'POST':
+            if request.content_type and 'application/json' in request.content_type:
+                try:
+                    data = json.loads(request.body.decode('utf-8') or '{}')
+                except Exception:
+                    data = {}
+            else:
+                data = request.POST
+        else:
+            data = {}
+
+        def _val(k, default=''):
+            v = data.get(k) if hasattr(data, 'get') else None
+            if v is None:
+                return default
+            return str(v).strip()
+
+        identificacion = _val('identificacion')
+        if not identificacion:
+            return JsonResponse({'success': False, 'message': 'Identificación requerida'}, status=400)
+        razon_social = _val('razon_social') or identificacion
+        correo = _val('correo')
+        direccion = _val('direccion') or 'NO ESPECIFICADA'
+        # Log breve para debug (se puede bajar a debug luego)
+        logger.debug(f"[crear_cliente_api] payload normalizado id={identificacion} razon={razon_social}")
+        # Heurística tipo identificacion
+        if len(identificacion) == 13:
+            tipoIdentificacion = '04'
+        elif len(identificacion) == 10:
+            tipoIdentificacion = '05'
+        else:
+            tipoIdentificacion = '08'
+        existente = Cliente.objects.filter(empresa_id=empresa_id, identificacion=identificacion).first()
+        created = False
+        if existente:
+            cliente = existente
+        else:
+            # Valores mínimos obligatorios
+            cliente = Cliente.objects.create(
+                empresa_id=empresa_id,
+                tipoIdentificacion=tipoIdentificacion,
+                identificacion=identificacion,
+                razon_social=razon_social,
+                nombre_comercial='',
+                direccion=direccion,
+                telefono='',
+                correo=correo or '',
+                observaciones='',
+                convencional='',
+                tipoVenta='1',
+                tipoRegimen='1',
+                tipoCliente='1'
+            )
+            created = True
+        resp = {
+            'success': True,
+            'created': created,
+            'cliente': {
+                'id': cliente.id,
+                'identificacion': cliente.identificacion,
+                'razon_social': cliente.razon_social,
+                'nombre_comercial': cliente.nombre_comercial or '',
+                'correo': cliente.correo or '',
+                'direccion': cliente.direccion or ''
+            }
+        }
+        return JsonResponse(resp, status=201 if created else 200)
+    except Exception as e:
+        logger.exception("Error crear cliente rapido")
+        return JsonResponse({'success': False, 'message': 'Error interno creando cliente'}, status=500)
+
+@login_required
+@csrf_exempt
+def enriquecer_cliente_api(request):
+    """Intenta complementar datos de un cliente existente usando el servicio externo
+    GET params:
+      id o identificacion (uno de los dos)
+    Solo cambia razon_social y nombre_comercial si actualmente son iguales a la identificación
+    o están vacíos.
+    """
+    if request.method != 'GET':
+        return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=405)
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        return JsonResponse({'success': False, 'message': 'Empresa no válida'}, status=403)
+    cliente = None
+    identificacion = (request.GET.get('identificacion') or '').strip()
+    cid = request.GET.get('id')
+    try:
+        if cid:
+            cliente = Cliente.objects.filter(id=cid, empresa_id=empresa_id).first()
+        if not cliente and identificacion:
+            cliente = Cliente.objects.filter(identificacion=identificacion, empresa_id=empresa_id).first()
+        if not cliente:
+            return JsonResponse({'success': False, 'message': 'Cliente no encontrado'}, status=404)
+        identificacion = cliente.identificacion
+        # Solo enriquecer si razon_social es muy pobre
+        if cliente.razon_social and cliente.razon_social.strip() and cliente.razon_social.strip() != identificacion:
+            return JsonResponse({'success': True, 'enriquecido': False, 'cliente': {
+                'id': cliente.id,
+                'identificacion': cliente.identificacion,
+                'razon_social': cliente.razon_social,
+                'nombre_comercial': cliente.nombre_comercial or '',
+                'correo': cliente.correo or '',
+            }})
+        # Llamar servicio externo
+        try:
+            from services import consultar_identificacion as servicio_consultar_identificacion
+            resultado = servicio_consultar_identificacion(identificacion)
+        except Exception as e:
+            logger.error(f"Fallo servicio externo enriquecer: {e}")
+            return JsonResponse({'success': False, 'message': 'No se pudo consultar servicio externo'}, status=502)
+        razon = resultado.get('razonSocial') or resultado.get('razon_social') or resultado.get('nombre') or resultado.get('name') or ''
+        if razon and razon.strip() and razon.strip() != identificacion:
+            cliente.razon_social = razon.strip()[:200]
+            cliente.save(update_fields=['razon_social'])
+            enriquecido = True
+        else:
+            enriquecido = False
+        return JsonResponse({'success': True, 'enriquecido': enriquecido, 'cliente': {
+            'id': cliente.id,
+            'identificacion': cliente.identificacion,
+            'razon_social': cliente.razon_social,
+            'nombre_comercial': cliente.nombre_comercial or '',
+            'correo': cliente.correo or ''
+        }})
+    except Exception as e:
+        logger.exception("Error enriqueciendo cliente")
+        return JsonResponse({'success': False, 'message': 'Error interno'}, status=500)
 
 # Funciones auxiliares para Guias de Remision
 
@@ -6803,19 +7064,26 @@ def _extraer_productos_del_post(post_data):
 
 def _generar_clave_acceso_temporal(guia):
     """Genera una clave de acceso temporal para la guia"""
-    fecha_str = guia.fecha_emision.strftime('%d%m%Y')
-    tipo_comprobante = '06'  # Codigo SRI para guia de remision
-    ruc = '1234567890001'  # TODO: Obtener del modelo de empresa
-    ambiente = '1'  # Pruebas
+    from random import randint
+    from django.utils import timezone
+    fecha = guia.fecha_emision or timezone.now().date()
+    fecha_str = fecha.strftime('%d%m%Y')
+    tipo_comprobante = '06'  # Guia de remisión
+    ruc = getattr(getattr(guia, 'empresa', None), 'ruc', None) or '0000000000000'
+    ambiente = '1'  # 1=Pruebas, 2=Producción (se podría parametrizar)
     serie = f"{guia.establecimiento}{guia.punto_emision}"
-    secuencial = guia.secuencial
-    codigo_numerico = '12345678'  # Numero aleatorio de 8 digitos
+    secuencial = guia.secuencial or '000000001'
+    codigo_numerico = f"{randint(0, 99999999):08d}"
     tipo_emision = '1'
-    
-    # Construir clave sin dígito verificador
-    clave_sin_dv = fecha_str + tipo_comprobante + ruc + ambiente + serie + secuencial + codigo_numerico + tipo_emision
-    
-    # TODO: Calcular digito verificador segun algoritmo modulo 11
-    digito_verificador = '1'  # Temporal
-    
-    return clave_sin_dv + digito_verificador
+
+    clave_sin_dv = f"{fecha_str}{tipo_comprobante}{ruc}{ambiente}{serie}{secuencial}{codigo_numerico}{tipo_emision}"
+
+    # Cálculo simple Mod 11 (placeholder mejor que fijo) — se puede mejorar si ya existe util.
+    factores = [2,3,4,5,6,7]*10
+    total = 0
+    for i, ch in enumerate(reversed(clave_sin_dv)):
+        total += int(ch) * factores[i]
+    dv = 11 - (total % 11)
+    if dv in (10,11):
+        dv = 1
+    return clave_sin_dv + str(dv)

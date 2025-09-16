@@ -463,9 +463,15 @@ class EmitirFacturaFormulario(forms.Form):
         super().__init__(*args, **kwargs)
 
         # Campo para seleccionar secuencia
+        # Construir las opciones de secuencia con un placeholder inicial '...'
+        secuencia_choices = [('', '...')]
+        secuencia_choices.extend([
+            (s.id, f"{s.get_establecimiento_formatted()}-{s.get_punto_emision_formatted()}-{s.get_secuencial_formatted()} ({s.descripcion})")
+            for s in secuencias
+        ])
         self.fields['secuencia'] = forms.ChoiceField(
             label="Secuencia",
-            choices=[(s.id, f"{s.get_establecimiento_formatted()}-{s.get_punto_emision_formatted()}-{s.get_secuencial_formatted()} ({s.descripcion})") for s in secuencias],
+            choices=secuencia_choices,
             widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_secuencia'})
         )
 
@@ -1602,6 +1608,16 @@ class AlmacenForm(forms.ModelForm):
                 'class': 'border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500'
             })
         }
+
+# === PLACEHOLDER FORMS (para evitar errores mientras se refactoriza) ===
+class ImportarProductosFormulario(forms.Form):
+    archivo = forms.FileField(required=False, help_text="CSV/XLSX de productos")
+
+class ImportarProveedoresFormulario(forms.Form):
+    archivo = forms.FileField(required=False, help_text="CSV/XLSX de proveedores")
+
+class ExportarProveedoresFormulario(forms.Form):
+    incluir_inactivos = forms.BooleanField(required=False, initial=False)
 
 # ✅ FORMULARIO PARA FORMAS DE PAGO
 class FormaPagoFormulario(forms.ModelForm):

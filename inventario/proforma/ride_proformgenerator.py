@@ -185,7 +185,7 @@ class ProformaRIDEGenerator:
             '6': 0.0,   # No objeto de impuesto
             '7': 0.0,   # Exento de IVA
             '8': 8.0,   # 8% (diferenciado)
-            '9': 16.0,  # 16% (algunos servicios)
+            '9': 15.0,  # 15% (normalizado, antes 16%)
             '10': 13.0  # 13%
         }
         return mapping.get(c)

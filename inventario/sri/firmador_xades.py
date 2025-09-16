@@ -6,6 +6,7 @@ Implementación actualizada usando endesive.xades (BES) con firma PKCS#12.
 
 import logging
 from inventario.models import Opciones
+from inventario.tenant.queryset import get_current_tenant
 from lxml import etree
 import io
 import base64
@@ -24,26 +25,52 @@ class XAdESError(Exception):
 
 
 class SRIXAdESFirmador:
-    """Firmador XAdES-BES sencillo respaldado por la librería endesive."""
+    """Firmador XAdES-BES sencillo respaldado por la librería endesive.
 
-    def __init__(self):
-        self.opciones = Opciones.objects.filter(
-            firma_electronica__isnull=False,
-            password_firma__isnull=False,
-        ).first()
-        if not self.opciones:
-            raise XAdESError(
-                "Firma electrónica o contraseña no configuradas en Opciones"
-            )
+    Permite pasar `empresa` explícita para evitar depender solo del thread-local.
+    """
+
+    def __init__(self, empresa=None):
+        tenant = empresa or get_current_tenant()
+        # Búsqueda priorizando empresa explícita
+        base_qs = Opciones._base_manager
+        self.opciones = None
+        missing_parts = []
+        if tenant:
+            # Obtener registro aunque le falten campos para explicar bien
+            registro = base_qs.filter(empresa=tenant).first()
+            if not registro:
+                raise XAdESError(
+                    f"No existe registro de configuración (Opciones) para la empresa id={tenant.id}. Debe abrir Configuración > Firma Electrónica y guardar los datos."
+                )
+            # Revisar archivo
+            if not registro.firma_electronica:
+                missing_parts.append("archivo de firma (.p12/.pfx)")
+            if not registro.password_firma:
+                missing_parts.append("contraseña de la firma")
+            if missing_parts:
+                detalle = ", ".join(missing_parts)
+                raise XAdESError(
+                    f"Configuración incompleta para empresa id={tenant.id}: faltan {detalle}. Suba el archivo y contraseña y vuelva a intentar."
+                )
+            self.opciones = registro
+        else:
+            raise XAdESError("No se pudo determinar la empresa (tenant) actual para seleccionar la firma.")
 
     def firmar_xml_xades_bes(self, xml_path: str, xml_firmado_path: str) -> bool:
         """Firma un XML usando XAdES-BES y guarda el resultado."""
         return firmar_xml_con_endesive(xml_path, xml_firmado_path)
 
 
-def firmar_xml_xades_bes(xml_path: str, xml_firmado_path: str) -> bool:
-    """Función de conveniencia para firmar un XML con XAdES-BES."""
-    firmador = SRIXAdESFirmador()
+def firmar_xml_xades_bes(xml_path: str, xml_firmado_path: str, empresa=None) -> bool:
+    """Función de conveniencia para firmar un XML con XAdES-BES.
+
+    Args:
+        xml_path: ruta origen
+        xml_firmado_path: ruta destino
+        empresa: instancia Empresa (opcional)
+    """
+    firmador = SRIXAdESFirmador(empresa=empresa)
     return firmador.firmar_xml_xades_bes(xml_path, xml_firmado_path)
 
 
@@ -64,12 +91,10 @@ def firmar_xml_con_endesive(xml_path: str, xml_firmado_path: str) -> bool:
         logger.error("%s: %s", msg, e)
         raise XAdESError(msg)
 
-    opciones = Opciones.objects.filter(
-        firma_electronica__isnull=False,
-        password_firma__isnull=False,
-    ).first()
-    if not opciones:
-        raise XAdESError("Firma electrónica o contraseña no configuradas")
+    # Reutilizar lógica: instanciar firmador para asegurar misma selección / diagnósticos
+    # (No pasamos empresa aquí porque firmar_xml_xades_bes ya la procesó antes)
+    signer_aux = SRIXAdESFirmador()
+    opciones = signer_aux.opciones
 
     # Leer XML fuente
     with open(xml_path, "rb") as f:

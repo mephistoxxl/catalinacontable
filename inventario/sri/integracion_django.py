@@ -8,6 +8,7 @@ from django.core.files.base import ContentFile
 from django.core.mail import EmailMessage
 from django.utils import timezone
 from inventario.models import Factura, DetalleFactura, Opciones
+from inventario.tenant.queryset import set_current_tenant
 from .sri_client import SRIClient
 from .xml_generator import SRIXMLGenerator
 from .pdf_firmador import PDFFirmador
@@ -53,6 +54,11 @@ class SRIIntegration:
 
         try:
             factura = Factura.objects.get(id=factura_id)
+            # 🔐 Asegurar contexto tenant para managers multi-tenant
+            try:
+                set_current_tenant(getattr(factura, 'empresa', None))
+            except Exception:
+                logger.warning("No se pudo establecer tenant antes de enviar_factura")
 
             # Si la factura ya está autorizada no se vuelve a enviar
             if hasattr(factura, 'estado_sri') and factura.estado_sri in ('AUTORIZADA', 'AUTORIZADO'):
@@ -84,7 +90,7 @@ class SRIIntegration:
             # Generar y firmar XML
             xml_path = self.generar_xml_factura(factura)
             xml_firmado_path = xml_path.replace('.xml', '_firmado.xml')
-            success = self._firmar_xml_xades_bes(xml_path, xml_firmado_path)
+            success = self._firmar_xml_xades_bes(xml_path, xml_firmado_path, factura.empresa)
             if not success:
                 raise Exception("Error al firmar XML con XAdES-BES")
 
@@ -151,6 +157,10 @@ class SRIIntegration:
         try:
             # Obtener factura
             factura = Factura.objects.get(id=factura_id)
+            try:
+                set_current_tenant(getattr(factura, 'empresa', None))
+            except Exception:
+                logger.warning("No se pudo establecer tenant antes de procesar_factura")
             
             # 🎯 ESTABLECER ESTADO PENDIENTE AL INICIAR PROCESAMIENTO SRI
             # Solo si no tiene estado SRI previo (estado_sri vacío = factura local)
@@ -240,7 +250,7 @@ class SRIIntegration:
             
             # 🎯 FIRMAR XML CON XAdES-BES (requerimiento SRI)
             xml_firmado_path = xml_path.replace('.xml', '_firmado.xml')
-            success = self._firmar_xml_xades_bes(xml_path, xml_firmado_path)
+            success = self._firmar_xml_xades_bes(xml_path, xml_firmado_path, factura.empresa)
             if not success:
                 raise Exception("Error al firmar XML con XAdES-BES")
             
@@ -731,16 +741,20 @@ class SRIIntegration:
         factura.save()
         logger.info(f"Factura {factura.id} actualizada y guardada en BD")
     
-    def _firmar_xml_xades_bes(self, xml_path, xml_firmado_path):
+    def _firmar_xml_xades_bes(self, xml_path, xml_firmado_path, empresa=None):
         """Firma un XML utilizando el esquema XAdES-BES."""
         try:
-            from .firmador_xades import firmar_xml_xades_bes
-            firmar_xml_xades_bes(xml_path, xml_firmado_path)
+            from .firmador_xades import firmar_xml_xades_bes, XAdESError
+            firmar_xml_xades_bes(xml_path, xml_firmado_path, empresa=empresa)
             logger.info("XML firmado exitosamente con XAdES-BES")
             return True
+        except XAdESError as xe:
+            # Error esperado de configuración incompleta: propagar texto limpio
+            logger.error(f"Fallo de configuración firma: {xe}")
+            raise Exception(str(xe))
         except Exception as e:
             logger.error(f"Error crítico en proceso de firma: {e}")
-            raise Exception(f"PROCESO DE FIRMA FALLÓ COMPLETAMENTE: {e}")
+            raise Exception(f"Proceso de firma falló: {e}")
     
     def _generar_ride_autorizado(self, factura, resultado):
         """
