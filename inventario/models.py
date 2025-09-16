@@ -1111,6 +1111,96 @@ class Factura(models.Model):
         
         return clave_acceso
 
+    # ===================== NUEVO: REGENERAR CLAVE POR CAMBIO DE AMBIENTE =====================
+    def regenerar_clave_por_ambiente(self, nuevo_ambiente: str, force: bool = False):
+        """Regenera la clave de acceso si el ambiente cambió y aún es seguro hacerlo.
+
+        Reglas de seguridad:
+        - Solo se regenera si la factura NO ha sido enviada al SRI (estado_sri vacío) y no tiene numero_autorizacion.
+        - Si ya tiene estado_sri en ['PENDIENTE','RECIBIDA','AUTORIZADA'] o numero_autorizacion, NO se regenera (salvo force=True).
+        - Mantiene misma fecha, serie y secuencia; sólo cambia el dígito de ambiente y nuevo código aleatorio + dígito verificador.
+        - Garantiza unicidad probando hasta 10 intentos (igual que generar_clave_acceso()).
+
+        Args:
+            nuevo_ambiente (str): '1' pruebas o '2' producción.
+            force (bool): Forzar regeneración aunque ya se haya enviado (NO recomendado, solo para contingencias controladas).
+
+        Returns:
+            tuple(bool, str): (regenerada, mensaje)
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        if not nuevo_ambiente or nuevo_ambiente not in ('1','2'):
+            return False, f"Ambiente inválido '{nuevo_ambiente}'"
+
+        if not self.clave_acceso:
+            return False, "Factura sin clave previa: usar generar_clave_acceso normal"
+
+        # Estado que indica que YA se relacionó con SRI
+        if not force and (self.estado_sri in ('PENDIENTE','RECIBIDA','AUTORIZADA') or self.numero_autorizacion):
+            return False, "No se regenera clave: factura ya enviada o autorizada"
+
+        try:
+            ambiente_actual = self.clave_acceso[23]
+        except Exception:
+            ambiente_actual = None
+
+        if ambiente_actual == nuevo_ambiente:
+            return False, f"Clave ya está en ambiente {nuevo_ambiente}"
+
+        # Regenerar conservando parámetros existentes
+        from datetime import datetime
+        from random import randint
+
+        fecha_emision = self.fecha_emision.strftime('%d%m%Y')
+        tipo_comprobante = "01"
+        try:
+            opciones = Opciones.objects.for_tenant(self.empresa).first()
+            if not opciones:
+                if self.empresa:
+                    opciones = Opciones.objects.create(empresa=self.empresa, identificacion=self.empresa.ruc)
+                else:
+                    raise ValueError("RUC no configurado en Opciones")
+            ruc_emisor = opciones.identificacion.zfill(13)
+        except Exception:
+            ruc_emisor = "1707181374001"  # fallback pruebas
+
+        serie = f"{self.establecimiento.zfill(3)}{self.punto_emision.zfill(3)}"
+        numero_secuencial = self.secuencia.zfill(9)
+        tipo_emision = "1"
+
+        intentos = 0
+        while intentos < 10:
+            codigo_numerico = str(randint(10000000, 99999999))
+            clave_base = (
+                f"{fecha_emision}{tipo_comprobante}{ruc_emisor}{nuevo_ambiente}{serie}{numero_secuencial}{codigo_numerico}{tipo_emision}"
+            )
+            # Calcular dígito verificador
+            clave_lista = [int(d) for d in clave_base]
+            pesos = [2,3,4,5,6,7]
+            total = 0
+            peso_index = 0
+            for digito in reversed(clave_lista):
+                total += digito * pesos[peso_index]
+                peso_index = (peso_index + 1) % len(pesos)
+            residuo = total % 11
+            digito_verificador = 11 - residuo
+            if digito_verificador == 11:
+                digito_verificador = 0
+            elif digito_verificador == 10:
+                digito_verificador = 1
+            nueva_clave = f"{clave_base}{digito_verificador}"
+            if not Factura.objects.filter(clave_acceso=nueva_clave).exclude(id=self.id).exists():
+                old = self.clave_acceso
+                self.clave_acceso = nueva_clave
+                self.save(update_fields=['clave_acceso'])
+                logger.warning(f"🔄 Clave factura {self.id} regenerada por cambio de ambiente {ambiente_actual}->{nuevo_ambiente}. Old={old} New={nueva_clave}")
+                return True, f"Clave regenerada ({ambiente_actual}->{nuevo_ambiente})"
+            intentos += 1
+
+        return False, "No se pudo regenerar clave única tras 10 intentos"
+
     # ✅ PROPERTIES PARA MAPEAR A NOMBRES XML
     @property
     def tipo_identificacion_comprador_xml(self):
