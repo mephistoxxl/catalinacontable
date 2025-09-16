@@ -17,6 +17,8 @@ urlpatterns = [
 
     # Productos
     path('listarProductos', views.ListarProductos.as_view(), name='listarProductos'),
+    path('productos/exportar/', views.ExportarProductosExcel.as_view(), name='exportar_productos_excel'),
+    path('productos/plantilla/', views.PlantillaProductosExcel.as_view(), name='plantilla_productos_excel'),
     path('agregarProducto', views.AgregarProducto.as_view(), name='agregarProducto'),
     path('importarProductos', views.ImportarProductos.as_view(), name='importarProductos'),
     path('exportarProductos', views.ExportarProductos.as_view(), name='exportarProductos'),

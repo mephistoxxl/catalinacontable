@@ -1200,6 +1200,107 @@ class ListarProductos(PermissionRequiredMixin, View):
 
 #Fin de vista-------------------------------------------------------------------------#
 
+from django.views import View
+from django.http import HttpResponse
+
+class ExportarProductosExcel(PermissionRequiredMixin, View):
+    """Exporta todos los productos de la empresa activa a un archivo Excel XLSX.
+
+    Columnas requeridas:
+        ProductoID | CodigoProducto | CodigoBarras | DescripcionP | Precio1 | Precio2
+    """
+    login_url = '/inventario/login'
+    redirect_field_name = None
+    permission_required = 'inventario.view_producto'
+
+    def get(self, request):
+        import io, csv
+        try:
+            from openpyxl import Workbook  # type: ignore
+            use_xlsx = True
+        except ModuleNotFoundError:
+            use_xlsx = False
+
+        empresa_id = request.session.get('empresa_activa')
+        if empresa_id is None or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'No se ha seleccionado una empresa válida')
+            return HttpResponseRedirect('/inventario/panel')
+
+        productos = Producto.objects.filter(empresa_id=empresa_id).order_by('id')
+        headers = ['ProductoID','CodigoProducto','CodigoBarras','DescripcionP','Precio1','Precio2']
+
+        if use_xlsx:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = 'Productos'
+            ws.append(headers)
+            for p in productos:
+                ws.append([
+                    p.id,
+                    p.codigo,
+                    p.codigo_barras,
+                    p.descripcion,
+                    float(p.precio) if p.precio is not None else 0,
+                    float(p.precio2) if p.precio2 is not None else 0,
+                ])
+            for col, width in {'A':12,'B':18,'C':18,'D':45,'E':12,'F':12}.items():
+                ws.column_dimensions[col].width = width
+            output = io.BytesIO()
+            wb.save(output)
+            output.seek(0)
+            response = HttpResponse(output.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = 'attachment; filename="productos.xlsx"'
+            return response
+        else:
+            sio = io.StringIO()
+            writer = csv.writer(sio)
+            writer.writerow(headers)
+            for p in productos:
+                writer.writerow([
+                    p.id, p.codigo, p.codigo_barras, p.descripcion,
+                    float(p.precio) if p.precio is not None else 0,
+                    float(p.precio2) if p.precio2 is not None else 0,
+                ])
+            response = HttpResponse(sio.getvalue().encode('utf-8'), content_type='text/csv; charset=utf-8')
+            response['Content-Disposition'] = 'attachment; filename="productos.csv"'
+            response['X-Export-Mode'] = 'csv-fallback-openpyxl-missing'
+            return response
+
+
+class PlantillaProductosExcel(PermissionRequiredMixin, View):
+    """Entrega una plantilla vacía para importar productos."""
+    login_url = '/inventario/login'
+    redirect_field_name = None
+    permission_required = 'inventario.add_producto'
+
+    def get(self, request):
+        import io, csv
+        try:
+            from openpyxl import Workbook  # type: ignore
+            wb = Workbook()
+            ws = wb.active
+            ws.title = 'Plantilla'
+            headers = ['Código','Descripción','Barras','Iva','Costo Actual','Precio 1','Precio 2']
+            ws.append(headers)
+            ws.append(['P000000001', 'EJEMPLO PRODUCTO', '1234567890123', '0', 10.50, 12.50, 11.99])
+            for col, width in {'A':16,'B':40,'C':18,'D':8,'E':14,'F':12,'G':12}.items():
+                ws.column_dimensions[col].width = width
+            output = io.BytesIO()
+            wb.save(output)
+            output.seek(0)
+            resp = HttpResponse(output.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            resp['Content-Disposition'] = 'attachment; filename="plantilla_productos.xlsx"'
+            return resp
+        except ModuleNotFoundError:
+            sio = io.StringIO()
+            writer = csv.writer(sio)
+            writer.writerow(['Código','Descripción','Barras','Iva','Costo Actual','Precio 1','Precio 2'])
+            writer.writerow(['P000000001','EJEMPLO PRODUCTO','1234567890123','0','10.50','12.50','11.99'])
+            resp = HttpResponse(sio.getvalue().encode('utf-8'), content_type='text/csv; charset=utf-8')
+            resp['Content-Disposition'] = 'attachment; filename="plantilla_productos.csv"'
+            resp['X-Export-Mode'] = 'csv-fallback-openpyxl-missing'
+            return resp
+
 
 #Maneja y visualiza un formulario--------------------------------------------------#
 class AgregarProducto(LoginRequiredMixin, View):
@@ -1291,22 +1392,115 @@ class ImportarProductos(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def post(self, request):
-        form = ImportarProductosFormulario(request.POST)
-        if form.is_valid():
-            request.session['productosImportados'] = True
-            return HttpResponseRedirect("/inventario/importarProductos")
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Empresa activa inválida.')
+            return HttpResponseRedirect('/inventario/panel')
+
+        form = ImportarProductosFormulario(request.POST, request.FILES)
+        modo = request.POST.get('modo', 'agregar')  # 'reemplazar' o 'agregar'
+        archivo = request.FILES.get('archivo')
+        if not archivo:
+            messages.error(request, 'Debe seleccionar un archivo XLSX o CSV.')
+            return HttpResponseRedirect('/inventario/importarProductos')
+
+        from services import parse_product_file
+        filas, errores = parse_product_file(archivo)
+
+        if errores:
+            messages.error(request, f"Errores en importación: {' | '.join(errores[:5])}")
+            if len(errores) > 5:
+                messages.error(request, f"{len(errores)-5} errores adicionales truncados")
+            return HttpResponseRedirect('/inventario/importarProductos')
+
+        # Estrategia reemplazo: borrar existentes antes de agregar
+        creados = 0
+        actualizados = 0
+        if modo == 'reemplazar':
+            Producto.objects.filter(empresa_id=empresa_id).delete()
+
+        for fila in filas:
+            # Parsing numéricos seguros
+            def to_decimal(val):
+                try:
+                    if val in (None, ''):
+                        return Decimal('0')
+                    return Decimal(str(val).replace(',', '.'))
+                except Exception:
+                    return Decimal('0')
+
+            precio1 = to_decimal(fila.get('precio1'))
+            precio2_raw = fila.get('precio2')
+            precio2 = to_decimal(precio2_raw) if (precio2_raw not in (None, '')) else None
+            costo_actual = to_decimal(fila.get('costo_actual') or fila.get('costo') or precio1)
+
+            # IVA: en el archivo se espera valor numérico (ej: 0, 5, 12)
+            iva_val = str(fila.get('iva') or '0').strip()
+            # Mapear a choices del modelo Producto.tiposIVA (ej: keys '0','2','3'?)
+            # Si el proyecto usa claves iguales al número, simplemente usar.
+            # Validación: si no coincide, caer a '0'.
+            iva_choices = {k: v for k, v in Producto.tiposIVA}
+            if iva_val not in iva_choices:
+                # Intentar normalizar quitando decimales
+                iva_val_simple = iva_val.split('.')[0]
+                if iva_val_simple in iva_choices:
+                    iva_val = iva_val_simple
+                else:
+                    iva_val = '0'
+
+            codigo = fila['codigo']
+            producto = Producto.objects.filter(empresa_id=empresa_id, codigo=codigo).first()
+            if producto:
+                producto.codigo_barras = fila.get('codigo_barras','')[:50]
+                producto.descripcion = fila.get('descripcion','')[:40]
+                producto.precio = precio1
+                producto.precio2 = precio2
+                if not producto.categoria:
+                    producto.categoria = '1'
+                producto.iva = iva_val or producto.iva or '0'
+                if producto.disponible is None:
+                    producto.disponible = 0
+                producto.costo_actual = costo_actual or producto.costo_actual or precio1
+                # Calcular precios con IVA si el modelo los maneja (según patrón en agregar)
+                try:
+                    iva_percent = Decimal(dict(Producto.tiposIVA).get(producto.iva).replace('%', '')) / 100
+                    producto.precio_iva1 = producto.precio * (Decimal('1.00') + iva_percent)
+                    producto.precio_iva2 = (producto.precio2 * (Decimal('1.00') + iva_percent)) if producto.precio2 else None
+                except Exception:
+                    pass
+                producto.save()
+                actualizados += 1
+            else:
+                try:
+                    iva_percent = Decimal(dict(Producto.tiposIVA).get(iva_val).replace('%', '')) / 100
+                except Exception:
+                    iva_percent = Decimal('0')
+                precio_iva1 = precio1 * (Decimal('1.00') + iva_percent)
+                precio_iva2 = (precio2 * (Decimal('1.00') + iva_percent)) if precio2 else None
+                Producto.objects.create(
+                    empresa_id=empresa_id,
+                    codigo=codigo,
+                    codigo_barras=fila.get('codigo_barras','')[:50],
+                    descripcion=fila.get('descripcion','')[:40],
+                    precio=precio1,
+                    precio2=precio2,
+                    disponible=0,
+                    categoria='1',
+                    iva=iva_val,
+                    costo_actual=costo_actual or precio1,
+                    precio_iva1=precio_iva1,
+                    precio_iva2=precio_iva2,
+                )
+                creados += 1
+
+        messages.success(request, f"Importación completada. Creados: {creados} | Actualizados: {actualizados}")
+        request.session['productosImportados'] = True
+        return HttpResponseRedirect('/inventario/importarProductos')
 
     def get(self, request):
         form = ImportarProductosFormulario()
-
-        if request.session.get('productosImportados') == True:
-            importado = request.session.get('productoImportados')
-            contexto = {'form': form, 'productosImportados': importado}
-            request.session['productosImportados'] = False
-
-        else:
-            contexto = {'form': form}
-            contexto = complementarContexto(contexto, request.user)
+        contexto = {'form': form}
+        contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/producto/importarProductos.html', contexto)
 
     #Fin de vista-------------------------------------------------------------------------#

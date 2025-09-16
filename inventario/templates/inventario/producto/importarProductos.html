@@ -1,43 +1,109 @@
 {% extends "inventario/comun/base.html" %}
 
 {% block content %}
-<article class="content forms-page">
-	    <div class="title-block">
-          <h3 class="title">Importar productos</h3>
-          <p class="title-description">Ingrese una base de datos nueva</p>
-        </div>
-<section class="section">
-    <div class="row sameheight-container">
-	<div class="col-md-12">
-		{% if productosImportados %}
-		 <div class="card card-primary">
-            <div class="card-header"> 
-            	<div class="header-block">
-            		<em class="fa fa-check"></em>
-                        <p class="title">Productos actualizados exitosamente</p>
-                    </div>
-                </div>
-         </div>
-		{%endif%}
+<!-- ESTILOS COMPACTOS + PANEL OSCURO (restaurado) -->
+<style>
+  /* Campos base compactos (mismo criterio listar) */
+  input[type="text"],input[type="email"],input[type="password"],input[type="number"],input[type="tel"],input[type="url"],input[type="date"],input[type="datetime-local"],textarea,select,input[type="file"]{
+    width:100%!important;padding:4px 8px!important;border:0.5px solid #d1d5db!important;border-radius:4px!important;font-size:13px!important;background:#ffffff!important;transition:all .2s ease!important;box-shadow:none!important;height:30px!important}
+  input[type="file"]{height:auto!important;font-size:12px!important;padding:6px!important}
+  input:focus,textarea:focus,select:focus{outline:none!important;border-color:#60a5fa!important;box-shadow:0 0 0 2px rgba(96,165,250,.08)!important}
+  input:hover,textarea:hover,select:hover{border-color:#9ca3af!important}
+  label{margin-bottom:2px!important;font-size:12px!important}
+  .text-xs{font-size:10px!important}
+  /* Radio pill oscuro */
+  .radio-pill{position:relative;cursor:pointer}
+  .radio-pill input{display:none}
+  .radio-pill span{display:inline-block;padding:6px 12px;font-size:11px;background:#1f2937;color:#e5e7eb;border:1px solid #374151;border-radius:6px;transition:.2s}
+  .radio-pill input:checked+span{background:#2563eb;border-color:#3b82f6;color:#fff;box-shadow:0 0 0 2px rgba(59,130,246,.35)}
+  .steps-list li{margin-bottom:4px}
+  .steps-list code{background:#1e293b;color:#93c5fd;padding:2px 4px;border-radius:4px;font-size:11px}
+  .badge-soft{font-size:10px;padding:2px 6px;border-radius:12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#d1d5db}
+  .panel-gradient{background:linear-gradient(135deg,#1e293b 0%,#111827 70%);border:1px solid #1f2937}
+	.btn-slim{padding:4px 9px;font-size:11px;line-height:1;border-radius:6px}
+  .btn-outline-light{background:transparent;border:1px solid #4b5563;color:#e5e7eb}
+  .btn-outline-light:hover{background:#374151}
+  .hint{font-size:10px;color:#9ca3af}
+	.divider{height:1px;background:linear-gradient(to right,transparent,#374151,transparent);margin:10px 0}
+	/* Compact panel adjustments */
+	.panel-compact{padding:16px 18px!important}
+	.panel-compact ol li{line-height:1.25}
+	.panel-compact ol{margin-bottom:10px!important}
+	.panel-compact form{margin-top:6px}
+	.panel-compact .radio-pill span{padding:4px 10px;font-size:10px}
+	@media (max-width:640px){
+		.panel-compact{padding:14px 14px!important}
+		.panel-compact h3{margin-bottom:6px!important}
+		.panel-compact .btn-slim{font-size:10px;padding:4px 8px}
+		.panel-compact .radio-pill span{padding:4px 8px;font-size:10px}
+	}
+</style>
 
-		<div class="card card-block sameheight-item">
-			<form role="form" method="POST">
-			{% csrf_token %}
-				{% for field in form %}
-				<div class="form-group">
-				<label for="{{ field.name }}">
-				{{field.label}}
-				</label>
-				{{field}}
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-2" style="min-height:auto; padding-top:0; padding-bottom:10px;">
+  <div class="max-w-5xl mx-auto">
+	<!-- Header -->
+	<div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 mb-4 rounded-lg mt-3">
+		<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+			<div class="flex items-start">
+				<i class="fas fa-file-import text-white text-sm mt-0.5"></i>
+				<div class="ml-3">
+					<h2 class="text-sm font-semibold text-white flex items-center leading-tight">Importar Productos <span class="badge-soft ml-2">ARCHIVO</span></h2>
+					<p class="text-xs text-gray-300 mt-1">Cargar/actualizar productos por lote</p>
 				</div>
-				{% endfor %}
-		<div class="form-group">
-            <button type="submit" class="btn btn-primary">Ingresar</button>
-        </div>
-			</form>
+			</div>
+			<div class="flex items-center space-x-2">
+				<a href="{% url 'inventario:listarProductos' %}" class="inline-flex items-center px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium rounded-md shadow transition"><i class="fas fa-arrow-left mr-1"></i> Volver</a>
+				<a href="{% url 'inventario:plantilla_productos_excel' %}" class="inline-flex items-center px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-md shadow transition"><i class="fas fa-download mr-1"></i> Plantilla</a>
+			</div>
 		</div>
 	</div>
+
+	<!-- Mensajes -->
+	{% if messages %}
+		<div class="space-y-2 mb-3">
+		{% for message in messages %}
+			<div class="px-3 py-2 rounded-md text-xs {% if message.tags == 'success' %}bg-green-50 text-green-700 border border-green-200{% elif message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-slate-50 text-slate-700 border border-slate-200{% endif %}">
+				{{ message }}
+			</div>
+		{% endfor %}
+		</div>
+	{% endif %}
+
+	<!-- Panel principal -->
+		<div class="bg-white border border-gray-200 rounded-xl shadow-sm imp-wrapper mt-2 panel-compact">
+			<h3 class="text-xs font-semibold text-gray-700 mb-3 flex items-center"><i class="fas fa-info-circle text-blue-500 mr-2"></i> Instrucciones</h3>
+			<ol class="steps-list text-[11px] text-gray-700 mb-4 pl-4">
+			<li>Use la <strong>Plantilla</strong> (botón arriba): columnas <code>Código</code>, <code>Descripción</code>, <code>Barras</code>, <code>Iva</code>, <code>Costo Actual</code>, <code>Precio 1</code>, <code>Precio 2</code>.</li>
+			<li>El sistema actualiza si encuentra el mismo <code>Código</code>; si no existe lo crea.</li>
+			<li><code>Precio 2</code> puede dejarse vacío.</li>
+			<li><code>Iva</code>: usar el valor de la lista (ej: 0, 5, 12). Si no coincide se asigna 0.</li>
+			<li><code>Costo Actual</code> se usa como costo base (si se deja vacío se toma Precio 1).</li>
+			<li>Nuevos: categoría Unidad, disponible 0 (editable luego).</li>
+			<li>Formato: XLSX (recomendado) o CSV UTF-8. No modifique los encabezados.</li>
+		</ol>
+		<div class="divider"></div>
+		<form method="POST" enctype="multipart/form-data" class="space-y-4">
+			{% csrf_token %}
+			<div>
+			<label class="block text-[11px] font-semibold text-gray-700 mb-2 uppercase tracking-wide">Modo de Importación</label>
+				<div class="flex flex-wrap gap-2">
+					  <label class="radio-pill"><input type="radio" name="modo" value="agregar" checked><span><i class="fas fa-plus-circle mr-1"></i> Agregar Productos</span></label>
+					  <label class="radio-pill"><input type="radio" name="modo" value="reemplazar"><span><i class="fas fa-recycle mr-1"></i> Eliminar Anteriores + Agregar</span></label>
+				</div>
+			</div>
+			<div>
+			<label for="id_archivo" class="block text-[11px] font-semibold text-gray-700 mb-2 uppercase tracking-wide">Archivo</label>
+			<input id="id_archivo" name="archivo" type="file" accept=".xlsx,.csv" required />
+			<p class="hint mt-1" style="color:#6b7280;">Asegúrese de no cambiar los nombres exactos de las columnas.</p>
+			</div>
+			<div class="pt-0 flex items-center space-x-2">
+			<button type="submit" class="btn-slim bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow">
+					<i class="fas fa-cloud-upload-alt mr-1"></i> Procesar
+				</button>
+				<a href="{% url 'inventario:plantilla_productos_excel' %}" class="btn-slim btn-outline-light inline-flex items-center"><i class="fas fa-file mr-1"></i> Descargar Plantilla</a>
+			</div>
+		</form>
 	</div>
-</section>
-</article>
+	</div>
+</div>
 {% endblock %}

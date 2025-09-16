@@ -1,3 +1,151 @@
+import io
+from typing import List, Tuple, Dict
+
+def parse_product_file(file_obj) -> Tuple[List[Dict], List[str]]:
+    """Parse an uploaded XLSX or CSV file returning list of product dicts and errors.
+
+    Nueva especificación de columnas (sin ProductoID):
+        Código | Descripción | Barras | Iva | Costo Actual | Precio 1 | Precio 2
+
+    Variantes aceptadas (case-insensitive, ignora espacios/acentos):
+        codigo / codigoproducto / codigo_producto
+        descripcion / descripcionp
+        barras / codigobarras / codigo_barras
+        iva
+        costoactual / costo_actual / costo
+        precio1 / precio 1 / precio
+        precio2 / precio 2
+
+    También se mantiene compatibilidad con el formato anterior:
+        ProductoID | CodigoProducto | CodigoBarras | DescripcionP | Precio1 | Precio2
+    (Si aparece productoid se usará únicamente para lectura, pero ya no es requerido.)
+
+    Retorna (rows, errors). Cada row contiene claves:
+        codigo, codigo_barras, descripcion, iva, costo_actual, precio1, precio2
+        (y opcionalmente productoid si venía en el archivo legacy)
+    """
+    import csv
+    errors: List[str] = []
+    rows: List[Dict] = []
+
+    # Read raw bytes to determine format
+    initial = file_obj.read()
+    file_obj.seek(0)
+
+    import unicodedata, re
+
+    def _strip_accents(txt: str) -> str:
+        return ''.join(c for c in unicodedata.normalize('NFKD', txt) if not unicodedata.combining(c))
+
+    def normalize_header(h: str) -> str:
+        h2 = _strip_accents(h or '')
+        h2 = h2.lower().strip()
+        h2 = re.sub(r'\s+', '', h2)  # remove spaces
+        h2 = h2.replace('-', '').replace('_', '')
+        return h2
+
+    # Map canonical internal keys to accepted normalized header variants
+    header_variants = {
+        'productoid': {'productoid','id','idproducto'},  # legacy, opcional
+        'codigo': {'codigo','codigoproducto','codigop'},
+        'descripcion': {'descripcion','descripcionp','descrip'},
+        'codigo_barras': {'barras','codigobarras','codigobarra','codigo_barras','barras13','barras12'},
+        'iva': {'iva'},
+        'costo_actual': {'costoactual','costo','costo_act','costoactualizado','costo_producto'},
+        'precio1': {'precio1','precio','precio_1','precioa'},
+        'precio2': {'precio2','precio_2','preciob'},
+    }
+
+    # Required new-format keys (precio2 can be optional header but recommended). We will treat precio2 as optional header.
+    required_keys = {'codigo','descripcion','codigo_barras','iva','costo_actual','precio1'}
+
+    def process_records(records):
+        if not records:
+            errors.append('Archivo vacío.')
+            return
+        raw_headers = records[0]
+        normalized_headers = [normalize_header(h) for h in raw_headers]
+
+        # Build mapping internal_key -> column index
+        col_map: Dict[str,int] = {}
+        for idx, norm in enumerate(normalized_headers):
+            for internal, variants in header_variants.items():
+                if norm in variants and internal not in col_map:
+                    col_map[internal] = idx
+                    break
+
+        missing_new = sorted(list(required_keys - set(k for k in col_map.keys() if k != 'productoid')))
+        if missing_new:
+            errors.append('Faltan columnas requeridas: ' + ', '.join(missing_new))
+            return
+
+        for r in records[1:]:
+            # Saltar filas totalmente vacías
+            if not any(str(c).strip() for c in r):
+                continue
+            try:
+                def safe_get(key):
+                    idx = col_map.get(key)
+                    if idx is None or idx >= len(r):
+                        return ''
+                    val = r[idx]
+                    return '' if val is None else str(val).strip()
+
+                raw_iva = safe_get('iva') or '0'
+                raw_iva_norm = raw_iva.replace('%','').strip()
+                # Mantener tal cual; la vista decidirá cómo mapear al modelo.
+
+                data = {
+                    'codigo': safe_get('codigo'),
+                    'codigo_barras': safe_get('codigo_barras'),
+                    'descripcion': safe_get('descripcion'),
+                    'iva': raw_iva_norm,
+                    'costo_actual': safe_get('costo_actual'),
+                    'precio1': safe_get('precio1'),
+                    'precio2': safe_get('precio2'),
+                }
+                if 'productoid' in col_map:
+                    data['productoid'] = safe_get('productoid')
+            except Exception as e:
+                errors.append(f"Error leyendo fila: {e}")
+                continue
+            # Validación mínima
+            if not data['codigo']:
+                errors.append('Fila omitida: código vacío.')
+                continue
+            rows.append(data)
+
+    # Try XLSX first
+    try:
+        from openpyxl import load_workbook  # type: ignore
+        bio = io.BytesIO(initial)
+        wb = load_workbook(bio, data_only=True)
+        ws = wb.active
+        records = []
+        for row in ws.iter_rows(values_only=True):
+            records.append([str(c) if c is not None else '' for c in row])
+        if records:
+            process_records(records)
+            return rows, errors
+    except ModuleNotFoundError:
+        # openpyxl not installed; fallback to CSV attempt below
+        pass
+    except Exception:
+        # Not a valid xlsx; attempt CSV
+        pass
+
+    # CSV fallback
+    try:
+        text = initial.decode('utf-8', errors='ignore')
+        reader = csv.reader(io.StringIO(text))
+        records = list(reader)
+        if records:
+            process_records(records)
+    except Exception as e:
+        errors.append(f"Error procesando archivo CSV: {e}")
+    finally:
+        file_obj.seek(0)
+    return rows, errors
 import requests
 import os
 from dotenv import load_dotenv

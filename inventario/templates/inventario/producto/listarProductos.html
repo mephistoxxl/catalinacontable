@@ -153,13 +153,25 @@
                 
         <!-- Header Section -->
         <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 mb-3 rounded-lg mt-4">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <i class="fa fa-boxes text-white text-sm"></i>
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <!-- Icono restaurado (usar 'fas') -->
+                        <i class="fas fa-boxes text-white text-sm"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h2 class="text-sm font-semibold text-white">Listar Productos</h2>
+                        <p class="text-gray-300 text-xs">Verifique los productos agregados al sistema</p>
+                    </div>
                 </div>
-                <div class="ml-3">
-                    <h2 class="text-sm font-semibold text-white">Listar Productos</h2>
-                    <p class="text-gray-300 text-xs">Verifique los productos agregados al sistema</p>
+                <!-- Botones acciones productos -->
+                <div class="flex items-center space-x-2">
+                    <a href="{% url 'inventario:importarProductos' %}" class="inline-flex items-center px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md shadow transition" title="Importar Productos">
+                        <i class="fas fa-file-import mr-1"></i> Importar
+                    </a>
+                    <a href="{% url 'inventario:exportar_productos_excel' %}" class="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-md shadow transition" title="Exportar a Excel">
+                        <i class="fas fa-file-excel mr-1"></i> Exportar
+                    </a>
                 </div>
             </div>
         </div>
