@@ -1,16 +1,27 @@
 #----------------------------FUNCIONES DE AYUDA Y COMPLEMENTO--------------------------------------------------
 
+from django.shortcuts import get_object_or_404
+
 from .models import Producto
 
 
-def obtenerIdProducto(descripcion):
-    id_producto = Producto.objects.get(descripcion=descripcion)
+def obtenerIdProducto(descripcion, empresa):
+    """Devuelve el ID del producto filtrando por empresa."""
+
+    empresa_id = getattr(empresa, 'id', empresa)
+    id_producto = Producto.objects.filter(
+        descripcion=descripcion,
+        empresa_id=empresa_id,
+    ).get()
     resultado = id_producto.id
 
     return resultado
 
-def obtenerProducto(idProducto):
-    producto = Producto.objects.get(id=idProducto)
+def obtenerProducto(idProducto, empresa):
+    """Obtiene el producto filtrando por la empresa proporcionada."""
+
+    empresa_id = getattr(empresa, 'id', empresa)
+    producto = get_object_or_404(Producto, id=idProducto, empresa_id=empresa_id)
     return producto
 
 
