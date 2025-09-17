@@ -1,9 +1,19 @@
 import json
+import os
+from decimal import Decimal
+
+import django
 import pytest
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.test import Client
 from django.core import signing
+
+from django.contrib.messages import get_messages
+
+os.environ.setdefault('DATABASE_URL', 'sqlite:///test_db.sqlite3')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sistema.settings')
+django.setup()
 
 from inventario.models import (
     Empresa,
@@ -15,6 +25,9 @@ from inventario.models import (
     Factura,
     Almacen,
     Proforma,
+    Proveedor,
+    Pedido,
+    DetallePedido,
 )
 
 User = get_user_model()
@@ -168,4 +181,127 @@ class TestMultiTenantIsolation:
         # Consulta correcta
         resp2 = client.post(reverse('inventario:consultar_estado_sri', args=[factura.id]))
         assert resp2.status_code == 200
+
+    def test_detalles_pedido_usa_producto_empresa_activa(self, client, usuario, empresas):
+        self._login(client, usuario)
+        empresa_a, empresa_b = empresas
+        proveedor = Proveedor.objects.create(
+            empresa=empresa_a,
+            tipoIdentificacion='05',
+            identificacion_proveedor='9999999999',
+            razon_social_proveedor='Proveedor A',
+            nombre_comercial_proveedor='Proveedor A',
+            direccion='Dir 1',
+            telefono='123456789',
+            correo='prov@a.com',
+        )
+        producto_a = Producto.objects.create(
+            empresa=empresa_a,
+            codigo='PA-1',
+            codigo_barras='111',
+            descripcion='Duplicado',
+            precio=Decimal('10.00'),
+            precio2=Decimal('10.00'),
+            disponible=5,
+            categoria='1',
+            iva='2',
+            costo_actual=Decimal('5.00'),
+        )
+        Producto.objects.create(
+            empresa=empresa_b,
+            codigo='PB-1',
+            codigo_barras='222',
+            descripcion='Duplicado',
+            precio=Decimal('10.00'),
+            precio2=Decimal('10.00'),
+            disponible=5,
+            categoria='1',
+            iva='2',
+            costo_actual=Decimal('5.00'),
+        )
+
+        self._set_empresa(client, empresa_a.id)
+        session = client.session
+        session['form_details'] = 1
+        session['id_proveedor'] = proveedor.identificacion_proveedor
+        session.save()
+
+        response = client.post(
+            reverse('inventario:detallesPedido'),
+            data={
+                'form-TOTAL_FORMS': '1',
+                'form-INITIAL_FORMS': '0',
+                'form-MAX_NUM_FORMS': '',
+                'form-0-descripcion': str(producto_a.id),
+                'form-0-cantidad': '2',
+                'form-0-valor_subtotal': '20.00',
+            },
+        )
+
+        assert response.status_code == 302
+        pedido = Pedido.objects.filter(empresa=empresa_a).latest('id')
+        detalle = DetallePedido.objects.get(id_pedido=pedido)
+        assert detalle.id_producto == producto_a
+
+    def test_detalles_pedido_rechaza_producto_otro_tenant(self, client, usuario, empresas):
+        self._login(client, usuario)
+        empresa_a, empresa_b = empresas
+        proveedor = Proveedor.objects.create(
+            empresa=empresa_a,
+            tipoIdentificacion='05',
+            identificacion_proveedor='1231231231',
+            razon_social_proveedor='Proveedor A',
+            nombre_comercial_proveedor='Proveedor A',
+            direccion='Dir 1',
+            telefono='123456789',
+            correo='prov@a.com',
+        )
+        producto_a = Producto.objects.create(
+            empresa=empresa_a,
+            codigo='PA-2',
+            codigo_barras='333',
+            descripcion='Producto A',
+            precio=Decimal('5.00'),
+            precio2=Decimal('5.00'),
+            disponible=5,
+            categoria='1',
+            iva='2',
+            costo_actual=Decimal('2.00'),
+        )
+        producto_b = Producto.objects.create(
+            empresa=empresa_b,
+            codigo='PB-2',
+            codigo_barras='444',
+            descripcion='Producto A',
+            precio=Decimal('5.00'),
+            precio2=Decimal('5.00'),
+            disponible=5,
+            categoria='1',
+            iva='2',
+            costo_actual=Decimal('2.00'),
+        )
+
+        self._set_empresa(client, empresa_a.id)
+        session = client.session
+        session['form_details'] = 1
+        session['id_proveedor'] = proveedor.identificacion_proveedor
+        session.save()
+
+        response = client.post(
+            reverse('inventario:detallesPedido'),
+            data={
+                'form-TOTAL_FORMS': '1',
+                'form-INITIAL_FORMS': '0',
+                'form-MAX_NUM_FORMS': '',
+                'form-0-descripcion': str(producto_b.id),
+                'form-0-cantidad': '1',
+                'form-0-valor_subtotal': '5.00',
+            },
+        )
+
+        assert response.status_code == 400
+        storage = get_messages(response.wsgi_request)
+        messages_text = [m.message for m in storage]
+        assert any('no pertenecen a la empresa activa' in m.lower() for m in messages_text)
+        assert Pedido.objects.filter(empresa=empresa_a).count() == 0
 

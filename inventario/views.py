@@ -3830,27 +3830,43 @@ class DetallesPedido(LoginRequiredMixin, View):
             cantidad = []
             subtotal = []
             total_general = []
-            sub_monto = 0
-            monto_general = 0
+            productos_cache = {}
+            sub_monto = Decimal('0')
+            monto_general = Decimal('0')
 
             for form in formset:
-                desc = form.cleaned_data['descripcion'].descripcion
-                cant = form.cleaned_data['cantidad']
-                sub = form.cleaned_data['valor_subtotal']
+                producto_seleccionado = form.cleaned_data.get('descripcion')
+                cant = form.cleaned_data.get('cantidad')
+                sub = form.cleaned_data.get('valor_subtotal')
 
-                id_producto.append(
-                    obtenerIdProducto(desc))  #esta funcion, a estas alturas, es innecesaria porque ya tienes la id
+                if producto_seleccionado is None:
+                    continue
+
+                try:
+                    producto_validado = productos_cache[producto_seleccionado.id]
+                except KeyError:
+                    try:
+                        producto_validado = obtenerProducto(producto_seleccionado.id, empresa_id)
+                    except Http404:
+                        messages.error(request, 'El producto seleccionado no pertenece a la empresa activa.')
+                        contexto = {'formset': formset}
+                        contexto = complementarContexto(contexto, request.user)
+                        return render(
+                            request,
+                            'inventario/pedido/detallesPedido.html',
+                            contexto,
+                            status=400,
+                        )
+                    productos_cache[producto_seleccionado.id] = producto_validado
+
+                id_producto.append(producto_validado.id)
                 cantidad.append(cant)
                 subtotal.append(sub)
 
-                #Ingresa la factura
-            #--Saca el sub-monto
-            for index in subtotal:
-                sub_monto += index
+            sub_monto = sum(subtotal, Decimal('0'))
 
-            #--Saca el monto general
             for index, element in enumerate(subtotal):
-                producto = obtenerProducto(id_producto[index])
+                producto = productos_cache[id_producto[index]]
                 porcentaje = Decimal(str(producto.get_porcentaje_iva_real())) / 100
                 nuevoPrecio = element + (element * porcentaje)
                 monto_general += nuevoPrecio
@@ -3873,14 +3889,23 @@ class DetallesPedido(LoginRequiredMixin, View):
             id_pedido = pedido
 
             for indice, elemento in enumerate(id_producto):
-                objetoProducto = obtenerProducto(elemento)
+                objetoProducto = productos_cache[elemento]
                 cantidadDetalle = cantidad[indice]
                 subDetalle = subtotal[indice]
                 totalDetalle = total_general[indice]
 
                 # Validar que el producto pertenezca a la misma empresa
                 if hasattr(objetoProducto, 'empresa_id') and objetoProducto.empresa_id != empresa_id:
-                    raise ValueError(f"Producto {objetoProducto.id} no pertenece a la empresa activa")
+                    messages.error(request, 'El producto seleccionado no pertenece a la empresa activa.')
+                    contexto = {'formset': formset}
+                    contexto = complementarContexto(contexto, request.user)
+                    pedido.delete()
+                    return render(
+                        request,
+                        'inventario/pedido/detallesPedido.html',
+                        contexto,
+                        status=400,
+                    )
                 detallePedido = DetallePedido(
                     id_pedido=id_pedido,
                     id_producto=objetoProducto,
@@ -3893,6 +3918,22 @@ class DetallesPedido(LoginRequiredMixin, View):
 
             messages.success(request, 'Pedido de ID %s insertado exitosamente.' % id_pedido.id)
             return HttpResponseRedirect("/inventario/agregarPedido")
+
+        else:
+            status_code = 200
+            for form in formset:
+                if 'descripcion' in form.errors:
+                    messages.error(request, 'Uno o más productos no pertenecen a la empresa activa.')
+                    status_code = 400
+                    break
+            contexto = {'formset': formset}
+            contexto = complementarContexto(contexto, request.user)
+            return render(
+                request,
+                'inventario/pedido/detallesPedido.html',
+                contexto,
+                status=status_code,
+            )
 
         #Fin de vista-----------------------------------------------------------------------------------#
 
