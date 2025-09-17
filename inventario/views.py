@@ -214,12 +214,28 @@ class EmitirProforma(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                 
                 # Procesar cliente
                 cliente = None
-                if cliente_data.get('id'):
-                    try:
-                        cliente = Cliente.objects.get(id=cliente_data['id'])
-                    except Cliente.DoesNotExist:
-                        pass
-                
+                cliente_id = cliente_data.get('id')
+                if cliente_id:
+                    cliente = Cliente.objects.filter(id=cliente_id, empresa=empresa).first()
+                    if not cliente:
+                        if Cliente.objects.filter(id=cliente_id).exclude(empresa=empresa).exists():
+                            logger.warning(
+                                "Intento de acceder a cliente fuera de la empresa activa",
+                                extra={
+                                    'usuario_id': getattr(request.user, 'id', None),
+                                    'cliente_id': cliente_id,
+                                    'empresa_activa_id': empresa.id,
+                                }
+                            )
+                            return JsonResponse({
+                                'success': False,
+                                'message': 'El cliente no pertenece a la empresa activa'
+                            })
+                        return JsonResponse({
+                            'success': False,
+                            'message': 'Cliente no encontrado'
+                        })
+
                 # Si no existe cliente, crear uno nuevo
                 if not cliente and cliente_data.get('identificacion'):
                     identificacion = cliente_data['identificacion']

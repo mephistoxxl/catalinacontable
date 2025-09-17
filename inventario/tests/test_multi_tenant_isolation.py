@@ -1,8 +1,21 @@
+import json
 import pytest
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from inventario.models import Empresa, Facturador, Cliente, Secuencia, Producto, Servicio, Factura, Almacen
 from django.test import Client
+from django.core import signing
+
+from inventario.models import (
+    Empresa,
+    Facturador,
+    Cliente,
+    Secuencia,
+    Producto,
+    Servicio,
+    Factura,
+    Almacen,
+    Proforma,
+)
 
 User = get_user_model()
 
@@ -99,6 +112,33 @@ class TestMultiTenantIsolation:
         resp = client.get(reverse('inventario:buscar_producto'), {'q': 'S-B'})
         # Servicio S-B pertenece a empresa 2, no debe aparecer
         assert 'S-B' not in resp.content.decode()
+
+    def test_emitir_proforma_rejects_cliente_de_otra_empresa(self, client, usuario, empresas, facturadores, datos_base):
+        self._login(client, usuario)
+        e1, e2 = empresas
+        self._set_empresa(client, e1.id)
+        facturador = facturadores[0]
+        token = signing.dumps({'fid': facturador.id}, salt='proformador')
+        payload = {
+            't': token,
+            'cliente': {
+                'id': datos_base['cliente_b'].id,
+            },
+            'productos': [
+                {'codigo': 'P-A', 'cantidad': 1, 'precio': '10.00', 'descuento': '0'}
+            ],
+            'observaciones': 'Intento inválido',
+        }
+        response = client.post(
+            reverse('inventario:emitirProforma'),
+            data=json.dumps(payload),
+            content_type='application/json',
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        data = response.json()
+        assert data['success'] is False
+        assert 'no pertenece a la empresa activa' in data['message'].lower()
+        assert Proforma.objects.filter(empresa=e1).count() == 0
 
     def test_consultar_estado_sri_isolation(self, client, usuario, empresas, facturadores, datos_base):
         self._login(client, usuario)
