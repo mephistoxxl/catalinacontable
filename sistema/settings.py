@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
+import warnings
 from dotenv import load_dotenv
 from cryptography.fernet import Fernet
 import dj_database_url
@@ -39,9 +40,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 STATIC_URL = '/static/'
+# Incluye solo directorios de estáticos que existan para evitar advertencias
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),
-    os.path.join(BASE_DIR, 'inventario', 'static'),
+    p for p in [
+        os.path.join(BASE_DIR, 'static'),
+        os.path.join(BASE_DIR, 'inventario', 'static'),
+    ] if os.path.isdir(p)
 ]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 import os
@@ -54,13 +58,19 @@ FIRMAS_ROOT = os.path.join(BASE_DIR, 'firmas_secure')
 # Clave utilizada para cifrar los archivos de firma; debe definirse en variables de entorno en producción
 env_firmas_key = os.environ.get('FIRMAS_KEY')
 if not env_firmas_key:
-    raise Exception('FIRMAS_KEY no está configurada en el entorno')
-
-FIRMAS_KEY = env_firmas_key.encode('utf-8')
-try:
-    Fernet(FIRMAS_KEY)
-except ValueError as exc:
-    raise ValueError('FIRMAS_KEY no es una clave Fernet válida') from exc
+    # Permitir ausencia en desarrollo / pruebas, pero advertir claramente.
+    FIRMAS_KEY = None
+    warnings.warn(
+        'FIRMAS_KEY no está configurada: las firmas electrónicas se almacenarán SIN CIFRAR. '
+        'Configura FIRMAS_KEY en producción para habilitar cifrado (Fernet urlsafe base64 key).',
+        RuntimeWarning
+    )
+else:
+    FIRMAS_KEY = env_firmas_key.encode('utf-8')
+    try:
+        Fernet(FIRMAS_KEY)  # valida formato
+    except ValueError as exc:
+        raise ValueError('FIRMAS_KEY no es una clave Fernet válida') from exc
 
 # ✅ CONFIGURACIÓN DE LOGGING (ROTACIÓN, JSON Y TENANT)
 LOGGING = {
