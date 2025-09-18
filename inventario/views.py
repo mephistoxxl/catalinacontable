@@ -970,6 +970,11 @@ class Perfil(LoginRequiredMixin, View):
             perf = Usuario.objects.get(id=p)
             editandoSuperAdmin = False
 
+            if request.user.nivel == Usuario.ROOT:
+                empresas_queryset = Empresa.objects.all()
+            else:
+                empresas_queryset = request.user.empresas.all()
+
             if p == 1:
                 if request.user.nivel != Usuario.ROOT:
                     messages.error(request,
@@ -992,10 +997,10 @@ class Perfil(LoginRequiredMixin, View):
                             return HttpResponseRedirect('/inventario/perfil/ver/%s' % p)
 
             if editandoSuperAdmin:
-                form = UsuarioFormulario(user=request.user)
+                form = UsuarioFormulario(user=request.user, empresas_queryset=empresas_queryset)
                 form.fields['level'].disabled = True
             else:
-                form = UsuarioFormulario(user=request.user)
+                form = UsuarioFormulario(user=request.user, empresas_queryset=empresas_queryset)
 
             #Me pregunto si habia una manera mas facil de hacer esto, solo necesitaba hacer que el formulario-
             #-apareciera lleno de una vez, pero arrojaba User already exists y no pasaba de form.is_valid()
@@ -1051,7 +1056,16 @@ class Perfil(LoginRequiredMixin, View):
     def post(self, request, modo, p):
         if modo == 'editar':
             # Crea una instancia del formulario y la llena con los datos:
-            form = UsuarioFormulario(request.POST, user=request.user)
+            if request.user.nivel == Usuario.ROOT:
+                empresas_queryset = Empresa.objects.all()
+            else:
+                empresas_queryset = request.user.empresas.all()
+
+            form = UsuarioFormulario(
+                request.POST,
+                user=request.user,
+                empresas_queryset=empresas_queryset,
+            )
             # Revisa si es valido:
 
             if form.is_valid():
