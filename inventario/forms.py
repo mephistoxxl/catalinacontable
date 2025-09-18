@@ -1068,13 +1068,15 @@ class UsuarioFormulario(forms.Form):
 
     empresa = forms.ModelChoiceField(
         label="Empresa",
-        queryset=Empresa.objects.all(),
+        queryset=Empresa.objects.none(),
         required=False,
         widget=forms.Select(attrs={'id':'empresa','class':'form-control'})
     )
 
-    def __init__(self, *args, user=None, **kwargs):
+    def __init__(self, *args, user=None, empresas_queryset=None, **kwargs):
         super().__init__(*args, **kwargs)
+        if empresas_queryset is not None:
+            self.fields['empresa'].queryset = empresas_queryset
         choices = [
             (Usuario.ADMIN, 'Administrador'),
             (Usuario.USER, 'Usuario'),
