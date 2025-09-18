@@ -1651,21 +1651,21 @@ function validarTodo(tipo)
                 let mensaje_factura = document.getElementById('mensaje_factura')
                 let nombre_negocio = document.getElementById('nombre_negocio')
 
-		if( (moneda.value.length) > 20 )
+		if( moneda && (moneda.value.length) > 20 )
 		{
 			error = true
 			mensaje += "<p class='" + claseErrores +"'>" +
 			 "-El campo de moneda no puede ser mayor a 20 caracteres. </p>"			
 		}
 
-		if( (mensaje_factura.value.length) > 50 )
+		if( (mensaje_factura && mensaje_factura.value.length) > 50 )
 		{
 			error = true
 			mensaje += "<p class='" + claseErrores +"'>" +
 			 "-El mensaje de la factura no puede ser mayor a 50 caracteres. </p>"			
 		}
 
-		if( (nombre_negocio.value.length) > 50 )
+		if( (nombre_negocio && nombre_negocio.value.length) > 50 )
 		{
 			error = true
 			mensaje += "<p class='" + claseErrores +"'>" +

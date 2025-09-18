@@ -1286,11 +1286,7 @@ class OpcionesFormulario(forms.Form):
     moneda = forms.CharField(
         label='Moneda del sistema',
         max_length=20,
-        widget=forms.TextInput(attrs={
-            'id': 'moneda',
-            'class': 'form-control',
-            'readonly': True  # Solo lectura
-        }),
+        widget=forms.HiddenInput(),
     )
     
     mensaje_factura = forms.CharField(
