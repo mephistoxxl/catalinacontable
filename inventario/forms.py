@@ -1985,6 +1985,16 @@ class FirmaElectronicaForm(forms.ModelForm):
             }),
         }
 
+    def clean_password_firma(self):
+        password = self.cleaned_data.get('password_firma')
+        if password not in (None, ''):
+            return password
+
+        if self.instance and getattr(self.instance, 'password_firma', None):
+            return self.instance.password_firma
+
+        return password
+
 from django import forms
 from .models import Servicio
 
