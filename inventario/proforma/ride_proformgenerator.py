@@ -9,7 +9,8 @@ import qrcode
 from io import BytesIO
 from datetime import datetime
 from pathlib import Path
-from django.conf import settings
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -21,6 +22,8 @@ import re
 import logging
 
 logger = logging.getLogger(__name__)
+
+from inventario.utils.media_paths import build_proforma_media_paths
 
 class ProformaRIDEGenerator:
     """Generador de PDF para PROFORMAS usando ReportLab (independiente del RIDE de facturas)."""
@@ -244,8 +247,9 @@ class ProformaRIDEGenerator:
         try:
             from reportlab.platypus import Spacer
             logger.info(f"Generando PROFORMA {getattr(proforma, 'numero', getattr(proforma, 'id', ''))}")
+            buffer = BytesIO()
             doc = SimpleDocTemplate(
-                output_path,
+                buffer,
                 pagesize=A4,
                 rightMargin=8*mm,
                 leftMargin=8*mm,
@@ -830,8 +834,11 @@ class ProformaRIDEGenerator:
                 elementos.append(observacion_table)
 
             doc.build(elementos)
-            logger.info(f"PROFORMA generada exitosamente: {output_path}")
-            return output_path
+            pdf_bytes = buffer.getvalue()
+            default_storage.delete(output_path)
+            saved_path = default_storage.save(output_path, ContentFile(pdf_bytes))
+            logger.info(f"PROFORMA generada exitosamente: {saved_path}")
+            return saved_path
             
         except Exception as e:
             logger.error(f"Error generando PROFORMA: {e}")
@@ -855,13 +862,12 @@ class ProformaRIDEGenerator:
             opciones = Opciones.objects.create(empresa=empresa, identificacion=getattr(empresa, 'ruc', '0000000000000'))
 
         # Salida
-        if output_dir is None:
-            output_dir = os.path.join(settings.MEDIA_ROOT, 'ride')
-        os.makedirs(output_dir, exist_ok=True)
+        media_paths = build_proforma_media_paths(proforma)
 
+        target_dir = output_dir or media_paths.pdf_dir
         numero = getattr(proforma, 'numero', None) or f"{getattr(proforma, 'id', 0)}"
         filename = f"PROFORMA_{numero}.pdf"
-        output_path = os.path.join(output_dir, filename)
+        output_path = f"{target_dir}/{filename}"
 
         return self.generar_ride_proforma(proforma, detalles, opciones, output_path)
 

@@ -3,10 +3,13 @@
 import os
 import base64
 import qrcode
+import tempfile
 from io import BytesIO
 from datetime import datetime
 from pathlib import Path
 from django.conf import settings
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -17,6 +20,8 @@ from xml.etree import ElementTree as ET
 import logging
 
 logger = logging.getLogger(__name__)
+
+from inventario.utils.media_paths import build_factura_media_paths
 
 class RIDEGenerator:
     """
@@ -176,8 +181,9 @@ class RIDEGenerator:
             from reportlab.graphics.barcode import code128
             from reportlab.platypus import Spacer
             logger.info(f"Generando RIDE para factura {factura.id}")
+            buffer = BytesIO()
             doc = SimpleDocTemplate(
-                output_path,
+                buffer,
                 pagesize=A4,
                 rightMargin=8*mm,
                 leftMargin=8*mm,
@@ -643,9 +649,10 @@ class RIDEGenerator:
             elementos.append(observacion_table)
 
             doc.build(elementos)
+            pdf_bytes = buffer.getvalue()
             logger.info(f"RIDE generado exitosamente: {output_path}")
-            return output_path
-            
+            return pdf_bytes
+
         except Exception as e:
             logger.error(f"Error generando RIDE: {e}")
             raise
@@ -671,20 +678,17 @@ class RIDEGenerator:
         if not opciones and empresa:
             opciones = Opciones.objects.create(empresa=empresa, identificacion=getattr(empresa, 'ruc', '0000000000000'))
         
-        # Generar nombre de archivo y ruta
-        if output_dir is None:
-            output_dir = os.path.join(settings.MEDIA_ROOT, 'ride')
-        
-        os.makedirs(output_dir, exist_ok=True)
-        
-        # Generar nombre de archivo basado en la factura
+        media_paths = build_factura_media_paths(factura)
+
+        # Generar nombre de archivo y ruta en almacenamiento
+        target_dir = output_dir or media_paths.pdf_dir
         filename = f"RIDE_{factura.establecimiento}-{factura.punto_emision}-{str(factura.secuencia).zfill(9)}.pdf"
-        output_path = os.path.join(output_dir, filename)
-        
+        storage_path = f"{target_dir}/{filename}"
+
         # 🔧 FIX CRÍTICO: SIEMPRE usar la clave de acceso ya generada de la factura
         # NUNCA generar nueva clave - debe existir desde la creación de la factura
         clave_acceso = getattr(factura, 'clave_acceso', None)
-        
+
         if not clave_acceso:
             raise ValueError(f"Factura {factura.id} no tiene clave de acceso. "
                            f"La clave debe generarse al crear/guardar la factura.")
@@ -692,31 +696,69 @@ class RIDEGenerator:
         logger.info(f"Generando RIDE para factura {factura.id} con clave: {clave_acceso}")
         
         # Generar el RIDE normal
-        pdf_path = self.generar_ride_factura(factura, detalles, opciones, output_path, clave_acceso=clave_acceso)
-        
+        pdf_bytes = self.generar_ride_factura(
+            factura,
+            detalles,
+            opciones,
+            storage_path,
+            clave_acceso=clave_acceso,
+        )
+
+        default_storage.delete(storage_path)
+        saved_path = default_storage.save(storage_path, ContentFile(pdf_bytes))
+        result_path = saved_path
+
         if firmar:
             try:
                 # Importar el firmador de PDF
                 from .pdf_firmador import PDFFirmador
-                
+
                 # Crear instancia del firmador
                 firmador = PDFFirmador()
-                
-                # Generar ruta para el PDF firmado
-                path = Path(pdf_path)
-                pdf_firmado_path = str(path.parent / f"{path.stem}_firmado{path.suffix}")
-                
-                # Firmar el PDF
-                firmador.firmar_ride_factura(factura, pdf_path, pdf_firmado_path)
-                
-                logger.info(f"RIDE firmado exitosamente: {pdf_firmado_path}")
-                return pdf_path, pdf_firmado_path
-                
+
+                temp_pdf_path = None
+                temp_signed_path = None
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_pdf:
+                        temp_pdf.write(pdf_bytes)
+                        temp_pdf_path = temp_pdf.name
+
+                    temp_signed = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+                    temp_signed_path = temp_signed.name
+                    temp_signed.close()
+
+                    signed_result_path = firmador.firmar_ride_factura(
+                        factura,
+                        temp_pdf_path,
+                        temp_signed_path,
+                    )
+
+                    with open(signed_result_path, 'rb') as signed_file:
+                        signed_bytes = signed_file.read()
+
+                    signed_storage_path = f"{target_dir}/{Path(filename).stem}_firmado{Path(filename).suffix}"
+                    default_storage.delete(signed_storage_path)
+                    saved_signed = default_storage.save(signed_storage_path, ContentFile(signed_bytes))
+
+                    logger.info(f"RIDE firmado exitosamente: {saved_signed}")
+                    return saved_path, saved_signed
+                finally:
+                    if temp_pdf_path and os.path.exists(temp_pdf_path):
+                        try:
+                            os.unlink(temp_pdf_path)
+                        except OSError:
+                            pass
+                    if temp_signed_path and os.path.exists(temp_signed_path):
+                        try:
+                            os.unlink(temp_signed_path)
+                        except OSError:
+                            pass
+
             except Exception as e:
                 logger.warning(f"Error al firmar el RIDE: {e}. Se devolverá solo el PDF sin firmar.")
-                return pdf_path
-        
-        return pdf_path
+                return saved_path
+
+        return result_path
 
     def _obtener_ambiente(self, ambiente):
         """Obtener descripción del ambiente"""

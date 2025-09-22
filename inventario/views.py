@@ -36,7 +36,8 @@ from django.core.management import call_command
 #procesa archivos en .json
 from django.core import serializers
 #permite acceder de manera mas facil a los ficheros
-from django.core.files.storage import FileSystemStorage
+from django.core.files.base import ContentFile
+from django.core.files.storage import FileSystemStorage, default_storage
 from django.db import IntegrityError
 import re
 from datetime import date
@@ -48,6 +49,7 @@ import logging
 from django.contrib import admin
 from .sri.ride_generator import RIDEGenerator
 from .proforma.ride_proformgenerator import ProformaRIDEGenerator
+from .utils.media_paths import build_factura_media_paths
 import os
 from pathlib import Path
 from django.conf import settings
@@ -3408,6 +3410,9 @@ class VerFactura(LoginRequiredMixin, View):
             # === USAR FUNCIONES DE ADAPTACIÓN PARA XML Y RIDE ===
             datos_factura = adapt_factura(factura, detalles=detalles, opciones=opciones)
             
+            # Rutas de almacenamiento normalizadas
+            media_paths = build_factura_media_paths(factura)
+
             # ✅ GENERAR XML ELECTRÓNICO SRI
             xml_path = None
             try:
@@ -3416,31 +3421,25 @@ class VerFactura(LoginRequiredMixin, View):
                         raise ValueError("Factura sin formas de pago; no se puede generar XML")
                     from .sri.xml_generator import SRIXMLGenerator
                     xml_generator = SRIXMLGenerator(ambiente=datos_factura['emisor'].get('tipo_ambiente', '1'))
-                    media_root = getattr(settings, 'MEDIA_ROOT', 'media')
-                    xml_dir = os.path.join(media_root, 'facturas_xml')
-                    os.makedirs(xml_dir, exist_ok=True)
                     xml_content = xml_generator.generar_xml_factura(factura)
                     xml_filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}.xml"
-                    xml_output_path = os.path.join(xml_dir, xml_filename)
-                    with open(xml_output_path, 'w', encoding='utf-8') as xml_file:
-                        xml_file.write(xml_content)
-                    xml_path = xml_filename
-                    logger.info(f"XML SRI generado exitosamente: {xml_output_path}")
+                    xml_storage_path = f"{media_paths.xml_dir}/{xml_filename}"
+                    default_storage.delete(xml_storage_path)
+                    default_storage.save(xml_storage_path, ContentFile(xml_content.encode('utf-8')))
+                    xml_path = xml_storage_path
+                    logger.info(f"XML SRI generado exitosamente: {xml_storage_path}")
             except Exception as e:
                 logger.error(f"Error generando XML SRI: {e}")
                 messages.warning(request, f'Error generando XML electrónico: {str(e)}')
-            
+
             # ✅ GENERAR RIDE AUTOMÁTICAMENTE
             ride_path = None
             try:
                 if opciones and detalles.exists():
                     ride_generator = RIDEGenerator()
                     media_root = getattr(settings, 'MEDIA_ROOT', 'media')
-                    pdf_dir = os.path.join(media_root, 'facturas_pdf')
                     logo_dir = os.path.join(media_root, 'logos')
-                    os.makedirs(pdf_dir, exist_ok=True)
                     filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}.pdf"
-                    output_path = os.path.join(pdf_dir, filename)
                     logo_path = None
                     possible_logos = ['logo.png', 'logo.jpg', 'logo.jpeg', 'logo2.png']
                     for logo_name in possible_logos:
@@ -3456,12 +3455,12 @@ class VerFactura(LoginRequiredMixin, View):
                     if xml_path:
                         try:
                             import xml.etree.ElementTree as ET
-                            xml_file_path = os.path.join(media_root, 'facturas_xml', xml_path)
-                            if os.path.exists(xml_file_path):
-                                tree = ET.parse(xml_file_path)
-                                clave_element = tree.find('.//claveAcceso')
-                                if clave_element is not None:
-                                    clave_acceso = clave_element.text
+                            if default_storage.exists(xml_path):
+                                with default_storage.open(xml_path, 'rb') as xml_file:
+                                    tree = ET.parse(xml_file)
+                                    clave_element = tree.find('.//claveAcceso')
+                                    if clave_element is not None:
+                                        clave_acceso = clave_element.text
                         except Exception as e:
                             logger.warning(f"No se pudo extraer clave de acceso: {e}")
                     # Generar RIDE con firma electrónica opcional
@@ -3470,17 +3469,17 @@ class VerFactura(LoginRequiredMixin, View):
                         ride_generator = RIDEGenerator()
                         result = ride_generator.generar_ride_factura_firmado(
                             factura=factura,
-                            output_dir=pdf_dir,
+                            output_dir=media_paths.pdf_dir,
                             firmar=True
                         )
-                        
+
                         if isinstance(result, tuple):
                             # Si se firmó correctamente, devuelve (original, firmado)
-                            ride_path = Path(result[1]).name  # Usar el PDF firmado
+                            ride_path = result[1]  # Usar el PDF firmado
                         else:
                             # Si no se firmó, devuelve solo el path original
-                            ride_path = Path(result).name
-                            
+                            ride_path = result
+
                     except ImportError as e:
                         # 🚫 NO MÁS FALLBACKS - SI NO HAY FIRMA, NO SE GENERA NADA
                         logger.error(f"🚫 CRÍTICO: Error de importación para firma de PDF: {e}")
@@ -3491,7 +3490,7 @@ class VerFactura(LoginRequiredMixin, View):
                         logger.error(f"🚫 CRÍTICO: Error en firma de PDF: {e}")
                         logger.error("🚫 NO SE GENERARÁ PDF SIN FIRMA VÁLIDA")
                         raise Exception(f"FIRMA DE PDF REQUERIDA - Error en firma: {e}")
-                    logger.info(f"RIDE generado exitosamente: {output_path}")
+                    logger.info(f"RIDE generado exitosamente: {ride_path}")
             except Exception as e:
                 logger.error(f"Error generando RIDE: {e}")
                 messages.warning(request, f'La factura se muestra correctamente, pero hubo un error generando el PDF: {str(e)}')
@@ -3511,13 +3510,16 @@ class VerFactura(LoginRequiredMixin, View):
             print(f"   - Detalles encontrados: {detalles.count()}")
             print(f"   - XML SRI: {xml_path or 'No generado'}")
             print(f"   - RIDE PDF: {ride_path or 'No generado'}")
-            
+
+            xml_display_name = Path(xml_path).name if xml_path else None
+            ride_display_name = Path(ride_path).name if ride_path else None
+
             contexto = {
-                'factura': factura, 
+                'factura': factura,
                 'detalles': detalles,
                 'opciones': opciones,
-                'xml_sri': xml_path,   # ✅ NUEVO: Ruta del XML generado
-                'ride_pdf': ride_path  # ✅ EXISTENTE: Ruta del PDF generado
+                'xml_sri': xml_display_name,
+                'ride_pdf': ride_display_name
             }
             contexto = complementarContexto(contexto, request.user)
             
@@ -3536,28 +3538,31 @@ class VerFactura(LoginRequiredMixin, View):
                 raise Http404("Empresa no válida")
             factura = get_object_or_404(Factura, id=p, empresa_id=empresa_id)
             action = request.POST.get('action', 'download_pdf')
-            media_root = getattr(settings, 'MEDIA_ROOT', 'media')
+            media_paths = build_factura_media_paths(factura)
 
             if action == 'download_xml':
                 # Descargar XML
-                xml_dir = os.path.join(media_root, 'facturas_xml')
                 xml_filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}_firmada.xml"
-                xml_file_path = os.path.join(xml_dir, xml_filename)
+                xml_storage_path = f"{media_paths.xml_dir}/{xml_filename}"
 
-                if os.path.exists(xml_file_path):
-                    return FileResponse(open(xml_file_path, 'rb'), as_attachment=True, filename=xml_filename, content_type='application/xml')
+                if default_storage.exists(xml_storage_path):
+                    return FileResponse(
+                        default_storage.open(xml_storage_path, 'rb'),
+                        as_attachment=True,
+                        filename=xml_filename,
+                        content_type='application/xml'
+                    )
                 else:
                     messages.error(request, 'El archivo XML no está disponible.')
                     return redirect('inventario:verFactura', p=p)
 
             else:
                 # Descargar PDF (RIDE) - SIEMPRE GENERAR Y FIRMAR
-                pdf_dir = os.path.join(media_root, 'facturas_pdf')
                 signed_filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}_firmado.pdf"
                 unsigned_filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}.pdf"
-                
-                signed_path = os.path.join(pdf_dir, signed_filename)
-                unsigned_path = os.path.join(pdf_dir, unsigned_filename)
+
+                signed_path = f"{media_paths.pdf_dir}/{signed_filename}"
+                unsigned_path = f"{media_paths.pdf_dir}/{unsigned_filename}"
                 
                 # Siempre intentar generar y firmar el PDF
                 try:
@@ -3568,17 +3573,14 @@ class VerFactura(LoginRequiredMixin, View):
                     if not opciones and empresa:
                         opciones = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
                     
-                    # Generar directorio si no existe
-                    os.makedirs(pdf_dir, exist_ok=True)
-                    
                     # Generar RIDE firmado
                     ride_generator = RIDEGenerator()
                     result = ride_generator.generar_ride_factura_firmado(
                         factura=factura,
-                        output_dir=pdf_dir,
+                        output_dir=media_paths.pdf_dir,
                         firmar=True
                     )
-                    
+
                     if isinstance(result, tuple):
                         # Se firmó correctamente, devuelve (original, firmado)
                         pdf_path = result[1]  # Usar el PDF firmado
@@ -3587,11 +3589,21 @@ class VerFactura(LoginRequiredMixin, View):
                         pdf_path = result
                         
                     # Verificar que el archivo firmado existe
-                    if os.path.exists(signed_path):
-                        return FileResponse(open(signed_path, 'rb'), as_attachment=True, filename=signed_filename, content_type='application/pdf')
-                    elif os.path.exists(pdf_path):
+                    if default_storage.exists(signed_path):
+                        return FileResponse(
+                            default_storage.open(signed_path, 'rb'),
+                            as_attachment=True,
+                            filename=signed_filename,
+                            content_type='application/pdf'
+                        )
+                    elif default_storage.exists(pdf_path):
                         # Si no se pudo firmar, devolver el no firmado
-                        return FileResponse(open(pdf_path, 'rb'), as_attachment=True, filename=os.path.basename(pdf_path), content_type='application/pdf')
+                        return FileResponse(
+                            default_storage.open(pdf_path, 'rb'),
+                            as_attachment=True,
+                            filename=Path(pdf_path).name,
+                            content_type='application/pdf'
+                        )
                     else:
                         messages.error(request, 'Error al generar el PDF firmado.')
                         return redirect('inventario:verFactura', p=p)
