@@ -45,3 +45,27 @@ xxd firmas_secure/firmas/<archivo>.p12 | head
 Si ves encabezado legible típico PKCS#12 (`0x30 0x82 ...`) y puedes importar el archivo directamente, está en plano. Si ves base64 o datos aleatorios binarios diferente cada vez que guardas, está cifrado.
 
 Conservar la misma `FIRMAS_KEY` entre reinicios o nuevas réplicas garantiza que las firmas cifradas previamente continúen siendo accesibles.
+
+### Almacenamiento de archivos en S3
+
+La aplicación puede almacenar medios (XML, RIDE, logos, etc.) en un bucket S3 compatible usando [`django-storages`](https://django-storages.readthedocs.io/en/latest/). Al definir la variable de entorno `AWS_STORAGE_BUCKET_NAME`, Django activará automáticamente el backend remoto y todos los `FileField`/`ImageField` utilizarán el bucket en lugar del sistema de archivos local.
+
+Variables principales:
+
+| Variable | Descripción |
+| --- | --- |
+| `AWS_STORAGE_BUCKET_NAME` | **Obligatoria**. Nombre del bucket o contenedor S3 compatible. |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Credenciales del bucket. Usa IAM Users o roles administrados. |
+| `AWS_S3_REGION_NAME` | Región AWS (p.ej. `us-east-1`). |
+| `AWS_S3_ENDPOINT_URL` | Endpoint alternativo para proveedores compatibles (MinIO, R2, etc.). Opcional. |
+| `AWS_S3_CUSTOM_DOMAIN` | Dominio CDN o CloudFront opcional para servir archivos. |
+| `AWS_MEDIA_LOCATION` | Prefijo dentro del bucket (por defecto sin prefijo). |
+| `MEDIA_STORAGE_PREFIX` | Prefijo adicional aplicado desde Django (útil si se comparte bucket). |
+| `FIRMAS_STORAGE_PREFIX` | Prefijo dentro del bucket para los certificados cifrados (`firmas/`). Por defecto `firmas_secure`. |
+| `MEDIA_URL` | URL pública para los archivos. Si no se define se genera automáticamente según el dominio/configuración anterior. |
+
+> 💡 En entornos locales sin `AWS_STORAGE_BUCKET_NAME` la aplicación continúa usando el sistema de archivos (`MEDIA_ROOT`) y las firmas se guardan en `FIRMAS_ROOT` como antes.
+
+#### Dependencias
+
+Instala las nuevas dependencias con `pip install -r requirements.txt` para disponer de `django-storages` y `boto3`.

@@ -50,6 +50,7 @@ from django.contrib import admin
 from .sri.ride_generator import RIDEGenerator
 from .proforma.ride_proformgenerator import ProformaRIDEGenerator
 from .utils.media_paths import build_factura_media_paths
+from .utils.storage_io import storage_read_text
 import os
 from pathlib import Path
 from django.conf import settings
@@ -6581,8 +6582,7 @@ def generar_xml_factura_view(request, factura_id):
         xml_path = integration.generar_xml_factura(factura)
         
         # Leer el XML generado
-        with open(xml_path, 'r', encoding='utf-8') as f:
-            xml_content = f.read()
+        xml_content = storage_read_text(xml_path)
         
         # Devolver como respuesta HTTP
         response = HttpResponse(xml_content, content_type='application/xml')

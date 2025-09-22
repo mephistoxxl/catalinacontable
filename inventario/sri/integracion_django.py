@@ -10,6 +10,12 @@ from django.utils import timezone
 from inventario.models import Factura, DetalleFactura, Opciones
 from inventario.tenant.queryset import set_current_tenant
 from inventario.utils.media_paths import build_factura_media_paths
+from inventario.utils.storage_io import (
+    build_storage_path,
+    iter_storage_files,
+    storage_read_text,
+    storage_write_text,
+)
 from .sri_client import SRIClient
 from .xml_generator import SRIXMLGenerator
 from .pdf_firmador import PDFFirmador
@@ -95,8 +101,7 @@ class SRIIntegration:
             if not success:
                 raise Exception("Error al firmar XML con XAdES-BES")
 
-            with open(xml_firmado_path, 'r', encoding='utf-8') as f:
-                xml_firmado_content = f.read()
+            xml_firmado_content = storage_read_text(xml_firmado_path)
 
             resultado = self.cliente.enviar_comprobante(xml_firmado_content, clave_acceso)
 
@@ -256,8 +261,7 @@ class SRIIntegration:
                 raise Exception("Error al firmar XML con XAdES-BES")
             
             # Enviar al SRI (usando la clave ya persistida)
-            with open(xml_firmado_path, 'r', encoding='utf-8') as f:
-                xml_firmado_content = f.read()
+            xml_firmado_content = storage_read_text(xml_firmado_path)
             
             resultado = self.cliente.enviar_comprobante(xml_firmado_content, clave_acceso)
 
@@ -355,67 +359,51 @@ class SRIIntegration:
             }
     
     def generar_xml_factura(self, factura, validar_xsd=True):
-        """
-        Genera el XML de una factura y lo guarda en el sistema de archivos
-        
-        Args:
-            factura: Instancia de Factura
-            validar_xsd: Si debe validar contra XSD (por defecto True)
-            
-        Returns:
-            str: Ruta del archivo XML generado
-        """
+        """Genera el XML de una factura y lo persiste en el storage configurado."""
+
         try:
-            # Asegurarse de que existan formas de pago antes de generar
             if not factura.formas_pago.exists():
                 raise ValueError(
                     f"Factura {factura.id} no tiene formas de pago registradas"
                 )
 
-            # Generar XML
             xml_generator = SRIXMLGenerator()
             xml_content = xml_generator.generar_xml_factura(factura)
-            
-            # Crear nombre de archivo único
-            xml_filename = f"factura_{factura.numero}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xml"
-            xml_path = os.path.join(settings.MEDIA_ROOT, "facturas_xml", xml_filename)
-            
-            # Crear directorio si no existe
-            os.makedirs(os.path.dirname(xml_path), exist_ok=True)
-            
-            # 🔧 FIX: Validar XML contra XSD OBLIGATORIAMENTE
+
+            timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+            xml_filename = f"factura_{factura.numero}_{timestamp}.xml"
+            media_paths = build_factura_media_paths(factura)
+            xml_path = f"{media_paths.xml_dir}/{xml_filename}"
+
             if validar_xsd:
                 xsd_path = self._obtener_ruta_xsd()
                 resultado_validacion = xml_generator.validar_xml_contra_xsd(xml_content, xsd_path)
-                
+
                 if not resultado_validacion['valido']:
-                    # 🚨 CRÍTICO: XML inválido debe detener todo el proceso
                     errores_detalle = resultado_validacion.get('errores', 'Sin detalles de error')
-                    error_msg = f"XML generado NO VÁLIDO según XSD del SRI: {resultado_validacion['mensaje']}\nDetalles: {errores_detalle}"
+                    error_msg = (
+                        f"XML generado NO VÁLIDO según XSD del SRI: {resultado_validacion['mensaje']}\n"
+                        f"Detalles: {errores_detalle}"
+                    )
                     logger.error(f"❌ {error_msg}")
-                    
-                    # Guardar XML problemático para debugging
-                    debug_filename = f"factura_{factura.numero}_INVALID_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
-                    debug_path = os.path.join(settings.MEDIA_ROOT, "facturas_xml", "debug", debug_filename)
-                    os.makedirs(os.path.dirname(debug_path), exist_ok=True)
-                    
-                    with open(debug_path, 'w', encoding='utf-8') as f:
-                        f.write(xml_content)
-                    
+
+                    debug_filename = (
+                        f"factura_{factura.numero}_INVALID_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
+                    )
+                    debug_path = f"{media_paths.xml_dir}/debug/{debug_filename}"
+                    storage_write_text(debug_path, xml_content)
                     logger.error(f"📁 XML inválido guardado para debugging en: {debug_path}")
-                    
-                    # 🛑 FALLAR COMPLETAMENTE - No continuar con XML inválido
-                    raise Exception(f"Validación XSD FALLÓ: {error_msg}. XML debug guardado en: {debug_path}")
+
+                    raise Exception(
+                        f"Validación XSD FALLÓ: {error_msg}. XML debug guardado en: {debug_path}"
+                    )
                 else:
                     logger.info("✅ XML generado válido según XSD")
-            
-            # Guardar XML
-            with open(xml_path, 'w', encoding='utf-8') as f:
-                f.write(xml_content)
-            
-            logger.info(f"XML generado en: {xml_path}")
+
+            storage_write_text(xml_path, xml_content)
+            logger.info(f"XML generado en almacenamiento: {xml_path}")
             return xml_path
-            
+
         except Exception as e:
             logger.error(f"Error generando XML para factura {factura.numero}: {str(e)}")
             raise Exception(f"Error generando XML: {str(e)}")
@@ -433,8 +421,7 @@ class SRIIntegration:
             Exception: Si el XML no es válido según el XSD
         """
         # Leer el contenido del XML
-        with open(xml_path, 'r', encoding='utf-8') as f:
-            xml_content = f.read()
+        xml_content = storage_read_text(xml_path)
         
         # Obtener la ruta del XSD
         xsd_path = self._obtener_ruta_xsd()
@@ -1119,8 +1106,7 @@ def validar_xml_existente(xml_path):
         integration = SRIIntegration()
         
         # Leer el XML
-        with open(xml_path, 'r', encoding='utf-8') as f:
-            xml_content = f.read()
+        xml_content = storage_read_text(xml_path)
         
         # Obtener XSD
         xsd_path = integration._obtener_ruta_xsd()
@@ -1150,10 +1136,12 @@ def validar_lote_xml_facturas():
     Valida todos los XML de facturas existentes
     Útil para verificar la calidad de XMLs ya generados
     """
-    import glob
-    
-    xml_pattern = os.path.join(settings.MEDIA_ROOT, "facturas_xml", "*.xml")
-    xml_files = glob.glob(xml_pattern)
+    prefix = build_storage_path('facturas')
+    xml_files = [
+        path
+        for path in iter_storage_files(prefix)
+        if path.endswith('.xml') and '/xml/' in path
+    ]
     
     resultados = []
     validos = 0
