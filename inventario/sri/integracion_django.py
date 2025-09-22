@@ -9,6 +9,7 @@ from django.core.mail import EmailMessage
 from django.utils import timezone
 from inventario.models import Factura, DetalleFactura, Opciones
 from inventario.tenant.queryset import set_current_tenant
+from inventario.utils.media_paths import build_factura_media_paths
 from .sri_client import SRIClient
 from .xml_generator import SRIXMLGenerator
 from .pdf_firmador import PDFFirmador
@@ -768,24 +769,26 @@ class SRIIntegration:
             from .ride_generator import RIDEGenerator
             
             ride_gen = RIDEGenerator()
+            media_paths = build_factura_media_paths(factura)
             # ✅ USAR MÉTODO CORRECTO: generar_ride_factura_firmado
-            pdf_path = ride_gen.generar_ride_factura_firmado(factura, firmar=False)
-            
-            # Leer contenido del PDF generado
-            with open(pdf_path, 'rb') as pdf_file:
+            pdf_path = ride_gen.generar_ride_factura_firmado(
+                factura,
+                output_dir=media_paths.pdf_dir,
+                firmar=False,
+            )
+
+            source_path = pdf_path[1] if isinstance(pdf_path, tuple) else pdf_path
+            if not default_storage.exists(source_path):
+                raise FileNotFoundError(f"No se encontró el PDF generado en almacenamiento: {source_path}")
+
+            with default_storage.open(source_path, 'rb') as pdf_file:
                 pdf_content = pdf_file.read()
-            
-            # Obtener RUC para organizar archivos
-            empresa = getattr(factura, 'empresa', None)
-            opciones = Opciones.objects.for_tenant(empresa).first()
-            if not opciones and empresa:
-                opciones = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
-            ruc = opciones.identificacion if opciones else 'sin_ruc'
-            
-            # Guardar RIDE
+
+            # Guardar RIDE autorizado bajo jerarquía consistente
             ride_filename = f"RIDE_{factura.numero}.pdf"
-            ride_path = f"rides/{ruc}/{ride_filename}"
-            
+            ride_path = f"{media_paths.ride_dir}/{ride_filename}"
+
+            default_storage.delete(ride_path)
             ride_file = ContentFile(pdf_content)
             saved_path = default_storage.save(ride_path, ride_file)
             
