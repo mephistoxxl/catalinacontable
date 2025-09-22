@@ -36,7 +36,7 @@ class Command(BaseCommand):
         regen_xml = options.get("regen_xml", False)
         only = options.get("only")
 
-        qs = Factura.objects.all()
+        qs = Factura.all_objects.all()
         if only:
             qs = qs.filter(id=only)
         else:

@@ -54,7 +54,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('=== DIAGNÓSTICO SRI ==='))
         
         try:
-            empresa = Factura.objects.first().empresa if Factura.objects.exists() else None
+            empresa = Factura.all_objects.first().empresa if Factura.all_objects.exists() else None
             integration = SRIIntegration(empresa=empresa)
             estado = integration.cliente.verificar_servicio()
 
@@ -73,7 +73,7 @@ class Command(BaseCommand):
     def procesar_factura_especifica(self, factura_id, solo_consultar=False):
         """Procesar una factura específica"""
         try:
-            factura = Factura.objects.get(id=factura_id)
+            factura = Factura.all_objects.get(id=factura_id)
             self.stdout.write(f"Procesando factura: {factura.numero_factura}")
 
             integration = SRIIntegration(empresa=factura.empresa)
@@ -90,7 +90,7 @@ class Command(BaseCommand):
 
     def procesar_facturas_por_estado(self, estado, solo_consultar=False):
         """Procesar todas las facturas con un estado específico"""
-        facturas = Factura.objects.filter(estado=estado)
+        facturas = Factura.all_objects.filter(estado=estado)
         
         if not facturas.exists():
             self.stdout.write(f"No hay facturas con estado {estado}")
@@ -115,7 +115,7 @@ class Command(BaseCommand):
 
     def procesar_facturas_pendientes(self, solo_consultar=False):
         """Procesar todas las facturas pendientes"""
-        facturas = Factura.objects.filter(estado__in=['PENDIENTE', 'RECIBIDA'])
+        facturas = Factura.all_objects.filter(estado__in=['PENDIENTE', 'RECIBIDA'])
         
         if not facturas.exists():
             self.stdout.write("No hay facturas pendientes")

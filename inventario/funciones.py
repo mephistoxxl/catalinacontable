@@ -12,7 +12,7 @@ def obtenerIdProducto(descripcion, empresa):
     """Devuelve el ID del producto filtrando por empresa."""
 
     empresa_id = getattr(empresa, 'id', empresa)
-    id_producto = Producto.objects.filter(
+    id_producto = Producto.all_objects.filter(
         descripcion=descripcion,
         empresa_id=empresa_id,
     ).get()
@@ -24,7 +24,7 @@ def obtenerProducto(idProducto, empresa):
     """Obtiene el producto filtrando por la empresa proporcionada."""
 
     empresa_id = getattr(empresa, 'id', empresa)
-    producto = get_object_or_404(Producto, id=idProducto, empresa_id=empresa_id)
+    producto = get_object_or_404(Producto.all_objects, id=idProducto, empresa_id=empresa_id)
     return producto
 
 

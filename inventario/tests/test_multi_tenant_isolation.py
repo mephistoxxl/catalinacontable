@@ -5,9 +5,11 @@ from decimal import Decimal
 import django
 import pytest
 from django.urls import reverse
+from django.apps import apps
 from django.contrib.auth import get_user_model
-from django.test import Client
 from django.core import signing
+from django.db import connection
+from django.test import Client
 
 from django.contrib.messages import get_messages
 
@@ -29,16 +31,40 @@ from inventario.models import (
     Pedido,
     DetallePedido,
 )
+from inventario.tenant.queryset import set_current_tenant
 
 User = get_user_model()
+
+@pytest.fixture(scope='session', autouse=True)
+def _ensure_schema():
+    with connection.schema_editor() as schema_editor:
+        existing = set(connection.introspection.table_names())
+        for model in apps.get_models():
+            if not model._meta.managed:
+                continue
+            table = model._meta.db_table
+            if table in existing:
+                continue
+            try:
+                schema_editor.create_model(model)
+            except Exception:
+                # Si alguna tabla ya existe o la operación no es compatible con SQLite,
+                # la ignoramos porque solo necesitamos un esquema básico para las pruebas.
+                continue
+            existing.add(table)
+
 
 @pytest.mark.django_db
 class TestMultiTenantIsolation:
     @pytest.fixture
     def empresas(self):
-        e1 = Empresa.objects.create(razon_social='Empresa Uno', identificacion='0999999999001')
-        e2 = Empresa.objects.create(razon_social='Empresa Dos', identificacion='0888888888001')
+        e1 = Empresa.objects.create(razon_social='Empresa Uno', ruc='0999999999001')
+        e2 = Empresa.objects.create(razon_social='Empresa Dos', ruc='0888888888001')
         return e1, e2
+
+    @pytest.fixture
+    def client(self):
+        return Client()
 
     @pytest.fixture
     def usuario(self, empresas):
@@ -181,6 +207,122 @@ class TestMultiTenantIsolation:
         # Consulta correcta
         resp2 = client.post(reverse('inventario:consultar_estado_sri', args=[factura.id]))
         assert resp2.status_code == 200
+
+    def test_tenant_managers_and_aggregates(self, empresas, facturadores, datos_base):
+        e1, e2 = empresas
+        f1, f2 = facturadores
+        cliente_a = datos_base['cliente_a']
+        cliente_b = datos_base['cliente_b']
+        almacen_a = datos_base['almacen_a']
+
+        # Crear productos exclusivos para la prueba con el manager global
+        prod_a = Producto.all_objects.create(
+            empresa=e1,
+            codigo='TENANT-A',
+            codigo_barras='TENANT-A',
+            descripcion='Producto Tenant A',
+            precio=Decimal('5.00'),
+            precio2=Decimal('5.00'),
+            disponible=10,
+            categoria='1',
+            iva='2',
+            costo_actual=Decimal('2.50'),
+        )
+        prod_b = Producto.all_objects.create(
+            empresa=e2,
+            codigo='TENANT-B',
+            codigo_barras='TENANT-B',
+            descripcion='Producto Tenant B',
+            precio=Decimal('7.00'),
+            precio2=Decimal('7.00'),
+            disponible=8,
+            categoria='1',
+            iva='2',
+            costo_actual=Decimal('3.50'),
+        )
+
+        # Crear facturas en ambas empresas usando el manager global
+        factura_a = Factura.all_objects.create(
+            empresa=e1,
+            cliente=cliente_a,
+            almacen=almacen_a,
+            facturador=f1,
+            fecha_emision='2025-01-02',
+            fecha_vencimiento='2025-01-10',
+            establecimiento='001',
+            punto_emision='001',
+            secuencia='000000010',
+            concepto='Venta Empresa A',
+            identificacion_cliente=cliente_a.identificacion,
+            nombre_cliente=cliente_a.razon_social,
+            sub_monto=Decimal('50.00'),
+            base_imponible=Decimal('50.00'),
+            monto_general=Decimal('56.00'),
+        )
+        factura_b = Factura.all_objects.create(
+            empresa=e2,
+            cliente=cliente_b,
+            almacen=None,
+            facturador=f2,
+            fecha_emision='2025-01-03',
+            fecha_vencimiento='2025-01-12',
+            establecimiento='002',
+            punto_emision='001',
+            secuencia='000000020',
+            concepto='Venta Empresa B',
+            identificacion_cliente=cliente_b.identificacion,
+            nombre_cliente=cliente_b.razon_social,
+            sub_monto=Decimal('80.00'),
+            base_imponible=Decimal('80.00'),
+            monto_general=Decimal('89.60'),
+        )
+
+        # Sin tenant activo no se debe devolver información
+        set_current_tenant(None)
+        assert Producto.objects.filter(codigo__in=['TENANT-A', 'TENANT-B']).count() == 0
+        assert Factura.objects.filter(id__in=[factura_a.id, factura_b.id]).count() == 0
+
+        # Con tenant A solo ve sus productos/facturas
+        set_current_tenant(e1)
+        codigos_a = set(Producto.objects.values_list('codigo', flat=True))
+        assert 'TENANT-A' in codigos_a
+        assert 'TENANT-B' not in codigos_a
+        assert Producto.all_objects.filter(codigo__in=['TENANT-A', 'TENANT-B']).count() >= 2
+
+        facturas_a_ids = set(Factura.objects.values_list('id', flat=True))
+        assert factura_a.id in facturas_a_ids
+        assert factura_b.id not in facturas_a_ids
+
+        expected_a_count = Factura.all_objects.filter(empresa=e1).count()
+        assert Factura.numeroRegistrados() == expected_a_count
+
+        expected_a_total = sum(
+            (f.monto_general for f in Factura.all_objects.filter(empresa=e1)),
+            Decimal('0.00')
+        )
+        assert Factura.ingresoTotal() == expected_a_total
+
+        # Con tenant B se invierte la visibilidad
+        set_current_tenant(e2)
+        codigos_b = set(Producto.objects.values_list('codigo', flat=True))
+        assert 'TENANT-B' in codigos_b
+        assert 'TENANT-A' not in codigos_b
+
+        facturas_b_ids = set(Factura.objects.values_list('id', flat=True))
+        assert factura_b.id in facturas_b_ids
+        assert factura_a.id not in facturas_b_ids
+
+        expected_b_count = Factura.all_objects.filter(empresa=e2).count()
+        assert Factura.numeroRegistrados() == expected_b_count
+
+        expected_b_total = sum(
+            (f.monto_general for f in Factura.all_objects.filter(empresa=e2)),
+            Decimal('0.00')
+        )
+        assert Factura.ingresoTotal() == expected_b_total
+
+        # Restablecer tenant
+        set_current_tenant(None)
 
     def test_detalles_pedido_usa_producto_empresa_activa(self, client, usuario, empresas):
         self._login(client, usuario)
