@@ -7,6 +7,8 @@ from typing import Optional
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 
+from .storage_io import build_storage_path
+
 
 @dataclass(frozen=True)
 class FacturaMediaPaths:
@@ -35,10 +37,10 @@ def build_factura_media_paths(factura) -> FacturaMediaPaths:
     """
 
     ruc = _extract_ruc(getattr(factura, "empresa", None)) or _extract_ruc(factura)
-    base_dir = f"facturas/{ruc}"
-    xml_dir = f"{base_dir}/xml"
-    pdf_dir = f"{base_dir}/pdf"
-    ride_dir = f"{base_dir}/ride"
+    base_dir = build_storage_path("facturas", ruc)
+    xml_dir = build_storage_path("facturas", ruc, "xml")
+    pdf_dir = build_storage_path("facturas", ruc, "pdf")
+    ride_dir = build_storage_path("facturas", ruc, "ride")
 
     for prefix in (base_dir, xml_dir, pdf_dir, ride_dir):
         _ensure_prefix(prefix)
@@ -50,8 +52,8 @@ def build_proforma_media_paths(proforma) -> ProformaMediaPaths:
     """Return normalized storage prefixes for a proforma."""
 
     ruc = _extract_ruc(getattr(proforma, "empresa", None)) or _extract_ruc(proforma)
-    base_dir = f"proformas/{ruc}"
-    pdf_dir = f"{base_dir}/pdf"
+    base_dir = build_storage_path("proformas", ruc)
+    pdf_dir = build_storage_path("proformas", ruc, "pdf")
 
     for prefix in (base_dir, pdf_dir):
         _ensure_prefix(prefix)

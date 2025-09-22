@@ -48,13 +48,68 @@ STATICFILES_DIRS = [
     ] if os.path.isdir(p)
 ]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-import os
-# ✅ CONFIGURACIÓN DE MEDIOS (NUEVA O VERIFICAR)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# ✅ CONFIGURACIÓN DE MEDIOS / ALMACENAMIENTO REMOTO
+MEDIA_URL = os.environ.get('MEDIA_URL', '/media/')
+MEDIA_ROOT = os.environ.get('MEDIA_ROOT', os.path.join(BASE_DIR, 'media'))
+MEDIA_STORAGE_PREFIX = os.environ.get('MEDIA_STORAGE_PREFIX', '').strip('/')
+USE_REMOTE_MEDIA_STORAGE = bool(os.environ.get('AWS_STORAGE_BUCKET_NAME'))
+
+if USE_REMOTE_MEDIA_STORAGE:
+    INSTALLED_APPS.append('storages')
+
+    AWS_STORAGE_BUCKET_NAME = os.environ['AWS_STORAGE_BUCKET_NAME']
+    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME')
+    AWS_S3_ENDPOINT_URL = os.environ.get('AWS_S3_ENDPOINT_URL')
+    AWS_S3_CUSTOM_DOMAIN = os.environ.get('AWS_S3_CUSTOM_DOMAIN')
+    AWS_S3_SIGNATURE_VERSION = os.environ.get('AWS_S3_SIGNATURE_VERSION', 's3v4')
+    AWS_S3_ADDRESSING_STYLE = os.environ.get('AWS_S3_ADDRESSING_STYLE')
+    AWS_DEFAULT_ACL = os.environ.get('AWS_DEFAULT_ACL', 'private')
+    AWS_QUERYSTRING_AUTH = os.environ.get('AWS_S3_QUERYSTRING_AUTH', 'False').lower() == 'true'
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': os.environ.get('AWS_S3_CACHE_CONTROL', 'max-age=86400'),
+    }
+
+    aws_location = os.environ.get('AWS_MEDIA_LOCATION') or os.environ.get('AWS_LOCATION', '')
+    aws_location = (aws_location or '').strip('/')
+    if aws_location and not MEDIA_STORAGE_PREFIX:
+        MEDIA_STORAGE_PREFIX = aws_location
+
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+    def _normalize_base_url(value: str) -> str:
+        value = value.strip()
+        if not value:
+            return ''
+        if not value.startswith(('http://', 'https://')):
+            value = f'https://{value}'
+        return value.rstrip('/')
+
+    if os.environ.get('MEDIA_URL'):
+        MEDIA_URL = os.environ['MEDIA_URL'].rstrip('/') + '/'
+    else:
+        if AWS_S3_CUSTOM_DOMAIN:
+            base_url = _normalize_base_url(AWS_S3_CUSTOM_DOMAIN)
+        elif AWS_S3_ENDPOINT_URL:
+            base_url = _normalize_base_url(AWS_S3_ENDPOINT_URL)
+        elif AWS_S3_REGION_NAME:
+            base_url = f"https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com"
+        else:
+            base_url = f"https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+
+        prefix = MEDIA_STORAGE_PREFIX or aws_location
+        if prefix:
+            MEDIA_URL = f"{base_url}/{prefix}/"
+        else:
+            MEDIA_URL = f"{base_url}/"
+
+    MEDIA_ROOT = ''
 
 # Directorio separado y seguro para certificados de firma electrónica
-FIRMAS_ROOT = os.path.join(BASE_DIR, 'firmas_secure')
+FIRMAS_ROOT = os.environ.get('FIRMAS_ROOT', os.path.join(BASE_DIR, 'firmas_secure'))
+FIRMAS_STORAGE_PREFIX = os.environ.get('FIRMAS_STORAGE_PREFIX', 'firmas_secure').strip('/')
 # Clave utilizada para cifrar los archivos de firma; debe definirse en variables de entorno en producción
 env_firmas_key = os.environ.get('FIRMAS_KEY')
 if not env_firmas_key:

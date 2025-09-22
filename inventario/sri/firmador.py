@@ -4,6 +4,7 @@ from signxml import XMLSigner, methods
 from lxml import etree
 from cryptography.hazmat.primitives.serialization import pkcs12
 from inventario.models import Opciones
+from inventario.utils.storage_io import storage_read_bytes, storage_write_bytes
 
 def firmar_xml(xml_path, xml_firmado_path):
     """
@@ -64,8 +65,7 @@ def firmar_xml_xades_experimental(xml_path, xml_firmado_path):
     cert_pem = certificate.public_bytes(Encoding.PEM)
     key_pem = private_key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
     
-    with open(xml_path, 'rb') as f:
-        xml_data = f.read()
+    xml_data = storage_read_bytes(xml_path)
     root = etree.fromstring(xml_data)
     
     # Configurar XMLSigner con parámetros más específicos para XAdES
@@ -91,8 +91,10 @@ def firmar_xml_xades_experimental(xml_path, xml_firmado_path):
     # 3. xades:SigningTime con timestamp ISO
     # 4. Namespace XAdES correctos
     
-    with open(xml_firmado_path, 'wb') as f:
-        f.write(etree.tostring(signed_root, pretty_print=True, xml_declaration=True, encoding='UTF-8'))
+    storage_write_bytes(
+        xml_firmado_path,
+        etree.tostring(signed_root, pretty_print=True, xml_declaration=True, encoding='UTF-8'),
+    )
 
 
 def _crear_qualifying_properties_xades(certificate, signing_time=None):

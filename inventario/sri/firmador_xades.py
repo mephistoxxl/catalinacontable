@@ -11,6 +11,8 @@ from lxml import etree
 import io
 import base64
 
+from inventario.utils.storage_io import storage_read_bytes, storage_write_bytes
+
 # crypto
 from cryptography.hazmat.primitives.serialization import pkcs12, Encoding
 from cryptography.hazmat.primitives import hashes, serialization
@@ -97,8 +99,7 @@ def firmar_xml_con_endesive(xml_path: str, xml_firmado_path: str) -> bool:
     opciones = signer_aux.opciones
 
     # Leer XML fuente
-    with open(xml_path, "rb") as f:
-        xml_data = f.read()
+    xml_data = storage_read_bytes(xml_path)
 
     # Asegurar que el nodo raíz tenga Id="comprobante" (requisito común SRI)
     try:
@@ -190,8 +191,7 @@ def firmar_xml_con_endesive(xml_path: str, xml_firmado_path: str) -> bool:
         raise XAdESError(f"Error en firma con endesive: {e}")
 
     # Guardar XML firmado
-    with open(xml_firmado_path, "wb") as f:
-        f.write(signed_bytes)
+    storage_write_bytes(xml_firmado_path, signed_bytes)
 
     logger.info("XML firmado con endesive XAdES-BES: %s", xml_firmado_path)
     return True

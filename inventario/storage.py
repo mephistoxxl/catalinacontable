@@ -1,45 +1,85 @@
-from django.core.files.storage import FileSystemStorage
-from django.conf import settings
 from django.core.files.base import ContentFile
+from django.core.files.storage import Storage, FileSystemStorage, default_storage
+from django.conf import settings
 from cryptography.fernet import Fernet
 import os
-import warnings
 
-class EncryptedFirmaStorage(FileSystemStorage):
+
+class EncryptedFirmaStorage(Storage):
     """Storage para guardar archivos de firma electrónica cifrados.
 
-    Los archivos se almacenan en ``settings.FIRMAS_ROOT`` y se cifran usando
-    ``Fernet`` con la clave definida en ``settings.FIRMAS_KEY``.
+    Utiliza el backend de almacenamiento configurado globalmente (por ejemplo,
+    S3 mediante ``django-storages``). En entornos locales cae
+    automáticamente a ``FileSystemStorage`` utilizando ``FIRMAS_ROOT``.
     """
 
-    def __init__(self, *args, **kwargs):
-        location = getattr(settings, "FIRMAS_ROOT", os.path.join(settings.BASE_DIR, "firmas_secure"))
-        super().__init__(location=location, *args, **kwargs)
+    def __init__(self, base_storage: Storage | None = None, location: str | None = None):
+        self._use_remote = getattr(settings, "USE_REMOTE_MEDIA_STORAGE", False)
+
+        if base_storage is not None:
+            self._storage = base_storage
+        elif self._use_remote:
+            self._storage = default_storage
+        else:
+            fs_location = location or getattr(
+                settings, "FIRMAS_ROOT", os.path.join(settings.BASE_DIR, "firmas_secure")
+            )
+            self._storage = FileSystemStorage(location=fs_location)
+
+        self._prefix = ""
+        if self._use_remote:
+            prefix = location or getattr(settings, "FIRMAS_STORAGE_PREFIX", "")
+            self._prefix = str(prefix).strip("/")
+
+    def __getattr__(self, attr):
+        """Delegar atributos no definidos a ``self._storage``."""
+
+        return getattr(self._storage, attr)
 
     def _encrypt(self, data: bytes) -> bytes:
-        """Cifra los datos si existe ``settings.FIRMAS_KEY``; de lo contrario retorna sin cambios."""
         if getattr(settings, 'FIRMAS_KEY', None) is None:
-            return data  # modo sin cifrado
+            return data
         f = Fernet(settings.FIRMAS_KEY)
         return f.encrypt(data)
 
     def _decrypt(self, data: bytes) -> bytes:
-        """Descifra los datos solo si hay clave; si no, retorna los datos originales."""
         if getattr(settings, 'FIRMAS_KEY', None) is None:
             return data
         f = Fernet(settings.FIRMAS_KEY)
         return f.decrypt(data)
 
+    def _full_name(self, name: str) -> str:
+        normalized = name.replace('\\', '/').lstrip('/')
+        if self._prefix:
+            if normalized.startswith(f"{self._prefix}/"):
+                return normalized
+            return f"{self._prefix}/{normalized}"
+        return normalized
+
     def _save(self, name, content):
-        # Leer datos en memoria para cifrarlos antes de guardar (si aplica)
         raw = content.read()
         processed = self._encrypt(raw)
         final_content = ContentFile(processed)
-        return super()._save(name, final_content)
+        storage_name = self._full_name(name)
+        if self._storage.exists(storage_name):
+            self._storage.delete(storage_name)
+        saved_name = self._storage.save(storage_name, final_content)
+        return saved_name
 
-    def open(self, name, mode='rb'):
-        # Abrir el archivo (cifrado o plano) y devolverlo descifrado si aplica
-        with super().open(name, 'rb') as stored_file:
+    def _open(self, name, mode='rb'):
+        storage_name = self._full_name(name)
+        with self._storage.open(storage_name, 'rb') as stored_file:
             data = stored_file.read()
         decrypted = self._decrypt(data)
-        return ContentFile(decrypted)
+        file_obj = ContentFile(decrypted)
+        file_obj.name = os.path.basename(name)
+        return file_obj
+
+    def delete(self, name):
+        self._storage.delete(self._full_name(name))
+
+    def exists(self, name):
+        return self._storage.exists(self._full_name(name))
+
+    def url(self, name):
+        return self._storage.url(self._full_name(name))
