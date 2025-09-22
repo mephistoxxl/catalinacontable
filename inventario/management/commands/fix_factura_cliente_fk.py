@@ -28,7 +28,7 @@ class Command(BaseCommand):
 
         # Detectar facturas con cliente_id inválido
         cliente_exist = Cliente.objects.filter(id=OuterRef('cliente_id'))
-        base_qs = Factura.objects.filter(cliente_id__isnull=False).annotate(has_cliente=Exists(cliente_exist)).filter(has_cliente=False)
+        base_qs = Factura.all_objects.filter(cliente_id__isnull=False).annotate(has_cliente=Exists(cliente_exist)).filter(has_cliente=False)
         if only:
             base_qs = base_qs.filter(id=only)
 
@@ -110,7 +110,7 @@ class Command(BaseCommand):
                     f"→ Factura {f.id}: set cliente_id {f.cliente_id} → {new_fk_value} (Cliente.{target_field})"
                 )
             else:
-                Factura.objects.filter(id=f.id).update(cliente_id=new_fk_value)
+                Factura.all_objects.filter(id=f.id).update(cliente_id=new_fk_value)
             stats["fixed"] += 1
 
         if dry_run:

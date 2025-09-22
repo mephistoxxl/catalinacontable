@@ -60,7 +60,7 @@ class SRIIntegration:
         raw_response = None
 
         try:
-            factura = Factura.objects.get(id=factura_id)
+            factura = Factura.all_objects.get(id=factura_id)
             # 🔐 Asegurar contexto tenant para managers multi-tenant
             try:
                 set_current_tenant(getattr(factura, 'empresa', None))
@@ -162,7 +162,7 @@ class SRIIntegration:
 
         try:
             # Obtener factura
-            factura = Factura.objects.get(id=factura_id)
+            factura = Factura.all_objects.get(id=factura_id)
             try:
                 set_current_tenant(getattr(factura, 'empresa', None))
             except Exception:
@@ -888,7 +888,7 @@ class SRIIntegration:
         raw_response = None
 
         try:
-            factura = Factura.objects.get(id=factura_id)
+            factura = Factura.all_objects.get(id=factura_id)
             
             if not factura.clave_acceso:
                 logger.error(
@@ -981,7 +981,7 @@ class SRIIntegration:
         raw_response = None
 
         try:
-            factura = Factura.objects.get(id=factura_id)
+            factura = Factura.all_objects.get(id=factura_id)
             
             # Verificar que pueda ser reenviada
             if hasattr(factura, 'estado') and factura.estado not in ['RECHAZADO', 'ERROR']:
@@ -1070,7 +1070,7 @@ def consultar_lote_facturas():
     """
     Consulta el estado de todas las facturas pendientes
     """
-    facturas_pendientes = Factura.objects.all()
+    facturas_pendientes = Factura.all_objects.all()
     
     # Filtrar por estado si el campo existe
     if hasattr(Factura, 'estado'):
@@ -1166,7 +1166,7 @@ def validar_lote_xml_facturas():
     Genera claves de acceso para facturas que no las tienen
     Útil para corregir datos existentes
     """
-    facturas_sin_clave = Factura.objects.filter(clave_acceso__isnull=True)
+    facturas_sin_clave = Factura.all_objects.filter(clave_acceso__isnull=True)
     integration = SRIIntegration()
     
     resultados = []

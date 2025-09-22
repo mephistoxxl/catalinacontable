@@ -180,6 +180,9 @@ class UsuarioEmpresa(models.Model):
     nivel_empresa = models.IntegerField(null=True, blank=True, help_text="Rol específico en esta empresa (override de nivel global)")
     alias = models.CharField(max_length=120, null=True, blank=True, help_text="Nombre/alias a mostrar en esta empresa")
 
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     class Meta:
         unique_together = ('usuario', 'empresa')
 
@@ -411,6 +414,7 @@ class Opciones(models.Model):
     )
 
     objects = TenantManager()
+    all_objects = models.Manager()
 
     # MÉTODOS ÚTILES PARA XML:
     @property
@@ -548,7 +552,10 @@ class Producto(models.Model):
     categoria = models.CharField(max_length=20, choices=decisiones)
     iva = models.CharField(max_length=10, choices=tiposIVA)
     costo_actual = models.DecimalField(max_digits=9, decimal_places=2)
-    
+
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     # Campos calculados para el precio con IVA
     precio_iva1 = models.DecimalField(max_digits=9, decimal_places=2, editable=False, default=0)
     precio_iva2 = models.DecimalField(max_digits=9, decimal_places=2, editable=False, default=0)
@@ -708,6 +715,7 @@ class Cliente(models.Model):
     ])
 
     objects = TenantManager()
+    all_objects = models.Manager()
 
     @classmethod
     def numeroRegistrados(cls, empresa_id=None):
@@ -906,6 +914,8 @@ class Factura(models.Model):
         null=True,
         help_text="RIDE (PDF) autorizado"
     )
+    objects = TenantManager()
+    all_objects = models.Manager()
 
     # ✅ VALIDACIONES de descuento
     def clean(self):
@@ -1549,6 +1559,9 @@ class DetalleFactura(models.Model):
 
     total = models.DecimalField(max_digits=20, decimal_places=2)
 
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     # ✅ NUEVO: OBLIGATORIO según XSD
     descuento = models.DecimalField(
         max_digits=14,
@@ -1863,6 +1876,9 @@ class Proveedor(models.Model):
         ('2', 'Sociedad'),
     ], default='1')
 
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     @classmethod
     def cedulasRegistradas(self):
         objetos = self.objects.all().order_by('razon_social_proveedor')
@@ -1902,6 +1918,9 @@ class Pedido(models.Model):
     monto_general = models.DecimalField(max_digits=20, decimal_places=2)
     presente = models.BooleanField(null=True)
 
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     @classmethod
     def recibido(self, pedido):
         return self.objects.get(id=pedido).presente
@@ -1931,6 +1950,9 @@ class DetallePedido(models.Model):
 
 
 # ------------------------------------NOTIFICACIONES------------------------------------
+    objects = TenantManager()
+    all_objects = models.Manager()
+
 class Notificaciones(models.Model):
     # id
     empresa = models.ForeignKey(
@@ -1947,6 +1969,9 @@ class Notificaciones(models.Model):
 # ---------------------------------------------------------------------------------------
 
 # ------------------------------------SECUENCIAS------------------------------------
+    objects = TenantManager()
+    all_objects = models.Manager()
+
 class Secuencia(models.Model):
     id = models.AutoField(
         primary_key=True,
@@ -2013,6 +2038,9 @@ class Secuencia(models.Model):
         default=True,
         verbose_name="Documento Electrónico"
     )
+
+    objects = TenantManager()
+    all_objects = models.Manager()
 
     class Meta:
         verbose_name = "Secuencia"
@@ -2119,6 +2147,9 @@ class Facturador(AbstractBaseUser):
     USERNAME_FIELD = 'correo'
     REQUIRED_FIELDS = ['nombres']
 
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     class Meta:
         verbose_name = 'Facturador'
         verbose_name_plural = 'Facturadores'
@@ -2172,6 +2203,7 @@ class Almacen(models.Model):
     activo = models.BooleanField(default=True)  # Campo activo añadido
 
     objects = TenantManager()
+    all_objects = models.Manager()
 
     def __str__(self):
         return self.descripcion
@@ -2215,6 +2247,9 @@ class Caja(models.Model):
         verbose_name="Creado por"
     )
     
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     class Meta:
         verbose_name = "Caja"
         verbose_name_plural = "Cajas"
@@ -2341,6 +2376,9 @@ class FormaPago(models.Model):
         verbose_name="Unidad de Tiempo"
     )
     
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     class Meta:
         verbose_name = "Forma de Pago"
         verbose_name_plural = "Formas de Pago"
@@ -2448,6 +2486,9 @@ class CampoAdicional(models.Model):
         help_text="Orden de aparición en la factura (1-15)"
     )
     
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     class Meta:
         verbose_name = "Campo Adicional"
         verbose_name_plural = "Campos Adicionales"
@@ -2635,6 +2676,9 @@ class MaquinaFiscal(models.Model):
         help_text="Notas adicionales sobre la máquina fiscal"
     )
     
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     class Meta:
         verbose_name = "Máquina Fiscal"
         verbose_name_plural = "Máquinas Fiscales"
@@ -2829,6 +2873,9 @@ class TipoNegociable(models.Model):
         help_text="Notas sobre el proceso de negociación"
     )
     
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     class Meta:
         verbose_name = "Tipo Negociable"
         verbose_name_plural = "Tipos Negociables"
@@ -3029,6 +3076,9 @@ class TotalImpuesto(models.Model):
         help_text="Descuento adicional aplicable solo a IVA"
     )
     
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     class Meta:
         verbose_name = "Total Impuesto"
         verbose_name_plural = "Totales Impuestos"
@@ -3075,6 +3125,9 @@ class ImpuestoDetalle(models.Model):
     # ✅ OBLIGATORIO: Valor del impuesto
     valor = models.DecimalField(max_digits=14, decimal_places=2)
     
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     def save(self, *args, **kwargs):
         # Auto-calcular valor
         if not self.valor:
@@ -3118,6 +3171,9 @@ class DetalleAdicional(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(3)]
     )
     
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     class Meta:
         verbose_name = "Detalle Adicional"
         verbose_name_plural = "Detalles Adicionales"
@@ -3237,6 +3293,9 @@ class Banco(models.Model):
         help_text="Usuario que creó esta cuenta bancaria"
     )
     
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     class Meta:
         verbose_name = "Banco"
         verbose_name_plural = "Bancos"
@@ -3367,6 +3426,9 @@ class Servicio(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_modificacion = models.DateTimeField(auto_now=True)
 
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     def __str__(self):
         return self.descripcion
 
@@ -3489,6 +3551,7 @@ class Proforma(models.Model):
         help_text="Factura generada a partir de esta proforma"
     )
     objects = TenantManager()
+    all_objects = models.Manager()
     
     @classmethod
     def siguiente_numero(cls, empresa):
