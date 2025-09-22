@@ -38,6 +38,7 @@ from django.core import serializers
 #permite acceder de manera mas facil a los ficheros
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage, default_storage
+from django.core.files.temp import NamedTemporaryFile
 from django.db import IntegrityError
 import re
 from datetime import date
@@ -1556,18 +1557,29 @@ class ExportarProductos(LoginRequiredMixin, View):
 
             #Se obtienen las entradas de producto en formato JSON
             data = serializers.serialize("json", Producto.objects.filter(empresa_id=empresa_id))
-            fs = FileSystemStorage('inventario/tmp/')
 
-            #Se utiliza la variable fs para acceder a la carpeta con mas facilidad
-            with fs.open("productos.json", "w") as out:
-                out.write(data)
-                out.close()
+            with NamedTemporaryFile(mode='wb', suffix='.json', dir='/tmp', delete=False) as tmp_file:
+                tmp_file.write(data.encode('utf-8'))
+                tmp_path = tmp_file.name
 
-            with fs.open("productos.json", "r") as out:
-                response = HttpResponse(out.read(), content_type="application/force-download")
-                response['Content-Disposition'] = 'attachment; filename="productos.json"'
-                out.close()
-                #------------------------------------------------------------
+            file_handle = open(tmp_path, 'rb')
+            response = FileResponse(
+                file_handle,
+                as_attachment=True,
+                filename='productos.json',
+                content_type='application/json',
+            )
+
+            def cleanup(_: HttpResponse) -> None:
+                try:
+                    file_handle.close()
+                finally:
+                    try:
+                        os.unlink(tmp_path)
+                    except FileNotFoundError:
+                        pass
+
+            response.add_post_render_callback(cleanup)
             return response
 
     def get(self, request):
@@ -4240,16 +4252,18 @@ class ImportarBDD(LoginRequiredMixin, View):
         form = ImportarBDDFormulario(request.POST, request.FILES)
 
         if form.is_valid():
-            ruta = 'inventario/archivos/BDD/inventario_respaldo.xml'
-            manejarArchivo(request.FILES['archivo'], ruta)
+            temp_path = manejarArchivo(request.FILES['archivo'])
 
             try:
-                call_command('loaddata', ruta, verbosity=0)
+                call_command('loaddata', temp_path, verbosity=0)
                 messages.success(request, 'Base de datos subida exitosamente')
                 return HttpResponseRedirect('/inventario/importarBDD')
             except Exception:
                 messages.error(request, 'El archivo esta corrupto')
                 return HttpResponseRedirect('/inventario/importarBDD')
+            finally:
+                if temp_path and os.path.exists(temp_path):
+                    os.unlink(temp_path)
 
 
 #Fin de vista--------------------------------------------------------------------------------
@@ -4261,28 +4275,36 @@ class DescargarBDD(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request):
-        #Se obtiene la carpeta donde se va a guardar y despues se crea el respaldo ahi
-        fs = FileSystemStorage('inventario/archivos/tmp/')
-        with fs.open('inventario_respaldo.xml', 'w') as output:
-            call_command('dumpdata', 'inventario', indent=4, stdout=output, format='xml',
-                         exclude=['contenttypes', 'auth.permission'])
+        with NamedTemporaryFile(mode='w+', suffix='.xml', dir='/tmp', delete=False, encoding='utf-8') as tmp_file:
+            call_command(
+                'dumpdata',
+                'inventario',
+                indent=4,
+                stdout=tmp_file,
+                format='xml',
+                exclude=['contenttypes', 'auth.permission'],
+            )
+            tmp_path = tmp_file.name
 
-            output.close()
+        file_handle = open(tmp_path, 'rb')
+        response = FileResponse(
+            file_handle,
+            as_attachment=True,
+            filename='inventario_respaldo.xml',
+            content_type='application/xml',
+        )
 
-        #Lo de abajo es para descargarlo
-        with fs.open('inventario_respaldo.xml', 'r') as output:
-            response = HttpResponse(output.read(), content_type="application/force-download")
-            response['Content-Disposition'] = 'attachment; filename="inventario_respaldo.xml"'
+        def cleanup(_: HttpResponse) -> None:
+            try:
+                file_handle.close()
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except FileNotFoundError:
+                    pass
 
-            #Cierra el archivo
-            output.close()
-
-            #Borra el archivo
-            ruta = 'inventario/archivos/tmp/inventario_respaldo.xml'
-            call_command('erasefile', ruta)
-
-            #Regresa el archivo a descargar
-            return response
+        response.add_post_render_callback(cleanup)
+        return response
 
 
 #Fin de vista--------------------------------------------------------------------------------

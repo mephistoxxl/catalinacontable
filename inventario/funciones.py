@@ -1,5 +1,8 @@
 #----------------------------FUNCIONES DE AYUDA Y COMPLEMENTO--------------------------------------------------
 
+from pathlib import Path
+
+from django.core.files.temp import NamedTemporaryFile
 from django.shortcuts import get_object_or_404
 
 from .models import Producto
@@ -49,10 +52,17 @@ def usuarioExiste(Usuario,buscar,valor):
         except Usuario.DoesNotExist:
             return False
 
-def manejarArchivo(archivo, ruta):
-    with open(ruta, 'wb+') as destino:  # ← aquí debe ser 'destino'
+def manejarArchivo(archivo):
+    """Guarda ``archivo`` de manera temporal en ``/tmp`` y devuelve la ruta."""
+
+    suffix = Path(getattr(archivo, 'name', '')).suffix
+    with NamedTemporaryFile(delete=False, dir='/tmp', suffix=suffix or '', mode='wb') as destino:
         for chunk in archivo.chunks():
             destino.write(chunk)
+        destino.flush()
+        temp_path = destino.name
+
+    return temp_path
 
 
 def generar_codigo_servicio():
