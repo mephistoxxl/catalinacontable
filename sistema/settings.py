@@ -127,7 +127,7 @@ else:
     except ValueError as exc:
         raise ValueError('FIRMAS_KEY no es una clave Fernet válida') from exc
 
-# ✅ CONFIGURACIÓN DE LOGGING (ROTACIÓN, JSON Y TENANT)
+# ✅ CONFIGURACIÓN DE LOGGING (JSON, TENANT Y STDOUT)
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -143,25 +143,17 @@ LOGGING = {
         },
     },
     'handlers': {
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': 'facturas.log',
-            'when': 'midnight',
-            'backupCount': 7,
-            'formatter': 'json',
-            'filters': ['tenant_context'],
-        },
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
+            'stream': 'ext://sys.stdout',
             'formatter': 'json',
             'filters': ['tenant_context'],
         },
     },
     'loggers': {
         'sri': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': True,
         },
@@ -193,7 +185,7 @@ LOGGING = {
         },
         # Mantener logs importantes del SRI
         'inventario.sri.sri_client': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },

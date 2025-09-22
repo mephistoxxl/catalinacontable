@@ -46,6 +46,18 @@ Si ves encabezado legible típico PKCS#12 (`0x30 0x82 ...`) y puedes importar el
 
 Conservar la misma `FIRMAS_KEY` entre reinicios o nuevas réplicas garantiza que las firmas cifradas previamente continúen siendo accesibles.
 
+### Logging y monitoreo
+
+- La configuración de Django usa un `logging.StreamHandler` que emite en formato JSON a **STDOUT**. No se genera el archivo `facturas.log`, por lo que Heroku y cualquier otra plataforma basada en contenedores capturarán directamente los eventos.
+- En desarrollo bastará con consultar la consola para ver los logs de `sri`, `inventario.sri.sri_client` y el resto de loggers configurados.
+- Si necesitas historiales persistentes en producción, utiliza un add-on de logging gestionado. Por ejemplo, en Heroku puedes activar [Papertrail](https://devcenter.heroku.com/articles/papertrail) con:
+
+  ```bash
+  heroku addons:create papertrail --app <tu-app>
+  ```
+
+  También puedes integrar cualquier otro servicio compatible (Datadog, LogDNA, etc.) que consuma los logs emitidos por STDOUT.
+
 ### Almacenamiento de archivos en S3
 
 La aplicación puede almacenar medios (XML, RIDE, logos, etc.) en un bucket S3 compatible usando [`django-storages`](https://django-storages.readthedocs.io/en/latest/). Al definir la variable de entorno `AWS_STORAGE_BUCKET_NAME`, Django activará automáticamente el backend remoto y todos los `FileField`/`ImageField` utilizarán el bucket en lugar del sistema de archivos local.
