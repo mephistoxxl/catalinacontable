@@ -55,7 +55,8 @@ MEDIA_STORAGE_PREFIX = os.environ.get('MEDIA_STORAGE_PREFIX', '').strip('/')
 USE_REMOTE_MEDIA_STORAGE = bool(os.environ.get('AWS_STORAGE_BUCKET_NAME'))
 
 if USE_REMOTE_MEDIA_STORAGE:
-    INSTALLED_APPS.append('storages')
+    # Añadiremos 'storages' luego de declarar INSTALLED_APPS (más abajo) para evitar NameError
+    _ADD_STORAGES = True
 
     AWS_STORAGE_BUCKET_NAME = os.environ['AWS_STORAGE_BUCKET_NAME']
     AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
@@ -233,6 +234,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 ]
+if globals().get('_ADD_STORAGES'):
+    INSTALLED_APPS.append('storages')
+
+# Registrar django-anymail si se habilita SES (después de definir INSTALLED_APPS)
+if os.environ.get('USE_SES', 'False').lower() == 'true' or os.environ.get('EMAIL_BACKEND', '').startswith('anymail.'):
+    INSTALLED_APPS.append('anymail')
 
 MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -375,14 +382,34 @@ if os.environ.get('DISABLE_INVENTARIO_MIGRATIONS'):
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ==============================
-# Email configuration
+# Email configuration (Anymail + Amazon SES)
 # ==============================
-# Default: console backend in development to avoid SMTP connection errors.
-EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@example.com')
 SERVER_EMAIL = os.environ.get('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
 
-# SMTP settings (used if EMAIL_BACKEND is SMTP)
+# Permite activar SES con USE_SES=true o declarando EMAIL_BACKEND=anymail.backends.amazon_ses.EmailBackend
+USE_SES = os.environ.get('USE_SES', 'False').lower() == 'true'
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND')
+if not EMAIL_BACKEND:
+    EMAIL_BACKEND = 'anymail.backends.amazon_ses.EmailBackend' if USE_SES else 'django.core.mail.backends.console.EmailBackend'
+
+# Configuración de Anymail para Amazon SES
+if EMAIL_BACKEND.startswith('anymail.'):
+    ANYMAIL = {
+        'AMAZON_SES_CLIENT_PARAMS': {
+            # Si usas IAM con variables de entorno, boto3 las tomará automáticamente
+            # Puedes forzar credenciales/región si lo deseas:
+            # 'aws_access_key_id': os.environ.get('AWS_SES_ACCESS_KEY_ID') or os.environ.get('AWS_ACCESS_KEY_ID'),
+            # 'aws_secret_access_key': os.environ.get('AWS_SES_SECRET_ACCESS_KEY') or os.environ.get('AWS_SECRET_ACCESS_KEY'),
+            'region_name': os.environ.get('AWS_SES_REGION_NAME') or os.environ.get('AWS_REGION') or os.environ.get('AWS_DEFAULT_REGION') or 'us-east-1',
+        },
+        # Opcional: sandbox/override
+        'SEND_DEFAULTS': {
+            'tags': [os.environ.get('EMAIL_TAG', 'sisfact')],
+        },
+    }
+
+# Compatibilidad: si se usa SMTP tradicional
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
 try:
     EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 25))
