@@ -2142,12 +2142,10 @@ class Facturador(AbstractBaseUser):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
-    objects = FacturadorManager()
-
     USERNAME_FIELD = 'correo'
     REQUIRED_FIELDS = ['nombres']
-
-    objects = TenantManager()
+    objects = FacturadorManager()
+    tenant_objects = TenantManager()
     all_objects = models.Manager()
 
     class Meta:
