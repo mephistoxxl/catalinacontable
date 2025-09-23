@@ -141,7 +141,7 @@ class EmitirProforma(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                 return redirect('inventario:login_proformador')
 
             # Validar facturador activo y que pertenezca a la empresa si aplica
-            facturador = Facturador.objects.filter(id=facturador_id, activo=True).first()
+            facturador = Facturador.tenant_objects.filter(id=facturador_id, activo=True).first()
             if not facturador:
                 messages.error(request, 'El facturador no existe o no está activo.')
                 return redirect('inventario:login_proformador')
@@ -153,7 +153,7 @@ class EmitirProforma(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
             from .forms import EmitirProformaFormulario
             # Obtener almacenes y vendedores (facturadores) activos SOLO de la empresa activa
             almacenes = Almacen.objects.filter(activo=True, empresa=empresa)
-            vendedores = Facturador.objects.filter(activo=True, empresa=empresa)
+            vendedores = Facturador.tenant_objects.filter(activo=True, empresa=empresa)
 
             form = EmitirProformaFormulario(almacenes=almacenes, vendedores=vendedores)
             # Calcular el siguiente código de proforma para mostrar en la UI
@@ -275,7 +275,7 @@ class EmitirProforma(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                     })
                 
                 # Resolver facturador únicamente desde el token (no se persiste en sesión)
-                facturador = Facturador.objects.filter(id=facturador_id, activo=True).first()
+                facturador = Facturador.tenant_objects.filter(id=facturador_id, activo=True).first()
                 if not facturador or (hasattr(facturador, 'empresa_id') and facturador.empresa_id and facturador.empresa_id != empresa.id):
                     return JsonResponse({'success': False, 'message': 'Facturador inválido. Inicie sesión nuevamente.'})
                 
@@ -339,7 +339,7 @@ class EmitirProforma(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
         
         # Procesamiento normal del formulario (no AJAX)
         almacenes = Almacen.objects.filter(activo=True, empresa=empresa)
-        vendedores = Facturador.objects.filter(activo=True, empresa=empresa)
+        vendedores = Facturador.tenant_objects.filter(activo=True, empresa=empresa)
         form = EmitirProformaFormulario(request.POST, almacenes=almacenes, vendedores=vendedores)
         # Validar token mínimo en POST clásico
         from django.core import signing
@@ -2158,7 +2158,7 @@ class EmitirFactura(LoginRequiredMixin, View):
             
             # Verificar que el facturador existe y está activo
             try:
-                facturador = Facturador.objects.get(id=facturador_id, activo=True)
+                facturador = Facturador.tenant_objects.get(id=facturador_id, activo=True)
             except Facturador.DoesNotExist:
                 messages.error(request, 'El facturador no existe o no está activo.')
                 # Limpiar sesión de facturador inválido
@@ -2218,7 +2218,7 @@ class EmitirFactura(LoginRequiredMixin, View):
                 return redirect('inventario:login_facturador')
             
             try:
-                facturador = Facturador.objects.get(id=facturador_id, activo=True)
+                facturador = Facturador.tenant_objects.get(id=facturador_id, activo=True)
             except Facturador.DoesNotExist:
                 messages.error(request, 'El facturador no existe o no está activo.')
                 # Limpiar sesión de facturador inválido
@@ -4685,7 +4685,7 @@ class ListarFacturadores(LoginRequiredMixin, View):
             messages.error(request, 'Seleccione una empresa válida.')
             return redirect('inventario:seleccionar_empresa')
 
-        facturadores = Facturador.objects.filter(empresa_id=empresa_id)
+        facturadores = Facturador.tenant_objects.filter(empresa_id=empresa_id)
     # Limpieza opcional: si existen facturadores huérfanos (empresa NULL) y el usuario es admin, se podrían reclamar
     # (De momento solo los ignoramos)
         contexto = {'facturadores': facturadores}
@@ -4704,7 +4704,7 @@ class EditarFacturador(LoginRequiredMixin, View):
             messages.error(request, 'Seleccione una empresa válida.')
             return redirect('inventario:seleccionar_empresa')
         # Recupera el facturador o lanza 404 si no existe
-        facturador = get_object_or_404(Facturador, id=id, empresa_id=empresa_id)
+        facturador = get_object_or_404(Facturador.tenant_objects, id=id, empresa_id=empresa_id)
         # Crea el formulario con los datos existentes
         form = FacturadorForm(instance=facturador)
         contexto = {
@@ -4720,7 +4720,7 @@ class EditarFacturador(LoginRequiredMixin, View):
             messages.error(request, 'Seleccione una empresa válida.')
             return redirect('inventario:seleccionar_empresa')
         # Recupera el facturador o lanza 404 si no existe
-        facturador = get_object_or_404(Facturador, id=id, empresa_id=empresa_id)
+        facturador = get_object_or_404(Facturador.tenant_objects, id=id, empresa_id=empresa_id)
 
         # Copia los datos del formulario para evitar problemas con el checkbox
         data = request.POST.copy()
@@ -4764,7 +4764,7 @@ class EliminarFacturador(LoginRequiredMixin, View):
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'Seleccione una empresa válida.')
             return redirect('inventario:seleccionar_empresa')
-        facturador = get_object_or_404(Facturador, id=id, empresa_id=empresa_id)
+        facturador = get_object_or_404(Facturador.tenant_objects, id=id, empresa_id=empresa_id)
         facturador.delete()
         messages.success(request, 'Facturador eliminado exitosamente.')
         return redirect('inventario:listar_facturadores')
@@ -4784,7 +4784,7 @@ class LoginFacturador(View):
                 return render(request, 'inventario/facturador/login_facturador.html')
             
             # Buscar el facturador dentro de la empresa activa
-            facturadores = Facturador.objects.filter(activo=True, empresa_id=empresa_id)
+            facturadores = Facturador.tenant_objects.filter(activo=True, empresa_id=empresa_id)
             facturador_valido = None
             
             for facturador in facturadores:
@@ -4828,7 +4828,7 @@ class LoginProformador(View):
                 return render(request, 'inventario/facturador/login_proformador.html')
             
             # Buscar el facturador dentro de la empresa activa
-            facturadores = Facturador.objects.filter(activo=True, empresa_id=empresa_id)
+            facturadores = Facturador.tenant_objects.filter(activo=True, empresa_id=empresa_id)
             facturador_valido = None
             
             for facturador in facturadores:
@@ -6238,7 +6238,7 @@ def validar_facturador(request):
             # Filtrar primero por empresa y activos para reducir superficie.
             # Se intenta una coincidencia única por comparación de hash.
             facturador_valido = None
-            for facturador in Facturador.objects.filter(empresa_id=empresa_id, activo=True):
+            for facturador in Facturador.tenant_objects.filter(empresa_id=empresa_id, activo=True):
                 if facturador.password and check_password(password, facturador.password):
                     facturador_valido = facturador
                     break
