@@ -2,23 +2,32 @@ from django.core.management.base import BaseCommand, CommandError
 from django.core.mail import send_mail, EmailMessage
 from django.conf import settings
 import json
+import os
+
+try:
+    import boto3
+except ImportError:  # pragma: no cover
+    boto3 = None
 
 
 class Command(BaseCommand):
     help = "Envía un correo de prueba usando la configuración actual (Anymail/SES)."
 
     def add_arguments(self, parser):
-        parser.add_argument('--to', dest='to', required=True, help='Correo destino para la prueba')
+        parser.add_argument('--to', dest='to', required=True, help='Correo destino para la prueba (cliente)')
+        parser.add_argument('--cc', dest='cc', help='Correo(s) CC separados por coma (sobrescribe empresa)')
+        parser.add_argument('--empresa-id', dest='empresa_id', type=int, help='Tomar correo de la empresa como CC si existe')
         parser.add_argument('--subject', dest='subject', default='Prueba SES', help='Asunto opcional')
         parser.add_argument('--body', dest='body', default='Correo de prueba SES/Anymail OK', help='Cuerpo opcional')
         parser.add_argument('--raw', action='store_true', help='Usar EmailMessage en lugar de send_mail')
+        parser.add_argument('--attach-dummy', action='store_true', help='Adjunta un archivo de texto de prueba')
+        parser.add_argument('--no-diag', action='store_true', help='Omite diagnóstico previo de SES')
 
     def handle(self, *args, **options):
         to = options['to']
         subject = options['subject']
         body = options['body']
         backend = settings.EMAIL_BACKEND
-
         self.stdout.write(self.style.NOTICE(f"Backend actual: {backend}"))
         self.stdout.write(self.style.NOTICE(f"DEFAULT_FROM_EMAIL: {settings.DEFAULT_FROM_EMAIL}"))
 
@@ -28,13 +37,45 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.WARNING('ANYMAIL no está configurado (backend SMTP o consola).'))
 
+        # Diagnóstico SES básico
+        if not options['no_diag'] and boto3:
+            try:
+                region = (anymail_cfg.get('AMAZON_SES_CLIENT_PARAMS', {}) or {}).get('region_name') or os.environ.get('AWS_SES_REGION_NAME') or 'us-east-1'
+                ses_client = boto3.client('ses', region_name=region)
+                quota = ses_client.get_send_quota()
+                self.stdout.write(self.style.NOTICE(f"SES Quota: Max24h={quota.get('Max24HourSend')} Remaining={quota.get('Max24HourSend')} Rate={quota.get('MaxSendRate')}"))
+            except Exception as e:  # pragma: no cover
+                self.stdout.write(self.style.WARNING(f"No se pudo obtener cuota SES: {e}"))
+
+        # Determinar CC
+        cc_list = []
+        if options.get('cc'):
+            cc_list = [c.strip() for c in options['cc'].split(',') if c.strip()]
+        elif options.get('empresa_id'):
+            try:
+                from inventario.models import Empresa
+                emp = Empresa.objects.filter(id=options['empresa_id']).first()
+                if emp and emp.correo:
+                    if emp.correo != to:
+                        cc_list.append(emp.correo)
+                        self.stdout.write(self.style.NOTICE(f"CC empresa: {emp.correo}"))
+            except Exception as e:  # pragma: no cover
+                self.stdout.write(self.style.WARNING(f"No se pudo obtener empresa para CC: {e}"))
+
         try:
             if options['raw']:
-                email = EmailMessage(subject, body, settings.DEFAULT_FROM_EMAIL, [to])
+                email = EmailMessage(subject, body, settings.DEFAULT_FROM_EMAIL, [to], cc=cc_list)
+                if options['attach_dummy']:
+                    email.attach('prueba.txt', b'Archivo de prueba de adjunto SES', 'text/plain')
                 email.send(fail_silently=False)
             else:
-                send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [to], fail_silently=False)
+                # send_mail no soporta CC directamente; usamos EmailMessage para CC
+                email = EmailMessage(subject, body, settings.DEFAULT_FROM_EMAIL, [to], cc=cc_list)
+                if options['attach_dummy']:
+                    email.attach('prueba.txt', b'Archivo de prueba de adjunto SES', 'text/plain')
+                email.send(fail_silently=False)
         except Exception as exc:
             raise CommandError(f"Error enviando correo: {exc}") from exc
 
-        self.stdout.write(self.style.SUCCESS(f"Correo de prueba enviado a {to}"))
+        destino = to + (f" (cc: {', '.join(cc_list)})" if cc_list else '')
+        self.stdout.write(self.style.SUCCESS(f"Correo de prueba enviado a {destino}"))

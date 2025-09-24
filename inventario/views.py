@@ -3242,6 +3242,46 @@ def consultar_estado_sri(request, factura_id):
                 except Exception:
                     pass
             factura.save()
+            # =============================
+            # Envío automático de email si pasó a AUTORIZADA y no se había enviado
+            # =============================
+            try:
+                if factura.estado_sri == 'AUTORIZADA' and not factura.email_enviado:
+                    from .utils.email_facturas import send_factura_autorizada_email
+                    # Asegurar generación de XML autorizado y RIDE
+                    from .sri.integracion_django import SRIIntegration
+                    integration_local = SRIIntegration(empresa=get_empresa_activa(request))
+                    # Generar/obtener XML autorizado (persistido en storage si aplica)
+                    xml_path = integration_local.generar_xml_factura(factura)
+                    # Generar RIDE (firmado o simple según config)
+                    ride_gen = RIDEGenerator()
+                    pdf_dir = os.path.join(getattr(settings, 'MEDIA_ROOT', 'media'), 'facturas_pdf')
+                    os.makedirs(pdf_dir, exist_ok=True)
+                    ride_result = ride_gen.generar_ride_factura_firmado(
+                        factura=factura,
+                        output_dir=pdf_dir,
+                        firmar=True
+                    )
+                    if isinstance(ride_result, tuple):
+                        ride_path = ride_result[1]
+                    else:
+                        ride_path = ride_result
+                    send_factura_autorizada_email(factura, xml_path, ride_path, copia_empresa=True)
+                    factura.email_enviado = True
+                    from datetime import timezone as _tz
+                    from django.utils import timezone
+                    factura.email_enviado_at = timezone.now()
+                    factura.email_envio_intentos = factura.email_envio_intentos + 1
+                    factura.email_ultimo_error = None
+                    factura.save(update_fields=['email_enviado','email_enviado_at','email_envio_intentos','email_ultimo_error'])
+                elif factura.estado_sri == 'AUTORIZADA':
+                    # Ya estaba marcado; solo incrementamos contador si forzaron la consulta
+                    factura.email_envio_intentos = factura.email_envio_intentos or 1
+            except Exception as email_exc:
+                logger.error(f"Fallo envío automático email factura {factura.id}: {email_exc}")
+                factura.email_envio_intentos = factura.email_envio_intentos + 1
+                factura.email_ultimo_error = str(email_exc)
+                factura.save(update_fields=['email_envio_intentos','email_ultimo_error'])
             estado_cambio = (estado_anterior != factura.estado_sri)
             logger.info(f"Estado consultado exitosamente: {factura.estado_sri}")
             return JsonResponse({

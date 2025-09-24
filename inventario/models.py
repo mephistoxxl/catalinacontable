@@ -893,6 +893,27 @@ class Factura(models.Model):
         ],
         help_text="Estado de la factura en el SRI"
     )
+    # ======================
+    # Control de envío email
+    # ======================
+    email_enviado = models.BooleanField(
+        default=False,
+        help_text="Indica si ya se envió el correo con XML/RIDE al cliente"
+    )
+    email_enviado_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Fecha/hora del primer envío exitoso"
+    )
+    email_envio_intentos = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Número de intentos (exitosos + fallidos) de envío"
+    )
+    email_ultimo_error = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Último error registrado al intentar enviar correo"
+    )
     mensaje_sri = models.TextField(
         blank=True, 
         null=True,

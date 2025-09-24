@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Factura autorizada</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f7f7f9; margin:0; padding:0; }
+    .container { max-width:620px; margin:0 auto; background:#ffffff; border:1px solid #e5e7eb; border-radius:8px; padding:24px; }
+    h1 { font-size:18px; margin:0 0 12px; color:#111827; }
+    p { font-size:14px; line-height:1.5; color:#374151; margin:4px 0; }
+    .total { font-size:16px; font-weight:bold; color:#111827; margin-top:12px; }
+    .footer { font-size:12px; color:#6b7280; margin-top:24px; text-align:center; }
+    .badge { display:inline-block; background:#0369a1; color:#fff; padding:4px 8px; font-size:11px; border-radius:4px; letter-spacing:0.5px; }
+    table { width:100%; border-collapse:collapse; margin-top:16px; }
+    th, td { text-align:left; padding:6px 4px; font-size:12px; }
+    th { background:#f1f5f9; } 
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Factura electrónica autorizada</h1>
+    <p>Estimado(a) {{ cliente.razon_social|default:factura.nombre_cliente }},</p>
+    <p>Su factura ha sido <strong>AUTORIZADA</strong> por el SRI.</p>
+    <p><span class="badge">{{ factura.establecimiento }}-{{ factura.punto_emision }}-{{ factura.secuencia }}</span></p>
+
+    <table>
+      <tr><th>Empresa</th><td>{{ empresa.razon_social }}</td></tr>
+      <tr><th>RUC</th><td>{{ empresa.ruc }}</td></tr>
+      <tr><th>Autorización</th><td>{{ numero_autorizacion }}</td></tr>
+      <tr><th>Fecha autorización</th><td>{{ fecha_autorizacion }}</td></tr>
+      <tr><th>Total</th><td>{{ total }}</td></tr>
+    </table>
+
+    <p>Adjuntamos los siguientes archivos:</p>
+    <ul>
+      <li>XML autorizado (estructura completa del comprobante)</li>
+      <li>RIDE en PDF (representación impresa)</li>
+    </ul>
+
+    <p class="total">Total a pagar: {{ total }}</p>
+    <p>Gracias por su preferencia.</p>
+    <div class="footer">
+      <p>Este es un correo automático, por favor no responder a esta dirección.</p>
+      <p>{{ empresa.nombre_comercial|default:empresa.razon_social }}</p>
+    </div>
+  </div>
+</body>
+</html>
