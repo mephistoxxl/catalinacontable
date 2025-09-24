@@ -1,13 +1,16 @@
 from django.core.management.base import BaseCommand, CommandError
-from django.core.mail import send_mail, EmailMessage
+from django.core.mail import EmailMessage
 from django.conf import settings
 import json
 import os
+import traceback
 
-try:
+try:  # pragma: no cover - entorno sin boto3
     import boto3
+    from botocore.exceptions import ClientError
 except ImportError:  # pragma: no cover
     boto3 = None
+    ClientError = None
 
 
 class Command(BaseCommand):
@@ -22,6 +25,41 @@ class Command(BaseCommand):
         parser.add_argument('--raw', action='store_true', help='Usar EmailMessage en lugar de send_mail')
         parser.add_argument('--attach-dummy', action='store_true', help='Adjunta un archivo de texto de prueba')
         parser.add_argument('--no-diag', action='store_true', help='Omite diagnóstico previo de SES')
+
+    def _friendly_ses_error(self, exc, to_addr):  # pragma: no cover (difícil de forzar en tests locales)
+        lines = []
+        msg = str(exc)
+        backend = settings.EMAIL_BACKEND
+        from_addr = settings.DEFAULT_FROM_EMAIL
+        lines.append('\n=== Diagnóstico SES (MessageRejected) ===')
+        # Causas típicas
+        sandbox_hints = [
+            '- La cuenta SES probablemente está en SANDBOX (cuota 200/24h y rate 1.0).',
+            f"- Debes VERIFICAR el dominio del remitente (recomendado) o al menos la dirección: {from_addr}.",
+            f"- Mientras sigas en sandbox, cada destinatario externo debe estar verificado (incluyendo: {to_addr}).",
+            '- Alternativa inmediata: Verifica el correo destino en la consola SES (Identities > Verify new email address).',
+            '- Solución definitiva: Solicita SALIDA DE SANDBOX (Request production access).',
+        ]
+        if 'Email address is not verified' in msg:
+            lines.append('Motivo: Dirección remitente/destino no verificada para este entorno sandbox.')
+        lines.extend(sandbox_hints)
+        lines.append('\nPasos recomendados:')
+        lines.append('  1. En SES > Verified identities: Add identity > Domain -> alpca.ec')
+        lines.append('  2. Añadir registros DNS: TXT de verificación + 3 CNAME DKIM que entrega SES.')
+        lines.append('  3. (Opcional) SPF: v=spf1 include:amazonses.com ~all (si no existe otro SPF)')
+        lines.append('  4. (Opcional) DMARC: _dmarc.alpca.ec  TXT  "v=DMARC1; p=none; rua=mailto:dmarc@alpca.ec"')
+        lines.append('  5. Esperar propagación DNS (5-30 min).')
+        lines.append('  6. Solicitar producción: SES > Account dashboard > Request production access.')
+        lines.append('     - Use case: Envío transaccional de facturas electrónicas autorizadas (SRI Ecuador).')
+        lines.append('     - Volumen esperado y plan de manejo de rebotes/quejas (bounces/complaints).')
+        lines.append('  7. Una vez fuera de sandbox solo necesitas verificar el dominio remitente.')
+        lines.append('\nMientras tanto puedes:')
+        lines.append('  - Verificar el email destino puntual para esta prueba.')
+        lines.append('  - Reintentar este comando tras la verificación.')
+        lines.append('\nInformación técnica capturada:')
+        lines.append(f'  Backend: {backend}')
+        lines.append(f'  FROM: {from_addr}')
+        return '\n'.join(lines)
 
     def handle(self, *args, **options):
         to = options['to']
@@ -43,7 +81,13 @@ class Command(BaseCommand):
                 region = (anymail_cfg.get('AMAZON_SES_CLIENT_PARAMS', {}) or {}).get('region_name') or os.environ.get('AWS_SES_REGION_NAME') or 'us-east-1'
                 ses_client = boto3.client('ses', region_name=region)
                 quota = ses_client.get_send_quota()
-                self.stdout.write(self.style.NOTICE(f"SES Quota: Max24h={quota.get('Max24HourSend')} Remaining={quota.get('Max24HourSend')} Rate={quota.get('MaxSendRate')}"))
+                max24 = float(quota.get('Max24HourSend') or 0)
+                sent24 = float(quota.get('SentLast24Hours') or 0)
+                remaining = max24 - sent24
+                rate = quota.get('MaxSendRate')
+                self.stdout.write(self.style.NOTICE(f"SES Quota: Max24h={max24} Sent24h={sent24} Remaining={remaining} Rate={rate}"))
+                if max24 <= 200 and rate <= 1:
+                    self.stdout.write(self.style.WARNING('Indicio: Cuenta aún en sandbox (límite 200/24h y 1 msg/seg).'))
             except Exception as e:  # pragma: no cover
                 self.stdout.write(self.style.WARNING(f"No se pudo obtener cuota SES: {e}"))
 
@@ -63,19 +107,20 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING(f"No se pudo obtener empresa para CC: {e}"))
 
         try:
-            if options['raw']:
-                email = EmailMessage(subject, body, settings.DEFAULT_FROM_EMAIL, [to], cc=cc_list)
-                if options['attach_dummy']:
-                    email.attach('prueba.txt', b'Archivo de prueba de adjunto SES', 'text/plain')
-                email.send(fail_silently=False)
-            else:
-                # send_mail no soporta CC directamente; usamos EmailMessage para CC
-                email = EmailMessage(subject, body, settings.DEFAULT_FROM_EMAIL, [to], cc=cc_list)
-                if options['attach_dummy']:
-                    email.attach('prueba.txt', b'Archivo de prueba de adjunto SES', 'text/plain')
-                email.send(fail_silently=False)
+            email = EmailMessage(subject, body, settings.DEFAULT_FROM_EMAIL, [to], cc=cc_list)
+            if options['attach_dummy']:
+                email.attach('prueba.txt', b'Archivo de prueba de adjunto SES', 'text/plain')
+            email.send(fail_silently=False)
         except Exception as exc:
-            raise CommandError(f"Error enviando correo: {exc}") from exc
+            # Manejo especial sandbox SES
+            if ClientError and isinstance(exc, ClientError):  # pragma: no cover
+                code = exc.response.get('Error', {}).get('Code')
+                if code == 'MessageRejected':
+                    self.stdout.write(self.style.ERROR(self._friendly_ses_error(exc, to)))
+            # Siempre elevar CommandError al final
+            detail = f"Error enviando correo: {exc}\n"
+            detail += ''.join(traceback.format_exception_only(type(exc), exc))
+            raise CommandError(detail) from exc
 
         destino = to + (f" (cc: {', '.join(cc_list)})" if cc_list else '')
         self.stdout.write(self.style.SUCCESS(f"Correo de prueba enviado a {destino}"))
