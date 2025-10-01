@@ -1,0 +1,72 @@
+{% extends "inventario/comun/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="container mx-auto px-6 py-6">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-semibold">{% trans "Liquidaciones de Compra" %}</h1>
+    <a class="btn btn-primary" href="{% url 'inventario:liquidaciones_compra_crear' %}">
+      {% trans "Nueva Liquidación" %}
+    </a>
+  </div>
+
+  {% if liquidaciones %}
+  <div class="table-responsive shadow bg-white rounded">
+    <table class="table table-striped mb-0">
+      <thead class="thead-light">
+        <tr>
+          <th>{% trans "Fecha" %}</th>
+          <th>{% trans "Serie" %}</th>
+          <th>{% trans "Secuencia" %}</th>
+          <th>{% trans "Proveedor" %}</th>
+          <th class="text-right">{% trans "Importe Total" %}</th>
+          <th>{% trans "Estado" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for liquidacion in liquidaciones %}
+        <tr>
+          <td>{{ liquidacion.fecha_emision|date:"d/m/Y" }}</td>
+          <td>{{ liquidacion.serie_formateada }}</td>
+          <td>{{ liquidacion.secuencia_formateada }}</td>
+          <td>{{ liquidacion.proveedor.razon_social_proveedor }}</td>
+          <td class="text-right">{{ liquidacion.importe_total|floatformat:2 }}</td>
+          <td>{{ liquidacion.get_estado_display }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="alert alert-info">
+    {% trans "Todavía no existen liquidaciones de compra." %}
+  </div>
+  {% endif %}
+
+  {% if is_paginated %}
+  <nav class="mt-4" aria-label="Paginación">
+    <ul class="pagination">
+      {% if page_obj.has_previous %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">&laquo;</a></li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
+      {% endif %}
+
+      {% for num in paginator.page_range %}
+      {% if page_obj.number == num %}
+      <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+      {% else %}
+      <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+      {% endif %}
+      {% endfor %}
+
+      {% if page_obj.has_next %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">&raquo;</a></li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

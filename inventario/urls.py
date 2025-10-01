@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from .views import FirmaElectronicaView, ConfiguracionGeneral
+from .liquidacion_compra import views as liquidacion_views
 from django.conf import settings
 from django.conf.urls.static import static
 app_name = "inventario"
@@ -102,6 +103,10 @@ urlpatterns = [
     path('almacenes/', views.gestion_almacenes, name='gestion_almacenes'),
     path('almacenes/editar/<int:id>/', views.editar_almacen, name='editar_almacen'),
     path('almacenes/eliminar/<int:id>/', views.eliminar_almacen, name='eliminar_almacen'),
+
+    # Liquidaciones de compra (codDoc 03)
+    path('liquidaciones-compra/', liquidacion_views.LiquidacionCompraListView.as_view(), name='liquidaciones_compra_listar'),
+    path('liquidaciones-compra/crear/', liquidacion_views.LiquidacionCompraCreateView.as_view(), name='liquidaciones_compra_crear'),
 
     # Bancos
     path('bancos/', views.ListarBancos.as_view(), name='listar_bancos'),

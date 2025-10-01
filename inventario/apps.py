@@ -14,3 +14,8 @@ class InventarioConfig(AppConfig):
             admin_group.permissions.set(Permission.objects.all())
 
         post_migrate.connect(create_default_groups, sender=self)
+
+        # Importar modelos de liquidación de compra cuando la app ya está lista
+        # para evitar conflictos con la facturación existente y con el registro
+        # anticipado de logging.
+        from .liquidacion_compra import models as _liquidacion_models  # noqa: F401

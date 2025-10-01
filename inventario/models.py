@@ -217,7 +217,7 @@ class Opciones(models.Model):
         upload_to='firmas/',
         null=True,
         blank=True,
-        help_text='Archivo de firma electrónica (.p12 o .pfx). Se cifra si FIRMAS_KEY está configurada; en desarrollo sin clave se guarda en texto plano dentro de firmas_secure.'
+        help_text='Archivo de firma electrónica (.p12 o .pfx). Se almacena cifrado y nunca se expone públicamente.'
     )
     password_firma = EncryptedCharField(
         max_length=500,

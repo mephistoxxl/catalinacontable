@@ -1,0 +1,142 @@
+{% extends "inventario/comun/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="container mx-auto px-6 py-6">
+  <div class="mb-6">
+    <h1 class="text-2xl font-semibold">{% trans "Nueva Liquidación de Compra" %}</h1>
+    <a class="btn btn-link" href="{% url 'inventario:liquidaciones_compra_listar' %}">&larr; {% trans "Volver al listado" %}</a>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="card shadow-sm mb-4">
+      <div class="card-header">
+        <strong>{% trans "Datos Generales" %}</strong>
+      </div>
+      <div class="card-body grid md:grid-cols-2 gap-4">
+        {% for field in form %}
+        <div class="form-group">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
+          {% for error in field.errors %}
+          <div class="text-danger text-sm">{{ error }}</div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+      <div class="card-header">
+        <strong>{% trans "Detalles" %}</strong>
+      </div>
+      <div class="card-body">
+        {{ detalle_formset.management_form }}
+        <div class="space-y-4">
+          {% for form_detalle in detalle_formset %}
+          <div class="border rounded p-4">
+            <div class="grid md:grid-cols-3 gap-4">
+              {% for field in form_detalle.visible_fields %}
+              <div class="form-group">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}
+                <div class="text-danger text-sm">{{ error }}</div>
+                {% endfor %}
+              </div>
+              {% endfor %}
+            </div>
+            {% if form_detalle.can_delete %}
+            <div class="form-check mt-2">
+              <label class="form-check-label">
+                {{ form_detalle.DELETE }} {% trans "Eliminar este detalle" %}
+              </label>
+            </div>
+            {% endif %}
+            {% for error in form_detalle.non_field_errors %}
+            <div class="text-danger text-sm mt-2">{{ error }}</div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+      <div class="card-header">
+        <strong>{% trans "Formas de Pago" %}</strong>
+      </div>
+      <div class="card-body">
+        {{ pago_formset.management_form }}
+        <div class="space-y-4">
+          {% for form_pago in pago_formset %}
+          <div class="border rounded p-4">
+            <div class="grid md:grid-cols-4 gap-4">
+              {% for field in form_pago.visible_fields %}
+              <div class="form-group">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}
+                <div class="text-danger text-sm">{{ error }}</div>
+                {% endfor %}
+              </div>
+              {% endfor %}
+            </div>
+            {% if form_pago.can_delete %}
+            <div class="form-check mt-2">
+              <label class="form-check-label">
+                {{ form_pago.DELETE }} {% trans "Eliminar esta forma de pago" %}
+              </label>
+            </div>
+            {% endif %}
+            {% for error in form_pago.non_field_errors %}
+            <div class="text-danger text-sm mt-2">{{ error }}</div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+      <div class="card-header">
+        <strong>{% trans "Información Adicional" %}</strong>
+      </div>
+      <div class="card-body">
+        {{ campo_adicional_formset.management_form }}
+        <div class="space-y-4">
+          {% for form_extra in campo_adicional_formset %}
+          <div class="border rounded p-4">
+            <div class="grid md:grid-cols-2 gap-4">
+              {% for field in form_extra.visible_fields %}
+              <div class="form-group">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}
+                <div class="text-danger text-sm">{{ error }}</div>
+                {% endfor %}
+              </div>
+              {% endfor %}
+            </div>
+            {% if form_extra.can_delete %}
+            <div class="form-check mt-2">
+              <label class="form-check-label">
+                {{ form_extra.DELETE }} {% trans "Eliminar" %}
+              </label>
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="flex justify-end">
+      <button type="submit" class="btn btn-primary">{% trans "Guardar Liquidación" %}</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
