@@ -2,141 +2,1204 @@
 {% load i18n %}
 
 {% block content %}
-<div class="container mx-auto px-6 py-6">
-  <div class="mb-6">
-    <h1 class="text-2xl font-semibold">{% trans "Nueva Liquidación de Compra" %}</h1>
-    <a class="btn btn-link" href="{% url 'inventario:liquidaciones_compra_listar' %}">&larr; {% trans "Volver al listado" %}</a>
-  </div>
+<!-- ✅ ESTILOS PERSONALIZADOS PARA INPUTS COMPACTOS Y FINOS -->
+<style>
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="date"],
+  input[type="datetime-local"],
+  textarea,
+  select,
+  .form-control {
+    width: 100% !important;
+    padding: 1px 4px !important;
+    border: 0.5px solid #d1d5db !important;
+    border-radius: 2px !important;
+    font-size: 10px !important;
+    background-color: #ffffff !important;
+    transition: all 0.2s ease !important;
+    box-shadow: none !important;
+    height: 20px !important;
+  }
 
-  <form method="post" novalidate>
-    {% csrf_token %}
+  /* Quitar flechas de los inputs number */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+  }
 
-    <div class="card shadow-sm mb-4">
-      <div class="card-header">
-        <strong>{% trans "Datos Generales" %}</strong>
-      </div>
-      <div class="card-body grid md:grid-cols-2 gap-4">
-        {% for field in form %}
-        <div class="form-group">
-          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-          {{ field }}
-          {% if field.help_text %}<small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
-          {% for error in field.errors %}
-          <div class="text-danger text-sm">{{ error }}</div>
-          {% endfor %}
+  input[type="number"] {
+    -moz-appearance: textfield !important;
+  }
+
+  input[type="text"]:focus,
+  input[type="email"]:focus,
+  input[type="password"]:focus,
+  input[type="number"]:focus,
+  input[type="tel"]:focus,
+  input[type="url"]:focus,
+  input[type="date"]:focus,
+  input[type="datetime-local"]:focus,
+  textarea:focus,
+  select:focus,
+  .form-control:focus {
+    outline: none !important;
+    border-color: #60a5fa !important;
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.08) !important;
+  }
+
+  input[type="text"]:hover,
+  input[type="email"]:hover,
+  input[type="password"]:hover,
+  input[type="number"]:hover,
+  input[type="tel"]:hover,
+  input[type="url"]:hover,
+  input[type="date"]:hover,
+  input[type="datetime-local"]:hover,
+  textarea:hover,
+  select:hover,
+  .form-control:hover {
+    border-color: #9ca3af !important;
+  }
+
+  select {
+    background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"></polyline></svg>') !important;
+    background-repeat: no-repeat !important;
+    background-position: right 8px center !important;
+    background-size: 16px !important;
+    padding-right: 40px !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+  }
+
+  textarea {
+    min-height: 36px !important;
+    height: auto !important;
+    resize: vertical !important;
+    padding: 1px 4px !important;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: auto !important;
+    margin-right: 4px !important;
+    accent-color: #60a5fa !important;
+  }
+
+  label {
+    margin-bottom: 0px !important;
+    font-size: 9px !important;
+    font-weight: 500 !important;
+  }
+
+  .text-xs {
+    font-size: 8px !important;
+  }
+
+  /* Controles de tabla interactiva */
+  .table-compact {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  .table-compact th,
+  .table-compact td {
+    border: 1px solid #e5e7eb;
+    padding: 2px 3px;
+    font-size: 9px;
+    line-height: 1.2;
+  }
+
+  .table-compact thead th {
+    background: #f3f4f6;
+    font-weight: 600;
+    color: #1f2937;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-size: 8px;
+  }
+
+  .table-compact tbody tr:nth-child(even) {
+    background: #fafbff;
+  }
+
+  .qty-btn {
+    width: 18px;
+    height: 18px;
+    border-radius: 2px;
+    border: 1px solid #d1d5db;
+    background-color: #f9fafb;
+    font-weight: 600;
+    line-height: 1;
+    font-size: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease;
+  }
+
+  .qty-btn:hover {
+    background-color: #e5e7eb;
+  }
+
+  .qty-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35);
+    border-color: #3b82f6;
+  }
+
+  .inline-flex {
+    display: inline-flex;
+  }
+
+  .items-center {
+    align-items: center;
+  }
+
+  .gap-1 {
+    gap: 0.25rem;
+  }
+
+  /* Tabla compacta para detalles */
+  .detalle-table-wrapper {
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #ffffff;
+  }
+
+  table.table-compact {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 12px;
+  }
+
+  table.table-compact thead th {
+    background: #f3f4f6;
+    color: #1f2937;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 11px;
+    padding: 6px 8px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  table.table-compact tbody td {
+    padding: 6px 8px;
+    vertical-align: top;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  table.table-compact tbody tr:nth-child(even) {
+    background: #fafbff;
+  }
+
+  table.table-compact tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .table-field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .table-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+    font-weight: 600;
+  }
+
+  .detalle-acciones label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    color: #dc2626;
+    font-weight: 600;
+  }
+
+  .detalle-acciones input[type="checkbox"] {
+    margin-right: 0 !important;
+  }
+
+  .detalle-nota {
+    background: #f8fafc;
+    border: 1px dashed #cbd5f5;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    color: #475569;
+  }
+
+  .form-error {
+    font-size: 11px;
+    color: #dc2626;
+    margin-top: 4px;
+  }
+
+  .border-red-500,
+  .form-control.is-invalid {
+    border-color: #ef4444 !important;
+    background-color: #fef2f2 !important;
+  }
+
+  .border-red-500:focus,
+  .form-control.is-invalid:focus {
+    border-color: #dc2626 !important;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1) !important;
+  }
+</style>
+
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-1" style="min-height: auto; padding: 2px;">
+  <div class="mx-auto" style="max-width: 95%; padding: 0 10px;">
+
+    {% if messages %}
+    <div class="mb-1">
+      {% for message in messages %}
+      <div class="bg-white rounded shadow-sm p-1 border-l-2 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            {% if message.tags == 'success' %}
+              <i class="fa fa-check-circle text-green-500 text-[10px]"></i>
+            {% elif message.tags == 'error' %}
+              <i class="fa fa-exclamation-circle text-red-500 text-[10px]"></i>
+            {% elif message.tags == 'warning' %}
+              <i class="fa fa-exclamation-triangle text-yellow-500 text-[10px]"></i>
+            {% else %}
+              <i class="fa fa-info-circle text-blue-500 text-[10px]"></i>
+            {% endif %}
+          </div>
+          <div class="ml-1">
+            <p class="text-[9px] font-medium {% if message.tags == 'success' %}text-green-800{% elif message.tags == 'error' %}text-red-800{% elif message.tags == 'warning' %}text-yellow-800{% else %}text-blue-800{% endif %}">
+              {{ message }}
+            </p>
+          </div>
         </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-3 mb-3 rounded">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center">
+          <i class="fa fa-file-text-o text-white text-sm mr-2"></i>
+          <h1 class="text-sm font-semibold text-white">{% trans "Nueva Liquidación de Compra" %}</h1>
+        </div>
+        <a href="{% url 'inventario:liquidaciones_compra_listar' %}" class="inline-flex items-center px-3 py-1 bg-white/10 hover:bg-white/20 text-white text-xs font-medium rounded transition-all">
+          <i class="fa fa-arrow-left mr-1 text-[9px]"></i>
+          <span>{% trans "Volver" %}</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="bg-white rounded shadow border border-gray-200 overflow-hidden">
+  <form method="post" novalidate class="p-2 space-y-2" id="form_liquidacion" onsubmit="return prepararEnvioLiquidacion()">
+        {% csrf_token %}
+        {{ form.proveedor }}
+        {% for error in form.proveedor.errors %}
+          <p class="form-error">{{ error }}</p>
         {% endfor %}
-      </div>
-    </div>
 
-    <div class="card shadow-sm mb-4">
-      <div class="card-header">
-        <strong>{% trans "Detalles" %}</strong>
-      </div>
-      <div class="card-body">
-        {{ detalle_formset.management_form }}
-        <div class="space-y-4">
-          {% for form_detalle in detalle_formset %}
-          <div class="border rounded p-4">
-            <div class="grid md:grid-cols-3 gap-4">
-              {% for field in form_detalle.visible_fields %}
-              <div class="form-group">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% for error in field.errors %}
-                <div class="text-danger text-sm">{{ error }}</div>
-                {% endfor %}
-              </div>
-              {% endfor %}
-            </div>
-            {% if form_detalle.can_delete %}
-            <div class="form-check mt-2">
-              <label class="form-check-label">
-                {{ form_detalle.DELETE }} {% trans "Eliminar este detalle" %}
-              </label>
-            </div>
-            {% endif %}
-            {% for error in form_detalle.non_field_errors %}
-            <div class="text-danger text-sm mt-2">{{ error }}</div>
-            {% endfor %}
-          </div>
+        {% if form.non_field_errors %}
+        <div class="bg-red-50 border border-red-200 rounded p-1">
+          {% for error in form.non_field_errors %}
+            <p class="form-error text-[9px]">{{ error }}</p>
           {% endfor %}
         </div>
-      </div>
-    </div>
+        {% endif %}
 
-    <div class="card shadow-sm mb-4">
-      <div class="card-header">
-        <strong>{% trans "Formas de Pago" %}</strong>
-      </div>
-      <div class="card-body">
-        {{ pago_formset.management_form }}
-        <div class="space-y-4">
-          {% for form_pago in pago_formset %}
-          <div class="border rounded p-4">
-            <div class="grid md:grid-cols-4 gap-4">
-              {% for field in form_pago.visible_fields %}
-              <div class="form-group">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% for error in field.errors %}
-                <div class="text-danger text-sm">{{ error }}</div>
-                {% endfor %}
-              </div>
-              {% endfor %}
-            </div>
-            {% if form_pago.can_delete %}
-            <div class="form-check mt-2">
-              <label class="form-check-label">
-                {{ form_pago.DELETE }} {% trans "Eliminar esta forma de pago" %}
+        <section>
+          <div class="flex items-center pb-1 border-b border-gray-200 mb-1">
+            <i class="fa fa-id-card-o text-slate-600 text-[9px] mr-1"></i>
+            <h2 class="text-[10px] font-semibold text-gray-800">{% trans "Datos Generales" %}</h2>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-1">
+            {% with field=form.fecha_emision %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}{% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
               </label>
+                {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
             </div>
-            {% endif %}
-            {% for error in form_pago.non_field_errors %}
-            <div class="text-danger text-sm mt-2">{{ error }}</div>
+            {% endwith %}
+
+            {% with field=form.establecimiento %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.punto_emision %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.secuencia %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.almacen %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.sustento_tributario %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                Sustento Tributario
+              </label>
+              <select id="{{ field.id_for_label }}" name="{{ field.name }}" class="form-control">
+                <option value="01">01 Crédito Tributario Para Declaraciones</option>
+                <option value="02">02 Costo o Gasto Para Declaración De Ir (Servicios Y Bienes Distintos De Inventarios Y Activos Fijos)</option>
+                <option value="03">03 Activo Fijo - Crédito Tributario Para Declaraciones De IVA</option>
+                <option value="04">04 Activo Fijo - Costo O Gasto Para Declaración De Ir</option>
+                <option value="05">05 Liquidación Gastos De Viaje, Hospedaje Y Alimentación Gastos Ir (A Nombre De Empleados Y No De La Empresa)</option>
+                <option value="06">06 Inventario - Crédito Tributario Para Declaraciones De IVA</option>
+                <option value="07">07 Inventario - Costos O Gastos Para Declaración De Ir</option>
+                <option value="08">08 Valor Pagado Para Solicitar Reembolso De Gasto (Intermediario)</option>
+                <option value="14">14 Valores Facturados Por Socios A Operadoras De Transporte (Que No Constituyen Gastos De Dicha Operadora)</option>
+              </select>
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.concepto %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            <div class="group">
+              <label for="forma_pago" class="block text-[9px] font-medium text-gray-700">
+                Forma de Pago
+              </label>
+              <select id="forma_pago" name="forma_pago" class="form-control">
+                <option value="efectivo">Efectivo</option>
+                <option value="cheque">Cheque</option>
+                <option value="credito">Crédito</option>
+                <option value="deposito">Depósito</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div class="flex items-center pb-1 border-b border-gray-200 mb-1">
+            <i class="fa fa-user text-slate-600 text-[9px] mr-1"></i>
+            <h2 class="text-[10px] font-semibold text-gray-800">{% trans "Datos del Proveedor" %}</h2>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-1">
+            {% with field=form.beneficiario_tipo_identificacion %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+                <span class="text-red-500">*</span>
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.beneficiario_identificacion %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+                <span class="text-red-500">*</span>
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.beneficiario_nombre %}
+            <div class="group md:col-span-2">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+                <span class="text-red-500">*</span>
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.beneficiario_direccion %}
+            <div class="group md:col-span-2">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.beneficiario_correo %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.beneficiario_telefono %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+          </div>
+        </section>
+
+        <section>
+          <div class="flex items-center pb-1 border-b border-gray-200 mb-1">
+            <i class="fa fa-list text-slate-600 text-[9px] mr-1"></i>
+            <h2 class="text-[10px] font-semibold text-gray-800">{% trans "Detalles" %}</h2>
+          </div>
+
+          {{ detalle_formset.management_form }}
+          <input type="hidden" name="productos_snapshot" id="productos_snapshot" value="">
+          <div id="detalles-hidden" style="display:none;"></div>
+
+          {% if detalle_formset.non_form_errors %}
+          <div class="bg-red-50 border border-red-200 text-red-700 text-[9px] rounded px-1 py-0.5 mb-1">
+            {% for error in detalle_formset.non_form_errors %}
+              <p class="font-medium">{{ error }}</p>
             {% endfor %}
           </div>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
+          {% endif %}
 
-    <div class="card shadow-sm mb-4">
-      <div class="card-header">
-        <strong>{% trans "Información Adicional" %}</strong>
-      </div>
-      <div class="card-body">
+          {% if detalle_formset.errors %}
+          <div class="bg-red-50 border border-red-200 text-red-700 text-[9px] rounded px-1 py-0.5 mb-1 space-y-0.5">
+            {% for form_detalle in detalle_formset %}
+              {% if form_detalle.errors %}
+                <div>
+                  <strong class="block">{% trans "Detalle" %} #{{ forloop.counter }}:</strong>
+                  {% for field, errors in form_detalle.errors.items %}
+                    {% for error in errors %}
+                      <span class="block">{{ field|capfirst }}: {{ error }}</span>
+                    {% endfor %}
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          <div class="bg-gray-50 rounded p-1 border border-gray-200 mb-1">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-1 items-end">
+              <div class="md:col-span-3">
+                <label for="codigo_producto" class="block text-[9px] font-medium text-gray-700">{% trans "Código" %}</label>
+                <input type="text" id="codigo_producto" name="codigo_producto" placeholder="{% trans "Código" %}">
+              </div>
+              <div class="md:col-span-7">
+                <label for="producto" class="block text-[9px] font-medium text-gray-700">{% trans "Producto" %}</label>
+                <input type="text" id="producto" name="producto" class="bg-gray-100" placeholder="{% trans "Resultado" %}" disabled data-precio="0" data-database-id="" data-tipo="producto" data-iva-percent="0.12">
+              </div>
+              <div class="md:col-span-2 flex gap-1">
+                <button type="button" onclick="buscarProducto()" id="btnBuscar" class="flex-1 inline-flex items-center justify-center px-2 py-1 border border-gray-300 text-[9px] font-medium rounded text-gray-700 bg-white hover:bg-gray-50">
+                  <i class="fa fa-search text-[8px]"></i>
+                </button>
+                <button type="button" onclick="agregarProducto()" id="btnAgregar" class="flex-1 inline-flex items-center justify-center px-2 py-1 text-[9px] font-medium rounded text-white bg-green-600 hover:bg-green-700">
+                  <i class="fa fa-plus text-[8px]"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded border border-gray-200 overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200" id="tabla-productos">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-1 py-0.5 text-left text-[8px] font-medium text-gray-500 uppercase">{% trans "Código" %}</th>
+                    <th class="px-1 py-0.5 text-left text-[8px] font-medium text-gray-500 uppercase">{% trans "Descripción" %}</th>
+                    <th class="px-1 py-0.5 text-center text-[8px] font-medium text-gray-500 uppercase">{% trans "Cant." %}</th>
+                    <th class="px-1 py-0.5 text-right text-[8px] font-medium text-gray-500 uppercase">{% trans "P. Unit." %}</th>
+                    <th class="px-1 py-0.5 text-right text-[8px] font-medium text-gray-500 uppercase">{% trans "Subtotal" %}</th>
+                    <th class="px-1 py-0.5 text-center text-[8px] font-medium text-gray-500 uppercase">{% trans "Acción" %}</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <!-- Filas dinámicas -->
+                </tbody>
+                <tfoot class="bg-gray-50">
+                  <tr>
+                    <td colspan="4" class="px-1 py-0.5 text-right text-[9px] font-semibold text-gray-900">{% trans "Total" %}:</td>
+                    <td class="px-1 py-0.5 text-right text-[10px] font-bold text-gray-900" id="total-general">$0.00</td>
+                    <td class="px-1 py-0.5"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div id="tabla-vacia" class="p-1 text-[9px] text-gray-500">
+              {% trans "Sin productos." %}
+            </div>
+          </div>
+
+          <!-- Modal de selección de productos/servicios -->
+          <div id="modal-lista-productos" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1050;">
+            <div style="background:#fff; width:95%; max-width:980px; max-height:85vh; overflow:hidden; border-radius:6px; box-shadow:0 10px 25px rgba(0,0,0,.2); margin:40px auto;">
+              <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid #e5e7eb;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <i class="fa fa-list-alt" aria-hidden="true"></i>
+                  <strong>{% trans "Seleccionar producto o servicio" %}</strong>
+                </div>
+                <button type="button" id="modal-btn-cerrar" class="btn btn-light"><i class="fa fa-times"></i></button>
+              </div>
+              <div style="padding:10px 12px; border-bottom:1px solid #e5e7eb; display:flex; gap:8px; align-items:center;">
+                <label style="margin:0; font-size:.85rem;">{% trans "Buscar" %}:</label>
+                <input id="modal-buscar-input" type="text" placeholder="{% trans "Código (parcial o completo)" %}" style="flex:1; min-width:160px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px;">
+                <button type="button" id="modal-buscar-btn" class="btn btn-primary"><i class="fa fa-search"></i></button>
+              </div>
+              <div class="table-responsive" style="max-height:65vh; overflow:auto;">
+                <table class="table table-sm table-striped table-hover" style="margin:0;">
+                  <thead class="thead-light">
+                    <tr>
+                      <th style="width:40px;">✓</th>
+                      <th style="width:140px;">{% trans "Código" %}</th>
+                      <th>{% trans "Descripción" %}</th>
+                      <th style="width:110px;" class="text-right">{% trans "Precio" %}</th>
+                      <th style="width:110px;" class="text-right">{% trans "Precio c/IVA" %}</th>
+                    </tr>
+                  </thead>
+                  <tbody id="modal-lista-tbody"></tbody>
+                </table>
+              </div>
+              <div id="modal-lista-vacio" style="display:none; padding:16px; color:#64748b;">{% trans "Sin resultados." %}</div>
+            </div>
+            <!-- loader simple -->
+            <div id="modal-loader" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center;">
+              <div class="spinner-border" role="status"><span class="sr-only">{% trans "Cargando…" %}</span></div>
+            </div>
+          </div>
+        </section>
+
         {{ campo_adicional_formset.management_form }}
-        <div class="space-y-4">
+        <div id="campos-adicionales-hidden" style="display:none;">
           {% for form_extra in campo_adicional_formset %}
-          <div class="border rounded p-4">
-            <div class="grid md:grid-cols-2 gap-4">
-              {% for field in form_extra.visible_fields %}
-              <div class="form-group">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% for error in field.errors %}
-                <div class="text-danger text-sm">{{ error }}</div>
-                {% endfor %}
-              </div>
-              {% endfor %}
-            </div>
-            {% if form_extra.can_delete %}
-            <div class="form-check mt-2">
-              <label class="form-check-label">
-                {{ form_extra.DELETE }} {% trans "Eliminar" %}
-              </label>
-            </div>
-            {% endif %}
-          </div>
+            {% for hidden in form_extra.hidden_fields %}{{ hidden }}{% endfor %}
+            {% for field in form_extra.visible_fields %}
+              {{ field }}
+            {% endfor %}
+            {% if form_extra.can_delete %}{{ form_extra.DELETE }}{% endif %}
           {% endfor %}
         </div>
-      </div>
-    </div>
 
-    <div class="flex justify-end">
-      <button type="submit" class="btn btn-primary">{% trans "Guardar Liquidación" %}</button>
+        <div class="pt-1 border-t border-gray-200 flex flex-row justify-end gap-1">
+          <button type="submit" class="inline-flex items-center justify-center px-2 py-0.5 bg-gray-800 text-white text-[9px] font-medium rounded hover:bg-gray-900 transition-all">
+            <i class="fa fa-save mr-1 text-[8px]"></i>
+            <span>{% trans "Guardar" %}</span>
+          </button>
+          <a href="{% url 'inventario:liquidaciones_compra_listar' %}" class="inline-flex items-center justify-center px-2 py-0.5 bg-gray-100 text-gray-700 text-[9px] font-medium rounded hover:bg-gray-200 transition-all border border-gray-300">
+            <i class="fa fa-arrow-left mr-1 text-[8px]"></i>
+            <span>{% trans "Cancelar" %}</span>
+          </a>
+        </div>
+      </form>
     </div>
-  </form>
+  </div>
 </div>
-{% endblock %}
+    {% endblock %}
+
+    {% block extra_js %}
+    <script>
+    'use strict';
+
+    const MSG_BUSCA_PRODUCTO = '{{ _("Debe buscar un producto válido antes de agregarlo.")|escapejs }}';
+    const MSG_PRECIO_INVALIDO = '{{ _("El precio del producto no es válido.")|escapejs }}';
+    const MSG_DUPLICADO = '{{ _("Este producto ya ha sido agregado.")|escapejs }}';
+    const MSG_CANTIDAD_INVALIDA = '{{ _("Ingrese una cantidad válida.")|escapejs }}';
+    const MSG_NO_ENCONTRADO = '{{ _("Producto o servicio no encontrado.")|escapejs }}';
+    const MSG_ERROR_BUSCAR = '{{ _("Error al buscar el producto. Inténtelo de nuevo.")|escapejs }}';
+    const MSG_SIN_PRODUCTOS = '{{ _("Debe agregar al menos un producto o servicio.")|escapejs }}';
+    const TEXT_ELIMINAR = '{{ _("Eliminar")|escapejs }}';
+
+    const productosAgregados = [];
+    let contadorProductos = 0;
+
+    const productosIniciales = (() => {
+      try {
+        return JSON.parse('{{ productos_json|default:"[]"|escapejs }}');
+      } catch (e) {
+        return [];
+      }
+    })();
+
+    function toNumber(value, fallback = 0) {
+      const num = parseFloat(value);
+      return Number.isFinite(num) ? num : fallback;
+    }
+
+    function roundN(value, decimals) {
+      const factor = Math.pow(10, decimals);
+      return Math.round(toNumber(value, 0) * factor) / factor;
+    }
+
+    function round2(value) {
+      return roundN(value, 2);
+    }
+
+    function round6(value) {
+      return roundN(value, 6);
+    }
+
+    function formatDecimal(value, decimals) {
+      return roundN(value, decimals).toFixed(decimals);
+    }
+
+    function crearHiddenInput(name, value) {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = value;
+      return input;
+    }
+
+    function actualizarCamposOcultos() {
+      const container = document.getElementById('detalles-hidden');
+      if (!container) return;
+      container.innerHTML = '';
+      productosAgregados.forEach((item, index) => {
+        container.appendChild(crearHiddenInput(`detalles-${index}-id`, item.formId || ''));
+        container.appendChild(crearHiddenInput(`detalles-${index}-producto`, item.tipo === 'producto' ? (item.databaseId || '') : ''));
+        container.appendChild(crearHiddenInput(`detalles-${index}-servicio`, item.tipo === 'servicio' ? (item.databaseId || '') : ''));
+        container.appendChild(crearHiddenInput(`detalles-${index}-descripcion`, item.descripcion || item.nombre || item.codigo || ''));
+        container.appendChild(crearHiddenInput(`detalles-${index}-unidad_medida`, item.unidad || ''));
+        container.appendChild(crearHiddenInput(`detalles-${index}-cantidad`, formatDecimal(item.cantidad, 6)));
+        container.appendChild(crearHiddenInput(`detalles-${index}-costo`, formatDecimal(item.precio, 6)));
+        container.appendChild(crearHiddenInput(`detalles-${index}-descuento`, formatDecimal(item.descuento || 0, 2)));
+        container.appendChild(crearHiddenInput(`detalles-${index}-DELETE`, ''));
+      });
+      const totalForms = document.getElementById('id_detalles-TOTAL_FORMS');
+      if (totalForms) {
+        totalForms.value = productosAgregados.length;
+      }
+      const snapshot = document.getElementById('productos_snapshot');
+      if (snapshot) {
+        snapshot.value = JSON.stringify(productosAgregados);
+      }
+    }
+
+    function actualizarTotal() {
+      const total = productosAgregados.reduce((sum, item) => sum + toNumber(item.totalConIva, 0), 0);
+      const totalCell = document.getElementById('total-general');
+      if (totalCell) {
+        totalCell.textContent = `$${round2(total).toFixed(2)}`;
+      }
+    }
+
+    function actualizarEstadoTabla() {
+      const placeholder = document.getElementById('tabla-vacia');
+      if (!placeholder) return;
+      placeholder.style.display = productosAgregados.length ? 'none' : 'block';
+    }
+
+    function construirPrecioHTML(item) {
+      const ivaValor = round2(item.precioConIva - item.precio);
+      const ivaPercent = Math.round(toNumber(item.ivaPercent, 0) * 100);
+      return `
+        <div>Base: $${round2(item.precio).toFixed(2)}</div>
+        <div class="text-xs text-gray-500">IVA ${ivaPercent}%: $${ivaValor.toFixed(2)}</div>
+        <div class="font-bold">Total: $${round2(item.precioConIva).toFixed(2)}</div>
+      `;
+    }
+
+    function construirSubtotalHTML(item) {
+      const ivaTotal = round2(item.totalConIva - item.subtotal);
+      return `
+        <div>Base: $${round2(item.subtotal).toFixed(2)}</div>
+        <div class="text-xs text-gray-500">IVA: $${ivaTotal.toFixed(2)}</div>
+        <div class="font-bold">Total: $${round2(item.totalConIva).toFixed(2)}</div>
+      `;
+    }
+
+    function renderFila(producto) {
+      const tbody = document.querySelector('#tabla-productos tbody');
+      if (!tbody) return;
+
+      const fila = document.createElement('tr');
+      fila.dataset.uid = String(producto.uid);
+      fila.innerHTML = `
+        <td>${producto.codigo || ''}</td>
+        <td>${producto.nombre || ''}</td>
+        <td class="cantidad">
+          <div class="inline-flex items-center gap-1">
+            <button type="button" class="qty-btn" data-action="minus" aria-label="-">-</button>
+            <input type="number" min="0.01" step="0.01" value="${formatDecimal(producto.cantidad, 2)}" class="w-16 text-center border rounded cantidad-input" />
+            <button type="button" class="qty-btn" data-action="plus" aria-label="+">+</button>
+          </div>
+        </td>
+        <td class="precio">${construirPrecioHTML(producto)}</td>
+        <td class="subtotal">${construirSubtotalHTML(producto)}</td>
+        <td class="accion">
+          <button type="button" class="btn btn-danger btn-sm" data-action="delete">${TEXT_ELIMINAR}</button>
+        </td>
+      `;
+
+      tbody.appendChild(fila);
+
+      const inputCantidad = fila.querySelector('.cantidad-input');
+      const botones = fila.querySelectorAll('.qty-btn');
+      const btnEliminar = fila.querySelector('[data-action="delete"]');
+
+      if (inputCantidad) {
+        inputCantidad.addEventListener('change', () => {
+          const valor = toNumber(inputCantidad.value, producto.cantidad);
+          if (valor <= 0) {
+            inputCantidad.value = formatDecimal(producto.cantidad, 2);
+            alert(MSG_CANTIDAD_INVALIDA);
+            return;
+          }
+          actualizarCantidad(producto.uid, valor);
+        });
+        inputCantidad.addEventListener('input', () => {
+          if (toNumber(inputCantidad.value, 0) <= 0) {
+            inputCantidad.value = '';
+          }
+        });
+      }
+
+      botones.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const delta = btn.dataset.action === 'plus' ? 1 : -1;
+          const nueva = round6(toNumber(inputCantidad.value || producto.cantidad, producto.cantidad) + delta);
+          if (nueva <= 0) {
+            alert(MSG_CANTIDAD_INVALIDA);
+            return;
+          }
+          inputCantidad.value = formatDecimal(nueva, 2);
+          actualizarCantidad(producto.uid, nueva);
+        });
+      });
+
+      if (btnEliminar) {
+        btnEliminar.addEventListener('click', () => eliminarProducto(producto.uid));
+      }
+    }
+
+    function refrescarFila(producto) {
+      const fila = document.querySelector(`#tabla-productos tbody tr[data-uid="${producto.uid}"]`);
+      if (!fila) return;
+      const inputCantidad = fila.querySelector('.cantidad-input');
+      const tdPrecio = fila.querySelector('.precio');
+      const tdSubtotal = fila.querySelector('.subtotal');
+      if (inputCantidad) {
+        inputCantidad.value = formatDecimal(producto.cantidad, 2);
+      }
+      if (tdPrecio) {
+        tdPrecio.innerHTML = construirPrecioHTML(producto);
+      }
+      if (tdSubtotal) {
+        tdSubtotal.innerHTML = construirSubtotalHTML(producto);
+      }
+    }
+
+    function normalizarProducto(data) {
+      const tipo = data.tipo === 'servicio' ? 'servicio' : 'producto';
+      const precioBase = round6(toNumber(data.precio, 0));
+      const ivaPercent = toNumber(data.ivaPercent, 0);
+      const cantidad = Math.max(0.01, round6(toNumber(data.cantidad, 1)));
+      const precioConIvaUnidad = round2(toNumber(data.precioConIva, precioBase * (1 + ivaPercent)));
+      const subtotal = round2(toNumber(data.subtotal, precioBase * cantidad));
+      const totalConIva = round2(toNumber(data.totalConIva, precioConIvaUnidad * cantidad));
+      const descuento = round2(toNumber(data.descuento, 0));
+      const uid = typeof data.uid === 'number' ? data.uid : contadorProductos++;
+      const databaseId = data.databaseId || data.database_id || data.producto || data.servicio || '';
+      const descripcion = data.descripcion || data.nombre || '';
+      const unidad = data.unidad || data.unidad_medida || '';
+      const formId = data.formId || data.id || '';
+
+      contadorProductos = Math.max(contadorProductos, uid + 1);
+
+      return {
+        uid,
+        codigo: data.codigo || '',
+        nombre: data.nombre || descripcion || '',
+        descripcion,
+        tipo,
+        databaseId,
+        precio: precioBase,
+        precioConIva: precioConIvaUnidad,
+        ivaPercent,
+        cantidad,
+        subtotal,
+        totalConIva,
+        descuento,
+        unidad,
+        formId
+      };
+    }
+
+    function agregarProductoDesdeObjeto(data, opciones = { actualizar: true }) {
+      const item = normalizarProducto(data);
+      productosAgregados.push(item);
+      renderFila(item);
+      actualizarEstadoTabla();
+      actualizarTotal();
+      if (opciones.actualizar !== false) {
+        actualizarCamposOcultos();
+      }
+    }
+
+    function agregarProducto() {
+      const codigoInput = document.getElementById('codigo_producto');
+      const productoInfo = document.getElementById('producto');
+      if (!codigoInput || !productoInfo) return;
+
+      const codigo = (codigoInput.value || '').trim();
+      const nombreProducto = (productoInfo.value || '').trim();
+      const precio = toNumber(productoInfo.dataset.precio, 0);
+      const ivaPercent = toNumber(productoInfo.dataset.ivaPercent, 0.12);
+      const tipo = productoInfo.dataset.tipo || 'producto';
+      const databaseId = productoInfo.dataset.databaseId || '';
+
+      if (!codigo || !nombreProducto || !databaseId) {
+        alert(MSG_BUSCA_PRODUCTO);
+        return;
+      }
+
+      if (precio <= 0) {
+        alert(MSG_PRECIO_INVALIDO);
+        return;
+      }
+
+      if (productosAgregados.some((p) => p.codigo === codigo && p.tipo === tipo)) {
+        alert(MSG_DUPLICADO);
+        return;
+      }
+
+      const cantidadIngresada = prompt('{{ _("Ingrese la cantidad:")|escapejs }}', '1');
+      if (cantidadIngresada === null) {
+        return;
+      }
+      const cantidad = round6(toNumber(cantidadIngresada, 1));
+      if (!cantidad || cantidad <= 0) {
+        alert(MSG_CANTIDAD_INVALIDA);
+        return;
+      }
+
+      let precioConIva = round2(precio * (1 + ivaPercent));
+      const subtotal = round2(precio * cantidad);
+      const totalConIva = round2(precioConIva * cantidad);
+
+      const item = {
+        uid: contadorProductos++,
+        codigo,
+        nombre: nombreProducto,
+        descripcion: nombreProducto,
+        tipo,
+        databaseId,
+        precio: round6(precio),
+        precioConIva,
+        ivaPercent,
+        cantidad,
+        subtotal,
+        totalConIva,
+        descuento: 0,
+        unidad: ''
+      };
+
+      productosAgregados.push(item);
+      renderFila(item);
+      actualizarEstadoTabla();
+      actualizarTotal();
+      actualizarCamposOcultos();
+      limpiarCamposProducto();
+    }
+
+    function actualizarCantidad(uid, nuevaCantidad) {
+      const item = productosAgregados.find((p) => p.uid === uid);
+      if (!item) return;
+      const cantidad = Math.max(0.01, round6(nuevaCantidad));
+      item.cantidad = cantidad;
+      item.subtotal = round2(item.precio * cantidad);
+      item.totalConIva = round2(item.precioConIva * cantidad);
+      refrescarFila(item);
+      actualizarTotal();
+      actualizarCamposOcultos();
+    }
+
+    function eliminarProducto(uid) {
+      const index = productosAgregados.findIndex((p) => p.uid === uid);
+      if (index === -1) return;
+      productosAgregados.splice(index, 1);
+      const fila = document.querySelector(`#tabla-productos tbody tr[data-uid="${uid}"]`);
+      if (fila) {
+        fila.remove();
+      }
+      actualizarTotal();
+      actualizarCamposOcultos();
+      actualizarEstadoTabla();
+    }
+
+    function limpiarCamposProducto() {
+      const codigoInput = document.getElementById('codigo_producto');
+      const productoInfo = document.getElementById('producto');
+      if (codigoInput) codigoInput.value = '';
+      if (productoInfo) {
+        productoInfo.value = '';
+        productoInfo.dataset.precio = '0';
+        productoInfo.dataset.tipo = 'producto';
+        productoInfo.dataset.databaseId = '';
+        productoInfo.dataset.ivaPercent = '0.12';
+        productoInfo.dataset.codigo = '';
+      }
+    }
+
+    function prepararEnvioLiquidacion() {
+      if (!productosAgregados.length) {
+        alert(MSG_SIN_PRODUCTOS);
+        return false;
+      }
+      actualizarCamposOcultos();
+      return true;
+    }
+
+    function setProductoSeleccionado(producto) {
+      const productoInfo = document.getElementById('producto');
+      if (!productoInfo) return;
+      const tipo = producto.tipo === 'servicio' ? 'servicio' : 'producto';
+      productoInfo.value = producto.nombre || '';
+      productoInfo.dataset.precio = producto.precio;
+      productoInfo.dataset.databaseId = producto.id;
+      productoInfo.dataset.tipo = tipo;
+      productoInfo.dataset.ivaPercent = producto.iva_percent != null ? producto.iva_percent : '0.12';
+      productoInfo.dataset.codigo = producto.codigo || '';
+      productoInfo.dataset.precioCiva = producto.precio_con_iva;
+      const codigoInput = document.getElementById('codigo_producto');
+      if (codigoInput) {
+        codigoInput.value = producto.codigo || '';
+      }
+    }
+
+    function buscarProducto() {
+      const codigoInput = document.getElementById('codigo_producto');
+      if (!codigoInput) return;
+      const codigo = codigoInput.value.trim();
+      if (!codigo) {
+        abrirModalProductos();
+        return;
+      }
+
+      fetch(`/inventario/buscar_producto/?q=${encodeURIComponent(codigo)}`)
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error('fetch error');
+          }
+          return response.json();
+        })
+        .then((data) => {
+          if (Array.isArray(data) && data.length > 0) {
+            setProductoSeleccionado(data[0]);
+          } else {
+            alert(MSG_NO_ENCONTRADO);
+            limpiarCamposProducto();
+          }
+        })
+        .catch(() => {
+          alert(MSG_ERROR_BUSCAR);
+          limpiarCamposProducto();
+        });
+    }
+
+    function abrirModalProductos() {
+      const modal = document.getElementById('modal-lista-productos');
+      if (!modal) return;
+      modal.style.display = 'block';
+      cargarProductosModal();
+    }
+
+    function cerrarModalProductos() {
+      const modal = document.getElementById('modal-lista-productos');
+      if (!modal) return;
+      modal.style.display = 'none';
+    }
+
+    function setLoaderModal(on) {
+      const loader = document.getElementById('modal-loader');
+      if (loader) {
+        loader.style.display = on ? 'flex' : 'none';
+      }
+    }
+
+    function cargarProductosModal(q) {
+      setLoaderModal(true);
+      const url = q && q.trim() ? `/inventario/buscar_producto/?q=${encodeURIComponent(q.trim())}` : '/inventario/buscar_producto/?all=1';
+      fetch(url)
+        .then((response) => response.json())
+        .then((lista) => {
+          renderProductosModal(Array.isArray(lista) ? lista : []);
+        })
+        .catch(() => {
+          renderProductosModal([]);
+        })
+        .finally(() => setLoaderModal(false));
+    }
+
+    function renderProductosModal(lista) {
+      const tbody = document.getElementById('modal-lista-tbody');
+      const vacio = document.getElementById('modal-lista-vacio');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      if (!lista.length) {
+        if (vacio) vacio.style.display = 'block';
+        return;
+      }
+      if (vacio) vacio.style.display = 'none';
+
+      lista.forEach((item) => {
+        const tr = document.createElement('tr');
+        const tdAccion = document.createElement('td');
+        tdAccion.className = 'text-center';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-success btn-sm';
+        btn.innerHTML = '<i class="fa fa-check"></i>';
+        btn.addEventListener('click', () => seleccionarProductoDesdeModal(item));
+        tdAccion.appendChild(btn);
+
+        const tdCodigo = document.createElement('td');
+        tdCodigo.textContent = item.codigo || '';
+
+        const tdNombre = document.createElement('td');
+        tdNombre.textContent = item.nombre || '';
+
+        const precio = Number(item.precio || 0);
+        const iva = Number(item.iva_percent || 0);
+        const precioConIva = Number(item.precio_con_iva || (precio * (1 + iva)));
+
+        const tdPrecio = document.createElement('td');
+        tdPrecio.className = 'text-right';
+        tdPrecio.textContent = precio.toFixed(2);
+
+        const tdPrecioIva = document.createElement('td');
+        tdPrecioIva.className = 'text-right';
+        tdPrecioIva.textContent = precioConIva.toFixed(2);
+
+        tr.appendChild(tdAccion);
+        tr.appendChild(tdCodigo);
+        tr.appendChild(tdNombre);
+        tr.appendChild(tdPrecio);
+        tr.appendChild(tdPrecioIva);
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function seleccionarProductoDesdeModal(item) {
+      try {
+        setProductoSeleccionado(item);
+        cerrarModalProductos();
+        agregarProducto();
+      } catch (e) {
+        console.error('Error al seleccionar producto desde modal', e);
+      }
+    }
+
+    function inicializarEventos() {
+      const codigoInput = document.getElementById('codigo_producto');
+      if (codigoInput) {
+        codigoInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            buscarProducto();
+          }
+        });
+      }
+
+      const modal = document.getElementById('modal-lista-productos');
+      if (modal) {
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            cerrarModalProductos();
+          }
+        });
+      }
+
+      const btnCerrar = document.getElementById('modal-btn-cerrar');
+      if (btnCerrar) {
+        btnCerrar.addEventListener('click', cerrarModalProductos);
+      }
+
+      const btnBuscarModal = document.getElementById('modal-buscar-btn');
+      const inputBuscarModal = document.getElementById('modal-buscar-input');
+      if (btnBuscarModal && inputBuscarModal) {
+        btnBuscarModal.addEventListener('click', () => cargarProductosModal(inputBuscarModal.value));
+        inputBuscarModal.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            cargarProductosModal(inputBuscarModal.value);
+          }
+        });
+      }
+
+      const totalForms = document.getElementById('id_detalles-TOTAL_FORMS');
+      if (totalForms) {
+        totalForms.value = 0;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      inicializarEventos();
+      if (productosIniciales.length) {
+        productosIniciales.forEach((item) => agregarProductoDesdeObjeto(item, { actualizar: false }));
+        actualizarCamposOcultos();
+        actualizarTotal();
+        actualizarEstadoTabla();
+      } else {
+        actualizarCamposOcultos();
+        actualizarEstadoTabla();
+      }
+    });
+
+    window.buscarProducto = buscarProducto;
+    window.agregarProducto = agregarProducto;
+    window.eliminarProducto = eliminarProducto;
+    window.prepararEnvioLiquidacion = prepararEnvioLiquidacion;
+    window.abrirModalProductos = abrirModalProductos;
+    window.cerrarModalProductos = cerrarModalProductos;
+    </script>
+    {% endblock %}

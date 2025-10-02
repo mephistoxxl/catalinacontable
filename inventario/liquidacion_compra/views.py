@@ -1,6 +1,8 @@
 """Vistas para gestionar liquidaciones de compra (codDoc 03)."""
 from __future__ import annotations
 
+import json
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
@@ -43,17 +45,27 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
     template_name = "inventario/liquidacion_compra/crear.html"
     success_url = reverse_lazy("inventario:liquidaciones_compra_listar")
 
-    def _build_context(self, request, form=None, detalles=None, pagos=None, adicionales=None):
+    def _build_context(
+        self,
+        request,
+        form=None,
+        detalles=None,
+        pagos=None,
+        adicionales=None,
+        productos_json="[]",
+    ):
+        empresa = get_empresa_activa(request)
         return {
-            "form": form or LiquidacionCompraForm(),
+            "form": form or LiquidacionCompraForm(empresa=empresa),
             "detalle_formset": detalles or DetalleFormSet(prefix="detalles"),
             "pago_formset": pagos or FormaPagoFormSet(prefix="pagos"),
             "campo_adicional_formset": adicionales or CampoAdicionalFormSet(prefix="adicionales"),
             "titulo": _("Nueva Liquidación de Compra"),
+            "productos_json": productos_json,
         }
 
     def get(self, request, *args, **kwargs):
-        context = self._build_context(request)
+        context = self._build_context(request, productos_json="[]")
         return render(request, self.template_name, context)
 
     def post(self, request, *args, **kwargs):
@@ -62,7 +74,7 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
             messages.error(request, _("Debe seleccionar una empresa para continuar."))
             return redirect("inventario:seleccionar_empresa")
 
-        form = LiquidacionCompraForm(request.POST)
+        form = LiquidacionCompraForm(request.POST, empresa=empresa)
         detalle_formset = DetalleFormSet(request.POST, prefix="detalles")
         pago_formset = FormaPagoFormSet(request.POST, prefix="pagos")
         adicional_formset = CampoAdicionalFormSet(request.POST, prefix="adicionales")
@@ -92,5 +104,18 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
             return redirect(self.success_url)
 
         messages.error(request, _("Por favor corrija los errores indicados."))
-        context = self._build_context(request, form, detalle_formset, pago_formset, adicional_formset)
+        productos_snapshot = request.POST.get("productos_snapshot", "[]")
+        try:
+            productos_json = json.dumps(json.loads(productos_snapshot))
+        except json.JSONDecodeError:
+            productos_json = "[]"
+
+        context = self._build_context(
+            request,
+            form,
+            detalle_formset,
+            pago_formset,
+            adicional_formset,
+            productos_json=productos_json,
+        )
         return render(request, self.template_name, context)

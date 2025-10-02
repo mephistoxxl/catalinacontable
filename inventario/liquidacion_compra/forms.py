@@ -1,11 +1,12 @@
 """Formularios para la emisión de Liquidaciones de Compra."""
 from __future__ import annotations
 
-from decimal import Decimal
-
 from django import forms
+from django.db.models import Q
 from django.forms import inlineformset_factory
+from django.utils.translation import gettext_lazy as _
 
+from ..models import Almacen, Proveedor
 from .models import (
     LiquidacionCampoAdicional,
     LiquidacionCompra,
@@ -15,6 +16,72 @@ from .models import (
 
 
 class LiquidacionCompraForm(forms.ModelForm):
+    beneficiario_tipo_identificacion = forms.ChoiceField(
+        label=_("Tipo de identificación"),
+        choices=[
+            ("05", _("Cédula")),
+            ("06", _("Pasaporte")),
+            ("08", _("Identificación del exterior")),
+            ("07", _("Consumidor final")),
+            ("04", _("RUC")),
+        ],
+        initial="05",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    beneficiario_identificacion = forms.CharField(
+        label=_("C.I. / Identificación"),
+        max_length=13,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "maxlength": "13",
+                "placeholder": _("Ingrese identificación"),
+            }
+        ),
+    )
+    beneficiario_nombre = forms.CharField(
+        label=_("Nombre / Razón social"),
+        max_length=200,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": _("Nombres y apellidos del liquidado"),
+            }
+        ),
+    )
+    beneficiario_direccion = forms.CharField(
+        label=_("Domicilio"),
+        required=False,
+        max_length=200,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": _("Provincia / Cantón / Dirección"),
+            }
+        ),
+    )
+    beneficiario_correo = forms.EmailField(
+        label=_("Correo"),
+        required=False,
+        widget=forms.EmailInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": _("Opcional"),
+            }
+        ),
+    )
+    beneficiario_telefono = forms.CharField(
+        label=_("Teléfono"),
+        required=False,
+        max_length=20,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": _("Opcional"),
+            }
+        ),
+    )
+
     fecha_emision = forms.DateField(
         input_formats=["%Y-%m-%d", "%d/%m/%Y"],
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
@@ -32,11 +99,9 @@ class LiquidacionCompraForm(forms.ModelForm):
             "concepto",
             "observaciones",
             "sustento_tributario",
-            "propina",
-            "moneda",
         ]
         widgets = {
-            "proveedor": forms.Select(attrs={"class": "form-control"}),
+            "proveedor": forms.HiddenInput(),
             "almacen": forms.Select(attrs={"class": "form-control"}),
             "establecimiento": forms.NumberInput(attrs={"class": "form-control", "min": 1, "max": 999}),
             "punto_emision": forms.NumberInput(attrs={"class": "form-control", "min": 1, "max": 999}),
@@ -44,15 +109,117 @@ class LiquidacionCompraForm(forms.ModelForm):
             "concepto": forms.TextInput(attrs={"class": "form-control"}),
             "observaciones": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "sustento_tributario": forms.Select(attrs={"class": "form-control"}),
-            "propina": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
-            "moneda": forms.Select(attrs={"class": "form-control"}),
         }
 
-    def clean_propina(self):
-        propina = self.cleaned_data.get("propina", Decimal("0.00"))
-        if propina < 0:
-            raise forms.ValidationError("La propina no puede ser negativa.")
-        return propina
+        labels = {
+            "almacen": _("Almacén"),
+            "establecimiento": _("Establecimiento (003)"),
+            "punto_emision": _("Punto de emisión (003)"),
+            "secuencia": _("Secuencial (000000001)"),
+            "sustento_tributario": _("Sustento tributario"),
+        }
+
+    def __init__(self, *args, empresa=None, **kwargs):
+        self.empresa = empresa
+        super().__init__(*args, **kwargs)
+
+        # Configurar queryset de proveedores según empresa activa y ocultar campo base
+        self.fields["proveedor"].required = False
+        self.fields["proveedor"].widget = forms.HiddenInput()
+        if empresa:
+            self.fields["proveedor"].queryset = Proveedor.objects.filter(empresa=empresa)
+        else:
+            self.fields["proveedor"].queryset = Proveedor.objects.none()
+
+        if empresa:
+            almacen_qs = Almacen.objects.filter(empresa=empresa, activo=True).order_by("descripcion")
+            if self.instance and getattr(self.instance, "almacen_id", None):
+                almacen_qs = Almacen.objects.filter(
+                    Q(empresa=empresa, activo=True) | Q(pk=self.instance.almacen_id)
+                ).order_by("descripcion")
+            self.fields["almacen"].queryset = almacen_qs
+        else:
+            self.fields["almacen"].queryset = Almacen.objects.none()
+        self.fields["almacen"].empty_label = _("Seleccione un almacén")
+
+        proveedor = None
+        if self.instance and getattr(self.instance, "proveedor", None):
+            proveedor = self.instance.proveedor
+        elif self.initial.get("proveedor"):
+            try:
+                proveedor = self.fields["proveedor"].queryset.get(pk=self.initial["proveedor"])
+            except (Proveedor.DoesNotExist, TypeError, ValueError):
+                proveedor = None
+
+        if proveedor:
+            self.initial.setdefault("beneficiario_tipo_identificacion", proveedor.tipoIdentificacion)
+            self.initial.setdefault("beneficiario_identificacion", proveedor.identificacion_proveedor)
+            self.initial.setdefault("beneficiario_nombre", proveedor.razon_social_proveedor)
+            self.initial.setdefault("beneficiario_direccion", proveedor.direccion)
+            self.initial.setdefault("beneficiario_correo", proveedor.correo)
+            self.initial.setdefault("beneficiario_telefono", proveedor.telefono or proveedor.telefono2)
+            self.initial.setdefault("proveedor", proveedor.pk)
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        tipo_id = cleaned_data.get("beneficiario_tipo_identificacion")
+        identificacion = cleaned_data.get("beneficiario_identificacion", "").strip()
+        nombre = cleaned_data.get("beneficiario_nombre", "").strip()
+        direccion = cleaned_data.get("beneficiario_direccion", "").strip()
+        correo = cleaned_data.get("beneficiario_correo", "").strip()
+        telefono = cleaned_data.get("beneficiario_telefono", "").strip()
+
+        if not tipo_id:
+            self.add_error("beneficiario_tipo_identificacion", _("Seleccione el tipo de identificación."))
+        if not identificacion:
+            self.add_error("beneficiario_identificacion", _("Ingrese la identificación del liquidado."))
+        if not nombre:
+            self.add_error("beneficiario_nombre", _("Ingrese el nombre del liquidado."))
+
+        if self.errors:
+            return cleaned_data
+
+        if tipo_id == "05" and len(identificacion) not in (10, 13):
+            self.add_error("beneficiario_identificacion", _("La cédula debe tener 10 o 13 dígitos."))
+        if tipo_id == "04" and len(identificacion) != 13:
+            self.add_error("beneficiario_identificacion", _("El RUC debe tener 13 dígitos."))
+
+        if self.errors:
+            return cleaned_data
+
+        if not self.empresa:
+            raise forms.ValidationError(_("No se pudo determinar la empresa activa para la liquidación."))
+
+        direccion_normalizada = direccion or str(_("SIN DIRECCIÓN REGISTRADA"))
+        correo_final = correo or f"sin-correo-{identificacion}@liquidacion.local"
+
+        proveedor_defaults = {
+            "tipoIdentificacion": tipo_id,
+            "razon_social_proveedor": nombre,
+            "nombre_comercial_proveedor": nombre,
+            "direccion": direccion_normalizada,
+            "telefono": telefono,
+            "telefono2": "",
+            "correo": correo_final,
+            "correo2": "",
+            "observaciones": str(_("Generado desde liquidación de compra")),
+            "convencional": "",
+            "nacimiento": None,
+            "tipoVenta": "1",
+            "tipoRegimen": "1",
+            "tipoProveedor": "1" if tipo_id != "04" else "2",
+        }
+
+        proveedor, _ = Proveedor.objects.update_or_create(
+            empresa=self.empresa,
+            identificacion_proveedor=identificacion,
+            defaults=proveedor_defaults,
+        )
+
+        cleaned_data["proveedor"] = proveedor
+        self.cleaned_data["proveedor"] = proveedor
+        return cleaned_data
 
 
 class LiquidacionDetalleForm(forms.ModelForm):

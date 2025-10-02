@@ -2975,6 +2975,7 @@ def buscar_producto(request):
                 precio_base = float(p.precio) if p.precio else 0.0
                 iva_percent = MAPEO_IVA.get(p.iva, 0.12)
                 resultados.append({
+                    'id': p.id,
                     'codigo': p.codigo,
                     'nombre': getattr(p, 'descripcion', '') or getattr(p, 'nombre', ''),
                     'precio': precio_base,
@@ -2989,6 +2990,7 @@ def buscar_producto(request):
                 iva_code = str(getattr(s, 'iva', '') or '2')
                 iva_percent = MAPEO_IVA.get(iva_code, 0.12)
                 resultados.append({
+                    'id': s.id,
                     'codigo': s.codigo,
                     'nombre': getattr(s, 'descripcion', '') or getattr(s, 'nombre', ''),
                     'precio': precio_base,
@@ -3027,6 +3029,7 @@ def buscar_producto(request):
             iva_percent = MAPEO_IVA.get(producto.iva, 0.12)  # 12% por defecto
             
             resultados.append({
+                'id': producto.id,
                 'codigo': producto.codigo,
                 'nombre': producto.descripcion,
                 'precio': precio_base,
@@ -3066,6 +3069,7 @@ def buscar_producto(request):
                 precio_con_iva = precio_base * (1 + iva_percent)
             
             resultados.append({
+                'id': servicio.id,
                 'codigo': servicio.codigo,
                 'nombre': servicio.descripcion,
                 'precio': precio_base,
@@ -3101,6 +3105,7 @@ def buscar_producto(request):
                 iva_percent = MAPEO_IVA.get(p.iva, 0.12)  # 12% por defecto
                 
                 resultados.append({
+                    'id': p.id,
                     'codigo': p.codigo,
                     'nombre': p.descripcion,
                     'precio': precio_base,
@@ -3129,6 +3134,7 @@ def buscar_producto(request):
                 }
                 iva_percent = MAPEO_IVA.get(iva_code, 0.12)
                 resultados.append({
+                    'id': s.id,
                     'codigo': s.codigo,
                     'nombre': getattr(s, 'descripcion', '') or getattr(s, 'nombre', ''),
                     'precio': precio_base,
