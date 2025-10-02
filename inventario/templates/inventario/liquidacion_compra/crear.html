@@ -332,7 +332,7 @@
               <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
                 {{ field.label }}{% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
               </label>
-                {{ field }}
+              {{ field }}
               {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
             </div>
             {% endwith %}

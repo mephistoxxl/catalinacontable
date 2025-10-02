@@ -9,6 +9,7 @@ from django.db import transaction
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
 from django.views import View
 from django.views.generic import ListView
 
@@ -65,7 +66,12 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
         }
 
     def get(self, request, *args, **kwargs):
-        context = self._build_context(request, productos_json="[]")
+        empresa = get_empresa_activa(request)
+        # Pre-cargar la fecha de emisión con la fecha actual en GET
+        form = LiquidacionCompraForm(empresa=empresa, initial={
+            "fecha_emision": timezone.localdate(),
+        })
+        context = self._build_context(request, form=form, productos_json="[]")
         return render(request, self.template_name, context)
 
     def post(self, request, *args, **kwargs):
