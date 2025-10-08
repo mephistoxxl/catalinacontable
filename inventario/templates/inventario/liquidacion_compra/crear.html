@@ -384,6 +384,9 @@
   <form method="post" novalidate class="p-2 space-y-2" id="form_liquidacion" onsubmit="return prepararEnvioLiquidacion()">
         {% csrf_token %}
         {{ form.proveedor }}
+        {{ form.secuencia_config_id }}
+        {{ form.retencion_iva_porcentaje }}
+        {{ form.retencion_renta_porcentaje }}
         {% for error in form.proveedor.errors %}
           <p class="form-error">{{ error }}</p>
         {% endfor %}
@@ -401,6 +404,42 @@
             <i class="fa fa-id-card-o text-slate-600 text-[9px] mr-1"></i>
             <h2 class="text-[10px] font-semibold text-gray-800">{% trans "Datos Generales" %}</h2>
           </div>
+
+          {% if secuencia_info %}
+          <div class="mb-1 rounded border border-blue-200 bg-blue-50 px-1.5 py-1 text-[9px] text-blue-900 shadow-inner">
+            <div class="flex items-start gap-1">
+              <i class="fa fa-hashtag mt-[2px] text-blue-600 text-[9px]"></i>
+              <div>
+                <p class="font-semibold">{% trans "Secuencia aplicada automáticamente" %}</p>
+                <dl class="grid grid-cols-3 gap-x-2 gap-y-1 mt-0.5">
+                  <div>
+                    <dt class="font-medium text-blue-800">{% trans "Establecimiento" %}</dt>
+                    <dd class="font-semibold">{{ secuencia_info.establecimiento_str }}</dd>
+                  </div>
+                  <div>
+                    <dt class="font-medium text-blue-800">{% trans "Punto de emisión" %}</dt>
+                    <dd class="font-semibold">{{ secuencia_info.punto_emision_str }}</dd>
+                  </div>
+                  <div>
+                    <dt class="font-medium text-blue-800">{% trans "Secuencial sugerido" %}</dt>
+                    <dd class="font-semibold">{{ secuencia_info.valor_str }}</dd>
+                  </div>
+                </dl>
+                <p class="mt-0.5 text-[8px] text-blue-700">{% trans "Los campos se bloquean para proteger la numeración autorizada." %}</p>
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <div class="mb-1 rounded border border-amber-300 bg-amber-50 px-1.5 py-1 text-[9px] text-amber-900 shadow-inner">
+            <div class="flex items-start gap-1">
+              <i class="fa fa-exclamation-triangle mt-[2px] text-amber-500 text-[9px]"></i>
+              <div>
+                <p class="font-semibold">{% trans "No hay secuencia configurada" %}</p>
+                <p class="mt-0.5 text-[8px]">{% trans "Configure una secuencia activa para continuar con la emisión de liquidaciones." %}</p>
+              </div>
+            </div>
+          </div>
+          {% endif %}
 
           <div class="grid grid-cols-1 md:grid-cols-4 gap-1">
             {% with field=form.fecha_emision %}
@@ -1024,6 +1063,76 @@
       }
     }
 
+    const IVA_CODE_PERCENT_MAP = Object.freeze({
+      '0': 0,
+      '5': 0.05,
+      '2': 0.12,
+      '10': 0.13,
+      '3': 0.14,
+      '4': 0.15,
+      '9': 0.15,
+      '8': 0.08,
+      '6': 0,
+      '7': 0,
+    });
+
+    function normalizarCodigoIva(codigo, ivaPercent) {
+      if (codigo !== undefined && codigo !== null && String(codigo).trim() !== '') {
+        return String(codigo).trim();
+      }
+      const porcentaje = toNumber(ivaPercent, 0);
+      let mejorCodigo = '0';
+      let diferenciaMinima = Number.POSITIVE_INFINITY;
+      Object.entries(IVA_CODE_PERCENT_MAP).forEach(([cod, valor]) => {
+        const diferencia = Math.abs(valor - porcentaje);
+        if (diferencia < diferenciaMinima) {
+          diferenciaMinima = diferencia;
+          mejorCodigo = cod;
+        }
+      });
+      return mejorCodigo;
+    }
+
+    function leerFactorPorcentaje(ids, defaultValue) {
+      for (const id of ids) {
+        const elemento = document.getElementById(id);
+        if (!elemento) {
+          continue;
+        }
+        const dataset = elemento.dataset || {};
+        const fuentes = [
+          elemento.value,
+          dataset.valor,
+          dataset.porcentaje,
+          dataset.retencion,
+        ];
+        for (const fuente of fuentes) {
+          if (fuente === undefined || fuente === null || String(fuente).trim() === '') {
+            continue;
+          }
+          const numero = toNumber(fuente, NaN);
+          if (!Number.isNaN(numero)) {
+            return numero > 1 ? numero / 100 : numero;
+          }
+        }
+      }
+      return defaultValue;
+    }
+
+    function obtenerRetencionIvaPorcentaje() {
+      return leerFactorPorcentaje(
+        ['retencion_iva_porcentaje', 'ret_iva_porcentaje', 'id_retencion_iva_porcentaje', 'retencionIvaPorcentaje'],
+        1
+      );
+    }
+
+    function obtenerRetencionRentaPorcentaje() {
+      return leerFactorPorcentaje(
+        ['retencion_renta_porcentaje', 'ret_renta_porcentaje', 'id_retencion_renta_porcentaje', 'retencionRentaPorcentaje'],
+        0
+      );
+    }
+
     function calcularResumenTotales() {
       const resumen = {
         subtotal: 0,
@@ -1045,32 +1154,85 @@
         totalCantidad: 0,
       };
 
-      productosAgregados.forEach((item) => {
-        const subtotal = toNumber(item.subtotal, 0);
-        const descuento = toNumber(item.descuento, 0);
-        const totalConIva = toNumber(item.totalConIva, subtotal);
-        const ivaPercent = toNumber(item.ivaPercent, 0);
-        const ivaCalculado = round2(totalConIva - subtotal);
-        const cantidad = toNumber(item.cantidad, 0);
+      const retIvaFactor = obtenerRetencionIvaPorcentaje();
+      const retRentaFactor = obtenerRetencionRentaPorcentaje();
 
-        resumen.subtotal += subtotal;
-        resumen.descuento += descuento;
-        resumen.totalIva += ivaCalculado;
-        resumen.total += totalConIva;
+      productosAgregados.forEach((item) => {
+        const cantidad = Math.max(0, toNumber(item.cantidad, 0));
+        const subtotalBrutoReferencia = toNumber(item.subtotalBruto, NaN);
+        const subtotalBruto = round2(
+          Number.isFinite(subtotalBrutoReferencia)
+            ? subtotalBrutoReferencia
+            : toNumber(item.precio, 0) * cantidad
+        );
+        const baseImponibleReferencia = toNumber(item.subtotal ?? item.baseImponible, NaN);
+        const baseImponible = round2(
+          Number.isFinite(baseImponibleReferencia) ? baseImponibleReferencia : Math.max(subtotalBruto, 0)
+        );
+        const descuentoItem = round2(Math.max(subtotalBruto - baseImponible, 0));
+
+        let ivaPercent = toNumber(item.ivaPercent, NaN);
+        if (!Number.isFinite(ivaPercent)) {
+          const codigoReferencia = item.ivaCodigo || item.iva_codigo || item.ivaCode || item.iva;
+          if (codigoReferencia && Object.prototype.hasOwnProperty.call(IVA_CODE_PERCENT_MAP, String(codigoReferencia))) {
+            ivaPercent = IVA_CODE_PERCENT_MAP[String(codigoReferencia)];
+          }
+        }
+        if (!Number.isFinite(ivaPercent)) {
+          ivaPercent = 0;
+        }
+
+        const ivaCodigo = normalizarCodigoIva(item.ivaCodigo || item.iva_codigo || item.ivaCode || item.iva, ivaPercent);
+        const ivaValor = round2(
+          toNumber(item.ivaValor ?? item.valorIva, baseImponible * Math.max(ivaPercent, 0))
+        );
+        const iceValor = round2(toNumber(item.valorIce ?? item.iceValor ?? item.ice ?? 0, 0));
+        const irbpValor = round2(toNumber(item.valorIrbp ?? item.irbpValor ?? item.irbp ?? 0, 0));
+        const ivaPresuntivoValor = round2(toNumber(item.ivaPresuntivo ?? item.iva_presuntivo ?? 0, 0));
+
+        resumen.subtotal += subtotalBruto;
+        resumen.descuento += descuentoItem;
+        resumen.totalIva += ivaValor;
+        resumen.ice += iceValor;
+        resumen.irPresuntivo += irbpValor;
+        resumen.ivaPresuntivo += ivaPresuntivoValor;
         resumen.totalCantidad += cantidad;
 
-        if (ivaPercent > 0) {
-          if (Math.abs(ivaPercent - 0.05) < 0.0001) {
-            resumen.baseIva5 += subtotal;
-          } else {
-            resumen.baseIvaDiferente += subtotal;
-          }
-        } else {
-          resumen.baseIva0 += subtotal;
+        switch (ivaCodigo) {
+          case '0':
+            resumen.baseIva0 += baseImponible;
+            break;
+          case '5':
+            resumen.baseIva5 += baseImponible;
+            break;
+          case '6':
+            resumen.baseNoObj += baseImponible;
+            break;
+          case '7':
+            resumen.baseExento += baseImponible;
+            break;
+          default:
+            resumen.baseIvaDiferente += baseImponible;
+            break;
         }
       });
 
-      resumen.subtotalNeto = resumen.subtotal - resumen.descuento;
+      resumen.subtotal = round2(resumen.subtotal);
+      resumen.descuento = round2(resumen.descuento);
+      resumen.subtotalNeto = round2(resumen.subtotal - resumen.descuento);
+      resumen.baseIvaDiferente = round2(resumen.baseIvaDiferente);
+      resumen.baseIva5 = round2(resumen.baseIva5);
+      resumen.baseIva0 = round2(resumen.baseIva0);
+      resumen.baseNoObj = round2(resumen.baseNoObj);
+      resumen.baseExento = round2(resumen.baseExento);
+      resumen.ice = round2(resumen.ice);
+      resumen.totalIva = round2(resumen.totalIva);
+      resumen.irPresuntivo = round2(resumen.irPresuntivo);
+      resumen.ivaPresuntivo = round2(resumen.ivaPresuntivo);
+      resumen.totalCantidad = round6(resumen.totalCantidad);
+      resumen.total = round2(resumen.subtotalNeto + resumen.ice + resumen.irPresuntivo + resumen.totalIva);
+      resumen.retIva = round2(resumen.totalIva * Math.max(retIvaFactor, 0));
+      resumen.retRenta = round2(resumen.subtotalNeto * Math.max(retRentaFactor, 0));
       return resumen;
     }
 
@@ -1127,6 +1289,22 @@
         container.appendChild(crearHiddenInput(`detalles-${index}-cantidad`, formatDecimal(item.cantidad, 6)));
         container.appendChild(crearHiddenInput(`detalles-${index}-costo`, formatDecimal(item.precio, 6)));
         container.appendChild(crearHiddenInput(`detalles-${index}-descuento`, formatDecimal(item.descuento || 0, 2)));
+        container.appendChild(crearHiddenInput(`detalles-${index}-codigo_iva`, item.ivaCodigo || ''));
+        container.appendChild(
+          crearHiddenInput(`detalles-${index}-tarifa_iva`, formatDecimal(item.ivaPercent ?? 0, 4))
+        );
+        container.appendChild(crearHiddenInput(`detalles-${index}-valor_iva`, formatDecimal(item.ivaValor ?? 0, 2)));
+        container.appendChild(crearHiddenInput(`detalles-${index}-valor_ice`, formatDecimal(item.valorIce ?? 0, 2)));
+        container.appendChild(crearHiddenInput(`detalles-${index}-valor_irbp`, formatDecimal(item.valorIrbp ?? 0, 2)));
+        container.appendChild(
+          crearHiddenInput(
+            `detalles-${index}-precio_unitario_con_impuestos`,
+            formatDecimal(item.precioUnitarioConImpuestos ?? item.precioConIva ?? 0, 6)
+          )
+        );
+        container.appendChild(
+          crearHiddenInput(`detalles-${index}-total_con_impuestos`, formatDecimal(item.totalConIva ?? 0, 2))
+        );
         container.appendChild(crearHiddenInput(`detalles-${index}-DELETE`, ''));
       });
       const totalForms = document.getElementById('id_detalles-TOTAL_FORMS');
@@ -1166,11 +1344,17 @@
     }
 
     function construirSubtotalHTML(item) {
-      const ivaTotal = round2(item.totalConIva - item.subtotal);
+      const base = round2(item.subtotal ?? 0);
+      const impuestos = round2(
+        toNumber(item.ivaValor ?? item.valorIva ?? 0, 0) +
+        toNumber(item.valorIce ?? item.iceValor ?? 0, 0) +
+        toNumber(item.valorIrbp ?? item.irbpValor ?? 0, 0)
+      );
+      const total = round2(base + impuestos);
       return `
-        <div>Base: $${round2(item.subtotal).toFixed(2)}</div>
-        <div class="text-xs text-gray-500">IVA: $${ivaTotal.toFixed(2)}</div>
-        <div class="font-bold">Total: $${round2(item.totalConIva).toFixed(2)}</div>
+        <div>Base: $${base.toFixed(2)}</div>
+        <div class="text-xs text-gray-500">Impuestos: $${impuestos.toFixed(2)}</div>
+        <div class="font-bold">Total: $${total.toFixed(2)}</div>
       `;
     }
 
@@ -1258,12 +1442,45 @@
     function normalizarProducto(data) {
       const tipo = data.tipo === 'servicio' ? 'servicio' : 'producto';
       const precioBase = round6(toNumber(data.precio, 0));
-      const ivaPercent = toNumber(data.ivaPercent, 0);
+      let ivaPercent = toNumber(
+        data.ivaPercent ?? data.iva_percent ?? data.ivaPorcentaje ?? data.iva_porcentaje ?? data.ivaPercentDecimal,
+        NaN
+      );
+      const ivaCodigoOrigen = data.ivaCodigo || data.iva_codigo || data.ivaCode || data.iva;
+      if (!Number.isFinite(ivaPercent)) {
+        if (ivaCodigoOrigen && Object.prototype.hasOwnProperty.call(IVA_CODE_PERCENT_MAP, String(ivaCodigoOrigen))) {
+          ivaPercent = IVA_CODE_PERCENT_MAP[String(ivaCodigoOrigen)];
+        }
+      }
+      if (!Number.isFinite(ivaPercent)) {
+        ivaPercent = 0;
+      }
       const cantidad = Math.max(0.01, round6(toNumber(data.cantidad, 1)));
-      const precioConIvaUnidad = round2(toNumber(data.precioConIva, precioBase * (1 + ivaPercent)));
-      const subtotal = round2(toNumber(data.subtotal, precioBase * cantidad));
-      const totalConIva = round2(toNumber(data.totalConIva, precioConIvaUnidad * cantidad));
-      const descuento = round2(toNumber(data.descuento, 0));
+      const subtotalBruto = round2(
+        toNumber(
+          data.subtotalBruto ?? data.subtotal_bruto,
+          round2(precioBase * cantidad)
+        )
+      );
+      const descuento = round2(Math.max(toNumber(data.descuento, 0), 0));
+      const baseImponible = round2(Math.max(subtotalBruto - descuento, 0));
+      const precioUnitarioConImpuestos = round6(
+        toNumber(
+          data.precioUnitarioConImpuestos ??
+            data.precio_unitario_con_impuestos ??
+            data.precioConIva ??
+            data.precio_con_iva,
+          precioBase * (1 + ivaPercent)
+        )
+      );
+      const precioConIvaUnidad = round2(precioUnitarioConImpuestos);
+      const ivaValor = round2(
+        toNumber(data.ivaValor ?? data.valorIva, baseImponible * Math.max(ivaPercent, 0))
+      );
+      const valorIce = round2(toNumber(data.valorIce ?? data.iceValor ?? data.ice ?? 0, 0));
+      const valorIrbp = round2(toNumber(data.valorIrbp ?? data.irbpValor ?? data.irbp ?? 0, 0));
+      const ivaPresuntivo = round2(toNumber(data.ivaPresuntivo ?? data.iva_presuntivo ?? 0, 0));
+      const totalConIva = round2(baseImponible + ivaValor + valorIce + valorIrbp);
       const uid = typeof data.uid === 'number' ? data.uid : contadorProductos++;
       const databaseId = data.databaseId || data.database_id || data.producto || data.servicio || '';
       const descripcion = data.descripcion || data.nombre || '';
@@ -1281,13 +1498,20 @@
         databaseId,
         precio: precioBase,
         precioConIva: precioConIvaUnidad,
+        precioUnitarioConImpuestos,
         ivaPercent,
+        ivaCodigo: normalizarCodigoIva(ivaCodigoOrigen, ivaPercent),
         cantidad,
-        subtotal,
+        subtotal: baseImponible,
+        subtotalBruto,
         totalConIva,
         descuento,
+        ivaValor,
+        valorIce,
+        valorIrbp,
+        ivaPresuntivo,
         unidad,
-        formId
+        formId,
       };
     }
 
@@ -1313,6 +1537,7 @@
       const ivaPercent = toNumber(productoInfo.dataset.ivaPercent, 0.12);
       const tipo = productoInfo.dataset.tipo || 'producto';
       const databaseId = productoInfo.dataset.databaseId || '';
+  const ivaCodigo = productoInfo.dataset.ivaCode || productoInfo.dataset.ivaCodigo || '';
 
       if (!codigo || !nombreProducto || !databaseId) {
         alert(MSG_BUSCA_PRODUCTO);
@@ -1339,9 +1564,16 @@
         return;
       }
 
-      let precioConIva = round2(precio * (1 + ivaPercent));
-      const subtotal = round2(precio * cantidad);
-      const totalConIva = round2(precioConIva * cantidad);
+      const precioUnitarioConImpuestos = round6(precio * (1 + ivaPercent));
+      const precioConIva = round2(precioUnitarioConImpuestos);
+      const subtotalBruto = round2(precio * cantidad);
+      const descuento = 0;
+      const baseImponible = round2(subtotalBruto - descuento);
+      const ivaValor = round2(baseImponible * Math.max(ivaPercent, 0));
+      const valorIce = 0;
+      const valorIrbp = 0;
+      const totalConIva = round2(baseImponible + ivaValor + valorIce + valorIrbp);
+      const ivaCodigoNormalizado = normalizarCodigoIva(ivaCodigo, ivaPercent);
 
       const item = {
         uid: contadorProductos++,
@@ -1352,11 +1584,18 @@
         databaseId,
         precio: round6(precio),
         precioConIva,
+        precioUnitarioConImpuestos,
         ivaPercent,
+        ivaCodigo: ivaCodigoNormalizado,
         cantidad,
-        subtotal,
+        subtotal: baseImponible,
+        subtotalBruto,
         totalConIva,
-        descuento: 0,
+        descuento,
+        valorIce,
+        valorIrbp,
+        ivaValor,
+        ivaPresuntivo: 0,
         unidad: ''
       };
 
@@ -1372,9 +1611,28 @@
       const item = productosAgregados.find((p) => p.uid === uid);
       if (!item) return;
       const cantidad = Math.max(0.01, round6(nuevaCantidad));
+      const subtotalBruto = round2(item.precio * cantidad);
+      const descuento = round2(Math.max(toNumber(item.descuento, 0), 0));
+      const baseImponible = round2(Math.max(subtotalBruto - descuento, 0));
+      const ivaPercent = Math.max(toNumber(item.ivaPercent, 0), 0);
+      const precioUnitarioConImpuestos = round6(
+        item.precioUnitarioConImpuestos ?? item.precio * (1 + ivaPercent)
+      );
+      const precioConIva = round2(precioUnitarioConImpuestos);
+      const ivaValor = round2(baseImponible * ivaPercent);
+      const valorIce = round2(Math.max(toNumber(item.valorIce ?? 0, 0), 0));
+      const valorIrbp = round2(Math.max(toNumber(item.valorIrbp ?? 0, 0), 0));
+
       item.cantidad = cantidad;
-      item.subtotal = round2(item.precio * cantidad);
-      item.totalConIva = round2(item.precioConIva * cantidad);
+      item.subtotalBruto = subtotalBruto;
+      item.subtotal = baseImponible;
+      item.precioUnitarioConImpuestos = precioUnitarioConImpuestos;
+      item.precioConIva = precioConIva;
+      item.ivaPercent = ivaPercent;
+      item.ivaValor = ivaValor;
+      item.valorIce = valorIce;
+      item.valorIrbp = valorIrbp;
+      item.totalConIva = round2(baseImponible + ivaValor + valorIce + valorIrbp);
       refrescarFila(item);
       actualizarTotal();
       actualizarCamposOcultos();
@@ -1403,6 +1661,7 @@
         productoInfo.dataset.tipo = 'producto';
         productoInfo.dataset.databaseId = '';
         productoInfo.dataset.ivaPercent = '0.12';
+        productoInfo.dataset.ivaCode = '0';
         productoInfo.dataset.codigo = '';
       }
     }
@@ -1425,6 +1684,7 @@
       productoInfo.dataset.databaseId = producto.id;
       productoInfo.dataset.tipo = tipo;
       productoInfo.dataset.ivaPercent = producto.iva_percent != null ? producto.iva_percent : '0.12';
+  productoInfo.dataset.ivaCode = producto.iva_codigo != null ? producto.iva_codigo : (producto.ivaCode || producto.iva || '');
       productoInfo.dataset.codigo = producto.codigo || '';
       productoInfo.dataset.precioCiva = producto.precio_con_iva;
       const codigoInput = document.getElementById('codigo_producto');

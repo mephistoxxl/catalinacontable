@@ -100,6 +100,25 @@ class LiquidacionCompra(models.Model):
     propina = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     moneda = models.CharField(max_length=10, choices=MONEDAS, default="DOLAR")
 
+    base_imponible_gravada = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+    base_imponible_reducida = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+    base_imponible_cero = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+    base_no_objeto = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+    base_exenta = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+
+    valor_total_iva = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+    valor_total_ice = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+    valor_total_irbp = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+    iva_presuntivo = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+
+    retencion_iva_porcentaje = models.DecimalField(max_digits=5, decimal_places=4, default=Decimal("1.0000"))
+    retencion_renta_porcentaje = models.DecimalField(max_digits=5, decimal_places=4, default=Decimal("0.0000"))
+    retencion_iva = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+    retencion_renta = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+
+    total_items = models.PositiveIntegerField(default=0)
+    total_cantidad = models.DecimalField(max_digits=20, decimal_places=6, default=Decimal("0.000000"))
+
     clave_acceso = models.CharField(max_length=49, blank=True, null=True, unique=True)
     numero_autorizacion = models.CharField(max_length=49, blank=True, null=True)
     fecha_autorizacion = models.DateTimeField(blank=True, null=True)
@@ -148,25 +167,75 @@ class LiquidacionCompra(models.Model):
     # -----------------------------
     def calcular_totales(self) -> None:
         """Recalcula totales y campos derivados en memoria."""
-        subtotal = Decimal("0.00")
+        subtotal_bruto = Decimal("0.00")
         descuento = Decimal("0.00")
-        total_impuestos = Decimal("0.00")
 
-        for detalle in self.detalles.all():
-            subtotal += detalle.precio_total_sin_impuesto
+        self.iva_presuntivo = Decimal("0.00")
+
+        base_gravada = Decimal("0.00")
+        base_reducida = Decimal("0.00")
+        base_cero = Decimal("0.00")
+        base_no_obj = Decimal("0.00")
+        base_exenta = Decimal("0.00")
+
+        total_iva = Decimal("0.00")
+        total_ice = Decimal("0.00")
+        total_irbp = Decimal("0.00")
+
+        total_cantidad = Decimal("0.000000")
+        total_items = 0
+
+        detalles_qs = self.detalles.all().select_related("producto", "servicio")
+        for detalle in detalles_qs:
+            subtotal_detalle = (detalle.costo * detalle.cantidad).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            subtotal_bruto += subtotal_detalle
             descuento += detalle.descuento
 
-        for total in self.totales_impuestos.all():
-            total_impuestos += total.valor
+            base_imponible = detalle.precio_total_sin_impuesto
+            codigo_iva = (detalle.codigo_iva or "").strip()
 
-        self.total_sin_impuestos = subtotal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if codigo_iva == "0":
+                base_cero += base_imponible
+            elif codigo_iva == "5":
+                base_reducida += base_imponible
+            elif codigo_iva == "6":
+                base_no_obj += base_imponible
+            elif codigo_iva == "7":
+                base_exenta += base_imponible
+            else:
+                base_gravada += base_imponible
+
+            total_iva += detalle.valor_iva
+            total_ice += detalle.valor_ice
+            total_irbp += detalle.valor_irbp
+            total_cantidad += detalle.cantidad
+            total_items += 1
+
+        self.base_imponible_gravada = base_gravada.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        self.base_imponible_reducida = base_reducida.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        self.base_imponible_cero = base_cero.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        self.base_no_objeto = base_no_obj.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        self.base_exenta = base_exenta.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        subtotal_neto = self.base_imponible_gravada + self.base_imponible_reducida + self.base_imponible_cero + self.base_no_objeto + self.base_exenta
+        self.total_sin_impuestos = subtotal_neto.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         self.total_descuento = descuento.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        self.total_con_impuestos = (
-            self.total_sin_impuestos + total_impuestos
-        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        self.importe_total = (
-            self.total_con_impuestos + self.propina
-        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        self.valor_total_iva = total_iva.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        self.valor_total_ice = total_ice.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        self.valor_total_irbp = total_irbp.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        total_con_impuestos = self.total_sin_impuestos + self.valor_total_iva + self.valor_total_ice + self.valor_total_irbp
+        self.total_con_impuestos = total_con_impuestos.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        self.importe_total = (self.total_con_impuestos + self.propina).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        ret_iva = self.valor_total_iva * (self.retencion_iva_porcentaje or Decimal("0"))
+        ret_renta = self.total_sin_impuestos * (self.retencion_renta_porcentaje or Decimal("0"))
+        self.retencion_iva = ret_iva.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        self.retencion_renta = ret_renta.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        self.total_items = total_items
+        self.total_cantidad = total_cantidad.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
 
     def sincronizar_formas_pago(self) -> None:
         """Ajusta automáticamente la forma de pago principal si hay desviaciones."""
@@ -213,6 +282,20 @@ class LiquidacionCompra(models.Model):
         return clave
 
 
+IVA_CODE_PERCENT_MAP = {
+    "0": Decimal("0.00"),
+    "5": Decimal("0.05"),
+    "2": Decimal("0.12"),
+    "10": Decimal("0.13"),
+    "3": Decimal("0.14"),
+    "4": Decimal("0.15"),
+    "9": Decimal("0.15"),
+    "8": Decimal("0.08"),
+    "6": Decimal("0.00"),
+    "7": Decimal("0.00"),
+}
+
+
 class LiquidacionDetalle(models.Model):
     """Detalle de productos/servicios en la liquidación."""
 
@@ -239,6 +322,13 @@ class LiquidacionDetalle(models.Model):
     costo = models.DecimalField(max_digits=20, decimal_places=6, validators=[MinValueValidator(Decimal("0.00"))])
     descuento = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
     precio_total_sin_impuesto = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+    codigo_iva = models.CharField(max_length=4, blank=True, default="2")
+    tarifa_iva = models.DecimalField(max_digits=6, decimal_places=4, default=Decimal("0.0000"))
+    valor_iva = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+    valor_ice = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+    valor_irbp = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+    precio_unitario_con_impuestos = models.DecimalField(max_digits=20, decimal_places=6, default=Decimal("0.000000"))
+    total_con_impuestos = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
 
     class Meta:
         verbose_name = "Detalle de Liquidación"
@@ -246,7 +336,41 @@ class LiquidacionDetalle(models.Model):
 
     def calcular_totales(self) -> None:
         subtotal = (self.costo * self.cantidad).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        self.precio_total_sin_impuesto = (subtotal - self.descuento).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        base_imponible = (subtotal - self.descuento).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        self.precio_total_sin_impuesto = base_imponible
+
+        tarifa_iva = self.tarifa_iva or Decimal("0.0000")
+        codigo_iva = (self.codigo_iva or "").strip()
+
+        if not codigo_iva and self.producto:
+            codigo_iva = self.producto.iva
+        if not codigo_iva and self.servicio:
+            codigo_iva = getattr(self.servicio, "iva", "")
+
+        if not tarifa_iva or tarifa_iva < Decimal("0"):
+            tarifa_iva = Decimal("0.0000")
+        if codigo_iva in IVA_CODE_PERCENT_MAP:
+            tarifa_iva = IVA_CODE_PERCENT_MAP[codigo_iva]
+        else:
+            for codigo, porcentaje in IVA_CODE_PERCENT_MAP.items():
+                if abs(porcentaje - tarifa_iva) < Decimal("0.0001"):
+                    codigo_iva = codigo
+                    break
+            else:
+                codigo_iva = "2" if tarifa_iva > Decimal("0") else "0"
+
+        self.codigo_iva = codigo_iva
+        self.tarifa_iva = tarifa_iva.quantize(Decimal("0.0001"))
+
+        self.valor_ice = (self.valor_ice or Decimal("0.00")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        self.valor_irbp = (self.valor_irbp or Decimal("0.00")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        self.valor_iva = (base_imponible * self.tarifa_iva).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        self.precio_unitario_con_impuestos = (
+            self.costo * (Decimal("1.0000") + self.tarifa_iva)
+        ).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+        total_impuestos = (self.valor_iva + self.valor_ice + self.valor_irbp).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        self.total_con_impuestos = (base_imponible + total_impuestos).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     def save(self, *args, **kwargs):  # pragma: no cover - lógica trivial
         self.calcular_totales()

@@ -1,6 +1,8 @@
 """Formularios para la emisión de Liquidaciones de Compra."""
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django import forms
 from django.db.models import Q
 from django.forms import inlineformset_factory
@@ -16,6 +18,21 @@ from .models import (
 
 
 class LiquidacionCompraForm(forms.ModelForm):
+    secuencia_config_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
+    retencion_iva_porcentaje = forms.DecimalField(
+        required=False,
+        max_digits=5,
+        decimal_places=4,
+        initial=Decimal("1.0000"),
+        widget=forms.HiddenInput(),
+    )
+    retencion_renta_porcentaje = forms.DecimalField(
+        required=False,
+        max_digits=5,
+        decimal_places=4,
+        initial=Decimal("0.0000"),
+        widget=forms.HiddenInput(),
+    )
     beneficiario_tipo_identificacion = forms.ChoiceField(
         label=_("Tipo de identificación"),
         choices=[
@@ -99,13 +116,36 @@ class LiquidacionCompraForm(forms.ModelForm):
             "concepto",
             "observaciones",
             "sustento_tributario",
+            "retencion_iva_porcentaje",
+            "retencion_renta_porcentaje",
         ]
         widgets = {
             "proveedor": forms.HiddenInput(),
             "almacen": forms.Select(attrs={"class": "form-control"}),
-            "establecimiento": forms.NumberInput(attrs={"class": "form-control", "min": 1, "max": 999}),
-            "punto_emision": forms.NumberInput(attrs={"class": "form-control", "min": 1, "max": 999}),
-            "secuencia": forms.NumberInput(attrs={"class": "form-control", "min": 1, "max": 999999999}),
+            "establecimiento": forms.TextInput(
+                attrs={
+                    "class": "form-control text-right",
+                    "maxlength": "3",
+                    "pattern": r"\d{1,3}",
+                    "inputmode": "numeric",
+                }
+            ),
+            "punto_emision": forms.TextInput(
+                attrs={
+                    "class": "form-control text-right",
+                    "maxlength": "3",
+                    "pattern": r"\d{1,3}",
+                    "inputmode": "numeric",
+                }
+            ),
+            "secuencia": forms.TextInput(
+                attrs={
+                    "class": "form-control text-right",
+                    "maxlength": "9",
+                    "pattern": r"\d{1,9}",
+                    "inputmode": "numeric",
+                }
+            ),
             "concepto": forms.TextInput(attrs={"class": "form-control"}),
             "observaciones": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "sustento_tributario": forms.Select(attrs={"class": "form-control"}),
@@ -159,6 +199,28 @@ class LiquidacionCompraForm(forms.ModelForm):
             self.initial.setdefault("beneficiario_correo", proveedor.correo)
             self.initial.setdefault("beneficiario_telefono", proveedor.telefono or proveedor.telefono2)
             self.initial.setdefault("proveedor", proveedor.pk)
+
+        self.initial.setdefault("retencion_iva_porcentaje", Decimal("1.0000"))
+        self.initial.setdefault("retencion_renta_porcentaje", Decimal("0.0000"))
+
+        # Bloquear edición manual de los campos de secuencia cuando se autogeneran
+        for campo in ("establecimiento", "punto_emision", "secuencia"):
+            if campo in self.fields:
+                widget = self.fields[campo].widget
+                clases_actuales = widget.attrs.get("class", "").strip()
+                widget.attrs["class"] = f"{clases_actuales} bg-gray-100".strip()
+                widget.attrs["readonly"] = "readonly"
+                widget.attrs["tabindex"] = "-1"
+
+        # Formatear valores iniciales con ceros a la izquierda cuando estén presentes
+        formatos = {"establecimiento": 3, "punto_emision": 3, "secuencia": 9}
+        for campo, longitud in formatos.items():
+            valor = self.initial.get(campo)
+            if valor not in (None, ""):
+                try:
+                    self.initial[campo] = f"{int(valor):0{longitud}d}"
+                except (TypeError, ValueError):
+                    pass
 
     def clean(self):
         cleaned_data = super().clean()
@@ -298,6 +360,13 @@ class LiquidacionDetalleForm(forms.ModelForm):
             "cantidad",
             "costo",
             "descuento",
+            "codigo_iva",
+            "tarifa_iva",
+            "valor_iva",
+            "valor_ice",
+            "valor_irbp",
+            "precio_unitario_con_impuestos",
+            "total_con_impuestos",
         ]
         widgets = {
             "producto": forms.Select(attrs={"class": "form-control"}),
@@ -307,6 +376,13 @@ class LiquidacionDetalleForm(forms.ModelForm):
             "cantidad": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
             "costo": forms.NumberInput(attrs={"class": "form-control", "step": "0.0001"}),
             "descuento": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "codigo_iva": forms.HiddenInput(),
+            "tarifa_iva": forms.HiddenInput(),
+            "valor_iva": forms.HiddenInput(),
+            "valor_ice": forms.HiddenInput(),
+            "valor_irbp": forms.HiddenInput(),
+            "precio_unitario_con_impuestos": forms.HiddenInput(),
+            "total_con_impuestos": forms.HiddenInput(),
         }
 
     def clean(self):
@@ -323,6 +399,13 @@ class LiquidacionDetalleForm(forms.ModelForm):
                 raise forms.ValidationError("Debe ingresar una descripción o seleccionar un producto/servicio.")
         if producto and servicio:
             raise forms.ValidationError("Seleccione producto o servicio, no ambos.")
+
+        cleaned["codigo_iva"] = (cleaned.get("codigo_iva") or "").strip() or "0"
+
+        for campo in ("tarifa_iva", "valor_iva", "valor_ice", "valor_irbp", "precio_unitario_con_impuestos", "total_con_impuestos"):
+            valor = cleaned.get(campo)
+            if valor in (None, ""):
+                cleaned[campo] = Decimal("0")
         return cleaned
 
 

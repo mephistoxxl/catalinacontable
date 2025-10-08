@@ -2979,6 +2979,7 @@ def buscar_producto(request):
                     'codigo': p.codigo,
                     'nombre': getattr(p, 'descripcion', '') or getattr(p, 'nombre', ''),
                     'precio': precio_base,
+                    'iva_codigo': p.iva,
                     'iva_percent': iva_percent,
                     'precio_con_iva': precio_base * (1 + iva_percent),
                     'tipo': 'producto',
@@ -2994,6 +2995,7 @@ def buscar_producto(request):
                     'codigo': s.codigo,
                     'nombre': getattr(s, 'descripcion', '') or getattr(s, 'nombre', ''),
                     'precio': precio_base,
+                    'iva_codigo': iva_code,
                     'iva_percent': iva_percent,
                     'precio_con_iva': precio_base * (1 + iva_percent),
                     'tipo': 'servicio',
@@ -3033,6 +3035,7 @@ def buscar_producto(request):
                 'codigo': producto.codigo,
                 'nombre': producto.descripcion,
                 'precio': precio_base,
+                'iva_codigo': producto.iva,
                 'iva_percent': iva_percent,
                 'precio_con_iva': precio_base * (1 + iva_percent),
                 'tipo': 'producto'
@@ -3073,6 +3076,7 @@ def buscar_producto(request):
                 'codigo': servicio.codigo,
                 'nombre': servicio.descripcion,
                 'precio': precio_base,
+                'iva_codigo': iva_code,
                 'iva_percent': iva_percent,  # ✅ CRÍTICO: Agregar este campo faltante
                 'precio_con_iva': precio_con_iva,
                 'tipo': 'servicio'
@@ -3109,6 +3113,7 @@ def buscar_producto(request):
                     'codigo': p.codigo,
                     'nombre': p.descripcion,
                     'precio': precio_base,
+                    'iva_codigo': p.iva,
                     'iva_percent': iva_percent,
                     'precio_con_iva': precio_base * (1 + iva_percent),
                     'tipo': 'producto'
@@ -3138,6 +3143,7 @@ def buscar_producto(request):
                     'codigo': s.codigo,
                     'nombre': getattr(s, 'descripcion', '') or getattr(s, 'nombre', ''),
                     'precio': precio_base,
+                    'iva_codigo': iva_code,
                     'iva_percent': iva_percent,
                     'precio_con_iva': precio_base * (1 + iva_percent),
                     'tipo': 'servicio'

@@ -6,6 +6,7 @@ import json
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
+from django.db.models import Max
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
@@ -14,6 +15,7 @@ from django.views import View
 from django.views.generic import ListView
 
 from ..mixins import RequireEmpresaActivaMixin, get_empresa_activa
+from ..models import Secuencia
 from .forms import (
     CampoAdicionalFormSet,
     DetalleFormSet,
@@ -45,6 +47,55 @@ class LiquidacionCompraListView(LoginRequiredMixin, RequireEmpresaActivaMixin, L
 class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
     template_name = "inventario/liquidacion_compra/crear.html"
     success_url = reverse_lazy("inventario:liquidaciones_compra_listar")
+    SECUENCIA_TIPO_DOCUMENTO = "03"
+
+    def _calcular_datos_secuencia(self, empresa, secuencia):
+        if not empresa or not secuencia:
+            return None
+
+        max_existente = LiquidacionCompra.objects.filter(
+            empresa=empresa,
+            establecimiento=secuencia.establecimiento,
+            punto_emision=secuencia.punto_emision,
+        ).aggregate(m=Max("secuencia"))["m"] or 0
+
+        base = secuencia.secuencial or 0
+        if max_existente > 0:
+            siguiente = max_existente + 1
+        else:
+            siguiente = max(base, 1)
+        if siguiente > 999_999_999:
+            raise ValueError("El secuencial ha alcanzado el valor máximo permitido (999999999).")
+
+        return {
+            "secuencia": secuencia,
+            "establecimiento": secuencia.establecimiento,
+            "punto_emision": secuencia.punto_emision,
+            "valor": siguiente,
+            "establecimiento_str": f"{secuencia.establecimiento:03d}",
+            "punto_emision_str": f"{secuencia.punto_emision:03d}",
+            "valor_str": f"{siguiente:09d}",
+        }
+
+    def _obtener_siguiente_secuencia(self, empresa, secuencia_id=None, lock=False):
+        if not empresa:
+            return None
+
+        qs = Secuencia.objects.filter(
+            empresa=empresa,
+            tipo_documento=self.SECUENCIA_TIPO_DOCUMENTO,
+            activo=True,
+        )
+        if secuencia_id:
+            qs = qs.filter(id=secuencia_id)
+        if lock:
+            qs = qs.select_for_update()
+
+        secuencia = qs.order_by("establecimiento", "punto_emision").first()
+        if not secuencia:
+            return None
+
+        return self._calcular_datos_secuencia(empresa, secuencia)
 
     def _build_context(
         self,
@@ -54,6 +105,7 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
         pagos=None,
         adicionales=None,
         productos_json="[]",
+        secuencia_info=None,
     ):
         empresa = get_empresa_activa(request)
         return {
@@ -63,15 +115,27 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
             "campo_adicional_formset": adicionales or CampoAdicionalFormSet(prefix="adicionales"),
             "titulo": _("Nueva Liquidación de Compra"),
             "productos_json": productos_json,
+            "secuencia_info": secuencia_info,
         }
 
     def get(self, request, *args, **kwargs):
         empresa = get_empresa_activa(request)
-        # Pre-cargar la fecha de emisión con la fecha actual en GET
-        form = LiquidacionCompraForm(empresa=empresa, initial={
+        secuencia_info = self._obtener_siguiente_secuencia(empresa)
+        initial = {
             "fecha_emision": timezone.localdate(),
-        })
-        context = self._build_context(request, form=form, productos_json="[]")
+        }
+        if secuencia_info:
+            initial.update(
+                {
+                    "establecimiento": secuencia_info["establecimiento_str"],
+                    "punto_emision": secuencia_info["punto_emision_str"],
+                    "secuencia": secuencia_info["valor_str"],
+                    "secuencia_config_id": secuencia_info["secuencia"].id,
+                }
+            )
+
+        form = LiquidacionCompraForm(empresa=empresa, initial=initial)
+        context = self._build_context(request, form=form, productos_json="[]", secuencia_info=secuencia_info)
         return render(request, self.template_name, context)
 
     def post(self, request, *args, **kwargs):
@@ -86,30 +150,55 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
         adicional_formset = CampoAdicionalFormSet(request.POST, prefix="adicionales")
 
         if all([form.is_valid(), detalle_formset.is_valid(), pago_formset.is_valid(), adicional_formset.is_valid()]):
-            with transaction.atomic():
-                liquidacion = form.save(commit=False)
-                liquidacion.empresa = empresa
-                liquidacion.usuario_creacion = request.user
-                liquidacion.estado = "BORRADOR"
-                liquidacion.save()
+            try:
+                with transaction.atomic():
+                    secuencia_info = self._obtener_siguiente_secuencia(
+                        empresa,
+                        form.cleaned_data.get("secuencia_config_id"),
+                        lock=True,
+                    )
+                    if not secuencia_info:
+                        raise Secuencia.DoesNotExist
 
-                form.guardar_prestador(liquidacion)
+                    liquidacion = form.save(commit=False)
+                    liquidacion.empresa = empresa
+                    liquidacion.usuario_creacion = request.user
+                    liquidacion.estado = "BORRADOR"
+                    liquidacion.establecimiento = secuencia_info["establecimiento"]
+                    liquidacion.punto_emision = secuencia_info["punto_emision"]
+                    liquidacion.secuencia = secuencia_info["valor"]
+                    liquidacion.save()
 
-                detalle_formset.instance = liquidacion
-                detalle_formset.save()
+                    # Actualizar el secuencial en la configuración utilizada
+                    secuencia_obj = secuencia_info["secuencia"]
+                    if secuencia_obj.secuencial != secuencia_info["valor"]:
+                        secuencia_obj.secuencial = secuencia_info["valor"]
+                        secuencia_obj.save(update_fields=["secuencial"])
 
-                pago_formset.instance = liquidacion
-                pago_formset.save()
+                    form.guardar_prestador(liquidacion)
 
-                adicional_formset.instance = liquidacion
-                adicional_formset.save()
+                    detalle_formset.instance = liquidacion
+                    detalle_formset.save()
 
-                liquidacion.calcular_totales()
-                liquidacion.sincronizar_formas_pago()
-                liquidacion.save()
+                    pago_formset.instance = liquidacion
+                    pago_formset.save()
 
-            messages.success(request, _("La liquidación se creó correctamente."))
-            return redirect(self.success_url)
+                    adicional_formset.instance = liquidacion
+                    adicional_formset.save()
+
+                    liquidacion.calcular_totales()
+                    liquidacion.sincronizar_formas_pago()
+                    liquidacion.save()
+
+                messages.success(request, _("La liquidación se creó correctamente."))
+                return redirect(self.success_url)
+            except Secuencia.DoesNotExist:
+                messages.error(
+                    request,
+                    _("No se encontró una secuencia activa para liquidaciones de compra. Configure una antes de continuar."),
+                )
+            except ValueError as error:
+                form.add_error(None, str(error))
 
         messages.error(request, _("Por favor corrija los errores indicados."))
         productos_snapshot = request.POST.get("productos_snapshot", "[]")
@@ -118,6 +207,7 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
         except json.JSONDecodeError:
             productos_json = "[]"
 
+        secuencia_info = self._obtener_siguiente_secuencia(empresa, form.cleaned_data.get("secuencia_config_id"))
         context = self._build_context(
             request,
             form,
@@ -125,5 +215,6 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
             pago_formset,
             adicional_formset,
             productos_json=productos_json,
+            secuencia_info=secuencia_info,
         )
         return render(request, self.template_name, context)
