@@ -174,6 +174,82 @@
     background: #ffffff;
   }
 
+  .detalle-contenido {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  @media (min-width: 768px) {
+    .detalle-contenido {
+      flex-direction: row;
+      align-items: flex-start;
+    }
+  }
+
+  .detalle-tabla-wrapper {
+    flex: 1 1 auto;
+  }
+
+  .detalle-totales {
+    flex: 0 0 220px;
+    border: 1px solid #cbd5f5;
+    border-radius: 8px;
+    background: linear-gradient(160deg, #eef2ff 0%, #f8fafc 100%);
+    padding: 10px 12px;
+    font-size: 10px;
+    color: #1f2937;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  }
+
+  .detalle-totales h3 {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #1e3a8a;
+    margin: 0 0 6px 0;
+  }
+
+  .detalle-totales dl {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 8px;
+    margin: 0;
+  }
+
+  .detalle-totales dt {
+    font-weight: 600;
+    color: #374151;
+  }
+
+  .detalle-totales dd {
+    margin: 0;
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: #111827;
+  }
+
+  .detalle-totales dd.destacado {
+    color: #0f172a;
+    font-size: 11px;
+  }
+
+  .detalle-totales .separador {
+    grid-column: 1 / -1;
+    height: 1px;
+    background: rgba(148, 163, 184, 0.45);
+    margin: 6px 0;
+  }
+
+  .detalle-totales .nota {
+    grid-column: 1 / -1;
+    font-size: 8px;
+    color: #64748b;
+    margin-top: 4px;
+  }
+
   table.table-compact {
     border-collapse: collapse;
     width: 100%;
@@ -566,34 +642,63 @@
             </div>
           </div>
 
-          <div class="bg-white rounded border border-gray-200 overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200" id="tabla-productos">
-                <thead class="bg-gray-50">
-                  <tr>
-                    <th class="px-1 py-0.5 text-left text-[8px] font-medium text-gray-500 uppercase">{% trans "Código" %}</th>
-                    <th class="px-1 py-0.5 text-left text-[8px] font-medium text-gray-500 uppercase">{% trans "Descripción" %}</th>
-                    <th class="px-1 py-0.5 text-center text-[8px] font-medium text-gray-500 uppercase">{% trans "Cant." %}</th>
-                    <th class="px-1 py-0.5 text-right text-[8px] font-medium text-gray-500 uppercase">{% trans "P. Unit." %}</th>
-                    <th class="px-1 py-0.5 text-right text-[8px] font-medium text-gray-500 uppercase">{% trans "Subtotal" %}</th>
-                    <th class="px-1 py-0.5 text-center text-[8px] font-medium text-gray-500 uppercase">{% trans "Acción" %}</th>
-                  </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                  <!-- Filas dinámicas -->
-                </tbody>
-                <tfoot class="bg-gray-50">
-                  <tr>
-                    <td colspan="4" class="px-1 py-0.5 text-right text-[9px] font-semibold text-gray-900">{% trans "Total" %}:</td>
-                    <td class="px-1 py-0.5 text-right text-[10px] font-bold text-gray-900" id="total-general">$0.00</td>
-                    <td class="px-1 py-0.5"></td>
-                  </tr>
-                </tfoot>
-              </table>
+          <div class="detalle-contenido">
+            <div class="detalle-tabla-wrapper">
+              <div class="bg-white rounded border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200" id="tabla-productos">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="px-1 py-0.5 text-left text-[8px] font-medium text-gray-500 uppercase">{% trans "Código" %}</th>
+                        <th class="px-1 py-0.5 text-left text-[8px] font-medium text-gray-500 uppercase">{% trans "Descripción" %}</th>
+                        <th class="px-1 py-0.5 text-center text-[8px] font-medium text-gray-500 uppercase">{% trans "Cant." %}</th>
+                        <th class="px-1 py-0.5 text-right text-[8px] font-medium text-gray-500 uppercase">{% trans "P. Unit." %}</th>
+                        <th class="px-1 py-0.5 text-right text-[8px] font-medium text-gray-500 uppercase">{% trans "Subtotal" %}</th>
+                        <th class="px-1 py-0.5 text-center text-[8px] font-medium text-gray-500 uppercase">{% trans "Acción" %}</th>
+                      </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                      <!-- Filas dinámicas -->
+                    </tbody>
+                    <tfoot class="bg-gray-50">
+                      <tr>
+                        <td colspan="4" class="px-1 py-0.5 text-right text-[9px] font-semibold text-gray-900">{% trans "Total" %}:</td>
+                        <td class="px-1 py-0.5 text-right text-[10px] font-bold text-gray-900" id="total-general">$0.00</td>
+                        <td class="px-1 py-0.5"></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                <div id="tabla-vacia" class="p-1 text-[9px] text-gray-500">
+                  {% trans "Sin productos." %}
+                </div>
+              </div>
             </div>
-            <div id="tabla-vacia" class="p-1 text-[9px] text-gray-500">
-              {% trans "Sin productos." %}
-            </div>
+            <aside class="detalle-totales" aria-labelledby="resumen-totales">
+              <h3 id="resumen-totales">{% trans "Resumen" %}</h3>
+              <dl>
+                <dt>{% trans "Sub Total" %}</dt><dd id="resumen-subtotal">0,00</dd>
+                <dt>{% trans "Descuento" %}</dt><dd id="resumen-descuento">0,00</dd>
+                <dt>{% trans "SubTotal Neto" %}</dt><dd id="resumen-subtotal-neto" class="destacado">0,00</dd>
+                <div class="separador" role="presentation"></div>
+                <dt>{% trans "Base IVA dif. 0%" %}</dt><dd id="resumen-base-dif">0,00</dd>
+                <dt>{% trans "Base IVA 5%" %}</dt><dd id="resumen-base-5">0,00</dd>
+                <dt>{% trans "Base IVA 0%" %}</dt><dd id="resumen-base-0">0,00</dd>
+                <dt>{% trans "Base No Obj. IVA" %}</dt><dd id="resumen-base-no-obj">0,00</dd>
+                <dt>{% trans "Base Exento IVA" %}</dt><dd id="resumen-base-exento">0,00</dd>
+                <dt>{% trans "ICE" %}</dt><dd id="resumen-ice">0,00</dd>
+                <dt>{% trans "Total IVA" %}</dt><dd id="resumen-total-iva" class="destacado">0,00</dd>
+                <dt>{% trans "Total" %}</dt><dd id="resumen-total" class="destacado">0,00</dd>
+                <dt>{% trans "IVA Presuntivo" %}</dt><dd id="resumen-iva-presuntivo">0,00</dd>
+                <dt>{% trans "IR Presuntivo/IRBP" %}</dt><dd id="resumen-ir-presuntivo">0,00</dd>
+                <div class="separador" role="presentation"></div>
+                <dt>{% trans "Ret. IVA" %}</dt><dd id="resumen-ret-iva">0,00</dd>
+                <dt>{% trans "Ret. Renta" %}</dt><dd id="resumen-ret-renta">0,00</dd>
+                <dt>{% trans "Cant. Items" %}</dt><dd id="resumen-cant-items">0</dd>
+                <dt>{% trans "Total Cant." %}</dt><dd id="resumen-total-cant">0,00</dd>
+                <p class="nota">{% trans "Valores expresados en USD." %}</p>
+              </dl>
+            </aside>
           </div>
 
           <!-- Modal de selección de productos/servicios -->
@@ -907,6 +1012,100 @@
       return roundN(value, decimals).toFixed(decimals);
     }
 
+    function formatNumber(value, decimals = 2) {
+      const numero = roundN(value, decimals);
+      try {
+        return Number(numero).toLocaleString('es-EC', {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+        });
+      } catch (error) {
+        return numero.toFixed(decimals);
+      }
+    }
+
+    function calcularResumenTotales() {
+      const resumen = {
+        subtotal: 0,
+        descuento: 0,
+        subtotalNeto: 0,
+        baseIvaDiferente: 0,
+        baseIva5: 0,
+        baseIva0: 0,
+        baseNoObj: 0,
+        baseExento: 0,
+        ice: 0,
+        totalIva: 0,
+        total: 0,
+        ivaPresuntivo: 0,
+        irPresuntivo: 0,
+        retIva: 0,
+        retRenta: 0,
+        items: productosAgregados.length,
+        totalCantidad: 0,
+      };
+
+      productosAgregados.forEach((item) => {
+        const subtotal = toNumber(item.subtotal, 0);
+        const descuento = toNumber(item.descuento, 0);
+        const totalConIva = toNumber(item.totalConIva, subtotal);
+        const ivaPercent = toNumber(item.ivaPercent, 0);
+        const ivaCalculado = round2(totalConIva - subtotal);
+        const cantidad = toNumber(item.cantidad, 0);
+
+        resumen.subtotal += subtotal;
+        resumen.descuento += descuento;
+        resumen.totalIva += ivaCalculado;
+        resumen.total += totalConIva;
+        resumen.totalCantidad += cantidad;
+
+        if (ivaPercent > 0) {
+          if (Math.abs(ivaPercent - 0.05) < 0.0001) {
+            resumen.baseIva5 += subtotal;
+          } else {
+            resumen.baseIvaDiferente += subtotal;
+          }
+        } else {
+          resumen.baseIva0 += subtotal;
+        }
+      });
+
+      resumen.subtotalNeto = resumen.subtotal - resumen.descuento;
+      return resumen;
+    }
+
+    function actualizarPanelTotales(resumen) {
+      const asignar = (id, valor, opciones = {}) => {
+        const elemento = document.getElementById(id);
+        if (!elemento) {
+          return;
+        }
+        if (opciones.raw) {
+          elemento.textContent = valor;
+        } else {
+          elemento.textContent = formatNumber(valor, opciones.decimals ?? 2);
+        }
+      };
+
+      asignar('resumen-subtotal', resumen.subtotal);
+      asignar('resumen-descuento', resumen.descuento);
+      asignar('resumen-subtotal-neto', resumen.subtotalNeto);
+      asignar('resumen-base-dif', resumen.baseIvaDiferente);
+      asignar('resumen-base-5', resumen.baseIva5);
+      asignar('resumen-base-0', resumen.baseIva0);
+      asignar('resumen-base-no-obj', resumen.baseNoObj);
+      asignar('resumen-base-exento', resumen.baseExento);
+      asignar('resumen-ice', resumen.ice);
+      asignar('resumen-total-iva', resumen.totalIva);
+      asignar('resumen-total', resumen.total);
+      asignar('resumen-iva-presuntivo', resumen.ivaPresuntivo);
+      asignar('resumen-ir-presuntivo', resumen.irPresuntivo);
+      asignar('resumen-ret-iva', resumen.retIva);
+      asignar('resumen-ret-renta', resumen.retRenta);
+      asignar('resumen-cant-items', resumen.items, { raw: true });
+      asignar('resumen-total-cant', resumen.totalCantidad);
+    }
+
     function crearHiddenInput(name, value) {
       const input = document.createElement('input');
       input.type = 'hidden';
@@ -941,11 +1140,13 @@
     }
 
     function actualizarTotal() {
-      const total = productosAgregados.reduce((sum, item) => sum + toNumber(item.totalConIva, 0), 0);
+      const resumen = calcularResumenTotales();
+      const total = resumen.total;
       const totalCell = document.getElementById('total-general');
       if (totalCell) {
-        totalCell.textContent = `$${round2(total).toFixed(2)}`;
+        totalCell.textContent = `$${formatNumber(total)}`;
       }
+      actualizarPanelTotales(resumen);
     }
 
     function actualizarEstadoTabla() {
@@ -1405,12 +1606,12 @@
       if (productosIniciales.length) {
         productosIniciales.forEach((item) => agregarProductoDesdeObjeto(item, { actualizar: false }));
         actualizarCamposOcultos();
-        actualizarTotal();
         actualizarEstadoTabla();
       } else {
         actualizarCamposOcultos();
         actualizarEstadoTabla();
       }
+      actualizarTotal();
     });
 
     window.buscarProducto = buscarProducto;
