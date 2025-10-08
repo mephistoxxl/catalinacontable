@@ -93,6 +93,8 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
                 liquidacion.estado = "BORRADOR"
                 liquidacion.save()
 
+                form.guardar_prestador(liquidacion)
+
                 detalle_formset.instance = liquidacion
                 detalle_formset.save()
 

@@ -151,7 +151,7 @@ import os
 from dotenv import load_dotenv
 import json
 import logging
-from typing import Dict, Optional, Union
+from typing import Any, Dict, Iterable, Optional, Union
 from requests.exceptions import RequestException, Timeout
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -164,6 +164,109 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 load_dotenv()
+
+DEFAULT_DIRECCION = 'SIN DIRECCIÓN REGISTRADA'
+
+
+def _limpiar_texto(valor: Any) -> str:
+    if valor is None:
+        return ''
+    if isinstance(valor, str):
+        texto = valor.strip()
+    else:
+        texto = str(valor).strip()
+    return texto
+
+
+def _agregar_componentes(destino: list[str], vistos: set[str], *valores: Any) -> None:
+    for valor in valores:
+        if not valor:
+            continue
+        if isinstance(valor, (list, tuple, set)):
+            _agregar_componentes(destino, vistos, *valor)
+            continue
+        texto = _limpiar_texto(valor)
+        if not texto:
+            continue
+        clave = texto.lower()
+        if clave in vistos:
+            continue
+        vistos.add(clave)
+        destino.append(texto)
+
+
+def _unir_componentes(componentes: Iterable[Any], separador: str = ' ') -> str:
+    partes = []
+    for componente in componentes:
+        texto = _limpiar_texto(componente)
+        if texto:
+            partes.append(texto)
+    return separador.join(partes)
+
+
+def _extraer_direccion(data: Dict[str, Any], tipo_identificacion: str) -> str:
+    componentes: list[str] = []
+    vistos: set[str] = set()
+
+    def agregar(*items: Any) -> None:
+        _agregar_componentes(componentes, vistos, *items)
+
+    if tipo_identificacion == 'RUC':
+        establecimientos = data.get('establecimientos') or []
+        for establecimiento in establecimientos:
+            if not isinstance(establecimiento, dict):
+                continue
+            agregar(
+                establecimiento.get('direccionCompleta'),
+                establecimiento.get('direccion'),
+                _unir_componentes(
+                    [
+                        establecimiento.get('calle'),
+                        establecimiento.get('numero'),
+                        establecimiento.get('interseccion'),
+                    ]
+                ),
+                _unir_componentes(
+                    [
+                        establecimiento.get('provincia'),
+                        establecimiento.get('canton'),
+                        establecimiento.get('parroquia'),
+                    ],
+                    ' - '
+                ),
+            )
+            if componentes:
+                break
+
+        agregar(
+            data.get('direccionMatriz'),
+            _unir_componentes(
+                [data.get('calleMatriz'), data.get('numeroMatriz'), data.get('interseccionMatriz')]
+            ),
+            _unir_componentes(
+                [
+                    data.get('provinciaMatriz'),
+                    data.get('cantonMatriz'),
+                    data.get('parroquiaMatriz'),
+                ],
+                ' - '
+            ),
+        )
+
+    agregar(
+        data.get('direccionDomicilio'),
+        data.get('direccion'),
+        data.get('direccionCompleta'),
+        _unir_componentes(
+            [data.get('calleDomicilio'), data.get('numeroDomicilio'), data.get('referenciaDomicilio')]
+        ),
+        data.get('barrio'),
+        data.get('parroquia'),
+        data.get('ciudad'),
+        data.get('provincia'),
+    )
+
+    return ' - '.join(componentes)
 
 def validar_identificacion(identificacion: str) -> Optional[str]:
     """Valida el formato de la identificación.
@@ -250,14 +353,11 @@ def consultar_identificacion(identificacion: str) -> Dict[str, Union[str, bool]]
         # Extraer dirección del primer establecimiento si existe
         establecimientos = data.get('establecimientos', [])
         nombre_comercial = ''
-        if tipo_identificacion == 'RUC':
-            if establecimientos:
-                direccion = establecimientos[0].get('direccionCompleta', '')
-                nombre_comercial = establecimientos[0].get('nombreFantasiaComercial', '')
-            else:
-                direccion = data.get('calleDomicilio', data.get('direccion', ''))
-        else:
-            direccion = data.get('direccionDomicilio', data.get('direccion', ''))
+        if tipo_identificacion == 'RUC' and establecimientos:
+            primer_establecimiento = establecimientos[0] if isinstance(establecimientos[0], dict) else {}
+            nombre_comercial = primer_establecimiento.get('nombreFantasiaComercial', '')
+
+        direccion = _extraer_direccion(data, tipo_identificacion)
 
         # Mapear la respuesta al formato esperado
         tipo_contribuyente = data.get('tipoContribuyente')
@@ -292,7 +392,7 @@ def consultar_identificacion(identificacion: str) -> Dict[str, Union[str, bool]]
             'message': api_message,
             'razon_social': razon_social,
             'nombre_comercial': nombre_comercial,
-            'direccion': direccion,
+            'direccion': direccion or DEFAULT_DIRECCION,
             'telefono': data.get('telefono', ''),
             'email': data.get('email', ''),
             'tipo_contribuyente': tipo_contribuyente,

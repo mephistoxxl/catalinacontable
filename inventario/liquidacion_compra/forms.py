@@ -211,7 +211,7 @@ class LiquidacionCompraForm(forms.ModelForm):
             "tipoProveedor": "1" if tipo_id != "04" else "2",
         }
 
-        proveedor, _ = Proveedor.objects.update_or_create(
+        proveedor, _created = Proveedor.objects.update_or_create(
             empresa=self.empresa,
             identificacion_proveedor=identificacion,
             defaults=proveedor_defaults,
@@ -220,6 +220,71 @@ class LiquidacionCompraForm(forms.ModelForm):
         cleaned_data["proveedor"] = proveedor
         self.cleaned_data["proveedor"] = proveedor
         return cleaned_data
+
+    def _valor_texto(self, campo: str) -> str:
+        if not hasattr(self, "cleaned_data"):
+            return ""
+        valor = self.cleaned_data.get(campo, "")
+        if isinstance(valor, str):
+            return valor.strip()
+        return valor or ""
+
+    def get_prestador_data(self, liquidacion=None) -> dict:
+        """Obtiene los datos normalizados del prestador asociados al formulario."""
+
+        proveedor = getattr(liquidacion, "proveedor", None)
+
+        data = {
+            "tipo_identificacion": self._valor_texto("beneficiario_tipo_identificacion"),
+            "identificacion": self._valor_texto("beneficiario_identificacion"),
+            "nombre": self._valor_texto("beneficiario_nombre"),
+            "direccion": self._valor_texto("beneficiario_direccion"),
+            "correo": self._valor_texto("beneficiario_correo"),
+            "telefono": self._valor_texto("beneficiario_telefono"),
+        }
+
+        if proveedor:
+            data.setdefault("nombre_comercial", proveedor.nombre_comercial_proveedor or "")
+            tipo_regimen = getattr(proveedor, "tipoRegimen", "") or ""
+            data.setdefault("tipo_regimen", tipo_regimen)
+            if not data.get("tipo_identificacion"):
+                data["tipo_identificacion"] = proveedor.tipoIdentificacion or ""
+            if not data.get("identificacion"):
+                data["identificacion"] = proveedor.identificacion_proveedor or ""
+            if not data.get("nombre"):
+                data["nombre"] = proveedor.razon_social_proveedor or ""
+        else:
+            data.setdefault("nombre_comercial", "")
+            data.setdefault("tipo_regimen", "")
+
+        return data
+
+    def guardar_prestador(self, liquidacion):
+        """Crea o actualiza el prestador ligado a la liquidación."""
+
+        if not hasattr(self, "cleaned_data"):
+            raise ValueError("El formulario debe validarse antes de guardar el prestador.")
+
+        from .models import Prestador
+
+        datos = self.get_prestador_data(liquidacion=liquidacion)
+        datos.setdefault("obligado_contabilidad", "NO")
+        datos.setdefault("tipo_contribuyente", "")
+        datos.setdefault("actividad_economica", "")
+        datos.setdefault("estado", "")
+        datos["proveedor"] = getattr(liquidacion, "proveedor", None)
+        datos["empresa"] = getattr(liquidacion, "empresa", None)
+
+        if not datos.get("tipo_identificacion") or not datos.get("identificacion") or not datos.get("nombre"):
+            raise ValueError("Los datos del prestador son incompletos.")
+        if datos.get("empresa") is None:
+            raise ValueError("La liquidación debe estar asociada a una empresa para guardar al prestador.")
+
+        prestador, _ = Prestador.objects.update_or_create(
+            liquidacion=liquidacion,
+            defaults=datos,
+        )
+        return prestador
 
 
 class LiquidacionDetalleForm(forms.ModelForm):

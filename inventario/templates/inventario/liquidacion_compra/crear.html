@@ -427,6 +427,11 @@
             <h2 class="text-[10px] font-semibold text-gray-800">{% trans "Datos del Proveedor" %}</h2>
           </div>
 
+          <div id="proveedor-identificacion-messages" class="hidden mb-1 rounded border-l-2 px-1.5 py-1 flex items-center gap-1 text-[8px] bg-white shadow-sm">
+            <i id="proveedor-identificacion-message-icon" class="fa fa-info-circle text-blue-500 text-[8px]"></i>
+            <span id="proveedor-identificacion-message-text" class="text-blue-800 font-medium"></span>
+          </div>
+
           <div class="grid grid-cols-1 md:grid-cols-4 gap-1">
             {% with field=form.beneficiario_tipo_identificacion %}
             <div class="group">
@@ -444,8 +449,20 @@
               <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
                 {{ field.label }}
                 <span class="text-red-500">*</span>
+                <span id="loading-identificacion-proveedor" class="hidden ml-1 inline-flex items-center gap-0.5 text-gray-500" style="display:none;">
+                  <i class="fa fa-spinner fa-spin text-[8px]"></i>
+                  <span class="text-[8px] font-medium">{% trans "Consultando" %}...</span>
+                </span>
               </label>
-              {{ field }}
+              <div class="flex items-center gap-1">
+                <div class="flex-1">
+                  {{ field }}
+                </div>
+                <button type="button" id="buscar-identificacion-proveedor" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-gray-800 text-white text-[8px] font-semibold rounded hover:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-600 transition-colors">
+                  <i class="fa fa-search text-[7px]"></i>
+                  <span>{% trans "Buscar" %}</span>
+                </button>
+              </div>
               {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
             </div>
             {% endwith %}
@@ -647,6 +664,206 @@
     {% block extra_js %}
     <script>
     'use strict';
+
+    const MSG_PROV_IDENT_EMPTY = '{{ _("Ingrese la identificación antes de consultar.")|escapejs }}';
+    const MSG_PROV_TIPO_INVALIDO = '{{ _("Seleccione Cédula (05) o RUC (04) para consultar.")|escapejs }}';
+    const MSG_PROV_LONGITUD_INVALIDA = '{{ _("La identificación ingresada no tiene el número de dígitos esperado.")|escapejs }}';
+    const MSG_PROV_NO_RESULTADOS = '{{ _("No se encontraron datos para la identificación ingresada.")|escapejs }}';
+    const MSG_PROV_ERROR = '{{ _("No se pudo consultar la identificación. Inténtelo nuevamente.")|escapejs }}';
+    const MSG_PROV_EXITO = '{{ _("Datos del proveedor cargados correctamente.")|escapejs }}';
+
+    let proveedorMensajeTimeoutId = null;
+
+    function mostrarMensajeProveedor(mensaje, tipo = 'info') {
+      const contenedor = document.getElementById('proveedor-identificacion-messages');
+      const texto = document.getElementById('proveedor-identificacion-message-text');
+      const icono = document.getElementById('proveedor-identificacion-message-icon');
+      if (!contenedor || !texto || !icono) {
+        return;
+      }
+
+      const estilos = {
+        success: {
+          border: 'border-green-500',
+          fondo: 'bg-green-50',
+          texto: 'text-green-800',
+          icono: 'fa-check-circle',
+          iconoColor: 'text-green-500',
+        },
+        warning: {
+          border: 'border-yellow-500',
+          fondo: 'bg-yellow-50',
+          texto: 'text-yellow-800',
+          icono: 'fa-exclamation-triangle',
+          iconoColor: 'text-yellow-500',
+        },
+        danger: {
+          border: 'border-red-500',
+          fondo: 'bg-red-50',
+          texto: 'text-red-800',
+          icono: 'fa-exclamation-circle',
+          iconoColor: 'text-red-500',
+        },
+        info: {
+          border: 'border-blue-500',
+          fondo: 'bg-blue-50',
+          texto: 'text-blue-800',
+          icono: 'fa-info-circle',
+          iconoColor: 'text-blue-500',
+        },
+      };
+
+      const config = estilos[tipo] || estilos.info;
+      contenedor.className = `mb-1 rounded border-l-2 px-1.5 py-1 flex items-center gap-1 text-[8px] shadow-sm ${config.fondo} ${config.border}`;
+      texto.textContent = mensaje;
+      texto.className = `text-[8px] font-medium ${config.texto}`;
+      icono.className = `fa ${config.icono} ${config.iconoColor} text-[8px]`;
+      contenedor.classList.remove('hidden');
+
+      if (proveedorMensajeTimeoutId) {
+        clearTimeout(proveedorMensajeTimeoutId);
+      }
+      proveedorMensajeTimeoutId = setTimeout(() => {
+        ocultarMensajeProveedor();
+      }, 5000);
+    }
+
+    function ocultarMensajeProveedor() {
+      const contenedor = document.getElementById('proveedor-identificacion-messages');
+      if (contenedor) {
+        contenedor.classList.add('hidden');
+      }
+    }
+
+    function limpiarCamposProveedor() {
+      ['id_beneficiario_nombre', 'id_beneficiario_direccion', 'id_beneficiario_correo', 'id_beneficiario_telefono'].forEach((id) => {
+        const campo = document.getElementById(id);
+        if (campo) {
+          campo.value = '';
+        }
+      });
+    }
+
+    async function consultarIdentificacionProveedor(identificacion, tipo) {
+      const indicador = document.getElementById('loading-identificacion-proveedor');
+      if (indicador) {
+        indicador.classList.remove('hidden');
+        indicador.style.display = 'inline-flex';
+      }
+      ocultarMensajeProveedor();
+
+      try {
+        const response = await fetch(`/inventario/consultar-identificacion/?identificacion=${encodeURIComponent(identificacion)}&tipo=${encodeURIComponent(tipo)}`);
+        if (!response.ok) {
+          throw new Error('Respuesta inválida');
+        }
+        const data = await response.json();
+
+        if (indicador) {
+          indicador.classList.add('hidden');
+          indicador.style.display = 'none';
+        }
+
+        if (data.error) {
+          mostrarMensajeProveedor(data.message || MSG_PROV_NO_RESULTADOS, 'warning');
+          limpiarCamposProveedor();
+          return false;
+        }
+
+        const campos = {
+          id_beneficiario_nombre: data.razon_social || data.nombre_comercial || '',
+          id_beneficiario_direccion: data.direccion || '',
+          id_beneficiario_correo: data.email || '',
+          id_beneficiario_telefono: data.telefono || data.celular || '',
+        };
+
+        Object.entries(campos).forEach(([id, valor]) => {
+          const campo = document.getElementById(id);
+          if (campo) {
+            campo.value = valor || '';
+          }
+        });
+
+        const tipoSelect = document.getElementById('id_beneficiario_tipo_identificacion');
+        if (tipoSelect) {
+          tipoSelect.value = tipo;
+        }
+
+        mostrarMensajeProveedor(MSG_PROV_EXITO, 'success');
+        return true;
+      } catch (error) {
+        console.error('Error consultando identificación del proveedor', error);
+        if (indicador) {
+          indicador.classList.add('hidden');
+          indicador.style.display = 'none';
+        }
+        mostrarMensajeProveedor(MSG_PROV_ERROR, 'danger');
+        return false;
+      }
+    }
+
+    function inicializarBusquedaProveedor() {
+      const botonBuscar = document.getElementById('buscar-identificacion-proveedor');
+      const identificacionInput = document.getElementById('id_beneficiario_identificacion');
+      const tipoSelect = document.getElementById('id_beneficiario_tipo_identificacion');
+
+      if (!botonBuscar || !identificacionInput || !tipoSelect) {
+        return;
+      }
+
+      let consultaEnProgreso = false;
+      let ultimaConsulta = 0;
+      const DEBOUNCE_MS = 1000;
+
+      botonBuscar.addEventListener('click', async (event) => {
+        event.preventDefault();
+
+        if (consultaEnProgreso) {
+          return;
+        }
+
+        const ahora = Date.now();
+        if (ahora - ultimaConsulta < DEBOUNCE_MS) {
+          return;
+        }
+        ultimaConsulta = ahora;
+
+        const identificacion = identificacionInput.value.trim();
+        const tipo = tipoSelect.value;
+
+        if (!identificacion) {
+          mostrarMensajeProveedor(MSG_PROV_IDENT_EMPTY, 'warning');
+          identificacionInput.focus();
+          return;
+        }
+
+        if (!['04', '05'].includes(tipo)) {
+          mostrarMensajeProveedor(MSG_PROV_TIPO_INVALIDO, 'warning');
+          tipoSelect.focus();
+          return;
+        }
+
+        const longitud = identificacion.length;
+        const longitudValida = (tipo === '04' && longitud === 13) || (tipo === '05' && (longitud === 10 || longitud === 13));
+        if (!longitudValida) {
+          mostrarMensajeProveedor(MSG_PROV_LONGITUD_INVALIDA, 'warning');
+          identificacionInput.focus();
+          return;
+        }
+
+        consultaEnProgreso = true;
+        botonBuscar.disabled = true;
+        botonBuscar.classList.add('opacity-70', 'cursor-not-allowed');
+
+        try {
+          await consultarIdentificacionProveedor(identificacion, tipo);
+        } finally {
+          consultaEnProgreso = false;
+          botonBuscar.disabled = false;
+          botonBuscar.classList.remove('opacity-70', 'cursor-not-allowed');
+        }
+      });
+    }
 
     const MSG_BUSCA_PRODUCTO = '{{ _("Debe buscar un producto válido antes de agregarlo.")|escapejs }}';
     const MSG_PRECIO_INVALIDO = '{{ _("El precio del producto no es válido.")|escapejs }}';
@@ -1184,6 +1401,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       inicializarEventos();
+      inicializarBusquedaProveedor();
       if (productosIniciales.length) {
         productosIniciales.forEach((item) => agregarProductoDesdeObjeto(item, { actualizar: false }));
         actualizarCamposOcultos();

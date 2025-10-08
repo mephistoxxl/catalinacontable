@@ -322,6 +322,67 @@ class LiquidacionFormaPago(models.Model):
         unique_together = ("liquidacion", "forma_pago")
 
 
+class Prestador(models.Model):
+    """Titular del comprobante de liquidación de compra."""
+
+    TIPO_IDENTIFICACION_CHOICES = (
+        ("04", "RUC"),
+        ("05", "Cédula"),
+        ("06", "Pasaporte"),
+        ("07", "Consumidor final"),
+        ("08", "Identificación del exterior"),
+    )
+
+    OPCIONES_SI_NO = (("SI", "Sí"), ("NO", "No"))
+
+    empresa = models.ForeignKey(
+        "inventario.Empresa",
+        on_delete=models.CASCADE,
+        related_name="prestadores",
+    )
+    liquidacion = models.OneToOneField(
+        LiquidacionCompra,
+        on_delete=models.CASCADE,
+        related_name="prestador",
+    )
+    proveedor = models.ForeignKey(
+        "inventario.Proveedor",
+        on_delete=models.PROTECT,
+        related_name="prestadores",
+        null=True,
+        blank=True,
+    )
+    tipo_identificacion = models.CharField(max_length=2, choices=TIPO_IDENTIFICACION_CHOICES)
+    identificacion = models.CharField(max_length=13)
+    nombre = models.CharField(max_length=255)
+    nombre_comercial = models.CharField(max_length=255, blank=True)
+    direccion = models.CharField(max_length=255, blank=True)
+    correo = models.EmailField(max_length=200, blank=True)
+    telefono = models.CharField(max_length=50, blank=True)
+    obligado_contabilidad = models.CharField(max_length=2, choices=OPCIONES_SI_NO, default="NO")
+    tipo_contribuyente = models.CharField(max_length=150, blank=True)
+    actividad_economica = models.CharField(max_length=255, blank=True)
+    estado = models.CharField(max_length=120, blank=True)
+    tipo_regimen = models.CharField(max_length=120, blank=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    objects = TenantManager()
+    all_objects = models.Manager()
+
+    class Meta:
+        verbose_name = "Prestador"
+        verbose_name_plural = "Prestadores"
+        indexes = [
+            models.Index(fields=["identificacion"]),
+            models.Index(fields=["tipo_identificacion", "identificacion"]),
+            models.Index(fields=["empresa", "identificacion"]),
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover - representación simple
+        return f"Prestador {self.identificacion}"
+
+
 class LiquidacionCampoAdicional(models.Model):
     """Campos adicionales opcionales."""
 
