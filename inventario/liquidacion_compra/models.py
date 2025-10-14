@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
 
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 from django.utils import timezone
 
@@ -42,6 +42,10 @@ class LiquidacionCompra(models.Model):
         ("05", "Inventarios"),
         ("06", "Exportaciones"),
         ("07", "Otros"),
+    ]
+
+    TIPO_LIQUIDACION_CHOICES = [
+        ("001901", "001901 Liquidación de Compra Electrónica"),
     ]
 
     MONEDAS = [
@@ -85,8 +89,24 @@ class LiquidacionCompra(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(999_999_999)],
     )
 
+    tipo_liquidacion = models.CharField(
+        max_length=6,
+        choices=TIPO_LIQUIDACION_CHOICES,
+        default="001901",
+    )
     concepto = models.CharField(max_length=255, blank=True, null=True)
     observaciones = models.TextField(blank=True, null=True)
+    autorizacion = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        validators=[
+            RegexValidator(
+                regex=r"^[0-9A-Za-z\s\-]+$",
+                message="La autorización solo puede contener letras, números, espacios o guiones.",
+            )
+        ],
+    )
     sustento_tributario = models.CharField(
         max_length=2,
         choices=SUSTENTOS_TRIBUTARIOS,

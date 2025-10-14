@@ -4,6 +4,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django import forms
+from django.core.validators import RegexValidator
 from django.db.models import Q
 from django.forms import inlineformset_factory
 from django.utils.translation import gettext_lazy as _
@@ -99,6 +100,31 @@ class LiquidacionCompraForm(forms.ModelForm):
         ),
     )
 
+    tipo_liquidacion = forms.ChoiceField(
+        label=_("Liquidación"),
+        choices=LiquidacionCompra.TIPO_LIQUIDACION_CHOICES,
+        initial=LiquidacionCompra.TIPO_LIQUIDACION_CHOICES[0][0],
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+
+    autorizacion = forms.CharField(
+        label=_("Autorización"),
+        required=False,
+        max_length=50,
+        validators=[
+            RegexValidator(
+                regex=r"^[0-9A-Za-z\s\-]+$",
+                message=_("La autorización solo puede contener letras, números, espacios o guiones."),
+            )
+        ],
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": _("Ingrese el código de autorización"),
+            }
+        ),
+    )
+
     fecha_emision = forms.DateField(
         input_formats=["%Y-%m-%d", "%d/%m/%Y"],
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
@@ -113,7 +139,9 @@ class LiquidacionCompraForm(forms.ModelForm):
             "establecimiento",
             "punto_emision",
             "secuencia",
+            "tipo_liquidacion",
             "concepto",
+            "autorizacion",
             "observaciones",
             "sustento_tributario",
             "retencion_iva_porcentaje",
@@ -146,7 +174,14 @@ class LiquidacionCompraForm(forms.ModelForm):
                     "inputmode": "numeric",
                 }
             ),
+            "tipo_liquidacion": forms.Select(attrs={"class": "form-control"}),
             "concepto": forms.TextInput(attrs={"class": "form-control"}),
+            "autorizacion": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": _("Ingrese el código de autorización"),
+                }
+            ),
             "observaciones": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "sustento_tributario": forms.Select(attrs={"class": "form-control"}),
         }
@@ -156,12 +191,19 @@ class LiquidacionCompraForm(forms.ModelForm):
             "establecimiento": _("Establecimiento (003)"),
             "punto_emision": _("Punto de emisión (003)"),
             "secuencia": _("Secuencial (000000001)"),
+            "tipo_liquidacion": _("Liquidación"),
+            "autorizacion": _("Autorización"),
             "sustento_tributario": _("Sustento tributario"),
         }
 
     def __init__(self, *args, empresa=None, **kwargs):
         self.empresa = empresa
         super().__init__(*args, **kwargs)
+
+        if "tipo_liquidacion" in self.fields:
+            self.fields["tipo_liquidacion"].choices = LiquidacionCompra.TIPO_LIQUIDACION_CHOICES
+            if not self.initial.get("tipo_liquidacion"):
+                self.initial["tipo_liquidacion"] = LiquidacionCompra.TIPO_LIQUIDACION_CHOICES[0][0]
 
         # Configurar queryset de proveedores según empresa activa y ocultar campo base
         self.fields["proveedor"].required = False

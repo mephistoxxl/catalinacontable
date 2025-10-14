@@ -1,0 +1,61 @@
+{% load i18n %}
+<div class="pago-form bg-white border border-gray-200 rounded p-1" data-form-index="{{ index }}" data-eliminado="0" data-form-prefix="{{ form.prefix }}">
+  {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+  <div class="flex items-center justify-between mb-1">
+    <span class="text-[10px] font-semibold text-gray-700 forma-pago-title">
+      {% if numero %}
+        {% trans "Forma de pago" %} #{{ numero }}
+      {% else %}
+        {% trans "Forma de pago" %}
+      {% endif %}
+    </span>
+    {% if can_delete %}
+    <div class="flex items-center gap-1">
+      <button type="button" class="text-[8px] text-red-600 hover:text-red-700 font-semibold inline-flex items-center gap-0.5 btn-eliminar-forma-pago" data-form-prefix="{{ form.prefix }}">
+        <i class="fa fa-trash text-[8px]"></i>
+        <span>{% trans "Eliminar" %}</span>
+      </button>
+      <span class="hidden pago-delete-field">{{ form.DELETE }}</span>
+    </div>
+    {% endif %}
+  </div>
+  {% if form.non_field_errors %}
+  <div class="bg-red-50 border border-red-200 text-red-700 text-[8px] rounded px-1 py-0.5 mb-1">
+    {% for error in form.non_field_errors %}
+    <p class="font-medium">{{ error }}</p>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <div class="grid grid-cols-1 md:grid-cols-6 gap-1">
+    <div class="group md:col-span-2">
+      <label for="{{ form.forma_pago.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+        {{ form.forma_pago.label }}
+        {% if form.forma_pago.field.required %}<span class="text-red-500">*</span>{% endif %}
+      </label>
+      {{ form.forma_pago }}
+      {% for error in form.forma_pago.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+    </div>
+    <div class="group md:col-span-2">
+      <label for="{{ form.total.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+        {{ form.total.label }}
+        {% if form.total.field.required %}<span class="text-red-500">*</span>{% endif %}
+      </label>
+      {{ form.total }}
+      {% for error in form.total.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+    </div>
+    <div class="group">
+      <label for="{{ form.plazo.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+        {{ form.plazo.label }}
+      </label>
+      {{ form.plazo }}
+      {% for error in form.plazo.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+    </div>
+    <div class="group">
+      <label for="{{ form.unidad_tiempo.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+        {{ form.unidad_tiempo.label }}
+      </label>
+      {{ form.unidad_tiempo }}
+      {% for error in form.unidad_tiempo.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+    </div>
+  </div>
+</div>

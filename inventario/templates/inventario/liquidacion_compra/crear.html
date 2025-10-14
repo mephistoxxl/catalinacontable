@@ -335,10 +335,131 @@
     border-color: #dc2626 !important;
     box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1) !important;
   }
+
+  :root {
+    --form-action-bottom: 16px;
+    --form-action-safe-area: 120px;
+  }
+
+  .safe-bottom-spacing {
+    padding-bottom: calc(var(--form-action-safe-area, 120px) + var(--form-action-bottom, 16px));
+  }
+
+  .form-action-bar {
+    position: sticky;
+    bottom: var(--form-action-bottom, 16px);
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px 18px;
+    border-radius: 14px;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    background: #ffffff;
+    box-shadow: 0 24px 34px -24px rgba(15, 23, 42, 0.45);
+    backdrop-filter: saturate(140%) blur(8px);
+    overflow: hidden;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .form-action-bar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 1px solid rgba(17, 24, 39, 0.1);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+  }
+
+  .form-action-bar:hover,
+  .form-action-bar:focus-within {
+    box-shadow: 0 26px 38px -24px rgba(15, 23, 42, 0.65);
+    transform: translateY(-1px);
+  }
+
+  .form-action-bar:hover::after,
+  .form-action-bar:focus-within::after {
+    opacity: 1;
+  }
+
+  .form-action-bar .primary-action {
+    width: 100%;
+    max-width: 100%;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #131e26 0%, #1f2937 48%, #293548 100%);
+    color: #fff;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 12px 24px;
+    box-shadow: 0 18px 28px -18px rgba(17, 24, 39, 0.75);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  }
+
+  .form-action-bar .primary-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 22px 30px -18px rgba(2, 6, 23, 0.7);
+    filter: brightness(1.05);
+  }
+
+  .form-action-bar .primary-action:focus-visible {
+    outline: 2px solid rgba(118, 212, 245, 0.6);
+    outline-offset: 3px;
+  }
+
+  .form-action-bar .secondary-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.5rem 1rem;
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: rgba(15, 23, 42, 0.04);
+    color: #1f2937;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .form-action-bar .secondary-action:hover {
+    background: rgba(15, 23, 42, 0.08);
+    border-color: rgba(15, 23, 42, 0.2);
+    color: #0f172a;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+
+  .form-action-bar .secondary-action:focus-visible {
+    outline: 2px solid rgba(133, 206, 54, 0.45);
+    outline-offset: 3px;
+  }
+
+  @media (min-width: 640px) {
+    .form-action-bar {
+      flex-direction: row;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 16px;
+      padding: 18px 24px;
+    }
+
+    .form-action-bar .primary-action {
+      width: auto;
+      min-width: 220px;
+      justify-content: center;
+    }
+  }
 </style>
 
 <div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-1" style="min-height: auto; padding: 2px;">
-  <div class="mx-auto" style="max-width: 95%; padding: 0 10px;">
+  <div class="mx-auto safe-bottom-spacing" style="max-width: 95%; padding: 0 10px;">
 
     {% if messages %}
     <div class="mb-1">
@@ -406,39 +527,15 @@
           </div>
 
           {% if secuencia_info %}
-          <div class="mb-1 rounded border border-blue-200 bg-blue-50 px-1.5 py-1 text-[9px] text-blue-900 shadow-inner">
-            <div class="flex items-start gap-1">
-              <i class="fa fa-hashtag mt-[2px] text-blue-600 text-[9px]"></i>
-              <div>
-                <p class="font-semibold">{% trans "Secuencia aplicada automáticamente" %}</p>
-                <dl class="grid grid-cols-3 gap-x-2 gap-y-1 mt-0.5">
-                  <div>
-                    <dt class="font-medium text-blue-800">{% trans "Establecimiento" %}</dt>
-                    <dd class="font-semibold">{{ secuencia_info.establecimiento_str }}</dd>
-                  </div>
-                  <div>
-                    <dt class="font-medium text-blue-800">{% trans "Punto de emisión" %}</dt>
-                    <dd class="font-semibold">{{ secuencia_info.punto_emision_str }}</dd>
-                  </div>
-                  <div>
-                    <dt class="font-medium text-blue-800">{% trans "Secuencial sugerido" %}</dt>
-                    <dd class="font-semibold">{{ secuencia_info.valor_str }}</dd>
-                  </div>
-                </dl>
-                <p class="mt-0.5 text-[8px] text-blue-700">{% trans "Los campos se bloquean para proteger la numeración autorizada." %}</p>
-              </div>
-            </div>
-          </div>
+          <p class="mb-1 text-[9px] text-slate-600">
+            <span class="font-semibold text-slate-700">{% trans "Secuencia aplicada automáticamente" %}:</span>
+            <span class="ml-1">{% trans "Establecimiento" %}: {{ secuencia_info.establecimiento_str }} · {% trans "Punto de emisión" %}: {{ secuencia_info.punto_emision_str }} · {% trans "Secuencial sugerido" %}: {{ secuencia_info.valor_str }}</span>
+          </p>
           {% else %}
-          <div class="mb-1 rounded border border-amber-300 bg-amber-50 px-1.5 py-1 text-[9px] text-amber-900 shadow-inner">
-            <div class="flex items-start gap-1">
-              <i class="fa fa-exclamation-triangle mt-[2px] text-amber-500 text-[9px]"></i>
-              <div>
-                <p class="font-semibold">{% trans "No hay secuencia configurada" %}</p>
-                <p class="mt-0.5 text-[8px]">{% trans "Configure una secuencia activa para continuar con la emisión de liquidaciones." %}</p>
-              </div>
-            </div>
-          </div>
+          <p class="mb-1 text-[9px] text-amber-600">
+            <span class="font-semibold">{% trans "No hay secuencia configurada" %}</span>
+            <span class="ml-1">{% trans "Configure una secuencia activa para continuar con la emisión de liquidaciones." %}</span>
+          </p>
           {% endif %}
 
           <div class="grid grid-cols-1 md:grid-cols-4 gap-1">
@@ -512,6 +609,16 @@
             </div>
             {% endwith %}
 
+            {% with field=form.tipo_liquidacion %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
             {% with field=form.concepto %}
             <div class="group">
               <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
@@ -522,19 +629,50 @@
             </div>
             {% endwith %}
 
+            {% with field=form.autorizacion %}
             <div class="group">
-              <label for="forma_pago" class="block text-[9px] font-medium text-gray-700">
-                Forma de Pago
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
               </label>
-              <select id="forma_pago" name="forma_pago" class="form-control">
-                <option value="efectivo">Efectivo</option>
-                <option value="cheque">Cheque</option>
-                <option value="credito">Crédito</option>
-                <option value="deposito">Depósito</option>
-              </select>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+          </div>
+        </section>
+
+        <section>
+          <div class="flex items-center pb-1 border-b border-gray-200 mb-1">
+            <i class="fa fa-credit-card text-slate-600 text-[9px] mr-1"></i>
+            <h2 class="text-[10px] font-semibold text-gray-800">{% trans "Formas de Pago" %}</h2>
+          </div>
+
+          <div class="bg-gray-50 border border-gray-200 rounded p-1 space-y-1">
+            {{ pago_formset.management_form }}
+            <div id="formas-pago-container" class="space-y-1">
+              {% for pago_form in pago_formset %}
+                {% include "inventario/liquidacion_compra/_forma_pago_form.html" with form=pago_form index=forloop.counter0 numero=forloop.counter can_delete=pago_formset.can_delete %}
+              {% empty %}
+                {% with form=pago_formset.empty_form %}
+                  {% include "inventario/liquidacion_compra/_forma_pago_form.html" with form=form index=0 numero=1 can_delete=pago_formset.can_delete %}
+                {% endwith %}
+              {% endfor %}
+            </div>
+            <div class="flex items-center gap-1">
+              <button type="button" id="btn-agregar-forma-pago" class="inline-flex items-center gap-1 px-2 py-1 text-[9px] font-semibold rounded bg-slate-800 text-white hover:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-600">
+                <i class="fa fa-plus text-[8px]"></i>
+                <span>{% trans "Agregar forma de pago" %}</span>
+              </button>
+              <p class="text-[8px] text-slate-500">{% trans "Registre una o más formas de pago con el total correspondiente." %}</p>
             </div>
           </div>
         </section>
+
+        <template id="forma-pago-empty-form-template">
+          {% with form=pago_formset.empty_form %}
+            {% include "inventario/liquidacion_compra/_forma_pago_form.html" with form=form index="__prefix__" numero=None can_delete=pago_formset.can_delete %}
+          {% endwith %}
+        </template>
 
         <section>
           <div class="flex items-center pb-1 border-b border-gray-200 mb-1">
@@ -789,13 +927,17 @@
           {% endfor %}
         </div>
 
-        <div class="pt-1 border-t border-gray-200 flex flex-row justify-end gap-1">
-          <button type="submit" class="inline-flex items-center justify-center px-2 py-0.5 bg-gray-800 text-white text-[9px] font-medium rounded hover:bg-gray-900 transition-all">
-            <i class="fa fa-save mr-1 text-[8px]"></i>
-            <span>{% trans "Guardar" %}</span>
+        <div class="form-action-bar">
+          <button
+            id="btn-guardar-liquidacion"
+            type="submit"
+            class="primary-action inline-flex items-center justify-center gap-2 px-5 py-2 text-white font-semibold uppercase transition-transform duration-200"
+          >
+            <i class="fa fa-save text-[14px]"></i>
+            <span>{% trans "Guardar liquidación" %}</span>
           </button>
-          <a href="{% url 'inventario:liquidaciones_compra_listar' %}" class="inline-flex items-center justify-center px-2 py-0.5 bg-gray-100 text-gray-700 text-[9px] font-medium rounded hover:bg-gray-200 transition-all border border-gray-300">
-            <i class="fa fa-arrow-left mr-1 text-[8px]"></i>
+          <a href="{% url 'inventario:liquidaciones_compra_listar' %}" class="secondary-action inline-flex items-center gap-1 px-3 py-1 transition-colors duration-200">
+            <i class="fa fa-arrow-left text-[8px]"></i>
             <span>{% trans "Cancelar" %}</span>
           </a>
         </div>
@@ -1017,6 +1159,8 @@
     const MSG_ERROR_BUSCAR = '{{ _("Error al buscar el producto. Inténtelo de nuevo.")|escapejs }}';
     const MSG_SIN_PRODUCTOS = '{{ _("Debe agregar al menos un producto o servicio.")|escapejs }}';
     const TEXT_ELIMINAR = '{{ _("Eliminar")|escapejs }}';
+    const MSG_FORMA_PAGO_MINIMA = '{{ _("Debe existir al menos una forma de pago activa.")|escapejs }}';
+    const LABEL_FORMA_PAGO = '{{ _("Forma de pago")|escapejs }}';
 
     const productosAgregados = [];
     let contadorProductos = 0;
@@ -1061,6 +1205,187 @@
       } catch (error) {
         return numero.toFixed(decimals);
       }
+    }
+
+    function obtenerContenedorFormasPago() {
+      return document.getElementById('formas-pago-container');
+    }
+
+    function obtenerCampoTotalFormsPago() {
+      return document.getElementById('id_pagos-TOTAL_FORMS');
+    }
+
+    function obtenerFormasPagoActivas() {
+      const container = obtenerContenedorFormasPago();
+      if (!container) {
+        return [];
+      }
+      return Array.from(container.querySelectorAll('.pago-form')).filter((form) => form.dataset.eliminado !== '1');
+    }
+
+    function actualizarIndicesFormasPago() {
+      const activos = obtenerFormasPagoActivas();
+      activos.forEach((form, idx) => {
+        const title = form.querySelector('.forma-pago-title');
+        if (title) {
+          title.textContent = `${LABEL_FORMA_PAGO} #${idx + 1}`;
+        }
+      });
+    }
+
+    function sincronizarTotalesFormasPago(totalGeneral) {
+      const activos = obtenerFormasPagoActivas();
+      if (!activos.length) {
+        return;
+      }
+      const primerFormulario = activos[0];
+      const totalInput = primerFormulario.querySelector('input[name$="-total"]');
+      if (!totalInput) {
+        return;
+      }
+      const editado = totalInput.dataset.userEdited === '1';
+      const valorActual = toNumber(totalInput.value, 0);
+      if (!editado || valorActual <= 0) {
+        totalInput.value = formatDecimal(totalGeneral, 2);
+      }
+    }
+
+    function adjuntarEventosFormaPago(formElement) {
+      if (!formElement) {
+        return;
+      }
+
+      const deleteField = formElement.querySelector('.pago-delete-field input');
+      const removeBtn = formElement.querySelector('.btn-eliminar-forma-pago');
+      if (removeBtn && deleteField) {
+        removeBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          eliminarFormaPago(formElement, deleteField);
+        });
+      }
+
+      const totalInput = formElement.querySelector('input[name$="-total"]');
+      if (totalInput) {
+        if (toNumber(totalInput.value, 0) > 0) {
+          totalInput.dataset.userEdited = '1';
+        }
+        totalInput.addEventListener('input', () => {
+          totalInput.dataset.userEdited = '1';
+        });
+      }
+
+      if (deleteField && deleteField.type === 'checkbox' && deleteField.checked) {
+        formElement.dataset.eliminado = '1';
+        formElement.classList.add('hidden');
+      } else {
+        formElement.dataset.eliminado = formElement.dataset.eliminado || '0';
+      }
+    }
+
+    function eliminarFormaPago(formElement, deleteField) {
+      if (!formElement || !deleteField) {
+        return;
+      }
+      const activos = obtenerFormasPagoActivas();
+      if (activos.length <= 1) {
+        alert(MSG_FORMA_PAGO_MINIMA);
+        return;
+      }
+
+      if (deleteField.type === 'checkbox') {
+        deleteField.checked = true;
+      } else {
+        deleteField.value = 'on';
+      }
+
+      formElement.dataset.eliminado = '1';
+      formElement.classList.add('hidden');
+      actualizarIndicesFormasPago();
+    }
+
+    function agregarFormaPago() {
+      const container = obtenerContenedorFormasPago();
+      const totalFormsInput = obtenerCampoTotalFormsPago();
+      const template = document.getElementById('forma-pago-empty-form-template');
+      if (!container || !totalFormsInput || !template) {
+        return;
+      }
+
+      const index = parseInt(totalFormsInput.value, 10) || 0;
+      const html = template.innerHTML.replace(/__prefix__/g, index);
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = html.trim();
+      const nuevoFormulario = wrapper.firstElementChild;
+      if (!nuevoFormulario) {
+        return;
+      }
+
+      nuevoFormulario.dataset.eliminado = '0';
+      container.appendChild(nuevoFormulario);
+      totalFormsInput.value = index + 1;
+
+      nuevoFormulario.querySelectorAll('input, select, textarea').forEach((field) => {
+        if (field.name && field.name.endsWith('-DELETE')) {
+          if (field.type === 'checkbox') {
+            field.checked = false;
+          } else {
+            field.value = '';
+          }
+          return;
+        }
+        if (field.tagName === 'INPUT') {
+          if (field.type === 'checkbox' || field.type === 'radio') {
+            field.checked = false;
+          } else if (field.type !== 'hidden') {
+            field.value = '';
+          }
+        } else if (field.tagName === 'SELECT') {
+          field.selectedIndex = 0;
+        } else if (field.tagName === 'TEXTAREA') {
+          field.value = '';
+        }
+      });
+
+      adjuntarEventosFormaPago(nuevoFormulario);
+      actualizarIndicesFormasPago();
+    }
+
+    function inicializarFormasPago() {
+      const container = obtenerContenedorFormasPago();
+      const addButton = document.getElementById('btn-agregar-forma-pago');
+      const totalFormsInput = obtenerCampoTotalFormsPago();
+      if (!container || !totalFormsInput) {
+        return;
+      }
+
+      Array.from(container.querySelectorAll('.pago-form')).forEach((formElement) => {
+        adjuntarEventosFormaPago(formElement);
+      });
+      actualizarIndicesFormasPago();
+
+      if (addButton) {
+        addButton.addEventListener('click', (event) => {
+          event.preventDefault();
+          agregarFormaPago();
+        });
+      }
+    }
+
+    function validarFormasPago() {
+      const activos = obtenerFormasPagoActivas();
+      if (!activos.length) {
+        alert(MSG_FORMA_PAGO_MINIMA);
+        return false;
+      }
+      const totalesValidos = activos.some((formElement) => {
+        const totalInput = formElement.querySelector('input[name$="-total"]');
+        return totalInput && toNumber(totalInput.value, 0) > 0;
+      });
+      if (!totalesValidos) {
+        alert(MSG_FORMA_PAGO_MINIMA);
+        return false;
+      }
+      return true;
     }
 
     const IVA_CODE_PERCENT_MAP = Object.freeze({
@@ -1325,6 +1650,7 @@
         totalCell.textContent = `$${formatNumber(total)}`;
       }
       actualizarPanelTotales(resumen);
+      sincronizarTotalesFormasPago(resumen.total);
     }
 
     function actualizarEstadoTabla() {
@@ -1671,6 +1997,9 @@
         alert(MSG_SIN_PRODUCTOS);
         return false;
       }
+      if (!validarFormasPago()) {
+        return false;
+      }
       actualizarCamposOcultos();
       return true;
     }
@@ -1860,9 +2189,65 @@
       }
     }
 
+    function inicializarBarraAccionFlotante() {
+      const actionBar = document.querySelector('.form-action-bar');
+      const footer = document.querySelector('footer.footer');
+      if (!actionBar) {
+        return;
+      }
+
+      const DEFAULT_OFFSET = 16;
+      const root = document.documentElement;
+      const updateSafeArea = () => {
+        const actionBarHeight = actionBar.getBoundingClientRect().height || 0;
+        const buffer = window.innerWidth < 640 ? 56 : 40;
+        const safeValue = Math.max(Math.ceil(actionBarHeight + buffer), 120);
+        root.style.setProperty('--form-action-safe-area', `${safeValue}px`);
+      };
+
+      const setOffset = (px) => {
+        const value = Math.max(px, DEFAULT_OFFSET);
+        const cssValue = `${value}px`;
+        actionBar.style.setProperty('--form-action-bottom', cssValue);
+        root.style.setProperty('--form-action-bottom', cssValue);
+        updateSafeArea();
+      };
+
+      setOffset(DEFAULT_OFFSET);
+
+      if ('ResizeObserver' in window) {
+        const resizeObserver = new ResizeObserver(() => updateSafeArea());
+        resizeObserver.observe(actionBar);
+      } else {
+        window.addEventListener('resize', updateSafeArea, { passive: true });
+      }
+
+      if (!('IntersectionObserver' in window) || !footer) {
+        return;
+      }
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio > 0) {
+            const footerHeight = footer.getBoundingClientRect().height || 72;
+            setOffset(Math.ceil(footerHeight + DEFAULT_OFFSET));
+          } else {
+            setOffset(DEFAULT_OFFSET);
+          }
+        });
+      }, {
+        root: null,
+        threshold: [0, 0.1],
+        rootMargin: '0px 0px -8px 0px',
+      });
+
+      observer.observe(footer);
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       inicializarEventos();
       inicializarBusquedaProveedor();
+      inicializarFormasPago();
       if (productosIniciales.length) {
         productosIniciales.forEach((item) => agregarProductoDesdeObjeto(item, { actualizar: false }));
         actualizarCamposOcultos();
@@ -1872,6 +2257,7 @@
         actualizarEstadoTabla();
       }
       actualizarTotal();
+      inicializarBarraAccionFlotante();
     });
 
     window.buscarProducto = buscarProducto;
