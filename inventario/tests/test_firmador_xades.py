@@ -164,6 +164,127 @@ def test_firmar_xml_usa_certificado_por_empresa(monkeypatch, tmp_path):
     empresa_b.delete()
 
 
+def test_firma_agrega_Id_en_raiz_y_conserva_reference(monkeypatch, tmp_path):
+    """El XML firmado debe exponer Id="…" coherente con el Reference."""
+
+    firmas_root = tmp_path / 'firmas'
+    firmas_root.mkdir()
+    monkeypatch.setattr(settings, 'FIRMAS_ROOT', str(firmas_root), raising=False)
+
+    def simple_save(self, *args, **kwargs):
+        dj_models.Model.save(self, *args, **kwargs)
+
+    monkeypatch.setattr(Opciones, 'save', simple_save, raising=False)
+
+    empresa = Empresa.objects.create(
+        razon_social='Empresa Id',
+        ruc=f"{random.randint(1000000000000, 9999999999999)}",
+    )
+    opciones = Opciones.objects.create(
+        empresa=empresa,
+        identificacion=empresa.ruc,
+        password_firma='clave',
+    )
+    opciones.firma_electronica.save('empresa_id.p12', ContentFile(b'PKCS12-ID'), save=True)
+
+    class DummyPrivateKey:
+        def sign(self, data, _padding, _algorithm):
+            return b'signature'
+
+    class DummyCertificate:
+        def public_bytes(self, _encoding):
+            return b'certificate-der'
+
+    def fake_load_key_and_certificates(p12_bytes, password, backend=None):
+        return DummyPrivateKey(), DummyCertificate(), []
+
+    monkeypatch.setattr(
+        firmador_xades.pkcs12,
+        'load_key_and_certificates',
+        fake_load_key_and_certificates,
+    )
+
+    captured_inputs = []
+
+    class DummyBES:
+        def enveloped(self, xml_data, certificate, cert_der, signproc, tspurl=None, tspcred=None):
+            captured_inputs.append(xml_data)
+            root = etree.fromstring(xml_data)
+            assert root.get('Id') == 'comprobante'
+            assert root.get('id') == 'comprobante'
+
+            ns = 'http://www.w3.org/2000/09/xmldsig#'
+            signature = etree.Element(f'{{{ns}}}Signature')
+            signed_info = etree.SubElement(signature, f'{{{ns}}}SignedInfo')
+            etree.SubElement(
+                signed_info,
+                f'{{{ns}}}CanonicalizationMethod',
+                Algorithm='http://www.w3.org/2001/10/xml-exc-c14n#',
+            )
+            etree.SubElement(
+                signed_info,
+                f'{{{ns}}}SignatureMethod',
+                Algorithm='http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
+            )
+            reference = etree.SubElement(
+                signed_info,
+                f'{{{ns}}}Reference',
+                URI=f"#{root.get('Id') or ''}",
+            )
+            transforms = etree.SubElement(reference, f'{{{ns}}}Transforms')
+            etree.SubElement(
+                transforms,
+                f'{{{ns}}}Transform',
+                Algorithm='http://www.w3.org/2000/09/xmldsig#enveloped-signature',
+            )
+            etree.SubElement(
+                transforms,
+                f'{{{ns}}}Transform',
+                Algorithm='http://www.w3.org/2001/10/xml-exc-c14n#',
+            )
+            etree.SubElement(
+                reference,
+                f'{{{ns}}}DigestMethod',
+                Algorithm='http://www.w3.org/2001/04/xmlenc#sha256',
+            )
+            etree.SubElement(reference, f'{{{ns}}}DigestValue').text = ''
+            etree.SubElement(signature, f'{{{ns}}}SignatureValue').text = ''
+            root.append(signature)
+            return etree.ElementTree(root)
+
+    fake_endesive = types.ModuleType('endesive')
+    fake_xades = types.ModuleType('endesive.xades')
+    fake_xades.BES = DummyBES
+    fake_endesive.xades = fake_xades
+    monkeypatch.setitem(sys.modules, 'endesive', fake_endesive)
+    monkeypatch.setitem(sys.modules, 'endesive.xades', fake_xades)
+
+    xml_path = tmp_path / 'factura.xml'
+    xml_path.write_text('<factura id="comprobante"></factura>', encoding='utf-8')
+    xml_firmado = tmp_path / 'factura_firmada.xml'
+
+    firmador_xades.firmar_xml_xades_bes(str(xml_path), str(xml_firmado), empresa=empresa)
+
+    # Debe haberse enviado a la librería endesive ya con Id="comprobante"
+    assert captured_inputs, 'La librería endesive debió invocarse'
+    root_pre_firma = etree.fromstring(captured_inputs[0])
+    assert root_pre_firma.get('Id') == 'comprobante'
+
+    tree = etree.parse(str(xml_firmado))
+    root_firmado = tree.getroot()
+    assert root_firmado.get('Id') == 'comprobante'
+    assert root_firmado.get('id') == 'comprobante'
+
+    ns = {'ds': 'http://www.w3.org/2000/09/xmldsig#'}
+    reference = tree.find('.//ds:Reference', namespaces=ns)
+    assert reference is not None
+    assert reference.get('URI') == '#comprobante'
+
+    opciones.firma_electronica.delete(save=False)
+    opciones.delete()
+    empresa.delete()
+
+
 def test_firmado_utiliza_hash_de_signature_method(monkeypatch, tmp_path):
     """La firma debe utilizar el hash declarado en SignatureMethod."""
 

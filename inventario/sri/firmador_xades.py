@@ -153,16 +153,25 @@ def firmar_xml_con_endesive(
     # Leer XML fuente
     xml_data = storage_read_bytes(xml_path)
 
-    # Asegurar que el nodo raíz tenga Id="comprobante" (requisito común SRI)
+    # Asegurar que el nodo raíz exponga Id="…" además de id="…" para el SRI
     try:
         doc = etree.parse(io.BytesIO(xml_data))
         root = doc.getroot()
-        # Solo poner si no existe ya
-        # SRI validadores suelen buscar Id="comprobante" o id="comprobante"
-        if root.get("Id") is None and root.get("id") is None:
-            root.set("Id", "comprobante")
-            root.set("id", "comprobante")
-            xml_data = etree.tostring(doc, encoding="UTF-8", xml_declaration=True, standalone=False)
+
+        id_lower = root.get("id")
+        id_value = id_lower or root.get("Id") or "comprobante"
+
+        # Alinear ambos atributos usando el valor elegido
+        root.set("Id", id_value)
+        if id_lower != id_value:
+            root.set("id", id_value)
+
+        xml_data = etree.tostring(
+            doc,
+            encoding="UTF-8",
+            xml_declaration=True,
+            standalone=False,
+        )
     except Exception as e:
         logger.warning("No se pudo preparar Id=comprobante en raíz: %s", e)
 
