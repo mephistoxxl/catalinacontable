@@ -30,6 +30,40 @@ class XAdESError(Exception):
     pass
 
 
+def resolver_hash_algoritmo(algorithm_uri: str):
+    """Obtiene funciones de ``hashlib`` y ``cryptography`` para la URI dada."""
+
+    if algorithm_uri is None:
+        raise XAdESError("Algoritmo de hash no especificado en la firma XAdES")
+
+    normalized = str(algorithm_uri).strip()
+    if not normalized:
+        raise XAdESError("Algoritmo de hash no especificado en la firma XAdES")
+
+    fragment = normalized
+    if "#" in fragment:
+        fragment = fragment.split("#", 1)[1]
+
+    fragment = fragment.lower()
+    for prefix in ("rsa-", "dsa-", "ecdsa-", "hmac-"):
+        if fragment.startswith(prefix):
+            fragment = fragment[len(prefix):]
+            break
+
+    mapping = {
+        "sha1": (hashlib.sha1, hashes.SHA1),
+        "sha224": (hashlib.sha224, hashes.SHA224),
+        "sha256": (hashlib.sha256, hashes.SHA256),
+        "sha384": (hashlib.sha384, hashes.SHA384),
+        "sha512": (hashlib.sha512, hashes.SHA512),
+    }
+
+    if fragment not in mapping:
+        raise XAdESError(f"Algoritmo de hash no soportado: {algorithm_uri}")
+
+    return mapping[fragment]
+
+
 class SRIXAdESFirmador:
     """Firmador XAdES-BES sencillo respaldado por la librería endesive.
 
@@ -155,7 +189,8 @@ def firmar_xml_con_endesive(
     # Función de firma para endesive (RSA + SHA256)
     def signproc(data: bytes, algo: str) -> bytes:
         try:
-            return private_key.sign(data, padding.PKCS1v15(), hashes.SHA256())
+            _, hash_cls = resolver_hash_algoritmo(algo)
+            return private_key.sign(data, padding.PKCS1v15(), hash_cls())
         except Exception as se:
             logger.error("Error firmando bytes canonizados: %s", se)
             raise
@@ -196,6 +231,12 @@ def firmar_xml_con_endesive(
             if digest_value_el is None:
                 raise XAdESError("No se encontró ds:DigestValue")
 
+            digest_method_el = ref.find('ds:DigestMethod', namespaces=ns)
+            if digest_method_el is None:
+                raise XAdESError("No se encontró ds:DigestMethod")
+            digest_algo_uri = digest_method_el.get('Algorithm')
+            hashlib_fn, _ = resolver_hash_algoritmo(digest_algo_uri)
+
             target_root = tree.getroot()
             # Clonar el nodo para aplicar transforms sin mutar el original
             target_copy = deepcopy(target_root)
@@ -221,7 +262,7 @@ def firmar_xml_con_endesive(
                 with_comments=False,
             )
             digest_raw = digest_buffer.getvalue()
-            digest_b64 = base64.b64encode(hashlib.sha256(digest_raw).digest()).decode()
+            digest_b64 = base64.b64encode(hashlib_fn(digest_raw).digest()).decode()
             digest_value_el.text = digest_b64
 
             # Canonicalizar SignedInfo según el algoritmo declarado
@@ -236,7 +277,13 @@ def firmar_xml_con_endesive(
             c14n_signed_info = signed_info_buffer.getvalue()
 
             # Firmar nuevamente SignedInfo con la URI ajustada
-            sig_bytes = private_key.sign(c14n_signed_info, padding.PKCS1v15(), hashes.SHA256())
+            signature_method_el = signed_info.find('ds:SignatureMethod', namespaces=ns)
+            if signature_method_el is None:
+                raise XAdESError("No se encontró ds:SignatureMethod")
+            signature_algo_uri = signature_method_el.get('Algorithm')
+            _, hash_cls = resolver_hash_algoritmo(signature_algo_uri)
+
+            sig_bytes = private_key.sign(c14n_signed_info, padding.PKCS1v15(), hash_cls())
             sig_b64 = base64.b64encode(sig_bytes).decode()
             # Formatear en líneas de 64 caracteres como realiza endesive
             formatted = "\n".join(sig_b64[i:i + 64] for i in range(0, len(sig_b64), 64))
