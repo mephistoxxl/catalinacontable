@@ -13,6 +13,7 @@ import base64
 import hashlib
 import uuid
 from datetime import datetime
+from copy import deepcopy
 
 from inventario.utils.storage_io import storage_read_bytes, storage_write_bytes
 
@@ -175,18 +176,56 @@ def firmar_xml_con_endesive(xml_path: str, xml_firmado_path: str) -> bool:
         ref = signed_info.find('ds:Reference', namespaces=ns)
         if ref is not None and ref.get('URI', '') == "":
             ref.set('URI', '#comprobante')
-            # Canonicalizar SignedInfo según C14N clásico
-            data = etree.tostring(signed_info, encoding="UTF-8", xml_declaration=True, standalone=False)
-            buf = io.BytesIO(data)
-            t = etree.parse(buf)
-            out = io.BytesIO()
-            t.write_c14n(out, exclusive=False, with_comments=False)
-            c14n = out.getvalue()
-            # Firmar nuevamente SignedInfo
-            sig_bytes = private_key.sign(c14n, padding.PKCS1v15(), hashes.SHA256())
+
+            # Recalcular digest tomando en cuenta los transforms declarados
+            digest_value_el = ref.find('ds:DigestValue', namespaces=ns)
+            if digest_value_el is None:
+                raise XAdESError("No se encontró ds:DigestValue")
+
+            target_root = tree.getroot()
+            # Clonar el nodo para aplicar transforms sin mutar el original
+            target_copy = deepcopy(target_root)
+
+            transforms_el = ref.find('ds:Transforms', namespaces=ns)
+            exclusive_c14n = False
+            if transforms_el is not None:
+                for transform in transforms_el.findall('ds:Transform', namespaces=ns):
+                    algo = transform.get('Algorithm') or ''
+                    if algo.endswith('#enveloped-signature'):
+                        sig_inside = target_copy.find('.//ds:Signature', namespaces=ns)
+                        if sig_inside is not None and sig_inside.getparent() is not None:
+                            sig_inside.getparent().remove(sig_inside)
+                    elif algo.endswith('xml-exc-c14n#'):
+                        exclusive_c14n = True
+                    elif algo.endswith('REC-xml-c14n-20010315'):
+                        exclusive_c14n = False
+
+            digest_buffer = io.BytesIO()
+            etree.ElementTree(target_copy).write_c14n(
+                digest_buffer,
+                exclusive=exclusive_c14n,
+                with_comments=False,
+            )
+            digest_raw = digest_buffer.getvalue()
+            digest_b64 = base64.b64encode(hashlib.sha256(digest_raw).digest()).decode()
+            digest_value_el.text = digest_b64
+
+            # Canonicalizar SignedInfo según el algoritmo declarado
+            can_method = signed_info.find('ds:CanonicalizationMethod', namespaces=ns)
+            can_algo = (can_method.get('Algorithm') if can_method is not None else '') or ''
+            signed_info_buffer = io.BytesIO()
+            etree.ElementTree(signed_info).write_c14n(
+                signed_info_buffer,
+                exclusive=can_algo.endswith('xml-exc-c14n#'),
+                with_comments=can_algo.endswith('#WithComments'),
+            )
+            c14n_signed_info = signed_info_buffer.getvalue()
+
+            # Firmar nuevamente SignedInfo con la URI ajustada
+            sig_bytes = private_key.sign(c14n_signed_info, padding.PKCS1v15(), hashes.SHA256())
             sig_b64 = base64.b64encode(sig_bytes).decode()
-            # Formatear en líneas de 64 chars como hace endesive
-            formatted = "\n".join(sig_b64[i:i+64] for i in range(0, len(sig_b64), 64))
+            # Formatear en líneas de 64 caracteres como realiza endesive
+            formatted = "\n".join(sig_b64[i:i + 64] for i in range(0, len(sig_b64), 64))
             sig_value_el = signature_el.find('ds:SignatureValue', namespaces=ns)
             if sig_value_el is None:
                 raise XAdESError("No se encontró ds:SignatureValue")
