@@ -65,7 +65,11 @@ class SRIXAdESFirmador:
 
     def firmar_xml_xades_bes(self, xml_path: str, xml_firmado_path: str) -> bool:
         """Firma un XML usando XAdES-BES y guarda el resultado."""
-        return firmar_xml_con_endesive(xml_path, xml_firmado_path)
+        return firmar_xml_con_endesive(
+            xml_path,
+            xml_firmado_path,
+            opciones=self.opciones,
+        )
 
 
 def firmar_xml_xades_bes(xml_path: str, xml_firmado_path: str, empresa=None) -> bool:
@@ -80,11 +84,22 @@ def firmar_xml_xades_bes(xml_path: str, xml_firmado_path: str, empresa=None) -> 
     return firmador.firmar_xml_xades_bes(xml_path, xml_firmado_path)
 
 
-def firmar_xml_con_endesive(xml_path: str, xml_firmado_path: str) -> bool:
+def firmar_xml_con_endesive(
+    xml_path: str,
+    xml_firmado_path: str,
+    opciones=None,
+    empresa=None,
+) -> bool:
     """Firma XML usando la implementación XAdES de la librería endesive.
 
-    Usa endesive.xades.BES.enveloped con una función de firmado basada en
-    la llave privada del archivo PKCS#12 configurado en Opciones.
+    Args:
+        xml_path: ruta origen del XML.
+        xml_firmado_path: ruta destino del XML firmado.
+        opciones: instancia de ``Opciones`` ya resuelta (opcional).
+        empresa: empresa explícita a usar si no se proporciona ``opciones``.
+
+    Usa ``endesive.xades.BES.enveloped`` con una función de firmado basada en
+    la llave privada del archivo PKCS#12 configurado en ``Opciones``.
     """
     try:
         # API actual de endesive (no existe endesive.xml.xades en versiones recientes)
@@ -97,10 +112,9 @@ def firmar_xml_con_endesive(xml_path: str, xml_firmado_path: str) -> bool:
         logger.error("%s: %s", msg, e)
         raise XAdESError(msg)
 
-    # Reutilizar lógica: instanciar firmador para asegurar misma selección / diagnósticos
-    # (No pasamos empresa aquí porque firmar_xml_xades_bes ya la procesó antes)
-    signer_aux = SRIXAdESFirmador()
-    opciones = signer_aux.opciones
+    if opciones is None:
+        signer_aux = SRIXAdESFirmador(empresa=empresa)
+        opciones = signer_aux.opciones
 
     # Leer XML fuente
     xml_data = storage_read_bytes(xml_path)
