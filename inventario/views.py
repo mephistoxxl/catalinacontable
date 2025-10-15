@@ -2670,7 +2670,8 @@ class DetallesFactura(LoginRequiredMixin, View):
                     factura=factura,
                     forma_pago='20',  # 'Otros con utilización del sistema financiero'
                     total=monto_total_factura,
-                    caja=caja_default
+                    caja=caja_default,
+                    empresa=factura.empresa
                 )
                 logger.info(f"✅ Forma de pago automática creada: id={forma_pago_auto.id} total={monto_total_factura}")
                 pagos_list = [{
@@ -2729,7 +2730,8 @@ class DetallesFactura(LoginRequiredMixin, View):
                     factura=factura,
                     forma_pago=sri_pago,
                     total=monto,
-                    caja=caja
+                    caja=caja,
+                    empresa=factura.empresa
                 )
                 suma_pagos += monto
                 logger.info(f"   ✅ Pago registrado. Total acumulado: {suma_pagos}")
@@ -2758,7 +2760,7 @@ class DetallesFactura(LoginRequiredMixin, View):
                                 CampoAdicional.objects.update_or_create(
                                     factura=factura,
                                     nombre='Banco Cheque',
-                                    defaults={'valor': banco_nombre, 'orden': 1}
+                                    defaults={'valor': banco_nombre, 'orden': 1, 'empresa': factura.empresa}
                                 )
 
                         # Comprobante
@@ -2766,14 +2768,14 @@ class DetallesFactura(LoginRequiredMixin, View):
                             CampoAdicional.objects.update_or_create(
                                 factura=factura,
                                 nombre='Comprobante Cheque',
-                                defaults={'valor': comprobante, 'orden': 2}
+                                defaults={'valor': comprobante, 'orden': 2, 'empresa': factura.empresa}
                             )
                         # Vence (fecha)
                         if vence:
                             CampoAdicional.objects.update_or_create(
                                 factura=factura,
                                 nombre='Vence Cheque',
-                                defaults={'valor': vence, 'orden': 3}
+                                defaults={'valor': vence, 'orden': 3, 'empresa': factura.empresa}
                             )
                     # Tarjeta de crédito (código 19) u objeto con tipo 'tarjeta'
                     if str(sri_pago) == '19' or str(pago.get('tipo', '')).lower() == 'tarjeta':
@@ -2784,7 +2786,7 @@ class DetallesFactura(LoginRequiredMixin, View):
                             CampoAdicional.objects.update_or_create(
                                 factura=factura,
                                 nombre='Tarjeta',
-                                defaults={'valor': tarjeta_tipo, 'orden': 4}
+                                defaults={'valor': tarjeta_tipo, 'orden': 4, 'empresa': factura.empresa}
                             )
                     # Depósito con banco y comprobante
                     if str(pago.get('tipo', '')).lower() == 'deposito':
@@ -2797,7 +2799,7 @@ class DetallesFactura(LoginRequiredMixin, View):
                                 CampoAdicional.objects.update_or_create(
                                     factura=factura,
                                     nombre='Banco Depósito',
-                                    defaults={'valor': str(banco.banco), 'orden': 5},
+                                    defaults={'valor': str(banco.banco), 'orden': 5, 'empresa': factura.empresa},
                                 )
                             except Banco.DoesNotExist:
                                 # Banco inexistente o de otra empresa: ignorar
@@ -2806,7 +2808,7 @@ class DetallesFactura(LoginRequiredMixin, View):
                             CampoAdicional.objects.update_or_create(
                                 factura=factura,
                                 nombre='Comprobante Depósito',
-                                defaults={'valor': comprobante_dep, 'orden': 6},
+                                defaults={'valor': comprobante_dep, 'orden': 6, 'empresa': factura.empresa},
                             )
                 except Exception as _e:
                     logger.warning(f"No se pudieron guardar datos adicionales del cheque: {_e}")
@@ -2816,6 +2818,10 @@ class DetallesFactura(LoginRequiredMixin, View):
             # Recalcular totales de la factura para evitar diferencias por redondeo
             factura.save()
             factura.refresh_from_db()
+
+            if factura.empresa_id:
+                FormaPago.all_objects.filter(factura=factura, empresa__isnull=True).update(empresa=factura.empresa)
+                CampoAdicional.all_objects.filter(factura=factura, empresa__isnull=True).update(empresa=factura.empresa)
 
             # 🔍 DEBUG: Logging detallado antes de validar pagos
             logger.info(f"📊 VALIDACIÓN FINAL:")
@@ -6237,7 +6243,8 @@ class GuardarFormaPagoView(LoginRequiredMixin, View):
                 factura=factura,
                 forma_pago=forma_pago_codigo,  # Código SRI exacto seleccionado
                 caja=caja,                     # Caja exacta seleccionada
-                total=monto                    # Monto exacto ingresado
+                total=monto,                   # Monto exacto ingresado
+                empresa=factura.empresa
             )
             
             # Verificar coherencia final después de la creación (debe ser exacta)

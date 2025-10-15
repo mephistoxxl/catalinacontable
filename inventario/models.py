@@ -1331,12 +1331,17 @@ class Factura(models.Model):
         """
         from decimal import Decimal
         
+        # Alinear cualquier forma de pago existente con el tenant correcto
+        if self.empresa_id:
+            FormaPago.all_objects.filter(factura=self, empresa__isnull=True).update(empresa=self.empresa)
+
         # Si no hay formas de pago, crear una por defecto
         if not self.formas_pago.exists():
             FormaPago.objects.create(
                 factura=self,
                 forma_pago='20',  # Otros con utilización del sistema financiero
-                total=self.monto_general
+                total=self.monto_general,
+                empresa=self.empresa
             )
             return f"✅ Forma de pago creada: ${self.monto_general}"
         
@@ -1349,6 +1354,8 @@ class Factura(models.Model):
         
         # Ajustar la primera forma de pago
         primera_forma_pago = self.formas_pago.first()
+        if self.empresa_id and primera_forma_pago and primera_forma_pago.empresa_id is None:
+            primera_forma_pago.empresa = self.empresa
         nuevo_total = primera_forma_pago.total + diferencia
         
         # Asegurar que el nuevo total no sea negativo
@@ -1361,7 +1368,7 @@ class Factura(models.Model):
             primera_forma_pago.total = nuevo_total
         
         primera_forma_pago.save()
-        
+
         return f"✅ Formas de pago sincronizadas. Diferencia corregida: ${diferencia}"
 
     def _calcular_y_crear_totales_impuestos(self, save_to_db=True):
@@ -1401,13 +1408,15 @@ class Factura(models.Model):
         for (codigo, codigo_porcentaje), datos in impuestos_agrupados.items():
             total_impuestos_calculado += datos['valor']
             if save_to_db:
+                empresa_factura = getattr(self, 'empresa', None)
                 TotalImpuesto.objects.create(
                     factura=self,
                     codigo=codigo,
                     codigo_porcentaje=codigo_porcentaje,
                     base_imponible=datos['base_imponible'],
                     valor=datos['valor'],
-                    tarifa=datos['tarifa']
+                    tarifa=datos['tarifa'],
+                    empresa=empresa_factura
                 )
         return total_impuestos_calculado
 
@@ -1677,6 +1686,10 @@ class DetalleFactura(models.Model):
         from django.core.exceptions import ValidationError
         
         # ========== FASE 1: VALIDAR DATOS BÁSICOS ==========
+        # Alinear el registro con el tenant activo para que TenantManager lo encuentre
+        if self.factura and getattr(self.factura, 'empresa_id', None):
+            self.empresa = self.factura.empresa
+
         if not (self.producto or self.servicio):
             raise ValueError("Debe asignar producto o servicio al detalle")
         if not self.cantidad or self.cantidad <= 0:
@@ -1834,13 +1847,16 @@ class DetalleFactura(models.Model):
             valor_iva_redondeado = Decimal('0.00')
 
         # Crear ImpuestoDetalle para IVA CON REDONDEO
+        empresa_factura = getattr(self.factura, 'empresa', None)
+
         ImpuestoDetalle.objects.create(
             detalle_factura=self,
             codigo='2',  # IVA siempre es código 2 según tabla 16 SRI
             codigo_porcentaje=codigo_iva_sri,
             tarifa=Decimal(str(porcentaje_iva)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
             base_imponible=self.sub_total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
-            valor=valor_iva_redondeado
+            valor=valor_iva_redondeado,
+            empresa=empresa_factura
         )
 
 # ---------------------------------------------------------------------------------------

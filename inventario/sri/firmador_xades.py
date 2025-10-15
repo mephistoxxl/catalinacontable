@@ -10,6 +10,9 @@ from inventario.tenant.queryset import get_current_tenant
 from lxml import etree
 import io
 import base64
+import hashlib
+import uuid
+from datetime import datetime
 
 from inventario.utils.storage_io import storage_read_bytes, storage_write_bytes
 
@@ -147,22 +150,28 @@ def firmar_xml_con_endesive(xml_path: str, xml_firmado_path: str) -> bool:
         signer = BES()
         tree = signer.enveloped(
             xml_data,
-            certificate,  # objeto x509
+            certificate,
             cert_der,
             signproc,
             tspurl=None,
             tspcred=None,
         )
 
-        # Ajustar URI de la referencia principal a '#comprobante' y recalcular SignatureValue
-        ns = {"ds": "http://www.w3.org/2000/09/xmldsig#"}
+        ns = {
+            'ds': 'http://www.w3.org/2000/09/xmldsig#',
+            'xades': 'http://uri.etsi.org/01903/v1.3.2#'
+        }
         signature_el = tree.find('.//ds:Signature', namespaces=ns)
         if signature_el is None:
             raise XAdESError("No se generó elemento ds:Signature en XML")
+
+        signature_id = signature_el.get('Id') or f"Signature_{uuid.uuid4()}"
+        signature_el.set('Id', signature_id)
+
         signed_info = signature_el.find('ds:SignedInfo', namespaces=ns)
         if signed_info is None:
             raise XAdESError("No se encontró ds:SignedInfo")
-        # Primera referencia (al documento)
+
         ref = signed_info.find('ds:Reference', namespaces=ns)
         if ref is not None and ref.get('URI', '') == "":
             ref.set('URI', '#comprobante')
