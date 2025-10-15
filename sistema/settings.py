@@ -237,10 +237,6 @@ INSTALLED_APPS = [
 if globals().get('_ADD_STORAGES'):
     INSTALLED_APPS.append('storages')
 
-# Registrar django-anymail si se habilita SES (después de definir INSTALLED_APPS)
-if os.environ.get('USE_SES', 'False').lower() == 'true' or os.environ.get('EMAIL_BACKEND', '').startswith('anymail.'):
-    INSTALLED_APPS.append('anymail')
-
 MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -381,44 +377,21 @@ if os.environ.get('DISABLE_INVENTARIO_MIGRATIONS'):
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# ==============================
-# Email configuration (Anymail + Amazon SES)
-# ==============================
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@example.com')
-SERVER_EMAIL = os.environ.get('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
-
-# Permite activar SES con USE_SES=true o declarando EMAIL_BACKEND=anymail.backends.amazon_ses.EmailBackend
-USE_SES = os.environ.get('USE_SES', 'False').lower() == 'true'
-EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND')
-if not EMAIL_BACKEND:
-    EMAIL_BACKEND = 'anymail.backends.amazon_ses.EmailBackend' if USE_SES else 'django.core.mail.backends.console.EmailBackend'
-
-# Configuración de Anymail para Amazon SES
-if EMAIL_BACKEND.startswith('anymail.'):
-    ANYMAIL = {
-        'AMAZON_SES_CLIENT_PARAMS': {
-            # Si usas IAM con variables de entorno, boto3 las tomará automáticamente
-            # Puedes forzar credenciales/región si lo deseas:
-            # 'aws_access_key_id': os.environ.get('AWS_SES_ACCESS_KEY_ID') or os.environ.get('AWS_ACCESS_KEY_ID'),
-            # 'aws_secret_access_key': os.environ.get('AWS_SES_SECRET_ACCESS_KEY') or os.environ.get('AWS_SECRET_ACCESS_KEY'),
-            'region_name': os.environ.get('AWS_SES_REGION_NAME') or os.environ.get('AWS_REGION') or os.environ.get('AWS_DEFAULT_REGION') or 'us-east-1',
-        },
-        # Opcional: sandbox/override
-        'SEND_DEFAULTS': {
-            'tags': [os.environ.get('EMAIL_TAG', 'sisfact')],
-        },
-    }
-
-# Compatibilidad: si se usa SMTP tradicional
-EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
+# Configuración de correo (Zeptomail por defecto)
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.zeptomail.com')
 try:
-    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 25))
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
 except Exception:
-    EMAIL_PORT = 25
-EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'False') == 'True'
-EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False') == 'True'
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+    EMAIL_PORT = 587
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() == 'true'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'emailapikey')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'wSsVR60jrkKlBqt9yjaqJOo8mAhXAlilE0R73lWi7H7/S6zEocdulkWaVwfzHKcfF2VoRztGpLkumUsJ1DcNjYl4zF9WDSiF9mqRe1U4J3x17qnvhDzPWWhdlBqKJY0IwwxrnWhkFMwr+g==')
+
+# Asegurar remitente por defecto acorde a Zeptomail
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@catalinasoft-ec.com')
+SERVER_EMAIL = os.environ.get('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
 
 # Configuración global de Django REST Framework
 REST_FRAMEWORK = {
