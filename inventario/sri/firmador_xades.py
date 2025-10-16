@@ -60,13 +60,13 @@ def _normalizar_atributos_factura(element: Optional[etree._Element]) -> None:
     if not id_value or id_value.lower() != "comprobante":
         id_value = "comprobante"
 
+    # Elimina variantes no estandarizadas de "Id" y fuerza solo el atributo en minúscula.
     for attr in id_attributes:
-        element.set(attr, id_value)
+        attr_local = attr.rsplit("}", 1)[-1] if "}" in attr else attr
+        if attr_local != "id":
+            del element.attrib[attr]
 
-    if "Id" not in element.attrib:
-        element.set("Id", id_value)
-    if "id" not in element.attrib:
-        element.set("id", id_value)
+    element.set("id", id_value)
 
     if preserved_version is not None:
         element.set("version", preserved_version)
@@ -83,19 +83,19 @@ def _normalizar_factura_bytes(xml_bytes: bytes) -> bytes:
     root = doc.getroot()
     _normalizar_atributos_factura(root)
 
-    id_attrs = [
-        attr
-        for attr in root.attrib
-        if (attr.rsplit("}", 1)[-1] if "}" in attr else attr).lower() == "id"
-    ]
-    if not id_attrs:
+    id_value = root.get("id")
+    if (id_value or "").strip() != "comprobante":
         raise XAdESError(
-            "Normalizacion fallida: el comprobante debe exponer el atributo 'Id'='comprobante'"
+            "Normalizacion fallida: el comprobante debe exponer el atributo 'id'='comprobante'"
         )
 
-    id_values = {root.get(attr) for attr in id_attrs}
-    if any((value or "").strip() != "comprobante" for value in id_values):
-        raise XAdESError("Normalizacion fallida: el comprobante debe tener Id='comprobante'")
+    for attr in list(root.attrib):
+        attr_local = attr.rsplit("}", 1)[-1] if "}" in attr else attr
+        if attr_local.lower() == "id" and attr_local != "id":
+            other_value = root.get(attr)
+            if (other_value or "").strip() and (other_value or "").strip() != "comprobante":
+                raise XAdESError("Normalizacion fallida: valores inconsistentes de identificador")
+            del root.attrib[attr]
     if root.get("version") is None:
         raise XAdESError("Normalizacion fallida: falta el atributo obligatorio 'version'")
 
@@ -336,16 +336,21 @@ def firmar_xml_xades_bes(
         if (attr.rsplit("}", 1)[-1] if "}" in attr else attr).lower() == "id"
     ]
     if not id_attrs_signed:
-        raise XAdESError("El comprobante firmado debe incluir Id='comprobante'")
+        raise XAdESError("El comprobante firmado debe incluir id='comprobante'")
 
-    id_values_signed = {root_signed.get(attr) for attr in id_attrs_signed}
-    if any((value or "").strip() != "comprobante" for value in id_values_signed):
-        raise XAdESError("El comprobante firmado debe conservar Id='comprobante'")
-
-    if root_signed.get("Id") != "comprobante":
-        raise XAdESError("El comprobante firmado debe exponer Id='comprobante'")
-    if root_signed.get("id") != "comprobante":
+    id_value_signed = (root_signed.get("id") or "").strip()
+    if id_value_signed != "comprobante":
         raise XAdESError("El comprobante firmado debe exponer id='comprobante'")
+
+    for attr in id_attrs_signed:
+        attr_local = attr.rsplit("}", 1)[-1] if "}" in attr else attr
+        if attr_local != "id":
+            other_value = (root_signed.get(attr) or "").strip()
+            if other_value and other_value != "comprobante":
+                raise XAdESError(
+                    "El comprobante firmado no puede contener identificadores inconsistentes"
+                )
+            del root_signed.attrib[attr]
 
     signature_el = tree.find(".//ds:Signature", namespaces=NSMAP)
     if signature_el is None:
