@@ -1,0 +1,44 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<factura xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" id="comprobante" Id="comprobante" version="1.1.0">
+    <infoTributaria>
+        <razonSocial>Empresa de Prueba</razonSocial>
+        <ruc>1790012345001</ruc>
+    </infoTributaria>
+    <ds:Signature Id="Signature123">
+        <ds:SignedInfo>
+            <ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+            <ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+            <ds:Reference URI="#comprobante">
+                <ds:Transforms>
+                    <ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+                    <ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+                </ds:Transforms>
+                <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                <ds:DigestValue>u/SN/ZcMtqogzWEQJkOH9rXetUoFUSegnU9BF2SZ4bU=</ds:DigestValue>
+            </ds:Reference>
+            <ds:Reference Type="http://uri.etsi.org/01903#SignedProperties" URI="#SignedProperties123">
+                <ds:Transforms>
+                    <ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+                </ds:Transforms>
+                <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                <ds:DigestValue>CJAtlv0/mtV+FusbW6WYbgme7B0NZaAoT4OgEnB1fxA=</ds:DigestValue>
+            </ds:Reference>
+        </ds:SignedInfo>
+        <ds:SignatureValue/>
+        <ds:KeyInfo/>
+        <ds:Object>
+            <xades:QualifyingProperties Target="#Signature123">
+                <xades:SignedProperties Id="SignedProperties123">
+                    <xades:SignedSignatureProperties>
+                        <xades:SigningTime>2024-01-01T00:00:00Z</xades:SigningTime>
+                    </xades:SignedSignatureProperties>
+                    <xades:SignedDataObjectProperties>
+                        <xades:DataObjectFormat ObjectReference="#comprobante">
+                            <xades:Description>Factura de prueba</xades:Description>
+                        </xades:DataObjectFormat>
+                    </xades:SignedDataObjectProperties>
+                </xades:SignedProperties>
+            </xades:QualifyingProperties>
+        </ds:Object>
+    </ds:Signature>
+</factura>

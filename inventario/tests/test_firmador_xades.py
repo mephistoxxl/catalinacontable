@@ -5,6 +5,7 @@ import os
 import random
 import sys
 import types
+from pathlib import Path
 
 os.environ.setdefault('DATABASE_URL', 'sqlite:///test_db.sqlite3')
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sistema.settings')
@@ -418,3 +419,43 @@ def test_firmado_utiliza_hash_de_signature_method(monkeypatch, tmp_path):
     opciones.firma_electronica.delete(save=False)
     opciones.delete()
     empresa.delete()
+
+
+def test_recalcular_digest_para_factura_y_signed_properties():
+    """Los digests deben calcularse sobre el objetivo indicado en la referencia."""
+
+    fixture_path = Path(__file__).resolve().parent / "data" / "factura_firmada_muestra.xml"
+    tree = etree.parse(str(fixture_path))
+
+    ns = {"ds": firmador_xades.DS_NS}
+    expected = {
+        "#comprobante": "u/SN/ZcMtqogzWEQJkOH9rXetUoFUSegnU9BF2SZ4bU=",
+        "#SignedProperties123": "CJAtlv0/mtV+FusbW6WYbgme7B0NZaAoT4OgEnB1fxA=",
+    }
+
+    for reference in tree.findall(".//ds:Reference", namespaces=ns):
+        digest_value = reference.find("ds:DigestValue", namespaces=ns)
+        assert digest_value is not None
+        digest_value.text = "INVALIDO"
+
+        firmador_xades._recalcular_digest(reference, tree)
+
+        uri = reference.get("URI")
+        assert uri in expected
+        assert digest_value.text == expected[uri]
+
+
+def test_recalcular_digest_error_si_objetivo_inexistente():
+    """Debe producirse un error comprensible si la referencia no existe."""
+
+    fixture_path = Path(__file__).resolve().parent / "data" / "factura_firmada_muestra.xml"
+    tree = etree.parse(str(fixture_path))
+
+    ns = {"ds": firmador_xades.DS_NS}
+    reference = tree.find(".//ds:Reference[@URI='#SignedProperties123']", namespaces=ns)
+    assert reference is not None
+
+    reference.set("URI", "#NoExiste")
+
+    with pytest.raises(firmador_xades.XAdESError, match="NoExiste"):
+        firmador_xades._recalcular_digest(reference, tree)

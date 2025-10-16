@@ -168,8 +168,34 @@ def _resolver_opciones_firma(
     return registro
 
 
-def _canonicalizar_objetivo(root: etree._Element, transforms: Optional[etree._Element]) -> bytes:
-    target = deepcopy(root)
+def _resolver_objetivo_desde_uri(root: etree._Element, uri: Optional[str]) -> etree._Element:
+    """Obtiene el elemento objetivo de una referencia ds:Reference."""
+
+    if uri in (None, "", "#"):
+        return root
+
+    if not uri.startswith("#"):
+        raise XAdESError(f"Referencia ds:Reference no soportada: URI='{uri}'")
+
+    target_id = uri[1:]
+    if not target_id:
+        return root
+
+    for element in root.iter():
+        for attr in ("Id", "ID", "id"):
+            value = element.get(attr)
+            if value is not None and value.strip() == target_id:
+                return element
+
+    raise XAdESError(f"No se encontro el elemento referenciado por URI='{uri}'")
+
+
+def _canonicalizar_objetivo(reference: etree._Element, tree: etree._ElementTree) -> bytes:
+    root = tree.getroot()
+    transforms = reference.find("ds:Transforms", namespaces=NSMAP)
+
+    objetivo = _resolver_objetivo_desde_uri(root, reference.get("URI"))
+    target = deepcopy(objetivo)
     _normalizar_atributos_factura(target)
 
     exclusive = False
@@ -208,8 +234,11 @@ def _recalcular_digest(reference: etree._Element, tree: etree._ElementTree) -> N
         raise XAdESError("Elementos de digest incompletos en la firma")
 
     hashlib_fn, _ = resolver_hash_algoritmo(digest_method.get("Algorithm"))
-    transforms = reference.find("ds:Transforms", namespaces=NSMAP)
-    canonical = _canonicalizar_objetivo(tree.getroot(), transforms)
+    try:
+        canonical = _canonicalizar_objetivo(reference, tree)
+    except XAdESError as exc:
+        uri = reference.get("URI")
+        raise XAdESError(f"Error al canonicalizar la referencia URI='{uri}': {exc}") from exc
     digest_value.text = base64.b64encode(hashlib_fn(canonical).digest()).decode()
 
 
