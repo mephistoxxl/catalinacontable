@@ -1,0 +1,14 @@
+{
+  "estado": "AUTORIZADO",
+  "numeroAutorizacion": "2205202412345678901234567890123456789012345",
+  "fechaAutorizacion": "2024-05-18T16:22:45-05:00",
+  "ambiente": "PRUEBAS",
+  "mensajes": [
+    {
+      "identificador": "60",
+      "mensaje": "COMPROBANTE AUTORIZADO",
+      "informacionAdicional": "Respuesta recibida en el portal de pruebas del SRI",
+      "tipo": "INFORMATIVO"
+    }
+  ]
+}
