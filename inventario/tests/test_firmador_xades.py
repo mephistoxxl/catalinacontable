@@ -118,7 +118,7 @@ def test_firmar_xml_usa_certificado_por_empresa(monkeypatch, tmp_path):
                 f'{{{ns}}}SignatureMethod',
                 Algorithm='http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
             )
-            assert root.get('Id') == 'comprobante'
+            assert root.get('Id') is None
             assert root.get('id') == 'comprobante'
             reference = etree.SubElement(signed_info, f'{{{ns}}}Reference', URI='#comprobante')
             transforms = etree.SubElement(reference, f'{{{ns}}}Transforms')
@@ -214,7 +214,7 @@ def test_firma_agrega_Id_en_raiz_y_conserva_reference(monkeypatch, tmp_path):
         def enveloped(self, xml_data, certificate, cert_der, signproc, tspurl=None, tspcred=None):
             captured_inputs.append(xml_data)
             root = etree.fromstring(xml_data)
-            assert root.get('Id') == 'comprobante'
+            assert root.get('Id') is None
             assert root.get('id') == 'comprobante'
 
             ns = 'http://www.w3.org/2000/09/xmldsig#'
@@ -273,11 +273,11 @@ def test_firma_agrega_Id_en_raiz_y_conserva_reference(monkeypatch, tmp_path):
     # Debe haberse enviado a la librería endesive ya con Id="comprobante"
     assert captured_inputs, 'La librería endesive debió invocarse'
     root_pre_firma = etree.fromstring(captured_inputs[0])
-    assert root_pre_firma.get('Id') == 'comprobante'
+    assert root_pre_firma.get('Id') is None
 
     tree = etree.parse(str(xml_firmado))
     root_firmado = tree.getroot()
-    assert root_firmado.get('Id') == 'comprobante'
+    assert root_firmado.get('Id') is None
     assert root_firmado.get('id') == 'comprobante'
 
     ns = {'ds': 'http://www.w3.org/2000/09/xmldsig#'}
@@ -287,7 +287,15 @@ def test_firma_agrega_Id_en_raiz_y_conserva_reference(monkeypatch, tmp_path):
 
     digest_value = tree.find('.//ds:DigestValue', namespaces=ns)
     assert digest_value is not None
-    assert (digest_value.text or '').strip() != ''
+    digest_text = (digest_value.text or '').strip()
+    assert digest_text != ''
+
+    digest_method = reference.find('ds:DigestMethod', namespaces=ns)
+    assert digest_method is not None
+    canonical = firmador_xades._canonicalizar_objetivo(reference, tree)
+    hashlib_fn, _ = firmador_xades.resolver_hash_algoritmo(digest_method.get('Algorithm'))
+    expected_digest = base64.b64encode(hashlib_fn(canonical).digest()).decode()
+    assert digest_text == expected_digest
 
     opciones.firma_electronica.delete(save=False)
     opciones.delete()
@@ -355,7 +363,7 @@ def test_firmado_utiliza_hash_de_signature_method(monkeypatch, tmp_path):
                 f'{{{ns}}}SignatureMethod',
                 Algorithm='http://www.w3.org/2000/09/xmldsig#rsa-sha1',
             )
-            assert root.get('Id') == 'comprobante'
+            assert root.get('Id') is None
             assert root.get('id') == 'comprobante'
             reference = etree.SubElement(signed_info, f'{{{ns}}}Reference', URI='#comprobante')
             transforms = etree.SubElement(reference, f'{{{ns}}}Transforms')
@@ -429,7 +437,7 @@ def test_recalcular_digest_para_factura_y_signed_properties():
 
     ns = {"ds": firmador_xades.DS_NS}
     expected = {
-        "#comprobante": "u/SN/ZcMtqogzWEQJkOH9rXetUoFUSegnU9BF2SZ4bU=",
+        "#comprobante": "p0P5r+kgPOTR0qGMfYbEY4kI0PrQ2zzgmjSqEKmy/co=",
         "#SignedProperties123": "CJAtlv0/mtV+FusbW6WYbgme7B0NZaAoT4OgEnB1fxA=",
     }
 
