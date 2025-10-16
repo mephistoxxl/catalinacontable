@@ -732,17 +732,28 @@ class SRIIntegration:
     def _firmar_xml_xades_bes(self, xml_path, xml_firmado_path, empresa=None):
         """Firma un XML utilizando el esquema XAdES-BES."""
         try:
-            from .firmador_xades import firmar_xml_xades_bes, XAdESError
-            firmar_xml_xades_bes(xml_path, xml_firmado_path, empresa=empresa)
+            from . import firmador_xades
+        except ImportError as exc:
+            logger.error(f"Dependencias de firma XAdES no disponibles: {exc}")
+            raise Exception(
+                "Proceso de firma fallido: dependencias XAdES no instaladas correctamente"
+            ) from exc
+
+        try:
+            firmador_xades.firmar_xml_xades_bes(
+                xml_path,
+                xml_firmado_path,
+                empresa=empresa,
+            )
             logger.info("XML firmado exitosamente con XAdES-BES")
             return True
-        except XAdESError as xe:
+        except firmador_xades.XAdESError as xe:
             # Error esperado de configuración incompleta: propagar texto limpio
             logger.error(f"Fallo de configuración firma: {xe}")
             raise Exception(str(xe))
         except Exception as e:
-            logger.error(f"Error crítico en proceso de firma: {e}")
-            raise Exception(f"Proceso de firma falló: {e}")
+            logger.error(f"Error critico en proceso de firma: {e}")
+            raise Exception(f"Proceso de firma fallo: {e}")
     
     def _generar_ride_autorizado(self, factura, resultado):
         """

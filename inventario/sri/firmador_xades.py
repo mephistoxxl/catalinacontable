@@ -6,7 +6,6 @@ import base64
 import hashlib
 import io
 import logging
-import uuid
 from copy import deepcopy
 from typing import Callable, Optional, Tuple
 
@@ -48,16 +47,15 @@ def _normalizar_atributos_factura(element: Optional[etree._Element]) -> None:
     preserved_version = element.get("version")
     for attr in list(element.attrib):
         attr_local = attr.rsplit("}", 1)[-1] if "}" in attr else attr
-        if attr_local.lower() == "id" and attr != "id":
+        if attr_local.lower() == "id":
             element.attrib.pop(attr, None)
 
-    element.set("id", "comprobante")
     if preserved_version is not None:
         element.set("version", preserved_version)
 
 
 def _normalizar_factura_bytes(xml_bytes: bytes) -> bytes:
-    """Normaliza la ra�z de la factura y devuelve bytes can�nicos."""
+    """Normaliza la raiz de la factura y devuelve bytes canonicos."""
     try:
         doc = etree.parse(io.BytesIO(xml_bytes))
     except Exception as exc:
@@ -67,8 +65,10 @@ def _normalizar_factura_bytes(xml_bytes: bytes) -> bytes:
     root = doc.getroot()
     _normalizar_atributos_factura(root)
 
-    if root.get("id") != "comprobante":
-        raise XAdESError("Normalizacion fallida: el comprobante debe exponer id='comprobante'")
+    for attr in root.attrib:
+        attr_local = attr.rsplit("}", 1)[-1] if "}" in attr else attr
+        if attr_local.lower() == "id":
+            raise XAdESError("Normalizacion fallida: el comprobante no debe incluir atributo 'id'")
     if root.get("version") is None:
         raise XAdESError("Normalizacion fallida: falta el atributo obligatorio 'version'")
 
@@ -244,64 +244,57 @@ def firmar_xml_xades_bes(
     empresa: Optional[Empresa] = None,
     opciones: Optional[Opciones] = None,
 ) -> bool:
-    """Firma un XML con XAdES-BES asegurando compatibilidad con el SRI."""
+    """Firma un XML con XAdES-BES siguiendo un flujo atomico."""
     opciones = _resolver_opciones_firma(opciones, empresa)
 
     xml_bytes = storage_read_bytes(xml_path)
-    xml_bytes = _normalizar_factura_bytes(xml_bytes)
+    xml_bytes_normalizados = _normalizar_factura_bytes(xml_bytes)
 
     try:
         with opciones.firma_electronica.open("rb") as descriptor:
             p12_bytes = descriptor.read()
     except FileNotFoundError as exc:
-        raise XAdESError("No se pudo leer el archivo de firma electr�nica configurado") from exc
+        raise XAdESError("No se pudo leer el archivo de firma electronica configurado") from exc
 
     try:
         private_key, certificate, _ = pkcs12.load_key_and_certificates(
             p12_bytes, (opciones.password_firma or "").encode("utf-8")
         )
     except Exception as exc:
-        raise XAdESError(f"Certificado PKCS#12 inv�lido: {exc}") from exc
+        raise XAdESError(f"Certificado PKCS#12 invalido: {exc}") from exc
 
     if private_key is None or certificate is None:
-        raise XAdESError("El archivo PKCS#12 no contiene llave y certificado v�lidos")
+        raise XAdESError("El archivo PKCS#12 no contiene llave y certificado validos")
 
     try:
         cert_der = certificate.public_bytes(Encoding.DER)
     except Exception as exc:
         raise XAdESError(f"No se pudo serializar el certificado PKCS#12: {exc}") from exc
 
-    tree = _firmar_con_endesive(xml_bytes, private_key, certificate, cert_der)
+    tree = _firmar_con_endesive(xml_bytes_normalizados, private_key, certificate, cert_der)
 
     root_signed = tree.getroot()
-    _normalizar_atributos_factura(root_signed)
+    for attr in root_signed.attrib:
+        attr_local = attr.rsplit("}", 1)[-1] if "}" in attr else attr
+        if attr_local.lower() == "id":
+            raise XAdESError("El comprobante firmado incluye un atributo 'id' no permitido")
 
     signature_el = tree.find(".//ds:Signature", namespaces=NSMAP)
     if signature_el is None:
-        raise XAdESError("No se gener� ds:Signature en el documento firmado")
+        raise XAdESError("No se genero ds:Signature en el documento firmado")
 
-    if not signature_el.get("Id"):
-        signature_el.set("Id", f"Signature_{uuid.uuid4().hex}")
+    references = signature_el.findall("ds:SignedInfo/ds:Reference", namespaces=NSMAP)
+    if not references:
+        raise XAdESError("La firma generada no contiene referencias")
 
-    signed_info = signature_el.find("ds:SignedInfo", namespaces=NSMAP)
-    if signed_info is None:
-        raise XAdESError("No se encontr� ds:SignedInfo en la firma generada")
+    principal_reference = next((ref for ref in references if not ref.get("Type")), None)
+    if principal_reference is None:
+        raise XAdESError("No se encontro la referencia principal al comprobante")
 
-    reference = signed_info.find("ds:Reference", namespaces=NSMAP)
-    if reference is None:
-        raise XAdESError("No se encontr� ds:Reference en la firma generada")
-
-    if reference.get("URI") != "#comprobante":
-        reference.set("URI", "#comprobante")
-
-    _recalcular_digest(reference, tree)
-    _firmar_signed_info(signed_info, private_key, signature_el)
-
-    _normalizar_atributos_factura(tree.getroot())
+    if principal_reference.get("URI") not in ("", None):
+        raise XAdESError("La referencia principal debe apuntar al documento completo con URI vacia")
 
     xml_firmado = etree.tostring(tree, encoding="UTF-8", xml_declaration=True, standalone=False)
-    xml_firmado = _normalizar_factura_bytes(xml_firmado)
-
     storage_write_bytes(xml_firmado_path, xml_firmado)
     logger.info("XML firmado exitosamente con XAdES-BES: %s", xml_firmado_path)
     return True
