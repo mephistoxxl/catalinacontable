@@ -24,6 +24,9 @@ DS_NS = "http://www.w3.org/2000/09/xmldsig#"
 XADES_NS = "http://uri.etsi.org/01903/v1.3.2#"
 NSMAP = {"ds": DS_NS, "xades": XADES_NS}
 
+RSA_SHA1_URI = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"
+SHA1_URI = "http://www.w3.org/2000/09/xmldsig#sha1"
+
 HashResolver = Tuple[Callable[[bytes], "hashlib._Hash"], Callable[[], hashes.HashAlgorithm]]
 
 
@@ -283,6 +286,12 @@ def _firmar_con_endesive(
         ) from exc
 
     def signproc(data: bytes, algo: str) -> bytes:
+        algoritmo_decl = (algo or "").strip()
+        if algoritmo_decl and algoritmo_decl.lower() != RSA_SHA1_URI.lower():
+            logger.warning(
+                "Algoritmo de firma solicitado por endesive (%s) diferente de RSA-SHA1",
+                algoritmo_decl,
+            )
         _, hash_cls = resolver_hash_algoritmo(algo)
         return private_key.sign(data, padding.PKCS1v15(), hash_cls())
 
@@ -356,11 +365,20 @@ def firmar_xml_xades_bes(
     if signature_el is None:
         raise XAdESError("No se genero ds:Signature en el documento firmado")
 
-    references = signature_el.findall("ds:SignedInfo/ds:Reference", namespaces=NSMAP)
-    if not references:
+    signed_info = signature_el.find("ds:SignedInfo", namespaces=NSMAP)
+    if signed_info is None:
+        raise XAdESError("No se encontro ds:SignedInfo en la firma generada")
+
+    signature_method = signed_info.find("ds:SignatureMethod", namespaces=NSMAP)
+    if signature_method is None:
+        raise XAdESError("No se encontro ds:SignatureMethod en la firma generada")
+    signature_method.set("Algorithm", RSA_SHA1_URI)
+
+    references_signed_info = signed_info.findall("ds:Reference", namespaces=NSMAP)
+    if not references_signed_info:
         raise XAdESError("La firma generada no contiene referencias")
 
-    principal_reference = next((ref for ref in references if not ref.get("Type")), None)
+    principal_reference = next((ref for ref in references_signed_info if not ref.get("Type")), None)
     if principal_reference is None:
         raise XAdESError("No se encontro la referencia principal al comprobante")
 
@@ -370,12 +388,13 @@ def firmar_xml_xades_bes(
     elif uri_value != "#comprobante":
         raise XAdESError("La referencia principal debe apuntar a '#comprobante'")
 
-    for reference in references:
+    references_all = signature_el.findall(".//ds:Reference", namespaces=NSMAP)
+    for reference in references_all:
+        digest_method = reference.find("ds:DigestMethod", namespaces=NSMAP)
+        if digest_method is None:
+            raise XAdESError("Cada ds:Reference debe incluir ds:DigestMethod")
+        digest_method.set("Algorithm", SHA1_URI)
         _recalcular_digest(reference, tree)
-
-    signed_info = signature_el.find("ds:SignedInfo", namespaces=NSMAP)
-    if signed_info is None:
-        raise XAdESError("No se encontro ds:SignedInfo en la firma generada")
 
     _firmar_signed_info(signed_info, private_key, signature_el)
 
