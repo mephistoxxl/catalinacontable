@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import io
+import json
 import os
 import random
 import sys
@@ -26,6 +27,29 @@ from inventario.models import Empresa, Opciones
 from cryptography.hazmat.primitives import hashes
 
 from inventario.sri import firmador_xades
+
+
+def _assert_signature_and_digests_sha1(xml_source):
+    """Carga un XML y comprueba que todas las referencias usan SHA1."""
+
+    if isinstance(xml_source, (str, Path)):
+        tree = etree.parse(str(xml_source))
+    elif isinstance(xml_source, bytes):
+        tree = etree.ElementTree(etree.fromstring(xml_source))
+    else:
+        tree = etree.ElementTree(etree.fromstring(xml_source.encode("utf-8")))
+
+    ns = {"ds": firmador_xades.DS_NS}
+    signature_method = tree.find(".//ds:SignatureMethod", namespaces=ns)
+    assert signature_method is not None
+    assert signature_method.get("Algorithm") == firmador_xades.RSA_SHA1_URI
+
+    digest_methods = tree.findall(".//ds:DigestMethod", namespaces=ns)
+    assert digest_methods, "Se esperaba al menos un DigestMethod en la firma"
+    for digest_method in digest_methods:
+        assert digest_method.get("Algorithm") == firmador_xades.SHA1_URI
+
+    return tree
 
 
 @pytest.fixture(scope='session', autouse=True)
@@ -83,8 +107,13 @@ def test_firmar_xml_usa_certificado_por_empresa(monkeypatch, tmp_path):
     captured_p12_bytes = []
 
     class DummyPrivateKey:
-        def sign(self, data, _padding, _algorithm):
-            return b'signature'
+        def __init__(self, etiqueta):
+            self.etiqueta = etiqueta
+            self.algoritmos = []
+
+        def sign(self, data, _padding, algorithm):
+            self.algoritmos.append(algorithm)
+            return f'signature-{self.etiqueta}'.encode('utf-8')
 
     class DummyCertificate:
         def public_bytes(self, _encoding):
@@ -92,13 +121,17 @@ def test_firmar_xml_usa_certificado_por_empresa(monkeypatch, tmp_path):
 
     def fake_load_key_and_certificates(p12_bytes, password, backend=None):
         captured_p12_bytes.append(p12_bytes)
-        return DummyPrivateKey(), DummyCertificate(), []
+        private_key = DummyPrivateKey(p12_bytes.decode('latin1', errors='ignore'))
+        captured_private_keys.append(private_key)
+        return private_key, DummyCertificate(), []
 
     monkeypatch.setattr(
         firmador_xades.pkcs12,
         'load_key_and_certificates',
         fake_load_key_and_certificates,
     )
+
+    captured_private_keys = []
 
     class DummyBES:
         def enveloped(self, xml_data, certificate, cert_der, signproc, tspurl=None, tspcred=None):
@@ -156,9 +189,25 @@ def test_firmar_xml_usa_certificado_por_empresa(monkeypatch, tmp_path):
 
     # Firmar con cada empresa y asegurar que se usa el archivo correcto
     firmador_xades.firmar_xml_xades_bes(str(xml_path), str(xml_firmado), empresa=empresa_a)
+    _assert_signature_and_digests_sha1(xml_firmado)
+    assert captured_private_keys
+    assert captured_private_keys[-1].algoritmos, 'La llave privada debe usarse al firmar'
+    assert isinstance(captured_private_keys[-1].algoritmos[-1], hashes.SHA1)
+    assert any(isinstance(algoritmo, hashes.SHA1) for algoritmo in captured_private_keys[-1].algoritmos)
+
     firmador_xades.firmar_xml_xades_bes(str(xml_path), str(xml_firmado), empresa=empresa_b)
+    _assert_signature_and_digests_sha1(xml_firmado)
+    assert len(captured_private_keys) == 2
+    assert captured_private_keys[-1].algoritmos
+    assert isinstance(captured_private_keys[-1].algoritmos[-1], hashes.SHA1)
+    assert any(isinstance(algoritmo, hashes.SHA1) for algoritmo in captured_private_keys[-1].algoritmos)
 
     assert captured_p12_bytes == [b'PKCS12-A', b'PKCS12-B']
+
+    for dummy_key in captured_private_keys:
+        assert dummy_key.algoritmos, 'La llave privada debe usarse al firmar'
+        assert isinstance(dummy_key.algoritmos[-1], hashes.SHA1)
+        assert any(isinstance(algoritmo, hashes.SHA1) for algoritmo in dummy_key.algoritmos)
 
     opciones_a.firma_electronica.delete(save=False)
     opciones_b.firma_electronica.delete(save=False)
@@ -192,15 +241,21 @@ def test_firma_agrega_Id_en_raiz_y_conserva_reference(monkeypatch, tmp_path):
     opciones.firma_electronica.save('empresa_id.p12', ContentFile(b'PKCS12-ID'), save=True)
 
     class DummyPrivateKey:
-        def sign(self, data, _padding, _algorithm):
+        def __init__(self):
+            self.algoritmos = []
+
+        def sign(self, data, _padding, algorithm):
+            self.algoritmos.append(algorithm)
             return b'signature'
+
+    dummy_private_key = DummyPrivateKey()
 
     class DummyCertificate:
         def public_bytes(self, _encoding):
             return b'certificate-der'
 
     def fake_load_key_and_certificates(p12_bytes, password, backend=None):
-        return DummyPrivateKey(), DummyCertificate(), []
+        return dummy_private_key, DummyCertificate(), []
 
     monkeypatch.setattr(
         firmador_xades.pkcs12,
@@ -275,7 +330,7 @@ def test_firma_agrega_Id_en_raiz_y_conserva_reference(monkeypatch, tmp_path):
     root_pre_firma = etree.fromstring(captured_inputs[0])
     assert root_pre_firma.get('Id') is None
 
-    tree = etree.parse(str(xml_firmado))
+    tree = _assert_signature_and_digests_sha1(xml_firmado)
     root_firmado = tree.getroot()
     assert root_firmado.get('Id') is None
     assert root_firmado.get('id') == 'comprobante'
@@ -296,6 +351,10 @@ def test_firma_agrega_Id_en_raiz_y_conserva_reference(monkeypatch, tmp_path):
     hashlib_fn, _ = firmador_xades.resolver_hash_algoritmo(digest_method.get('Algorithm'))
     expected_digest = base64.b64encode(hashlib_fn(canonical).digest()).decode()
     assert digest_text == expected_digest
+
+    assert dummy_private_key.algoritmos, 'La llave privada debe usarse al firmar'
+    assert isinstance(dummy_private_key.algoritmos[-1], hashes.SHA1)
+    assert any(isinstance(algoritmo, hashes.SHA1) for algoritmo in dummy_private_key.algoritmos)
 
     opciones.firma_electronica.delete(save=False)
     opciones.delete()
@@ -437,8 +496,8 @@ def test_recalcular_digest_para_factura_y_signed_properties():
 
     ns = {"ds": firmador_xades.DS_NS}
     expected = {
-        "#comprobante": "p0P5r+kgPOTR0qGMfYbEY4kI0PrQ2zzgmjSqEKmy/co=",
-        "#SignedProperties123": "CJAtlv0/mtV+FusbW6WYbgme7B0NZaAoT4OgEnB1fxA=",
+        "#comprobante": "XHabIec1kyL2PyvYHWzFsoYQ9B8=",
+        "#SignedProperties123": "g7mRStHBILonpeqKum12cRI4zV8=",
     }
 
     for reference in tree.findall(".//ds:Reference", namespaces=ns):
@@ -451,6 +510,46 @@ def test_recalcular_digest_para_factura_y_signed_properties():
         uri = reference.get("URI")
         assert uri in expected
         assert digest_value.text == expected[uri]
+
+
+def test_fixture_autorizado_sri_documenta_sha1_y_autorizacion():
+    """El comprobante de ejemplo autorizado debe permanecer en SHA1."""
+
+    data_dir = Path(__file__).resolve().parent / "data"
+    xml_autorizado = data_dir / "factura_autorizada_sri.xml"
+    json_autorizado = data_dir / "factura_autorizada_sri.json"
+
+    raw_autorizacion = xml_autorizado.read_text(encoding="utf-8")
+    assert "ambiente de pruebas del SRI" in raw_autorizacion
+
+    autorizacion_tree = etree.parse(str(xml_autorizado))
+    estado = autorizacion_tree.findtext(".//estado")
+    assert estado == "AUTORIZADO"
+
+    comprobante_text = autorizacion_tree.findtext(".//comprobante")
+    assert comprobante_text is not None
+    comprobante_xml = comprobante_text.strip()
+    assert comprobante_xml
+
+    comprobante_tree = _assert_signature_and_digests_sha1(comprobante_xml.encode("utf-8"))
+    ns = {"ds": firmador_xades.DS_NS}
+    for reference in comprobante_tree.findall(".//ds:Reference", namespaces=ns):
+        digest_value = reference.find("ds:DigestValue", namespaces=ns)
+        assert digest_value is not None
+        digest_original = digest_value.text
+        digest_value.text = "INVALIDO"
+        firmador_xades._recalcular_digest(reference, comprobante_tree)
+        assert digest_value.text == digest_original
+
+    sri_response = json.loads(json_autorizado.read_text(encoding="utf-8"))
+    assert sri_response.get("estado") == "AUTORIZADO"
+    assert sri_response.get("ambiente") == "PRUEBAS"
+    assert sri_response.get("numeroAutorizacion")
+    mensajes = sri_response.get("mensajes") or []
+    assert any(
+        (mensaje.get("mensaje") or "").upper().startswith("COMPROBANTE AUTORIZADO")
+        for mensaje in mensajes
+    )
 
 
 def test_recalcular_digest_error_si_objetivo_inexistente():

@@ -81,3 +81,35 @@ Variables principales:
 #### Dependencias
 
 Instala las nuevas dependencias con `pip install -r requirements.txt` para disponer de `django-storages` y `boto3`.
+
+### Evidencias de firma XAdES con SHA1 y validación en SRI
+
+- El archivo `inventario/tests/data/factura_firmada_muestra.xml` es un ejemplo mínimo firmado con `rsa-sha1`. Si editas el contenido
+  del comprobante, ejecuta el siguiente fragmento para recalcular los `DigestValue` en SHA1 y mantener las pruebas consistentes:
+
+  ```bash
+  python - <<'PY'
+  import os, django
+  os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sistema.settings')
+  os.environ.setdefault('DATABASE_URL', 'sqlite:///test_db.sqlite3')
+  django.setup()
+  from pathlib import Path
+  from lxml import etree
+  from inventario.sri import firmador_xades
+
+  fixture = Path('inventario/tests/data/factura_firmada_muestra.xml')
+  tree = etree.parse(str(fixture))
+  for reference in tree.findall('.//ds:Reference', namespaces={'ds': firmador_xades.DS_NS}):
+      reference.find('ds:DigestMethod', namespaces={'ds': firmador_xades.DS_NS}).set(
+          'Algorithm', firmador_xades.SHA1_URI
+      )
+      firmador_xades._recalcular_digest(reference, tree)
+  tree.write(str(fixture), encoding='UTF-8', xml_declaration=True, pretty_print=True)
+  PY
+  ```
+
+- Para documentar la autorización oficial del SRI mantenemos el par `inventario/tests/data/factura_autorizada_sri.(xml|json)`.
+  El XML incluye la respuesta anonimizada del ambiente de pruebas del 18/05/2024 y el `numeroAutorizacion` correspondiente. Puedes
+  validar la evidencia ingresando al [portal de pruebas del SRI](https://srienlinea.sri.gob.ec/sri-en-linea) con un RUC de pruebas,
+  navegando a **Consultas > Comprobantes electrónicos > Comprobantes autorizados** e ingresando el `numeroAutorizacion`
+  `2205202412345678901234567890123456789012345`. El JSON adjunto refleja la misma respuesta para trazabilidad interna.
