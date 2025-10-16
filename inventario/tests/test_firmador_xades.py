@@ -117,7 +117,9 @@ def test_firmar_xml_usa_certificado_por_empresa(monkeypatch, tmp_path):
                 f'{{{ns}}}SignatureMethod',
                 Algorithm='http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
             )
-            reference = etree.SubElement(signed_info, f'{{{ns}}}Reference', URI='')
+            assert root.get('Id') == 'comprobante'
+            assert root.get('id') == 'comprobante'
+            reference = etree.SubElement(signed_info, f'{{{ns}}}Reference', URI='#comprobante')
             transforms = etree.SubElement(reference, f'{{{ns}}}Transforms')
             etree.SubElement(
                 transforms,
@@ -135,6 +137,7 @@ def test_firmar_xml_usa_certificado_por_empresa(monkeypatch, tmp_path):
                 Algorithm='http://www.w3.org/2001/04/xmlenc#sha256',
             )
             etree.SubElement(reference, f'{{{ns}}}DigestValue').text = ''
+            signproc(b'dummy', 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256')
             etree.SubElement(signature, f'{{{ns}}}SignatureValue').text = ''
             root.append(signature)
             return etree.ElementTree(root)
@@ -147,7 +150,7 @@ def test_firmar_xml_usa_certificado_por_empresa(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, 'endesive.xades', fake_xades)
 
     xml_path = tmp_path / 'factura.xml'
-    xml_path.write_text('<factura></factura>', encoding='utf-8')
+    xml_path.write_text('<factura version="1.1.0"></factura>', encoding='utf-8')
     xml_firmado = tmp_path / 'factura_firmada.xml'
 
     # Firmar con cada empresa y asegurar que se usa el archivo correcto
@@ -248,6 +251,7 @@ def test_firma_agrega_Id_en_raiz_y_conserva_reference(monkeypatch, tmp_path):
                 Algorithm='http://www.w3.org/2001/04/xmlenc#sha256',
             )
             etree.SubElement(reference, f'{{{ns}}}DigestValue').text = ''
+            signproc(b'dummy', 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256')
             etree.SubElement(signature, f'{{{ns}}}SignatureValue').text = ''
             root.append(signature)
             return etree.ElementTree(root)
@@ -260,7 +264,7 @@ def test_firma_agrega_Id_en_raiz_y_conserva_reference(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, 'endesive.xades', fake_xades)
 
     xml_path = tmp_path / 'factura.xml'
-    xml_path.write_text('<factura id="comprobante"></factura>', encoding='utf-8')
+    xml_path.write_text('<factura id="comprobante" version="1.1.0"></factura>', encoding='utf-8')
     xml_firmado = tmp_path / 'factura_firmada.xml'
 
     firmador_xades.firmar_xml_xades_bes(str(xml_path), str(xml_firmado), empresa=empresa)
@@ -296,6 +300,8 @@ def test_firmado_utiliza_hash_de_signature_method(monkeypatch, tmp_path):
         dj_models.Model.save(self, *args, **kwargs)
 
     monkeypatch.setattr(Opciones, 'save', simple_save, raising=False)
+
+    Empresa.objects.filter(ruc='1790012345001').delete()
 
     empresa = Empresa.objects.create(razon_social='Empresa SHA1', ruc='1790012345001')
     opciones = Opciones.objects.create(
@@ -344,7 +350,9 @@ def test_firmado_utiliza_hash_de_signature_method(monkeypatch, tmp_path):
                 f'{{{ns}}}SignatureMethod',
                 Algorithm='http://www.w3.org/2000/09/xmldsig#rsa-sha1',
             )
-            reference = etree.SubElement(signed_info, f'{{{ns}}}Reference', URI='')
+            assert root.get('Id') == 'comprobante'
+            assert root.get('id') == 'comprobante'
+            reference = etree.SubElement(signed_info, f'{{{ns}}}Reference', URI='#comprobante')
             transforms = etree.SubElement(reference, f'{{{ns}}}Transforms')
             etree.SubElement(
                 transforms,
@@ -362,6 +370,7 @@ def test_firmado_utiliza_hash_de_signature_method(monkeypatch, tmp_path):
                 Algorithm='http://www.w3.org/2000/09/xmldsig#sha1',
             )
             etree.SubElement(reference, f'{{{ns}}}DigestValue').text = ''
+            signproc(b'dummy', 'http://www.w3.org/2000/09/xmldsig#rsa-sha1')
             etree.SubElement(signature, f'{{{ns}}}SignatureValue').text = ''
             root.append(signature)
             return etree.ElementTree(root)
@@ -374,7 +383,7 @@ def test_firmado_utiliza_hash_de_signature_method(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, 'endesive.xades', fake_xades)
 
     xml_path = tmp_path / 'factura.xml'
-    xml_path.write_text('<factura></factura>', encoding='utf-8')
+    xml_path.write_text('<factura version="1.1.0"></factura>', encoding='utf-8')
     xml_firmado = tmp_path / 'factura_firmada.xml'
 
     firmador_xades.firmar_xml_xades_bes(str(xml_path), str(xml_firmado), empresa=empresa)

@@ -45,10 +45,28 @@ def _normalizar_atributos_factura(element: Optional[etree._Element]) -> None:
         return
 
     preserved_version = element.get("version")
+
+    id_attributes: list[str] = []
+    id_value: Optional[str] = None
+
     for attr in list(element.attrib):
         attr_local = attr.rsplit("}", 1)[-1] if "}" in attr else attr
         if attr_local.lower() == "id":
-            element.attrib.pop(attr, None)
+            id_attributes.append(attr)
+            candidate = element.get(attr)
+            if candidate and candidate.strip():
+                id_value = candidate.strip()
+
+    if not id_value or id_value.lower() != "comprobante":
+        id_value = "comprobante"
+
+    for attr in id_attributes:
+        element.set(attr, id_value)
+
+    if "Id" not in element.attrib:
+        element.set("Id", id_value)
+    if "id" not in element.attrib:
+        element.set("id", id_value)
 
     if preserved_version is not None:
         element.set("version", preserved_version)
@@ -65,10 +83,19 @@ def _normalizar_factura_bytes(xml_bytes: bytes) -> bytes:
     root = doc.getroot()
     _normalizar_atributos_factura(root)
 
-    for attr in root.attrib:
-        attr_local = attr.rsplit("}", 1)[-1] if "}" in attr else attr
-        if attr_local.lower() == "id":
-            raise XAdESError("Normalizacion fallida: el comprobante no debe incluir atributo 'id'")
+    id_attrs = [
+        attr
+        for attr in root.attrib
+        if (attr.rsplit("}", 1)[-1] if "}" in attr else attr).lower() == "id"
+    ]
+    if not id_attrs:
+        raise XAdESError(
+            "Normalizacion fallida: el comprobante debe exponer el atributo 'Id'='comprobante'"
+        )
+
+    id_values = {root.get(attr) for attr in id_attrs}
+    if any((value or "").strip() != "comprobante" for value in id_values):
+        raise XAdESError("Normalizacion fallida: el comprobante debe tener Id='comprobante'")
     if root.get("version") is None:
         raise XAdESError("Normalizacion fallida: falta el atributo obligatorio 'version'")
 
@@ -274,10 +301,22 @@ def firmar_xml_xades_bes(
     tree = _firmar_con_endesive(xml_bytes_normalizados, private_key, certificate, cert_der)
 
     root_signed = tree.getroot()
-    for attr in root_signed.attrib:
-        attr_local = attr.rsplit("}", 1)[-1] if "}" in attr else attr
-        if attr_local.lower() == "id":
-            raise XAdESError("El comprobante firmado incluye un atributo 'id' no permitido")
+    id_attrs_signed = [
+        attr
+        for attr in root_signed.attrib
+        if (attr.rsplit("}", 1)[-1] if "}" in attr else attr).lower() == "id"
+    ]
+    if not id_attrs_signed:
+        raise XAdESError("El comprobante firmado debe incluir Id='comprobante'")
+
+    id_values_signed = {root_signed.get(attr) for attr in id_attrs_signed}
+    if any((value or "").strip() != "comprobante" for value in id_values_signed):
+        raise XAdESError("El comprobante firmado debe conservar Id='comprobante'")
+
+    if root_signed.get("Id") != "comprobante":
+        raise XAdESError("El comprobante firmado debe exponer Id='comprobante'")
+    if root_signed.get("id") != "comprobante":
+        raise XAdESError("El comprobante firmado debe exponer id='comprobante'")
 
     signature_el = tree.find(".//ds:Signature", namespaces=NSMAP)
     if signature_el is None:
@@ -291,8 +330,17 @@ def firmar_xml_xades_bes(
     if principal_reference is None:
         raise XAdESError("No se encontro la referencia principal al comprobante")
 
-    if principal_reference.get("URI") not in ("", None):
-        raise XAdESError("La referencia principal debe apuntar al documento completo con URI vacia")
+    if principal_reference.get("URI") != "#comprobante":
+        raise XAdESError("La referencia principal debe apuntar a '#comprobante'")
+
+    for reference in references:
+        _recalcular_digest(reference, tree)
+
+    signed_info = signature_el.find("ds:SignedInfo", namespaces=NSMAP)
+    if signed_info is None:
+        raise XAdESError("No se encontro ds:SignedInfo en la firma generada")
+
+    _firmar_signed_info(signed_info, private_key, signature_el)
 
     xml_firmado = etree.tostring(tree, encoding="UTF-8", xml_declaration=True, standalone=False)
     storage_write_bytes(xml_firmado_path, xml_firmado)
