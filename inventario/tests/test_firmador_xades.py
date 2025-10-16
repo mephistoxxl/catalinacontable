@@ -232,7 +232,7 @@ def test_firma_agrega_Id_en_raiz_y_conserva_reference(monkeypatch, tmp_path):
             reference = etree.SubElement(
                 signed_info,
                 f'{{{ns}}}Reference',
-                URI=f"#{root.get('Id') or ''}",
+                URI='',
             )
             transforms = etree.SubElement(reference, f'{{{ns}}}Transforms')
             etree.SubElement(
@@ -283,6 +283,10 @@ def test_firma_agrega_Id_en_raiz_y_conserva_reference(monkeypatch, tmp_path):
     reference = tree.find('.//ds:Reference', namespaces=ns)
     assert reference is not None
     assert reference.get('URI') == '#comprobante'
+
+    digest_value = tree.find('.//ds:DigestValue', namespaces=ns)
+    assert digest_value is not None
+    assert (digest_value.text or '').strip() != ''
 
     opciones.firma_electronica.delete(save=False)
     opciones.delete()

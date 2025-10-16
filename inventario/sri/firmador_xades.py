@@ -330,7 +330,10 @@ def firmar_xml_xades_bes(
     if principal_reference is None:
         raise XAdESError("No se encontro la referencia principal al comprobante")
 
-    if principal_reference.get("URI") != "#comprobante":
+    uri_value = principal_reference.get("URI")
+    if uri_value in (None, ""):
+        principal_reference.set("URI", "#comprobante")
+    elif uri_value != "#comprobante":
         raise XAdESError("La referencia principal debe apuntar a '#comprobante'")
 
     for reference in references:
