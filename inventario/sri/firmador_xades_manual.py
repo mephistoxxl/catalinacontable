@@ -229,11 +229,11 @@ def firmar_xml_xades_bes_manual(
     digest_value1.text = factura_digest
 
     # Reference 2: KeyInfo (certificado) - como en facturas autorizadas
+    # NOTA: El digest se calculará después de crear el KeyInfo
     ref2 = etree.SubElement(signed_info, f"{{{NSMAP['ds']}}}Reference", attrib={"URI": f"#{key_info_id}"})
     digest_method2 = etree.SubElement(ref2, f"{{{NSMAP['ds']}}}DigestMethod", attrib={"Algorithm": SHA1_ALGORITHM})
     digest_value2 = etree.SubElement(ref2, f"{{{NSMAP['ds']}}}DigestValue")
-    # Calcular digest del KeyInfo (lo haremos después de crearlo)
-    digest_value2.text = "PLACEHOLDER_KEYINFO_DIGEST"
+    digest_value2.text = "PLACEHOLDER_KEYINFO_DIGEST"  # Se actualizará después
 
     # Reference 3: SignedProperties - SIN transforms como en facturas autorizadas
     ref3 = etree.SubElement(
@@ -280,10 +280,29 @@ def firmar_xml_xades_bes_manual(
     key_info_c14n = _canonicalizar_elemento(key_info)
     key_info_digest = _calcular_digest_sha1(key_info_c14n)
     
-    # Actualizar el digest del KeyInfo en SignedInfo
-    ns = {'ds': NSMAP['ds']}
-    key_info_ref = signed_info.xpath(f'.//ds:Reference[@URI="#{key_info_id}"]/ds:DigestValue', namespaces=ns)[0]
-    key_info_ref.text = key_info_digest
+    logger.info(f"✅ Digest KeyInfo calculado: {key_info_digest}")
+    
+    # Buscar y actualizar el digest del KeyInfo en SignedInfo
+    # El SignedInfo ya está en el árbol de Signature, así que podemos buscarlo directamente
+    updated = False
+    for ref in signed_info.findall(f".//{{{NSMAP['ds']}}}Reference", namespaces=NSMAP):
+        uri = ref.get('URI', '')
+        if uri == f"#{key_info_id}":
+            digest_elem = ref.find(f".//{{{NSMAP['ds']}}}DigestValue", namespaces=NSMAP)
+            if digest_elem is not None:
+                old_value = digest_elem.text
+                digest_elem.text = key_info_digest
+                logger.info(f"✅ Digest del KeyInfo actualizado: {old_value} -> {key_info_digest}")
+                updated = True
+                break
+    
+    if not updated:
+        logger.error(f"❌ NO SE PUDO ACTUALIZAR el digest del KeyInfo!")
+        # Debug: listar todas las referencias
+        refs = signed_info.findall(f".//{{{NSMAP['ds']}}}Reference", namespaces=NSMAP)
+        logger.error(f"   Referencias en SignedInfo: {len(refs)}")
+        for i, ref in enumerate(refs, 1):
+            logger.error(f"   {i}. URI={ref.get('URI', 'N/A')}")
     
     # Re-firmar SignedInfo con el digest correcto del KeyInfo
     signed_info_c14n_final = _canonicalizar_elemento(signed_info)
@@ -291,7 +310,7 @@ def firmar_xml_xades_bes_manual(
     signature_b64_final = _partir_base64(signature_bytes_final)
     sig_value.text = signature_b64_final
     
-    logger.info(f"✅ Digest KeyInfo calculado y SignedInfo re-firmado")
+    logger.info("✅ SignedInfo re-firmado con digest correcto del KeyInfo")
 
     # Object con QualifyingProperties
     obj = etree.SubElement(signature, f"{{{NSMAP['ds']}}}Object")
