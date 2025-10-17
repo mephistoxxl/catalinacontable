@@ -369,6 +369,12 @@ class SRIIntegration:
                     f"Factura {factura.id} no tiene formas de pago registradas"
                 )
 
+            # FORZAR RECARGA del módulo xml_generator para usar lxml
+            import importlib
+            from inventario.sri import xml_generator as xml_gen_module
+            importlib.reload(xml_gen_module)
+            SRIXMLGenerator = xml_gen_module.SRIXMLGenerator
+            
             xml_generator = SRIXMLGenerator()
             xml_content = xml_generator.generar_xml_factura(factura)
 
