@@ -6,6 +6,7 @@ import base64
 import hashlib
 import io
 import logging
+import os
 from copy import deepcopy
 from typing import Callable, Optional, Tuple
 
@@ -19,6 +20,9 @@ from inventario.tenant.queryset import get_current_tenant
 from inventario.utils.storage_io import storage_read_bytes, storage_write_bytes
 
 logger = logging.getLogger(__name__)
+
+# ✅ NUEVO: Usar implementación manual si está habilitada
+USE_MANUAL_XADES = os.getenv("USE_MANUAL_XADES", "true").lower() == "true"
 
 DS_NS = "http://www.w3.org/2000/09/xmldsig#"
 XADES_NS = "http://uri.etsi.org/01903/v1.3.2#"
@@ -369,10 +373,12 @@ def _firmar_con_endesive(
     try:
         tree_raw = signer.enveloped(xml_bytes, certificate, cert_der, signproc, tspurl=None, tspcred=None)
         
-        # ✅ CRÍTICO: Serializar y re-parsear INMEDIATAMENTE para evitar bug de duplicación
-        # El árbol devuelto por endesive tiene un problema interno que causa duplicación
-        # de caracteres en atributos cuando se manipula posteriormente
-        xml_bytes_signed = etree.tostring(tree_raw, encoding="UTF-8", xml_declaration=True, standalone=False)
+        # ✅ CRÍTICO: El árbol devuelto por endesive está corrupto internamente
+        # Serializar con tostring NO funciona porque mantiene la corrupción
+        # Solución: Escribir a buffer usando write() y luego re-parsear
+        buffer = io.BytesIO()
+        tree_raw.write(buffer, encoding="UTF-8", xml_declaration=True, standalone=False)
+        xml_bytes_signed = buffer.getvalue()
         tree = etree.parse(io.BytesIO(xml_bytes_signed))
         
         # ✅ Verificar y corregir si endesive usó SHA256
@@ -403,6 +409,13 @@ def firmar_xml_xades_bes(
     opciones: Optional[Opciones] = None,
 ) -> bool:
     """Firma un XML con XAdES-BES siguiendo un flujo atomico."""
+    
+    # ✅ NUEVO: Usar implementación manual si está habilitada
+    if USE_MANUAL_XADES:
+        logger.info("🔧 Usando implementación manual de XAdES-BES (sin endesive)")
+        from inventario.sri.firmador_xades_manual import firmar_xml_xades_bes_manual
+        return firmar_xml_xades_bes_manual(xml_path, xml_firmado_path, empresa=empresa, opciones=opciones)
+    
     opciones = _resolver_opciones_firma(opciones, empresa)
 
     xml_bytes = storage_read_bytes(xml_path)
