@@ -275,6 +275,34 @@ def firmar_xml_xades_bes_manual(
     x509_data = etree.SubElement(key_info, f"{{{NSMAP['ds']}}}X509Data")
     x509_cert = etree.SubElement(x509_data, f"{{{NSMAP['ds']}}}X509Certificate")
     x509_cert.text = cert_b64
+    
+    # Agregar KeyValue con RSAKeyValue (como en XMLs autorizados)
+    key_value = etree.SubElement(key_info, f"{{{NSMAP['ds']}}}KeyValue")
+    rsa_key_value = etree.SubElement(key_value, f"{{{NSMAP['ds']}}}RSAKeyValue")
+    
+    # Extraer módulo y exponente de la clave pública
+    public_key = certificate.public_key()
+    public_numbers = public_key.public_numbers()
+    
+    # Convertir módulo a base64
+    modulus_bytes = public_numbers.n.to_bytes(
+        (public_numbers.n.bit_length() + 7) // 8, 
+        byteorder='big'
+    )
+    modulus_b64 = base64.b64encode(modulus_bytes).decode('utf-8')
+    
+    # Convertir exponente a base64
+    exponent_bytes = public_numbers.e.to_bytes(
+        (public_numbers.e.bit_length() + 7) // 8, 
+        byteorder='big'
+    )
+    exponent_b64 = base64.b64encode(exponent_bytes).decode('utf-8')
+    
+    modulus_elem = etree.SubElement(rsa_key_value, f"{{{NSMAP['ds']}}}Modulus")
+    modulus_elem.text = modulus_b64
+    
+    exponent_elem = etree.SubElement(rsa_key_value, f"{{{NSMAP['ds']}}}Exponent")
+    exponent_elem.text = exponent_b64
 
     # Calcular digest del KeyInfo y actualizar SignedInfo
     key_info_c14n = _canonicalizar_elemento(key_info)
