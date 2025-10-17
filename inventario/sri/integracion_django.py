@@ -369,8 +369,20 @@ class SRIIntegration:
                     f"Factura {factura.id} no tiene formas de pago registradas"
                 )
 
-            # FORZAR RECARGA del módulo xml_generator para usar lxml
+            # FORZAR RECARGA NUCLEAR del módulo xml_generator
+            import sys
             import importlib
+            
+            # Eliminar de sys.modules
+            modules_to_delete = [
+                'inventario.sri.xml_generator',
+                'xml.etree.ElementTree',
+                'xml.etree',
+            ]
+            for mod_name in modules_to_delete:
+                if mod_name in sys.modules:
+                    del sys.modules[mod_name]
+            
             from inventario.sri import xml_generator as xml_gen_module
             importlib.reload(xml_gen_module)
             SRIXMLGenerator = xml_gen_module.SRIXMLGenerator
