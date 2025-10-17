@@ -15,6 +15,8 @@ from inventario.utils.storage_io import (
     iter_storage_files,
     storage_read_text,
     storage_write_text,
+    storage_read_bytes,
+    storage_write_bytes,
 )
 from .sri_client import SRIClient
 from .xml_generator import SRIXMLGenerator
@@ -391,7 +393,8 @@ class SRIIntegration:
                         f"factura_{factura.numero}_INVALID_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
                     )
                     debug_path = f"{media_paths.xml_dir}/debug/{debug_filename}"
-                    storage_write_text(debug_path, xml_content)
+                    # xml_content ahora es bytes, usar storage_write_bytes
+                    storage_write_bytes(debug_path, xml_content)
                     logger.error(f"📁 XML inválido guardado para debugging en: {debug_path}")
 
                     raise Exception(
@@ -400,7 +403,8 @@ class SRIIntegration:
                 else:
                     logger.info("✅ XML generado válido según XSD")
 
-            storage_write_text(xml_path, xml_content)
+            # xml_content ahora es bytes UTF-8, usar storage_write_bytes
+            storage_write_bytes(xml_path, xml_content)
             logger.info(f"XML generado en almacenamiento: {xml_path}")
             return xml_path
 

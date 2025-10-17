@@ -3496,7 +3496,8 @@ class VerFactura(LoginRequiredMixin, View):
                     xml_filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}.xml"
                     xml_storage_path = f"{media_paths.xml_dir}/{xml_filename}"
                     default_storage.delete(xml_storage_path)
-                    default_storage.save(xml_storage_path, ContentFile(xml_content.encode('utf-8')))
+                    # xml_content ahora ya es bytes UTF-8, NO encode() de nuevo
+                    default_storage.save(xml_storage_path, ContentFile(xml_content))
                     xml_path = xml_storage_path
                     logger.info(f"XML SRI generado exitosamente: {xml_storage_path}")
             except Exception as e:
