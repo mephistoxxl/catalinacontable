@@ -6706,9 +6706,8 @@ def enviar_factura_email(request, factura_id):
     """
     Envía la factura por correo electrónico al cliente.
     - Verifica empresa activa y pertenencia del usuario.
-    - Genera (o reutiliza) el PDF firmado del RIDE.
-    - Usa email del cliente o correo proporcionado en POST (campo 'email').
-    Este es un placeholder: integra tu lógica real de envío (SMTP, API, etc.).
+    - Genera el RIDE si no existe.
+    - Envía email con RIDE PDF y XML autorizado adjuntos.
     """
     if request.method not in ("POST", "GET"):
         return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=405)
@@ -6720,64 +6719,40 @@ def enviar_factura_email(request, factura_id):
 
         factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
 
-        # Determinar email destino
-        email_destino = (request.POST.get('email') if request.method == 'POST' else None) or getattr(factura, 'correo_cliente', None)
-        if not email_destino:
-            return JsonResponse({'success': False, 'message': 'No hay correo de destino definido para esta factura.'})
+        # Verificar que la factura esté autorizada
+        if factura.estado_sri != 'AUTORIZADA':
+            return JsonResponse({
+                'success': False, 
+                'message': f'La factura debe estar AUTORIZADA para enviar email. Estado actual: {factura.estado_sri or "Sin enviar al SRI"}'
+            })
 
-        from django.conf import settings
-        import os
-        media_root = getattr(settings, 'MEDIA_ROOT', 'media')
-        pdf_dir = os.path.join(media_root, 'facturas_pdf')
-        os.makedirs(pdf_dir, exist_ok=True)
-
-        signed_filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}_firmado.pdf"
-        signed_path = os.path.join(pdf_dir, signed_filename)
-
-        # (Re)generar PDF firmado si no existe
-        if not os.path.exists(signed_path):
-            try:
-                ride_generator = RIDEGenerator()
-                result = ride_generator.generar_ride_factura_firmado(
-                    factura=factura,
-                    output_dir=pdf_dir,
-                    firmar=True
-                )
-                if isinstance(result, tuple):
-                    # (original, firmado)
-                    signed_path = result[1]
-                else:
-                    signed_path = result
-            except Exception as e:
-                logger.error(f"Error generando RIDE para envío email: {e}")
-                return JsonResponse({'success': False, 'message': f'Error generando PDF: {e}'})
-
-        if not os.path.exists(signed_path):
-            return JsonResponse({'success': False, 'message': 'No se pudo generar el PDF de la factura.'})
-
-        # Placeholder de envío. Aquí integrarías send_mail o un servicio externo.
-        # from django.core.mail import EmailMessage
-        # email = EmailMessage(
-        #     subject=f"Factura {factura.numero}",
-        #     body="Adjuntamos su factura electrónica.",
-        #     to=[email_destino]
-        # )
-        # email.attach_file(signed_path)
-        # email.send()
-
-        logger.info(f"[EMAIL] Factura {factura.id} simulada para envío a {email_destino} con adjunto {signed_path}")
-        return JsonResponse({
-            'success': True,
-            'message': f'Factura enviada (simulado) a {email_destino}',
-            'factura_id': factura.id,
-            'archivo': signed_filename
-        })
+        # Usar el método de integración SRI
+        from inventario.sri.integracion_django import SRIIntegration
+        
+        sri_integration = SRIIntegration()
+        resultado = sri_integration.enviar_factura_email(factura)
+        
+        if resultado.get('success'):
+            logger.info(f"✅ Email enviado para factura {factura.id}")
+            return JsonResponse({
+                'success': True,
+                'message': resultado.get('message', 'Email enviado correctamente'),
+                'factura_id': factura.id
+            })
+        else:
+            logger.error(f"❌ Error enviando email para factura {factura.id}: {resultado.get('message')}")
+            return JsonResponse({
+                'success': False,
+                'message': resultado.get('message', 'Error desconocido al enviar email')
+            })
 
     except Http404:
         return JsonResponse({'success': False, 'message': f'Factura {factura_id} no encontrada'}, status=404)
     except Exception as e:
         logger.error(f"Error en enviar_factura_email: {e}")
-        return JsonResponse({'success': False, 'message': f'Error interno: {e}'}, status=500)
+        import traceback
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'message': f'Error interno: {str(e)}'}, status=500)
         if not almacenes_activos.exists():
             almacen1, created1 = Almacen.objects.get_or_create(
                 descripcion="Almacén Principal",

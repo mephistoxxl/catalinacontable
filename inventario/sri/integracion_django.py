@@ -199,6 +199,17 @@ class SRIIntegration:
                 # 🔧 FIX CRÍTICO: Reconocer tanto AUTORIZADA como AUTORIZADO en consulta
                 if resultado_auth.get('estado') in ('AUTORIZADA', 'AUTORIZADO'):
                     self._generar_ride_autorizado(factura, resultado_auth)
+                    
+                    # 📧 ENVÍO AUTOMÁTICO DE EMAIL tras autorización exitosa
+                    try:
+                        resultado_email = self.enviar_factura_email(factura)
+                        if resultado_email.get('success'):
+                            logger.info(f"✅ Email enviado automáticamente para factura {factura.id}")
+                        else:
+                            logger.warning(f"⚠️ No se pudo enviar email para factura {factura.id}: {resultado_email.get('message')}")
+                    except Exception as e:
+                        logger.error(f"❌ Error enviando email automático para factura {factura.id}: {e}")
+                    
                     return {
                         'success': True,
                         'message': 'Factura autorizada exitosamente',
@@ -278,6 +289,16 @@ class SRIIntegration:
                 if estado_auth in ('AUTORIZADA', 'AUTORIZADO'):
                     # Generar RIDE autorizado
                     self._generar_ride_autorizado(factura, resultado_auth)
+
+                    # 📧 ENVÍO AUTOMÁTICO DE EMAIL tras autorización exitosa
+                    try:
+                        resultado_email = self.enviar_factura_email(factura)
+                        if resultado_email.get('success'):
+                            logger.info(f"✅ Email enviado automáticamente para factura {factura.id}")
+                        else:
+                            logger.warning(f"⚠️ No se pudo enviar email para factura {factura.id}: {resultado_email.get('message')}")
+                    except Exception as e:
+                        logger.error(f"❌ Error enviando email automático para factura {factura.id}: {e}")
 
                     return {
                         'success': True,
@@ -768,36 +789,19 @@ class SRIIntegration:
             from .ride_generator import RIDEGenerator
             
             ride_gen = RIDEGenerator()
-            # ✅ USAR MÉTODO CORRECTO: generar_ride_factura_firmado
-            pdf_path = ride_gen.generar_ride_factura_firmado(factura, firmar=False)
+            # ✅ generar_ride_factura_firmado ya guarda en storage y retorna la ruta
+            saved_path = ride_gen.generar_ride_factura_firmado(factura, firmar=False)
             
-            # Leer contenido del PDF generado
-            with open(pdf_path, 'rb') as pdf_file:
-                pdf_content = pdf_file.read()
-            
-            # Obtener RUC para organizar archivos
-            empresa = getattr(factura, 'empresa', None)
-            opciones = Opciones.objects.for_tenant(empresa).first()
-            if not opciones and empresa:
-                opciones = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
-            ruc = opciones.identificacion if opciones else 'sin_ruc'
-            
-            # Guardar RIDE
-            ride_filename = f"RIDE_{factura.numero}.pdf"
-            ride_path = f"rides/{ruc}/{ride_filename}"
-            
-            ride_file = ContentFile(pdf_content)
-            saved_path = default_storage.save(ride_path, ride_file)
-            
-            # Actualizar factura con ruta del RIDE si el campo existe
+            # Actualizar factura con ruta del RIDE
             if hasattr(factura, 'ride_autorizado'):
                 factura.ride_autorizado = saved_path
-                factura.save()
+                factura.save(update_fields=['ride_autorizado'])
             
-            logger.info(f"RIDE generado: {saved_path}")
+            logger.info(f"✅ RIDE generado y guardado: {saved_path}")
             
         except Exception as e:
-            logger.error(f"Error generando RIDE: {e}")
+            logger.error(f"❌ Error generando RIDE: {e}")
+            raise  # Re-lanzar la excepción para que se maneje arriba
     def enviar_factura_email(self, factura):
         """
         Envía por correo electrónico el RIDE y XML autorizado de una factura.
@@ -825,10 +829,16 @@ class SRIIntegration:
                     return {'success': False, 'message': 'No se encontraron opciones de empresa'}
 
             # Asegurar existencia de RIDE autorizado
-            if not getattr(factura, 'ride_autorizado'):
-                self._generar_ride_autorizado(factura, {'numero_autorizacion': factura.numero_autorizacion})
+            if not getattr(factura, 'ride_autorizado', None):
+                try:
+                    self._generar_ride_autorizado(factura, {'numero_autorizacion': factura.numero_autorizacion})
+                    factura.refresh_from_db()  # Refrescar para obtener el campo actualizado
+                except Exception as e:
+                    logger.error(f"Error generando RIDE para email: {e}")
+                    return {'success': False, 'message': f'No se pudo generar RIDE: {str(e)}'}
 
-            if not getattr(factura, 'ride_autorizado'):
+            # Verificar nuevamente después del intento
+            if not getattr(factura, 'ride_autorizado', None):
                 return {'success': False, 'message': 'No se pudo generar RIDE autorizado'}
 
             asunto_base = (
@@ -926,6 +936,16 @@ class SRIIntegration:
                         self._generar_ride_autorizado(factura, resultado)
                     except Exception as e:
                         logger.warning(f"Error generando RIDE para factura {factura.id}: {e}")
+                
+                # 📧 ENVÍO AUTOMÁTICO DE EMAIL tras autorización exitosa
+                try:
+                    resultado_email = self.enviar_factura_email(factura)
+                    if resultado_email.get('success'):
+                        logger.info(f"✅ Email enviado automáticamente para factura {factura.id}")
+                    else:
+                        logger.warning(f"⚠️ No se pudo enviar email para factura {factura.id}: {resultado_email.get('message')}")
+                except Exception as e:
+                    logger.error(f"❌ Error enviando email automático para factura {factura.id}: {e}")
                 
                 message = 'Factura autorizada exitosamente'
                 success = True
