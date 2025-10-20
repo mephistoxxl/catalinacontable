@@ -352,7 +352,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+# Usar hora oficial de Ecuador para generación de comprobantes y firmas
+TIME_ZONE = 'America/Guayaquil'
 
 USE_I18N = True
 
