@@ -3952,7 +3952,15 @@ class GuiaRemision(models.Model):
     """
     Modelo para las Guías de Remisión según normativa SRI Ecuador
     """
-    
+
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='guias_remision',
+        null=True,
+        blank=True,
+    )
+
     # Opciones para motivo de traslado según SRI
     MOTIVOS_TRASLADO = [
         ('01', 'Venta'),
@@ -4098,7 +4106,7 @@ class GuiaRemision(models.Model):
         verbose_name = 'Guía de Remisión'
         verbose_name_plural = 'Guías de Remisión'
         ordering = ['-fecha_emision', '-secuencial']
-        unique_together = [['establecimiento', 'punto_emision', 'secuencial']]
+        unique_together = [['empresa', 'establecimiento', 'punto_emision', 'secuencial']]
         indexes = [
             models.Index(fields=['fecha_emision']),
             models.Index(fields=['estado']),
@@ -4119,6 +4127,7 @@ class GuiaRemision(models.Model):
         if not self.secuencial:
             # Obtener el último secuencial para este establecimiento y punto de emisión
             ultima_guia = GuiaRemision.objects.filter(
+                empresa=self.empresa,
                 establecimiento=self.establecimiento,
                 punto_emision=self.punto_emision
             ).order_by('-secuencial').first()
@@ -4146,6 +4155,13 @@ class DetalleGuiaRemision(models.Model):
     Modelo para los detalles de productos en la Guía de Remisión
     """
     
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='detalles_guia_remision',
+        null=True,
+        blank=True,
+    )
     guia = models.ForeignKey(
         GuiaRemision, 
         on_delete=models.CASCADE, 
@@ -4187,7 +4203,12 @@ class DetalleGuiaRemision(models.Model):
     # Campos de auditoría
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_modificacion = models.DateTimeField(auto_now=True)
-    
+
+    def save(self, *args, **kwargs):
+        if self.guia and self.empresa_id is None:
+            self.empresa = self.guia.empresa
+        super().save(*args, **kwargs)
+
     class Meta:
         db_table = 'detalle_guia_remision'
         verbose_name = 'Detalle de Guía de Remisión'

@@ -2058,13 +2058,16 @@ def obtener_datos_secuencia(request, secuencia_id):
             from django.db import transaction
             from django.db.models import Max
             empresa_id = request.session.get('empresa_activa')
-            if not empresa_id:
+            empresa = None
+            if empresa_id:
+                empresa = request.user.empresas.filter(id=empresa_id).first()
+            if not empresa:
                 return JsonResponse({'success': False, 'error': 'Empresa no activa'}, status=403)
 
             with transaction.atomic():
                 # Bloquea la fila de la secuencia para lecturas concurrentes seguras
                 secuencia = (Secuencia.objects.select_for_update()
-                             .get(id=secuencia_id, empresa_id=empresa_id))
+                             .get(id=secuencia_id, empresa=empresa))
 
                 establecimiento_formatted = secuencia.get_establecimiento_formatted()
                 punto_emision_formatted = secuencia.get_punto_emision_formatted()
@@ -2072,7 +2075,7 @@ def obtener_datos_secuencia(request, secuencia_id):
                 siguiente_numero = 1
                 if secuencia.tipo_documento == '01':
                     max_seq = (Factura.objects.filter(
-                        empresa_id=empresa_id,
+                        empresa=empresa,
                         establecimiento=establecimiento_formatted,
                         punto_emision=punto_emision_formatted
                     ).aggregate(m=Max('secuencia'))['m'])
@@ -2083,7 +2086,7 @@ def obtener_datos_secuencia(request, secuencia_id):
                             siguiente_numero = 1
                 elif secuencia.tipo_documento == '06':
                     max_seq = (GuiaRemision.objects.filter(
-                        empresa_id=empresa_id,
+                        empresa=empresa,
                         establecimiento=establecimiento_formatted,
                         punto_emision=punto_emision_formatted
                     ).aggregate(m=Max('secuencial'))['m'])
@@ -6839,7 +6842,10 @@ import logging
 def listar_guias_remision(request):
     """Vista para listar todas las guias de remision"""
     empresa_id = request.session.get('empresa_activa')
-    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+    empresa = None
+    if empresa_id:
+        empresa = request.user.empresas.filter(id=empresa_id).first()
+    if not empresa:
         messages.error(request, 'Seleccione una empresa válida.')
         return redirect('inventario:seleccionar_empresa')
     # Obtener parámetros de filtro
@@ -6849,7 +6855,7 @@ def listar_guias_remision(request):
     fecha = request.GET.get('fecha', '').strip()
     
     # Query base (scoped by empresa)
-    guias = GuiaRemision.objects.filter(empresa_id=empresa_id)
+    guias = GuiaRemision.objects.filter(empresa=empresa)
     
     # Aplicar filtros
     if numero:
@@ -6902,7 +6908,10 @@ def listar_guias_remision(request):
 def emitir_guia_remision(request):
     """Vista para crear una nueva guia de remision"""
     empresa_id = request.session.get('empresa_activa')
-    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+    empresa = None
+    if empresa_id:
+        empresa = request.user.empresas.filter(id=empresa_id).first()
+    if not empresa:
         messages.error(request, 'Seleccione una empresa válida.')
         return redirect('inventario:seleccionar_empresa')
     if request.method == 'POST':
@@ -6931,7 +6940,7 @@ def emitir_guia_remision(request):
 
                 # Crear la guía
                 guia = GuiaRemision(
-                    empresa_id=empresa_id,
+                    empresa=empresa,
                     establecimiento=establecimiento,
                     punto_emision=punto_emision,
                     fecha_emision=request.POST.get('fecha_emision'),
@@ -6960,6 +6969,7 @@ def emitir_guia_remision(request):
                     if producto['codigo'] and producto['descripcion'] and producto['cantidad']:
                         DetalleGuiaRemision.objects.create(
                             guia=guia,
+                            empresa=empresa,
                             orden=i,
                             codigo_producto=producto['codigo'],
                             descripcion_producto=producto['descripcion'],
@@ -6983,8 +6993,11 @@ def emitir_guia_remision(request):
     # GET request - mostrar formulario
     # Secuencias SOLO de Guía de Remisión (código SRI 06)
     empresa_id = request.session.get('empresa_activa')
-    if empresa_id and request.user.empresas.filter(id=empresa_id).exists():
-        secuencias_guia = Secuencia.objects.filter(empresa_id=empresa_id, tipo_documento='06', activo=True).order_by('descripcion')
+    empresa = None
+    if empresa_id:
+        empresa = request.user.empresas.filter(id=empresa_id).first()
+    if empresa:
+        secuencias_guia = Secuencia.objects.filter(empresa=empresa, tipo_documento='06', activo=True).order_by('descripcion')
     else:
         secuencias_guia = Secuencia.objects.none()
     context = {
@@ -7002,10 +7015,13 @@ def emitir_guia_remision(request):
 def ver_guia_remision(request, guia_id):
     """Vista para ver los detalles de una guia de remision"""
     empresa_id = request.session.get('empresa_activa')
-    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+    empresa = None
+    if empresa_id:
+        empresa = request.user.empresas.filter(id=empresa_id).first()
+    if not empresa:
         messages.error(request, 'Seleccione una empresa válida.')
         return redirect('inventario:seleccionar_empresa')
-    guia = get_object_or_404(GuiaRemision, id=guia_id, empresa_id=empresa_id)
+    guia = get_object_or_404(GuiaRemision, id=guia_id, empresa=empresa)
     
     context = {
         'guia': guia,
@@ -7020,10 +7036,13 @@ def ver_guia_remision(request, guia_id):
 def editar_guia_remision(request, guia_id):
     """Vista para editar una guia de remision"""
     empresa_id = request.session.get('empresa_activa')
-    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+    empresa = None
+    if empresa_id:
+        empresa = request.user.empresas.filter(id=empresa_id).first()
+    if not empresa:
         messages.error(request, 'Seleccione una empresa válida.')
         return redirect('inventario:seleccionar_empresa')
-    guia = get_object_or_404(GuiaRemision, id=guia_id, empresa_id=empresa_id)
+    guia = get_object_or_404(GuiaRemision, id=guia_id, empresa=empresa)
     
     if not guia.puede_editarse():
         messages.error(request, 'No se puede editar una guia que no esta en borrador.')
@@ -7055,6 +7074,7 @@ def editar_guia_remision(request, guia_id):
                     if producto['codigo'] and producto['descripcion'] and producto['cantidad']:
                         DetalleGuiaRemision.objects.create(
                             guia=guia,
+                            empresa=empresa,
                             orden=i,
                             codigo_producto=producto['codigo'],
                             descripcion_producto=producto['descripcion'],
@@ -7080,9 +7100,12 @@ def editar_guia_remision(request, guia_id):
 def anular_guia_remision(request, guia_id):
     """Vista para anular una guia de remision"""
     empresa_id = request.session.get('empresa_activa')
-    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+    empresa = None
+    if empresa_id:
+        empresa = request.user.empresas.filter(id=empresa_id).first()
+    if not empresa:
         return JsonResponse({'success': False, 'message': 'Empresa no válida.'}, status=400)
-    guia = get_object_or_404(GuiaRemision, id=guia_id, empresa_id=empresa_id)
+    guia = get_object_or_404(GuiaRemision, id=guia_id, empresa=empresa)
     
     if not guia.puede_anularse():
         return JsonResponse({
@@ -7111,10 +7134,13 @@ def anular_guia_remision(request, guia_id):
 def descargar_guia_pdf(request, guia_id):
     """Vista para descargar el PDF de una guia de remision"""
     empresa_id = request.session.get('empresa_activa')
-    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+    empresa = None
+    if empresa_id:
+        empresa = request.user.empresas.filter(id=empresa_id).first()
+    if not empresa:
         messages.error(request, 'Seleccione una empresa válida.')
         return redirect('inventario:seleccionar_empresa')
-    guia = get_object_or_404(GuiaRemision, id=guia_id, empresa_id=empresa_id)
+    guia = get_object_or_404(GuiaRemision, id=guia_id, empresa=empresa)
     
     if guia.estado != 'autorizada':
         messages.error(request, 'Solo se puede descargar PDF de guías autorizadas.')
@@ -7401,11 +7427,21 @@ def _generar_clave_acceso_temporal(guia):
     """Genera una clave de acceso temporal para la guia"""
     from random import randint
     from django.utils import timezone
-    fecha = guia.fecha_emision or timezone.now().date()
+    empresa = getattr(guia, 'empresa', None)
+    ruc = getattr(empresa, 'ruc', '') if empresa else ''
+    if not ruc:
+        raise ValueError('La empresa asociada a la guía debe tener un RUC configurado.')
+    fecha_valor = guia.fecha_emision
+    if isinstance(fecha_valor, str):
+        try:
+            fecha = datetime.strptime(fecha_valor, '%Y-%m-%d').date()
+        except ValueError:
+            fecha = timezone.now().date()
+    else:
+        fecha = fecha_valor or timezone.now().date()
     fecha_str = fecha.strftime('%d%m%Y')
     tipo_comprobante = '06'  # Guia de remisión
-    ruc = getattr(getattr(guia, 'empresa', None), 'ruc', None) or '0000000000000'
-    ambiente = '1'  # 1=Pruebas, 2=Producción (se podría parametrizar)
+    ambiente = getattr(empresa, 'tipo_ambiente', None) or '1'  # 1=Pruebas, 2=Producción
     serie = f"{guia.establecimiento}{guia.punto_emision}"
     secuencial = guia.secuencial or '000000001'
     codigo_numerico = f"{randint(0, 99999999):08d}"
