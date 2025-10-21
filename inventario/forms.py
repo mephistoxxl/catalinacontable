@@ -4,6 +4,7 @@ from django import forms
 from .models import Producto, Cliente, Proveedor, Usuario, Opciones, Secuencia, Facturador, Almacen, FormaPago, Banco, Caja, Empresa
 from django.forms import ModelChoiceField
 from django.core.exceptions import ValidationError
+from django.contrib.auth.password_validation import validate_password
 
 class MisProductos(ModelChoiceField):
     def label_from_instance(self, obj):
@@ -1172,16 +1173,36 @@ class NuevoUsuarioFormulario(forms.Form):
         email = self.cleaned_data.get('email', '').strip().lower()
         return email
 
+    def clean(self):
+        cleaned_data = super().clean()
+        password = cleaned_data.get('password')
+        rep_password = cleaned_data.get('rep_password')
+
+        if password and rep_password and password != rep_password:
+            self.add_error('rep_password', 'Las claves no coinciden')
+
+        if password:
+            try:
+                validate_password(password)
+            except ValidationError as exc:
+                self.add_error('password', exc)
+
+        return cleaned_data
+
 
 
 class ClaveFormulario(forms.Form):
-    #clave = forms.CharField(
-        #label = 'Ingrese su clave actual',
-        #max_length=50,
-        #widget = forms.TextInput(
-        #attrs={'placeholder': 'Inserte la clave actual para verificar su identidad',
-        #'id':'clave','class':'form-control', 'type': 'password'}),
-        #)
+    clave_actual = forms.CharField(
+        label='Ingrese su clave actual',
+        max_length=50,
+        widget=forms.PasswordInput(
+            attrs={
+                'placeholder': 'Inserte la clave actual para verificar su identidad',
+                'id': 'clave_actual',
+                'class': 'form-control',
+            }
+        ),
+    )
 
     clave_nueva = forms.CharField(
         label='Ingrese la clave nueva',
@@ -1206,6 +1227,26 @@ class ClaveFormulario(forms.Form):
             }
         ),
     )
+
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        clave_nueva = cleaned_data.get('clave_nueva')
+        repetir_clave = cleaned_data.get('repetir_clave')
+
+        if clave_nueva and repetir_clave and clave_nueva != repetir_clave:
+            self.add_error('repetir_clave', 'Las claves nuevas no coinciden')
+
+        if clave_nueva:
+            try:
+                validate_password(clave_nueva, user=self.user)
+            except ValidationError as exc:
+                self.add_error('clave_nueva', exc)
+
+        return cleaned_data
 
 
 class ImportarBDDFormulario(forms.Form):

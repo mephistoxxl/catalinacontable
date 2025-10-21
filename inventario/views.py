@@ -1051,7 +1051,7 @@ class Perfil(LoginRequiredMixin, View):
                             messages.error(request, 'No puedes cambiar la clave de un usuario de tu mismo nivel')
                             return HttpResponseRedirect('/inventario/perfil/ver/%s' % p)
 
-            form = ClaveFormulario(request.POST)
+            form = ClaveFormulario(user=perf)
             contexto = {'form': form, 'modo': request.session.get('perfilProcesado'),
                         'editar': 'clave', 'nombreUsuario': perf.username}
 
@@ -1112,42 +1112,26 @@ class Perfil(LoginRequiredMixin, View):
                 return render(request, 'inventario/perfil/perfil.html', {'form': form})
 
         elif modo == 'clave':
-            form = ClaveFormulario(request.POST)
+            usuario = Usuario.objects.get(id=p)
+            form = ClaveFormulario(request.POST, user=usuario)
 
             if form.is_valid():
-                error = 0
                 clave_nueva = form.cleaned_data['clave_nueva']
-                repetir_clave = form.cleaned_data['repetir_clave']
-                #clave = form.cleaned_data['clave']
-
-                #Comentare estas lineas de abajo para deshacerme de la necesidad
-                #   de obligar a que el usuario coloque la clave nuevamente
-                #correcto = authenticate(username=request.user.username , password=clave)
-
-                #if correcto is not None:
-                #if clave_nueva != clave:
-                #pass
-                #else:
-                #error = 1
-                #messages.error(request,"La clave nueva no puede ser identica a la actual")
-                        # Caso 3: Usuario pertenece a una o más empresas
-                usuario = Usuario.objects.get(id=p)
-
-                if clave_nueva == repetir_clave:
-                    pass
-                else:
-                    error = 1
-                #error = 1
-                # Si el formulario no es válido, se vuelve a mostrar con errores
-
-                if (error == 0):
-                    messages.success(request, 'La clave se ha cambiado correctamente!')
-                    usuario.set_password(clave_nueva)
-                    usuario.save()
-                    return HttpResponseRedirect("/inventario/login")
-
-                else:
+                clave_actual = form.cleaned_data['clave_actual']
+                autenticado = authenticate(username=usuario.username, password=clave_actual)
+                if autenticado is None:
+                    messages.error(request, 'La clave actual es incorrecta.')
                     return HttpResponseRedirect("/inventario/perfil/clave/%s" % p)
+
+                messages.success(request, 'La clave se ha cambiado correctamente!')
+                usuario.set_password(clave_nueva)
+                usuario.save()
+                return HttpResponseRedirect("/inventario/login")
+
+            for field_errors in form.errors.values():
+                for error in field_errors:
+                    messages.error(request, error)
+            return HttpResponseRedirect("/inventario/perfil/clave/%s" % p)
 
 
 #----------------------------------------------------------------------------------#   
@@ -4194,14 +4178,15 @@ class CrearUsuario(LoginRequiredMixin, View):
             return HttpResponseRedirect('/inventario/panel')
         form = NuevoUsuarioFormulario(request.POST, user=request.user)
         if not form.is_valid():
-            messages.error(request, 'Formulario inválido')
+            for field_errors in form.errors.values():
+                for error in field_errors:
+                    messages.error(request, error)
             return HttpResponseRedirect('/inventario/crearUsuario')
 
         identificacion = form.cleaned_data['identificacion']
         nombre_completo = form.cleaned_data['nombre_completo']
         email = form.cleaned_data['email']
         password = form.cleaned_data['password']
-        rep_password = form.cleaned_data['rep_password']
         level = form.cleaned_data['level']
         empresa_id = request.session.get('empresa_activa')
         try:
@@ -4210,10 +4195,6 @@ class CrearUsuario(LoginRequiredMixin, View):
             messages.error(request, 'No se ha seleccionado una empresa válida')
             return HttpResponseRedirect('/inventario/crearUsuario')
 
-        # Validaciones básicas
-        if password != rep_password:
-            messages.error(request, 'Las claves no coinciden')
-            return HttpResponseRedirect('/inventario/crearUsuario')
         if usuarioExiste(Usuario, 'username', identificacion):
             # En vez de bloquear, intentamos vincular a la empresa si no lo está
             existente = Usuario.objects.filter(username=identificacion).first()
