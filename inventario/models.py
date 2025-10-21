@@ -3955,10 +3955,8 @@ class GuiaRemision(models.Model):
 
     empresa = models.ForeignKey(
         'Empresa',
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='guias_remision',
-        null=True,
-        blank=True,
     )
 
     # Opciones para motivo de traslado según SRI

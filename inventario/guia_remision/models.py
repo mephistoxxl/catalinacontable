@@ -133,6 +133,14 @@ class GuiaRemision(models.Model):
         help_text="Observaciones generales de la guía"
     )
     
+    # Campo multi-tenant
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.PROTECT,
+        related_name='guias_remision',
+        help_text="Empresa a la que pertenece esta guía"
+    )
+    
     # Campos de auditoría
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_modificacion = models.DateTimeField(auto_now=True)
@@ -177,6 +185,7 @@ class GuiaRemision(models.Model):
         if not self.secuencial:
             # Obtener el último secuencial para este establecimiento y punto de emisión
             ultima_guia = GuiaRemision.objects.filter(
+                empresa=self.empresa,
                 establecimiento=self.establecimiento,
                 punto_emision=self.punto_emision
             ).order_by('-secuencial').first()
