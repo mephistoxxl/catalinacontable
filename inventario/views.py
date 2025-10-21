@@ -3,7 +3,15 @@ from django.contrib.auth.hashers import check_password
 from django.shortcuts import render, get_object_or_404, redirect
 
 # para redirigir a otras paginas
-from django.http import HttpResponseRedirect, HttpResponse, FileResponse, JsonResponse, HttpResponseForbidden, Http404
+from django.http import (
+    HttpResponseRedirect,
+    HttpResponse,
+    FileResponse,
+    JsonResponse,
+    HttpResponseForbidden,
+    Http404,
+    HttpResponseNotAllowed,
+)
 from urllib3 import request
 #el formulario de login
 from .forms import *
@@ -1155,6 +1163,9 @@ class Eliminar(LoginRequiredMixin, View):
         if not request.user.empresas.filter(id=empresa_id).exists():
             return HttpResponseForbidden()
 
+        if modo == 'usuario':
+            return HttpResponseNotAllowed(['POST'])
+
         if modo == 'producto':
             prod = get_object_or_404(Producto, id=p, empresa_id=empresa_id)
             prod.delete()
@@ -1182,30 +1193,39 @@ class Eliminar(LoginRequiredMixin, View):
             messages.success(request, f'Proveedor de ID {p} borrado exitosamente.')
             return HttpResponseRedirect("/inventario/listarProveedores")
 
-        elif modo == 'usuario':
-            if request.user.is_superuser == False:
-                messages.error(request, 'No tienes permisos suficientes para borrar usuarios')
-                return HttpResponseRedirect('/inventario/listarUsuarios')
+        #Fin de vista-------------------------------------------------------------------
 
-            elif p == 1:
-                messages.error(request, 'No puedes eliminar al super-administrador.')
-                return HttpResponseRedirect('/inventario/listarUsuarios')
+    def post(self, request, modo, p):
+        empresa_id = request.session.get('empresa_activa')
+        if not request.user.empresas.filter(id=empresa_id).exists():
+            return HttpResponseForbidden()
 
-            elif request.user.id == p:
-                messages.error(request, 'No puedes eliminar tu propio usuario.')
-                return HttpResponseRedirect('/inventario/listarUsuarios')
+        if modo != 'usuario':
+            return HttpResponseNotAllowed(['GET'])
 
-            else:
-                usuario_obj = get_object_or_404(Usuario, id=p)
-                # Si Usuario tiene relación M2M con empresas, validar pertenencia
-                if hasattr(usuario_obj, 'empresas') and not usuario_obj.empresas.filter(id=empresa_id).exists():
-                    messages.error(request, 'El usuario no pertenece a la empresa activa.')
-                    return HttpResponseRedirect('/inventario/listarUsuarios')
-                usuario_obj.delete()
-                messages.success(request, f'Usuario de ID {p} borrado exitosamente.')
-                return HttpResponseRedirect("/inventario/listarUsuarios")
+        if not request.user.is_superuser:
+            messages.error(request, 'No tienes permisos suficientes para borrar usuarios')
+            return HttpResponseRedirect('/inventario/listarUsuarios')
 
-            #Fin de vista-------------------------------------------------------------------
+        if p == 1:
+            messages.error(request, 'No puedes eliminar al super-administrador.')
+            return HttpResponseRedirect('/inventario/listarUsuarios')
+
+        if request.user.id == p:
+            messages.error(request, 'No puedes eliminar tu propio usuario.')
+            return HttpResponseRedirect('/inventario/listarUsuarios')
+
+        usuario_obj = get_object_or_404(Usuario, id=p)
+        # Si Usuario tiene relación M2M con empresas, validar pertenencia
+        if hasattr(usuario_obj, 'empresas') and not usuario_obj.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'El usuario no pertenece a la empresa activa.')
+            return HttpResponseRedirect('/inventario/listarUsuarios')
+
+        usuario_obj.delete()
+        messages.success(request, f'Usuario de ID {p} borrado exitosamente.')
+        return HttpResponseRedirect("/inventario/listarUsuarios")
+
+        #Fin de vista-------------------------------------------------------------------
 
 
 #Muestra una lista de 10 productos por pagina----------------------------------------#
