@@ -145,6 +145,13 @@ select:disabled {
                                                                 <i class="fas fa-envelope text-green-600 mr-1 text-xs"></i>{{form.email.label}}
                                                         </label>
                                                         {{form.email}}
+                                                        {% if form.email.errors %}
+                                                                <ul class="mt-1 space-y-0.5">
+                                                                        {% for error in form.email.errors %}
+                                                                                <li class="text-xs text-red-600">{{ error }}</li>
+                                                                        {% endfor %}
+                                                                </ul>
+                                                        {% endif %}
                                                 </div>
                                                 <div>
                                                         <label for="{{ form.level.name }}" class="block text-xs font-medium text-gray-800 mb-1">

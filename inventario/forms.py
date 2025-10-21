@@ -1051,12 +1051,19 @@ class UsuarioFormulario(forms.Form):
         'id':'nombre_completo','class':'form-control','value':''}),
         )
 
-    email = forms.CharField(
-        label = 'Correo electronico',
+    email = forms.EmailField(
+        label='Correo electronico',
         max_length=100,
-        widget = forms.TextInput(attrs={'placeholder': 'Inserte un correo valido',
-        'id':'email','class':'form-control','type':'email','value':''} )
-        )
+        widget=forms.EmailInput(
+            attrs={
+                'placeholder': 'Inserte un correo valido',
+                'id': 'email',
+                'class': 'form-control',
+                'type': 'email',
+                'value': '',
+            }
+        ),
+    )
 
     level = forms.TypedChoiceField(
         required=False,
@@ -1085,6 +1092,10 @@ class UsuarioFormulario(forms.Form):
             choices.insert(0, (Usuario.ROOT, 'Raiz'))
         self.fields['level'].choices = choices
 
+    def clean_email(self):
+        email = self.cleaned_data.get('email', '').strip().lower()
+        return email
+
 class NuevoUsuarioFormulario(forms.Form):
     identificacion = forms.CharField(
         label = "Identificación",
@@ -1100,12 +1111,19 @@ class NuevoUsuarioFormulario(forms.Form):
         'id':'nombre_completo','class':'form-control','value':''}),
         )
 
-    email = forms.CharField(
-        label = 'Correo electronico',
+    email = forms.EmailField(
+        label='Correo electronico',
         max_length=100,
-        widget = forms.TextInput(attrs={'placeholder': 'Inserte un correo valido',
-        'id':'email','class':'form-control','type':'email','value':''} )
-        )
+        widget=forms.EmailInput(
+            attrs={
+                'placeholder': 'Inserte un correo valido',
+                'id': 'email',
+                'class': 'form-control',
+                'type': 'email',
+                'value': '',
+            }
+        ),
+    )
 
     password = forms.CharField(
         label='Clave',
@@ -1149,6 +1167,10 @@ class NuevoUsuarioFormulario(forms.Form):
         if user and user.nivel == Usuario.ROOT:
             choices.insert(0, (Usuario.ROOT, 'Raiz'))
         self.fields['level'].choices = choices
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email', '').strip().lower()
+        return email
 
 
 
