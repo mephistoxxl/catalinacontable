@@ -118,6 +118,13 @@ input[name="clave"]:focus, input[name="clave_nueva"]:focus, input[name="repetir_
                         </div>
                         {{ form.email }}
                     </div>
+                    {% if form.email.errors %}
+                        <ul class="mt-1 space-y-0.5">
+                            {% for error in form.email.errors %}
+                                <li class="text-xs text-red-600">{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
                 </div>
 
                 <!-- Access Level Field -->
