@@ -137,9 +137,12 @@ td {
                                                         <a href="/inventario/perfil/ver/{{ fila.id }}" class="block px-2 py-1 text-xs text-gray-700 hover:bg-gray-100">
                                                             <i class="fa fa-eye mr-1 text-xs"></i>Ver usuario
                                                         </a>
-                                                        <button onclick="eliminarEntrada({{ fila.id }},'usuario')" class="block w-full text-left px-2 py-1 text-xs text-red-700 hover:bg-red-50">
-                                                            <i class="fa fa-trash mr-1 text-xs"></i>Eliminar usuario
-                                                        </button>
+                                                        <form method="post" action="{% url 'inventario:eliminar' 'usuario' fila.id %}" onsubmit="return confirm('¿Estás seguro de eliminar este usuario?');" class="m-0">
+                                                            {% csrf_token %}
+                                                            <button type="submit" class="w-full text-left px-2 py-1 text-xs text-red-700 hover:bg-red-50">
+                                                                <i class="fa fa-trash mr-1 text-xs"></i>Eliminar usuario
+                                                            </button>
+                                                        </form>
                                                     </div>
                                                 </div>
                                             </div>
