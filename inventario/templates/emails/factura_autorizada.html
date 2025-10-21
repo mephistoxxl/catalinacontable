@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Factura Electrónica Autorizada</title>
+</head>
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); padding: 30px; text-align: center; color: white;">
+            {% if logo_url %}
+            <img src="{{ logo_url }}" style="max-width: 200px; height: auto; margin-bottom: 15px;">
+            {% endif %}
+            <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: 2px; color: white;">CATALINA</h1>
+            <p style="margin: 5px 0 0 0; font-size: 14px; letter-spacing: 1px; color: white;">Factura Electrónica Autorizada</p>
+        </div>
+
+        <!-- Content -->
+        <div style="padding: 30px; text-align: center;">
+            <div style="font-size: 18px; color: #333; margin-bottom: 15px;">
+                ¡Estimado/a {{ nombre_cliente }}!
+            </div>
+
+            <div style="font-size: 14px; color: #555; line-height: 1.6; margin-bottom: 20px;">
+                Se ha emitido un comprobante electrónico con su nombre. El documento se encuentra autorizado por el SRI y ha sido enviado a través del <strong>Sistema Catalina Facturador</strong>.
+            </div>
+
+            <!-- Info Box -->
+            <table width="100%" cellpadding="8" cellspacing="0" style="background-color: #f8f9fa; border-left: 4px solid #2c3e50; margin: 20px 0; border-radius: 4px;">
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="font-weight: 600; color: #333; text-align: left;">Emisor:</td>
+                    <td style="color: #555; text-align: right;">{{ razon_social }}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="font-weight: 600; color: #333; text-align: left;">RUC:</td>
+                    <td style="color: #555; text-align: right;">{{ ruc }}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="font-weight: 600; color: #333; text-align: left;">Factura No:</td>
+                    <td style="color: #555; text-align: right;">{{ numero_factura }}</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 600; color: #333; text-align: left;">Fecha de Emisión:</td>
+                    <td style="color: #555; text-align: right;">{{ fecha_emision }}</td>
+                </tr>
+            </table>
+
+            <!-- Clave de Acceso -->
+            <div style="background-color: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 4px; margin: 20px 0; text-align: center;">
+                <div style="font-size: 12px; color: #856404; font-weight: 600; margin-bottom: 5px;">CLAVE DE ACCESO:</div>
+                <div style="font-family: 'Courier New', monospace; font-size: 12px; color: #333; word-break: break-all;">{{ clave_acceso }}</div>
+            </div>
+
+            <!-- Total -->
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 4px; margin: 20px 0; text-align: center;">
+                <div style="font-size: 16px; font-weight: 600; color: #333; margin-bottom: 10px;">Total Incl. Impuesto:</div>
+                <div style="font-size: 32px; font-weight: 700; color: #2c3e50;">${{ total }}</div>
+            </div>
+
+            <!-- Attachments -->
+            <div style="background-color: #e3f2fd; border: 1px solid #2196f3; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                <div style="font-weight: 600; color: #1976d2; margin-bottom: 10px; font-size: 14px;">📎 Archivos Adjuntos:</div>
+                <span style="display: inline-block; background-color: white; border: 1px solid #90caf9; padding: 8px 15px; border-radius: 20px; margin: 5px; font-size: 13px; color: #1976d2;">📄 RIDE.pdf</span>
+                <span style="display: inline-block; background-color: white; border: 1px solid #90caf9; padding: 8px 15px; border-radius: 20px; margin: 5px; font-size: 13px; color: #1976d2;">📋 Factura.xml</span>
+            </div>
+
+            <div style="font-size: 14px; color: #555; margin-top: 20px;">
+                Conéctese con nosotros para obtener consejos y noticias.
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background-color: #2c3e50; color: white; padding: 25px; text-align: center; font-size: 12px;">
+            {% if logo_url %}
+            <img src="{{ logo_url }}" style="max-width: 150px; margin-bottom: 15px; filter: brightness(0) invert(1);">
+            {% endif %}
+
+            <p style="margin: 15px 0 5px 0; color: white;">© {{ year }} <strong>CATALINA FACT</strong> - Todos los derechos reservados</p>
+            <p style="margin: 5px 0; color: white;">Santo Domingo - Ecuador</p>
+        </div>
+    </div>
+</body>
+</html>

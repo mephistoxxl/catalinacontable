@@ -193,26 +193,34 @@ class RIDEGenerator:
             elementos = []
 
             # === FILA SUPERIOR: LOGO + DATOS EMPRESA  |  CUADRO AZUL REORGANIZADO ===
-            # Logo
-            logo_abspath = None
+            # Logo - Compatible con filesystem local Y storage remoto (S3)
+            logo = ""
             if hasattr(opciones, 'imagen') and opciones.imagen:
-                logo_abspath = opciones.imagen.path if hasattr(opciones.imagen, 'path') else str(opciones.imagen)
-            if logo_abspath and os.path.exists(logo_abspath):
                 try:
                     from reportlab.lib.utils import ImageReader
-                    reader = ImageReader(logo_abspath)
+                    from io import BytesIO
+                    
+                    # Intentar leer desde storage (funciona con filesystem y S3)
+                    with opciones.imagen.open('rb') as logo_file:
+                        logo_data = BytesIO(logo_file.read())
+                    
+                    reader = ImageReader(logo_data)
                     orig_width, orig_height = reader.getSize()
                     max_width = 45 * mm
                     max_height = 40 * mm
                     ratio = min(max_width / orig_width, max_height / orig_height)
                     new_width = orig_width * ratio
                     new_height = orig_height * ratio
-                    logo = Image(logo_abspath, width=new_width, height=new_height)
+                    
+                    # Resetear el BytesIO para leerlo de nuevo
+                    logo_data.seek(0)
+                    logo = Image(logo_data, width=new_width, height=new_height)
+                    logger.info(f"✅ Logo cargado correctamente: {opciones.imagen.name}")
                 except Exception as e:
-                    logger.error(f"Error cargando logo: {e}")
+                    logger.error(f"❌ Error cargando logo: {e}")
                     logo = ""
             else:
-                logo = ""
+                logger.warning("⚠️ No hay logo configurado en Opciones")
 
             # Datos de empresa
             razon_social = getattr(opciones, 'razon_social', '')

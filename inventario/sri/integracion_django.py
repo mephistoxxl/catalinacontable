@@ -824,52 +824,91 @@ class SRIIntegration:
             if not getattr(factura, 'ride_autorizado', None):
                 return {'success': False, 'message': 'No se pudo generar RIDE autorizado'}
 
-            asunto_base = (
-                f"Documento Electronico {factura.establecimiento}-"
-                f"{factura.punto_emision}-{factura.secuencia} - {opciones.razon_social}"
-            )
-
-            cuerpo = (
-                f"Estimado/a {factura.nombre_cliente},\n\n"
-                f"Adjunto encontrará su comprobante electrónico.\n\n"
-                f"Emisor: {opciones.razon_social}\n"
-                f"RUC: {opciones.identificacion}\n"
-            )
-
+            # Preparar datos para el template
+            from django.template.loader import render_to_string
+            from datetime import datetime
+            
+            numero_factura = f"{factura.establecimiento}-{factura.punto_emision}-{factura.secuencia}"
+            
+            asunto = f"Factura Electrónica {numero_factura} - {opciones.razon_social}"
+            
             destinatario = getattr(factura.cliente, 'correo', None)
             if not destinatario:
                 return {'success': False, 'message': 'El cliente no tiene correo registrado'}
 
+            # Contexto para el template HTML
+            context = {
+                'nombre_cliente': factura.nombre_cliente,
+                'razon_social': opciones.razon_social,
+                'ruc': opciones.identificacion,
+                'numero_factura': numero_factura,
+                'fecha_emision': factura.fecha_emision.strftime('%d/%m/%Y'),
+                'fecha_autorizacion': factura.fecha_autorizacion.strftime('%d/%m/%Y %H:%M:%S') if factura.fecha_autorizacion else 'N/A',
+                'clave_acceso': factura.clave_acceso,
+                'total': f"{factura.monto_general:.2f}",
+                'ambiente': 'Pruebas' if getattr(empresa, 'tipo_ambiente', '1') == '1' else 'Producción',
+                'nombre_sistema': 'Catalina Facturador',
+                'email_empresa': getattr(opciones, 'correo', ''),
+                'telefono': getattr(opciones, 'telefono', ''),
+                'year': datetime.now().year,
+                'logo_url': opciones.imagen.url if hasattr(opciones, 'imagen') and opciones.imagen else None,
+                # Redes sociales (puedes agregar estos campos a Opciones si quieres)
+                'facebook_url': None,
+                'youtube_url': None,
+                'instagram_url': None,
+            }
+            
+            # Renderizar HTML
+            html_content = render_to_string('emails/factura_autorizada.html', context)
+            
+            # Texto plano alternativo (fallback)
+            texto_plano = f"""
+Estimado/a {factura.nombre_cliente},
+
+Se ha emitido un comprobante electrónico con su nombre. El documento se encuentra autorizado por el SRI.
+
+Emisor: {opciones.razon_social}
+RUC: {opciones.identificacion}
+Factura No: {numero_factura}
+Fecha de Emisión: {factura.fecha_emision.strftime('%d/%m/%Y')}
+Clave de Acceso: {factura.clave_acceso}
+Total: ${factura.monto_general:.2f}
+
+Adjunto encontrará el RIDE (PDF) y el XML autorizado.
+
+Saludos cordiales,
+{opciones.razon_social}
+"""
+
             # 🔧 FIX: Usar dominio verificado de Zeptomail (no Gmail)
-            # Zeptomail solo permite enviar desde dominios verificados
+            # Remitente simple sin nombre de empresa
             from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@catalinasoft-ec.com')
             
-            # Opcional: agregar nombre de la empresa al remitente
-            if opciones and opciones.razon_social:
-                from_email = f"{opciones.razon_social} <{settings.DEFAULT_FROM_EMAIL}>"
-            
-            # Reply-to puede ser el correo de la empresa (Gmail está bien aquí)
+            # Reply-to con el correo de la empresa
             reply_to_email = getattr(opciones, 'correo', None)
 
-            email = EmailMessage(
-                asunto_base,
-                cuerpo,
+            # Crear email con HTML
+            from django.core.mail import EmailMultiAlternatives
+            email = EmailMultiAlternatives(
+                asunto,
+                texto_plano,
                 from_email=from_email,
                 to=[destinatario],
                 reply_to=[reply_to_email] if reply_to_email else None,
             )
+            email.attach_alternative(html_content, "text/html")
 
             # Adjuntar RIDE PDF
             try:
                 with default_storage.open(factura.ride_autorizado.name, 'rb') as ride_file:
-                    email.attach(f"{asunto_base}.pdf", ride_file.read(), 'application/pdf')
+                    email.attach(f"RIDE_{numero_factura}.pdf", ride_file.read(), 'application/pdf')
             except Exception as e:
                 logger.error(f"Error adjuntando RIDE: {e}")
 
             # Adjuntar XML autorizado
             if factura.xml_autorizado:
                 xml_file = ContentFile(factura.xml_autorizado.encode('utf-8'))
-                email.attach(f"{asunto_base}.xml", xml_file.read(), 'application/xml')
+                email.attach(f"Factura_{numero_factura}.xml", xml_file.read(), 'application/xml')
 
             email.send(fail_silently=False)
             return {'success': True, 'message': 'Factura enviada por correo exitosamente'}
