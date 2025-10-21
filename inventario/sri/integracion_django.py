@@ -200,15 +200,8 @@ class SRIIntegration:
                 if resultado_auth.get('estado') in ('AUTORIZADA', 'AUTORIZADO'):
                     self._generar_ride_autorizado(factura, resultado_auth)
                     
-                    # 📧 ENVÍO AUTOMÁTICO DE EMAIL tras autorización exitosa
-                    try:
-                        resultado_email = self.enviar_factura_email(factura)
-                        if resultado_email.get('success'):
-                            logger.info(f"✅ Email enviado automáticamente para factura {factura.id}")
-                        else:
-                            logger.warning(f"⚠️ No se pudo enviar email para factura {factura.id}: {resultado_email.get('message')}")
-                    except Exception as e:
-                        logger.error(f"❌ Error enviando email automático para factura {factura.id}: {e}")
+                    # 📧 NOTA: Envío automático DESHABILITADO para evitar bucles
+                    # El usuario debe usar el botón "Enviar Email" manualmente
                     
                     return {
                         'success': True,
@@ -290,15 +283,8 @@ class SRIIntegration:
                     # Generar RIDE autorizado
                     self._generar_ride_autorizado(factura, resultado_auth)
 
-                    # 📧 ENVÍO AUTOMÁTICO DE EMAIL tras autorización exitosa
-                    try:
-                        resultado_email = self.enviar_factura_email(factura)
-                        if resultado_email.get('success'):
-                            logger.info(f"✅ Email enviado automáticamente para factura {factura.id}")
-                        else:
-                            logger.warning(f"⚠️ No se pudo enviar email para factura {factura.id}: {resultado_email.get('message')}")
-                    except Exception as e:
-                        logger.error(f"❌ Error enviando email automático para factura {factura.id}: {e}")
+                    # 📧 NOTA: Envío automático DESHABILITADO para evitar bucles
+                    # El usuario debe usar el botón "Enviar Email" manualmente
 
                     return {
                         'success': True,
@@ -813,12 +799,9 @@ class SRIIntegration:
             dict: resultado del envío con ``success`` y ``message``.
         """
         try:
-            # Revalidar autorización si faltan datos
-            if not factura.numero_autorizacion or not factura.fecha_autorizacion:
-                self.consultar_estado_factura(factura.id)
-                factura.refresh_from_db()
-                if factura.estado_sri != 'AUTORIZADA':
-                    return {'success': False, 'message': 'La factura no está autorizada'}
+            # Verificar autorización (SIN consultar al SRI para evitar bucles)
+            if factura.estado_sri != 'AUTORIZADA':
+                return {'success': False, 'message': f'La factura no está autorizada. Estado actual: {factura.estado_sri}'}
 
             empresa = getattr(factura, 'empresa', None)
             opciones = Opciones.objects.for_tenant(empresa).first()
@@ -857,22 +840,23 @@ class SRIIntegration:
             if not destinatario:
                 return {'success': False, 'message': 'El cliente no tiene correo registrado'}
 
-            # Usar el correo configurado en Opciones como remitente
-            from_email = None
-            try:
-                if getattr(opciones, 'correo', None):
-                    from_email = f"{opciones.razon_social} <{opciones.correo}>"
-            except Exception:
-                from_email = None
-            if not from_email:
-                from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@example.com')
+            # 🔧 FIX: Usar dominio verificado de Zeptomail (no Gmail)
+            # Zeptomail solo permite enviar desde dominios verificados
+            from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@catalinasoft-ec.com')
+            
+            # Opcional: agregar nombre de la empresa al remitente
+            if opciones and opciones.razon_social:
+                from_email = f"{opciones.razon_social} <{settings.DEFAULT_FROM_EMAIL}>"
+            
+            # Reply-to puede ser el correo de la empresa (Gmail está bien aquí)
+            reply_to_email = getattr(opciones, 'correo', None)
 
             email = EmailMessage(
                 asunto_base,
                 cuerpo,
                 from_email=from_email,
                 to=[destinatario],
-                reply_to=[opciones.correo] if getattr(opciones, 'correo', None) else None,
+                reply_to=[reply_to_email] if reply_to_email else None,
             )
 
             # Adjuntar RIDE PDF
@@ -937,15 +921,8 @@ class SRIIntegration:
                     except Exception as e:
                         logger.warning(f"Error generando RIDE para factura {factura.id}: {e}")
                 
-                # 📧 ENVÍO AUTOMÁTICO DE EMAIL tras autorización exitosa
-                try:
-                    resultado_email = self.enviar_factura_email(factura)
-                    if resultado_email.get('success'):
-                        logger.info(f"✅ Email enviado automáticamente para factura {factura.id}")
-                    else:
-                        logger.warning(f"⚠️ No se pudo enviar email para factura {factura.id}: {resultado_email.get('message')}")
-                except Exception as e:
-                    logger.error(f"❌ Error enviando email automático para factura {factura.id}: {e}")
+                # 📧 NOTA: Envío automático DESHABILITADO para evitar bucles
+                # El usuario debe usar el botón "Enviar Email" manualmente
                 
                 message = 'Factura autorizada exitosamente'
                 success = True
