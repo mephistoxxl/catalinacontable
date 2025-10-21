@@ -1,3 +1,4 @@
+from django.contrib.messages import get_messages
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -114,3 +115,37 @@ class PerfilSuperadminTests(TestCase):
         self.superadmin.refresh_from_db()
         self.assertEqual(self.superadmin.first_name, "Root Actualizado")
         self.assertEqual(list(self.superadmin.empresas.all()), [self.empresa_b])
+
+
+class PerfilPasswordChangeTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.usuario = Usuario.objects.create_user(
+            username="4000000000000",
+            email="usuario@example.com",
+            password="ClaveVieja123",
+        )
+        self.usuario.nivel = Usuario.ROOT
+        self.usuario.is_superuser = True
+        self.usuario.save()
+
+    def test_rejects_wrong_current_password(self):
+        self.client.force_login(self.usuario)
+        url = reverse("inventario:perfil", args=("clave", self.usuario.id))
+        response = self.client.post(
+            url,
+            data={
+                "clave_actual": "ClaveIncorrecta",
+                "clave_nueva": "NuevaClaveSegura123",
+                "repetir_clave": "NuevaClaveSegura123",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mensajes = [mensaje.message for mensaje in get_messages(response.wsgi_request)]
+        self.assertIn("La clave actual es incorrecta.", mensajes)
+
+        self.usuario.refresh_from_db()
+        self.assertTrue(self.usuario.check_password("ClaveVieja123"))
+        self.assertFalse(self.usuario.check_password("NuevaClaveSegura123"))

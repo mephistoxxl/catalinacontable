@@ -55,3 +55,19 @@ class UsuarioEmailValidationTests(TestCase):
         )
         self.assertTrue(form.is_valid())
         self.assertEqual(form.cleaned_data["email"], "usuario@ejemplo.com")
+
+    def test_nuevo_usuario_form_rejects_weak_password(self):
+        form = NuevoUsuarioFormulario(
+            data={
+                "identificacion": "1234567890124",
+                "nombre_completo": "Nombre Apellido",
+                "email": "usuario@example.com",
+                "password": "12345",
+                "rep_password": "12345",
+                "level": str(Usuario.USER),
+            },
+            user=self.root_user,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("password", form.errors)
