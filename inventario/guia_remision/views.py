@@ -347,19 +347,37 @@ def _generar_clave_acceso_temporal(guia):
     Genera una clave de acceso temporal para la guía
     TODO: Implementar algoritmo oficial del SRI
     """
-    fecha_str = guia.fecha_emision.strftime('%d%m%Y')
+    empresa = getattr(guia, 'empresa', None)
+    ruc = getattr(empresa, 'ruc', '') if empresa else ''
+    if not ruc:
+        raise ValueError('La empresa asociada a la guía debe tener un RUC configurado.')
+    fecha_valor = guia.fecha_emision
+    if isinstance(fecha_valor, str):
+        try:
+            fecha = datetime.strptime(fecha_valor, '%Y-%m-%d').date()
+        except ValueError:
+            fecha = timezone.now().date()
+    else:
+        fecha = fecha_valor or timezone.now().date()
+    fecha_str = fecha.strftime('%d%m%Y')
     tipo_comprobante = '06'  # Código SRI para guía de remisión
-    ruc = '1234567890001'  # TODO: Obtener del modelo de empresa
-    ambiente = '1'  # Pruebas
+    ambiente = getattr(empresa, 'tipo_ambiente', None) or '1'  # Pruebas por defecto
     serie = f"{guia.establecimiento}{guia.punto_emision}"
     secuencial = guia.secuencial
-    codigo_numerico = '12345678'  # Número aleatorio de 8 dígitos
+    from random import randint
+    codigo_numerico = f"{randint(0, 99999999):08d}"  # Número aleatorio de 8 dígitos
     tipo_emision = '1'
-    
+
     # Construir clave sin dígito verificador
     clave_sin_dv = fecha_str + tipo_comprobante + ruc + ambiente + serie + secuencial + codigo_numerico + tipo_emision
-    
+
     # TODO: Calcular dígito verificador según algoritmo módulo 11
-    digito_verificador = '1'  # Temporal
-    
-    return clave_sin_dv + digito_verificador
+    factores = [2, 3, 4, 5, 6, 7] * 10
+    total = 0
+    for i, ch in enumerate(reversed(clave_sin_dv)):
+        total += int(ch) * factores[i]
+    digito_verificador = 11 - (total % 11)
+    if digito_verificador in (10, 11):
+        digito_verificador = 1
+
+    return clave_sin_dv + str(digito_verificador)

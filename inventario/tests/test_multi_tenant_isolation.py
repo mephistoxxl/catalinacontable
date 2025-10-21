@@ -10,12 +10,16 @@ from django.contrib.auth import get_user_model
 from django.core import signing
 from django.db import connection
 from django.test import Client
+from django.utils import timezone
+from django.conf import settings
 
 from django.contrib.messages import get_messages
 
 os.environ.setdefault('DATABASE_URL', 'sqlite:///test_db.sqlite3')
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sistema.settings')
 django.setup()
+
+settings.ALLOWED_HOSTS = ['testserver', 'localhost']
 
 from inventario.models import (
     Empresa,
@@ -30,6 +34,8 @@ from inventario.models import (
     Proveedor,
     Pedido,
     DetallePedido,
+    GuiaRemision,
+    DetalleGuiaRemision,
 )
 from inventario.tenant.queryset import set_current_tenant
 
@@ -58,6 +64,8 @@ def _ensure_schema():
 class TestMultiTenantIsolation:
     @pytest.fixture
     def empresas(self):
+        Empresa.objects.filter(ruc='0999999999001').delete()
+        Empresa.objects.filter(ruc='0888888888001').delete()
         e1 = Empresa.objects.create(razon_social='Empresa Uno', ruc='0999999999001')
         e2 = Empresa.objects.create(razon_social='Empresa Dos', ruc='0888888888001')
         return e1, e2
@@ -68,7 +76,8 @@ class TestMultiTenantIsolation:
 
     @pytest.fixture
     def usuario(self, empresas):
-        user = User.objects.create_user(username='admin', password='pass')
+        User.objects.filter(username='admin').delete()
+        user = User.objects.create_user(username='admin', password='pass', email='admin@example.com')
         # Asumiendo relación ManyToMany Usuario.empresas
         if hasattr(user, 'empresas'):
             for e in empresas:
@@ -447,3 +456,83 @@ class TestMultiTenantIsolation:
         assert any('no pertenecen a la empresa activa' in m.lower() for m in messages_text)
         assert Pedido.objects.filter(empresa=empresa_a).count() == 0
 
+
+    def test_emitir_guia_remision_asigna_empresa_y_detalles(self, client, usuario, empresas):
+        self._login(client, usuario)
+        empresa_a, _ = empresas
+        self._set_empresa(client, empresa_a.id)
+
+        payload = {
+            'fecha_emision': '2025-01-01',
+            'fecha_inicio_traslado': '2025-01-01T10:00',
+            'fecha_fin_traslado': '',
+            'motivo_traslado': '01',
+            'destinatario_identificacion': '0123456789001',
+            'destinatario_nombre': 'Cliente Transporte',
+            'direccion_partida': 'Origen 123',
+            'direccion_destino': 'Destino 456',
+            'transportista_ruc': '1234567890123',
+            'transportista_nombre': 'Transportista Demo',
+            'placa': 'AAA0000',
+            'transportista_observaciones': 'N/A',
+            'productos[0][codigo]': 'PRD1',
+            'productos[0][descripcion]': 'Producto 1',
+            'productos[0][cantidad]': '2',
+        }
+
+        response = client.post(reverse('inventario:emitir_guia_remision'), payload, follow=True)
+        assert response.status_code == 200
+
+        guia = GuiaRemision.objects.filter(empresa=empresa_a).order_by('-id').first()
+        assert guia is not None
+        assert guia.destinatario_nombre == 'Cliente Transporte'
+        assert guia.empresa_id == empresa_a.id
+        detalle = guia.detalles.get()
+        assert detalle.empresa_id == empresa_a.id
+        assert detalle.codigo_producto == 'PRD1'
+
+    def test_listar_guias_remision_filtra_por_empresa(self, client, usuario, empresas):
+        self._login(client, usuario)
+        empresa_a, empresa_b = empresas
+        self._set_empresa(client, empresa_a.id)
+
+        guia_a = GuiaRemision.objects.create(
+            empresa=empresa_a,
+            establecimiento='001',
+            punto_emision='001',
+            secuencial='000000101',
+            fecha_emision=timezone.now().date(),
+            fecha_inicio_traslado=timezone.now(),
+            fecha_fin_traslado=timezone.now(),
+            motivo_traslado='01',
+            destinatario_identificacion='0101010101',
+            destinatario_nombre='Dest Empresa A',
+            direccion_partida='Bodega A',
+            direccion_destino='Cliente A',
+            transportista_ruc='1111111111111',
+            transportista_nombre='Trans A',
+            placa='AAA0001',
+        )
+        GuiaRemision.objects.create(
+            empresa=empresa_b,
+            establecimiento='001',
+            punto_emision='001',
+            secuencial='000000201',
+            fecha_emision=timezone.now().date(),
+            fecha_inicio_traslado=timezone.now(),
+            fecha_fin_traslado=timezone.now(),
+            motivo_traslado='01',
+            destinatario_identificacion='0202020202',
+            destinatario_nombre='Dest Empresa B',
+            direccion_partida='Bodega B',
+            direccion_destino='Cliente B',
+            transportista_ruc='2222222222222',
+            transportista_nombre='Trans B',
+            placa='BBB0002',
+        )
+
+        response = client.get(reverse('inventario:listar_guias_remision'), follow=True)
+        assert response.status_code == 200
+        contenido = response.content.decode()
+        assert 'Dest Empresa A' in contenido
+        assert 'Dest Empresa B' not in contenido
