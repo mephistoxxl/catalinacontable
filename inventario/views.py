@@ -6938,49 +6938,71 @@ def emitir_guia_remision(request):
                 except Exception:
                     punto_emision = f"{str(punto_emision).zfill(3)}" if punto_emision else "001"
 
-                # Crear la guía
+                # Crear la guía con los campos correctos del modelo según XSD SRI
                 guia = GuiaRemision(
                     empresa=empresa,
                     establecimiento=establecimiento,
                     punto_emision=punto_emision,
-                    fecha_emision=request.POST.get('fecha_emision'),
                     fecha_inicio_traslado=request.POST.get('fecha_inicio_traslado'),
                     fecha_fin_traslado=request.POST.get('fecha_fin_traslado') or None,
-                    motivo_traslado=request.POST.get('motivo_traslado'),
-                    destinatario_identificacion=(request.POST.get('destinatario_identificacion') or ''),
-                    destinatario_nombre=(request.POST.get('destinatario_nombre') or ''),
                     direccion_partida=(request.POST.get('direccion_partida') or ''),
                     direccion_destino=(request.POST.get('direccion_destino') or ''),
+                    dir_establecimiento=(request.POST.get('dir_establecimiento') or ''),
                     transportista_ruc=request.POST.get('transportista_ruc'),
                     transportista_nombre=request.POST.get('transportista_nombre'),
+                    tipo_identificacion_transportista=request.POST.get('tipo_identificacion_transportista', '05'),
                     placa=request.POST.get('placa'),
-                    transportista_observaciones=request.POST.get('transportista_observaciones', ''),
+                    rise=request.POST.get('rise', ''),
+                    obligado_contabilidad=request.POST.get('obligado_contabilidad', ''),
+                    contribuyente_especial=request.POST.get('contribuyente_especial', ''),
+                    correo_envio=request.POST.get('correo_envio', ''),
+                    informacion_adicional=request.POST.get('informacion_adicional', ''),
+                    ruta=request.POST.get('ruta', ''),
                     usuario_creacion=request.user,
-                    estado='autorizada'
+                    estado='borrador'
                 )
                 # Si llega un secuencial calculado, úsalo; si no, el save lo generará
                 if secu_post and secu_post.isdigit():
                     guia.secuencial = str(int(secu_post)).zfill(9)
                 guia.save()
                 
-                # Procesar productos
-                productos_data = _extraer_productos_del_post(request.POST)
-                for i, producto in enumerate(productos_data, 1):
-                    if producto['codigo'] and producto['descripcion'] and producto['cantidad']:
-                        DetalleGuiaRemision.objects.create(
+                # Procesar destinatarios según el formulario HTML
+                destinatarios = {}
+                for key in request.POST:
+                    if key.startswith('destinatarios[') and '][' in key:
+                        # Extraer índice y campo: destinatarios[0][ruc] -> índice=0, campo=ruc
+                        parts = key.replace('destinatarios[', '').replace(']', '').split('[')
+                        if len(parts) == 2:
+                            idx = parts[0]
+                            campo = parts[1]
+                            if idx not in destinatarios:
+                                destinatarios[idx] = {}
+                            destinatarios[idx][campo] = request.POST.get(key, '').strip()
+                
+                # Crear destinatarios
+                for idx, dest_data in destinatarios.items():
+                    if dest_data.get('ruc') and dest_data.get('nombre'):
+                        from inventario.models import DestinatarioGuia
+                        DestinatarioGuia.objects.create(
                             guia=guia,
-                            empresa=empresa,
-                            orden=i,
-                            codigo_producto=producto['codigo'],
-                            descripcion_producto=producto['descripcion'],
-                            cantidad=producto['cantidad']
+                            identificacion_destinatario=dest_data.get('ruc', ''),
+                            razon_social_destinatario=dest_data.get('nombre', ''),
+                            dir_destinatario=dest_data.get('direccion', ''),
+                            motivo_traslado=dest_data.get('motivo', '01'),
+                            doc_aduanero_unico=dest_data.get('documento', '')
                         )
                 
-                # Generar clave de acceso temporal
-                guia.clave_acceso = _generar_clave_acceso_temporal(guia)
-                guia.numero_autorizacion = guia.clave_acceso
-                guia.fecha_autorizacion = timezone.now()
-                guia.save()
+                # Generar clave de acceso usando el generador del XML
+                from inventario.guia_remision.xml_generator_guia import XMLGeneratorGuiaRemision
+                try:
+                    opciones = Opciones.objects.filter(empresa=empresa).first()
+                    xml_gen = XMLGeneratorGuiaRemision(guia, empresa, opciones)
+                    guia.clave_acceso = xml_gen.generar_clave_acceso()
+                    guia.save()
+                except Exception as e:
+                    logger.warning(f"No se pudo generar clave de acceso: {e}")
+                    guia.clave_acceso = f"TEMP{guia.id:015d}"
+                    guia.save()
                 
                 messages.success(request, f'Guia de remision {guia.numero_completo} creada exitosamente.')
                 return redirect('inventario:ver_guia_remision', guia_id=guia.id)
