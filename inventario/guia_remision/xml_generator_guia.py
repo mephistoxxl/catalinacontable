@@ -129,6 +129,11 @@ class XMLGeneratorGuiaRemision:
         """Genera la sección de información de la guía de remisión"""
         info_guia = etree.Element("infoGuiaRemision")
         
+        # Dirección del establecimiento (opcional pero recomendado)
+        if self.guia.dir_establecimiento:
+            dir_estab = etree.SubElement(info_guia, "dirEstablecimiento")
+            dir_estab.text = self.guia.dir_establecimiento[:300]
+        
         # Dirección de partida
         dir_partida = etree.SubElement(info_guia, "dirPartida")
         dir_partida.text = self.guia.direccion_partida[:300]
@@ -137,36 +142,46 @@ class XMLGeneratorGuiaRemision:
         razon_social_transp = etree.SubElement(info_guia, "razonSocialTransportista")
         razon_social_transp.text = self.guia.transportista_nombre[:300] if self.guia.transportista_nombre else "TRANSPORTISTA"
         
-        # Tipo identificación transportista
+        # Tipo identificación transportista (CAMPO CRÍTICO - usa el nuevo campo del modelo)
         tipo_id_transp = etree.SubElement(info_guia, "tipoIdentificacionTransportista")
-        if len(self.guia.transportista_ruc) == 13:
-            tipo_id_transp.text = "04"  # RUC
-        elif len(self.guia.transportista_ruc) == 10:
-            tipo_id_transp.text = "05"  # Cédula
-        else:
-            tipo_id_transp.text = "06"  # Pasaporte
+        tipo_id_transp.text = self.guia.tipo_identificacion_transportista
         
         # RUC/Cédula transportista
         ruc_transp = etree.SubElement(info_guia, "rucTransportista")
         ruc_transp.text = self.guia.transportista_ruc
         
+        # RISE (opcional)
+        if self.guia.rise:
+            rise = etree.SubElement(info_guia, "rise")
+            rise.text = self.guia.rise[:40]
+        
         # Obligado a llevar contabilidad
-        obligado_contabilidad = etree.SubElement(info_guia, "obligadoContabilidad")
-        obligado_contabilidad.text = self.opciones.obligado_contabilidad if self.opciones else "NO"
+        if self.guia.obligado_contabilidad:
+            obligado_contabilidad = etree.SubElement(info_guia, "obligadoContabilidad")
+            obligado_contabilidad.text = self.guia.obligado_contabilidad
+        elif self.opciones:
+            obligado_contabilidad = etree.SubElement(info_guia, "obligadoContabilidad")
+            obligado_contabilidad.text = self.opciones.obligado_contabilidad if hasattr(self.opciones, 'obligado_contabilidad') else "NO"
         
         # Contribuyente especial (si aplica)
-        if self.opciones and self.opciones.contribuyente_especial:
+        if self.guia.contribuyente_especial:
             contrib_especial = etree.SubElement(info_guia, "contribuyenteEspecial")
-            contrib_especial.text = self.opciones.contribuyente_especial
+            contrib_especial.text = self.guia.contribuyente_especial[:13]
+        elif self.opciones and hasattr(self.opciones, 'contribuyente_especial') and self.opciones.contribuyente_especial:
+            contrib_especial = etree.SubElement(info_guia, "contribuyenteEspecial")
+            contrib_especial.text = self.opciones.contribuyente_especial[:13]
         
         # Fecha inicio transporte
         fecha_ini = etree.SubElement(info_guia, "fechaIniTransporte")
         fecha_ini.text = self.guia.fecha_inicio_traslado.strftime("%d/%m/%Y")
         
-        # Fecha fin transporte (opcional)
+        # Fecha fin transporte
+        fecha_fin = etree.SubElement(info_guia, "fechaFinTransporte")
         if self.guia.fecha_fin_traslado:
-            fecha_fin = etree.SubElement(info_guia, "fechaFinTransporte")
             fecha_fin.text = self.guia.fecha_fin_traslado.strftime("%d/%m/%Y")
+        else:
+            # Si no hay fecha fin, usar la misma que fecha inicio
+            fecha_fin.text = self.guia.fecha_inicio_traslado.strftime("%d/%m/%Y")
         
         # Placa
         placa = etree.SubElement(info_guia, "placa")

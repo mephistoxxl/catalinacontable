@@ -2,29 +2,29 @@
 {% block content %}
 
 <style>
-  /* Estilos ultra-compactos */
+  /* Estilos ULTRA-COMPACTOS */
   .guia-container {
-    max-width: 1000px;
+    max-width: 900px;
     margin: 0 auto;
-    padding: 8px;
+    padding: 4px;
   }
 
   .guia-card {
     background: white;
-    border-radius: 4px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
-    padding: 10px;
+    border-radius: 3px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    padding: 6px;
   }
 
   .form-section {
-    margin-bottom: 8px;
+    margin-bottom: 4px;
   }
 
   .form-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 8px;
-    margin-bottom: 6px;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 4px;
+    margin-bottom: 3px;
   }
 
   .form-group {
@@ -33,19 +33,19 @@
   }
 
   .form-group label {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 600;
     color: #374151;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
   }
 
   .form-control {
-    padding: 4px 8px;
+    padding: 2px 6px;
     border: 1px solid #d1d5db;
-    border-radius: 3px;
-    font-size: 12px;
+    border-radius: 2px;
+    font-size: 11px;
     transition: all 0.15s;
-    height: 28px;
+    height: 24px;
   }
 
   .form-control:focus {
@@ -61,38 +61,38 @@
   }
 
   .section-title {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     color: #1f2937;
-    padding-bottom: 4px;
+    padding-bottom: 2px;
     border-bottom: 1px solid #e5e7eb;
-    margin-bottom: 6px;
+    margin-bottom: 3px;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
   }
 
   .btn-group {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     justify-content: space-between;
-    margin-top: 10px;
-    padding-top: 8px;
+    margin-top: 6px;
+    padding-top: 4px;
     border-top: 1px solid #e5e7eb;
   }
 
   .btn {
-    padding: 4px 10px;
+    padding: 2px 8px;
     border: none;
-    border-radius: 3px;
-    font-size: 11px;
+    border-radius: 2px;
+    font-size: 10px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    height: 28px;
+    gap: 3px;
+    height: 24px;
   }
 
   .btn:hover {
@@ -127,9 +127,9 @@
   .header-section {
     background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
     color: white;
-    padding: 8px 12px;
-    border-radius: 4px;
-    margin-bottom: 8px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    margin-bottom: 4px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -138,22 +138,22 @@
   .header-title {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
   }
 
   .header-title i {
-    font-size: 16px;
+    font-size: 12px;
   }
 
   .header-info h2 {
     margin: 0;
-    font-size: 14px;
+    font-size: 11px;
     font-weight: 700;
   }
 
   .header-info p {
-    margin: 1px 0 0 0;
-    font-size: 10px;
+    margin: 0;
+    font-size: 8px;
     opacity: 0.8;
   }
 
@@ -162,20 +162,20 @@
   }
 
   .secuencia-label {
-    font-size: 9px;
+    font-size: 8px;
     opacity: 0.7;
-    margin-bottom: 1px;
+    margin-bottom: 0;
   }
 
   .secuencia-numero {
     font-family: 'Courier New', monospace;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
   }
 
   .input-group {
     display: flex;
-    gap: 6px;
+    gap: 3px;
   }
 
   .input-group .form-control {
@@ -183,21 +183,21 @@
   }
 
   .btn-icon {
-    padding: 4px 8px;
-    min-width: 28px;
+    padding: 2px 6px;
+    min-width: 24px;
     width: auto;
   }
 
   .input-small {
-    width: 60px;
+    width: 50px;
   }
 
   .btn i {
-    font-size: 10px;
+    font-size: 9px;
   }
 
   .section-title i {
-    font-size: 10px;
+    font-size: 9px;
   }
 
   /* Animaciones para notificaciones */
@@ -242,7 +242,7 @@
 
   <!-- Formulario ultra-compacto -->
   <div class="guia-card">
-    <form method="post" id="form-guia-remision">
+    <form method="post" id="form-guia-remision" action="{% url 'inventario:emitir_guia_remision' %}">
       {% csrf_token %}
       
       <!-- Numeración -->
@@ -290,6 +290,15 @@
             </div>
           </div>
           <div class="form-group">
+            <label>Tipo Identificación *</label>
+            <select id="tipo_identificacion_transportista" name="tipo_identificacion_transportista" class="form-control" required>
+              <option value="05" selected>Cédula</option>
+              <option value="04">RUC</option>
+              <option value="06">Pasaporte</option>
+              <option value="08">Identificación del exterior</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label>Nombre Transportista</label>
             <input type="text" id="transportista_nombre" name="transportista_nombre" placeholder="Nombre" class="form-control">
           </div>
@@ -329,15 +338,15 @@
           </button>
         </div>
         <div style="overflow-x: auto;">
-          <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
             <thead>
               <tr style="background: #f3f4f6;">
-                <th style="border: 1px solid #d1d5db; padding: 4px 6px; text-align: left; width: 100px;">RUC</th>
-                <th style="border: 1px solid #d1d5db; padding: 4px 6px; text-align: left;">Destinatario</th>
-                <th style="border: 1px solid #d1d5db; padding: 4px 6px; text-align: left;">Dirección</th>
-                <th style="border: 1px solid #d1d5db; padding: 4px 6px; text-align: left; width: 80px;">Motivo</th>
-                <th style="border: 1px solid #d1d5db; padding: 4px 6px; text-align: left; width: 100px;">Documento</th>
-                <th style="border: 1px solid #d1d5db; padding: 4px 6px; text-align: center; width: 50px;">Acción</th>
+                <th style="border: 1px solid #d1d5db; padding: 2px 4px; text-align: left; width: 90px;">RUC</th>
+                <th style="border: 1px solid #d1d5db; padding: 2px 4px; text-align: left;">Destinatario</th>
+                <th style="border: 1px solid #d1d5db; padding: 2px 4px; text-align: left;">Dirección</th>
+                <th style="border: 1px solid #d1d5db; padding: 2px 4px; text-align: left; width: 70px;">Motivo</th>
+                <th style="border: 1px solid #d1d5db; padding: 2px 4px; text-align: left; width: 90px;">Documento</th>
+                <th style="border: 1px solid #d1d5db; padding: 2px 4px; text-align: center; width: 40px;">Acción</th>
               </tr>
             </thead>
             <tbody id="tabla-destinatarios">
@@ -345,36 +354,36 @@
             </tbody>
           </table>
         </div>
-        <div style="margin-top: 6px;">
-          <label style="font-size: 10px; font-weight: 600; color: #374151; margin-right: 8px;">Correo de envío:</label>
-          <input type="email" id="correo_envio" name="correo_envio" placeholder="correo@ejemplo.com" class="form-control" style="display: inline-block; width: auto; min-width: 250px;">
+        <div style="margin-top: 3px;">
+          <label style="font-size: 9px; font-weight: 600; color: #374151; margin-right: 4px;">Correo:</label>
+          <input type="email" id="correo_envio" name="correo_envio" placeholder="correo@ejemplo.com" class="form-control" style="display: inline-block; width: auto; min-width: 200px;">
         </div>
       </div>
 
       <!-- Información Adicional -->
       <div class="form-section">
-        <div style="margin-bottom: 6px;">
-          <label style="font-size: 10px; font-weight: 600; color: #374151; margin-right: 8px;">Clave de Acceso:</label>
-          <input type="text" id="clave_acceso" name="clave_acceso" maxlength="49" placeholder="Se genera automáticamente" class="form-control" readonly style="display: inline-block; width: auto; min-width: 350px;">
+        <div style="margin-bottom: 3px;">
+          <label style="font-size: 9px; font-weight: 600; color: #374151; margin-right: 4px;">Clave Acceso:</label>
+          <input type="text" id="clave_acceso" name="clave_acceso" maxlength="49" placeholder="Auto-generada" class="form-control" readonly style="display: inline-block; width: auto; min-width: 300px;">
         </div>
-        <div style="margin-bottom: 6px;">
-          <label style="font-size: 10px; font-weight: 600; color: #374151; margin-right: 8px;">Información Adicional:</label>
-          <input type="text" id="informacion_adicional" name="informacion_adicional" placeholder="Información adicional del traslado" class="form-control" style="display: inline-block; width: auto; min-width: 400px;">
+        <div style="margin-bottom: 3px;">
+          <label style="font-size: 9px; font-weight: 600; color: #374151; margin-right: 4px;">Info Adicional:</label>
+          <input type="text" id="informacion_adicional" name="informacion_adicional" placeholder="Info adicional" class="form-control" style="display: inline-block; width: auto; min-width: 300px;">
         </div>
-        <div style="margin-bottom: 0px;">
-          <label style="font-size: 10px; font-weight: 600; color: #374151; margin-right: 8px;">Ruta:</label>
-          <input type="text" id="ruta" name="ruta" placeholder="Ruta del traslado" class="form-control" style="display: inline-block; width: auto; min-width: 400px;">
+        <div style="margin-bottom: 0;">
+          <label style="font-size: 9px; font-weight: 600; color: #374151; margin-right: 4px;">Ruta:</label>
+          <input type="text" id="ruta" name="ruta" placeholder="Ruta" class="form-control" style="display: inline-block; width: auto; min-width: 300px;">
         </div>
       </div>
 
-      <!-- Botones ultra-compactos -->
+      <!-- Botones -->
       <div class="btn-group">
-        <div style="display: flex; gap: 4px;">
+        <div style="display: flex; gap: 3px;">
           <button type="button" class="btn btn-danger" onclick="eliminarGuia()">
             <i class="fas fa-trash"></i> Eliminar
           </button>
         </div>
-        <div style="display: flex; gap: 4px;">
+        <div style="display: flex; gap: 3px;">
           <button type="button" class="btn btn-secondary" onclick="guardarGuia()">
             <i class="fas fa-save"></i> Guardar
           </button>
@@ -399,6 +408,8 @@ document.addEventListener('DOMContentLoaded', function() {
   if (selectSec) {
     selectSec.addEventListener('change', function() {
       const id = this.value;
+      console.log('Secuencia seleccionada:', id);
+      
       if (!id) {
         est.value = '001';
         pemi.value = '001';
@@ -406,18 +417,38 @@ document.addEventListener('DOMContentLoaded', function() {
         lblNumero.textContent = '001-001-000000001';
         return;
       }
-      fetch(`/inventario/obtener_datos_secuencia/${id}/`)
-        .then(r => r.json())
+      
+      const url = `/inventario/obtener_datos_secuencia/${id}/`;
+      console.log('Fetching URL:', url);
+      
+      fetch(url)
+        .then(r => {
+          console.log('Response status:', r.status);
+          if (!r.ok) {
+            throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+          }
+          return r.json();
+        })
         .then(data => {
+          console.log('Data recibida:', data);
           if (data.success) {
             est.value = data.data.establecimiento || '001';
             pemi.value = data.data.punto_emision || '001';
             sec.value = data.data.secuencial || '000000001';
             lblNumero.textContent = `${est.value}-${pemi.value}-${sec.value}`;
+            console.log('Campos actualizados:', {est: est.value, pemi: pemi.value, sec: sec.value});
+          } else {
+            console.error('Error en respuesta:', data.message);
+            alert('Error: ' + data.message);
           }
         })
-        .catch(err => console.error(err));
+        .catch(err => {
+          console.error('Error en fetch:', err);
+          alert('Error al obtener datos de secuencia: ' + err.message);
+        });
     });
+  } else {
+    console.error('No se encontró el elemento secuencia_guia');
   }
 });
 
@@ -429,22 +460,22 @@ function agregarDestinatario() {
   
   const row = document.createElement('tr');
   row.innerHTML = `
-    <td style="border: 1px solid #d1d5db; padding: 4px;">
-      <div style="display: flex; gap: 4px;">
-        <input type="text" name="destinatarios[${contadorDestinatarios}][ruc]" class="form-control destinatario-ruc" placeholder="RUC" maxlength="13" style="width: 100%; min-width: 90px;">
-        <button type="button" class="btn btn-primary" onclick="buscarDestinatario(this)" style="padding: 2px 6px; height: 24px; font-size: 10px; min-width: 24px;" title="Buscar datos">
+    <td style="border: 1px solid #d1d5db; padding: 2px;">
+      <div style="display: flex; gap: 2px;">
+        <input type="text" name="destinatarios[${contadorDestinatarios}][ruc]" class="form-control destinatario-ruc" placeholder="RUC" maxlength="13" style="width: 100%; min-width: 80px; font-size: 10px;">
+        <button type="button" class="btn btn-primary" onclick="buscarDestinatario(this)" style="padding: 1px 4px; height: 20px; font-size: 9px; min-width: 20px;" title="Buscar">
           <i class="fas fa-search"></i>
         </button>
       </div>
     </td>
-    <td style="border: 1px solid #d1d5db; padding: 4px;">
-      <input type="text" name="destinatarios[${contadorDestinatarios}][nombre]" class="form-control destinatario-nombre" placeholder="Nombre del destinatario" style="width: 100%; min-width: 150px;">
+    <td style="border: 1px solid #d1d5db; padding: 2px;">
+      <input type="text" name="destinatarios[${contadorDestinatarios}][nombre]" class="form-control destinatario-nombre" placeholder="Nombre" style="width: 100%; min-width: 120px; font-size: 10px;">
     </td>
-    <td style="border: 1px solid #d1d5db; padding: 4px;">
-      <input type="text" name="destinatarios[${contadorDestinatarios}][direccion]" class="form-control destinatario-direccion" placeholder="Dirección" style="width: 100%; min-width: 150px;">
+    <td style="border: 1px solid #d1d5db; padding: 2px;">
+      <input type="text" name="destinatarios[${contadorDestinatarios}][direccion]" class="form-control destinatario-direccion" placeholder="Dirección" style="width: 100%; min-width: 120px; font-size: 10px;">
     </td>
-    <td style="border: 1px solid #d1d5db; padding: 4px;">
-      <select name="destinatarios[${contadorDestinatarios}][motivo]" class="form-control" style="width: 100%;">
+    <td style="border: 1px solid #d1d5db; padding: 2px;">
+      <select name="destinatarios[${contadorDestinatarios}][motivo]" class="form-control" style="width: 100%; font-size: 10px;">
         <option value="">-</option>
         <option value="01">Venta</option>
         <option value="02">Transformación</option>
@@ -453,11 +484,11 @@ function agregarDestinatario() {
         <option value="05">Otros</option>
       </select>
     </td>
-    <td style="border: 1px solid #d1d5db; padding: 4px;">
-      <input type="text" name="destinatarios[${contadorDestinatarios}][documento]" class="form-control" placeholder="Nro. Doc" style="width: 100%; min-width: 90px;">
+    <td style="border: 1px solid #d1d5db; padding: 2px;">
+      <input type="text" name="destinatarios[${contadorDestinatarios}][documento]" class="form-control" placeholder="Doc" style="width: 100%; min-width: 80px; font-size: 10px;">
     </td>
-    <td style="border: 1px solid #d1d5db; padding: 4px; text-align: center;">
-      <button type="button" class="btn btn-danger" onclick="eliminarDestinatario(this)" style="padding: 2px 6px; height: 24px; font-size: 10px;">
+    <td style="border: 1px solid #d1d5db; padding: 2px; text-align: center;">
+      <button type="button" class="btn btn-danger" onclick="eliminarDestinatario(this)" style="padding: 1px 4px; height: 20px; font-size: 9px;">
         <i class="fas fa-trash"></i>
       </button>
     </td>

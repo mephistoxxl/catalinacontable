@@ -4021,8 +4021,31 @@ class GuiaRemision(models.Model):
     # Datos básicos
     transportista_ruc = models.CharField(max_length=13, help_text="Cédula o RUC del transportista")
     transportista_nombre = models.CharField(max_length=300, blank=True, default='')
+    
+    # CAMPO CRÍTICO SRI (sin esto el SRI rechaza)
+    tipo_identificacion_transportista = models.CharField(
+        max_length=2,
+        choices=[
+            ('04', 'RUC'),
+            ('05', 'Cédula'),
+            ('06', 'Pasaporte'),
+            ('07', 'Consumidor Final'),
+            ('08', 'Identificación del exterior'),
+        ],
+        default='05',
+        help_text='Tipo de identificación del transportista (04-08)'
+    )
+    
     direccion_partida = models.TextField()
     direccion_destino = models.TextField()
+    
+    # Dirección del establecimiento emisor (opcional pero recomendado)
+    dir_establecimiento = models.CharField(
+        max_length=300,
+        blank=True,
+        default='',
+        help_text='Dirección del establecimiento que emite la guía'
+    )
     
     # Fechas
     fecha_inicio_traslado = models.DateField(help_text="Fecha de salida")
@@ -4033,6 +4056,27 @@ class GuiaRemision(models.Model):
     correo_envio = models.EmailField(blank=True, default='', help_text="Correo para envío del documento")
     informacion_adicional = models.TextField(blank=True, default='', help_text="Información adicional del traslado")
     ruta = models.TextField(blank=True, default='', help_text="Ruta del traslado")
+    
+    # Campos opcionales del transportista (según XSD SRI)
+    rise = models.CharField(
+        max_length=40,
+        blank=True,
+        default='',
+        help_text='Régimen RISE del transportista (si aplica)'
+    )
+    obligado_contabilidad = models.CharField(
+        max_length=2,
+        choices=[('SI', 'SI'), ('NO', 'NO'), ('', 'N/A')],
+        blank=True,
+        default='',
+        help_text='¿Obligado a llevar contabilidad?'
+    )
+    contribuyente_especial = models.CharField(
+        max_length=13,
+        blank=True,
+        default='',
+        help_text='Número de resolución de contribuyente especial'
+    )
     
     # Campos SRI (para autorización futura)
     clave_acceso = models.CharField(max_length=49, null=True, blank=True, unique=True)
@@ -4188,6 +4232,134 @@ class DetalleGuiaRemision(models.Model):
     
     def __str__(self):
         return f"{self.codigo_producto} - {self.descripcion_producto[:50]}"
+
+
+class DestinatarioGuia(models.Model):
+    """
+    Modelo para los destinatarios de una Guía de Remisión (según esquema SRI)
+    Una guía puede tener múltiples destinatarios
+    """
+    guia = models.ForeignKey(
+        GuiaRemision,
+        on_delete=models.CASCADE,
+        related_name='destinatarios'
+    )
+    
+    # Identificación del destinatario
+    identificacion_destinatario = models.CharField(
+        max_length=20,
+        help_text="RUC, cédula o pasaporte del destinatario"
+    )
+    razon_social_destinatario = models.CharField(
+        max_length=300,
+        help_text="Nombre o razón social del destinatario"
+    )
+    dir_destinatario = models.CharField(
+        max_length=300,
+        help_text="Dirección del destinatario"
+    )
+    
+    # Motivo del traslado
+    motivo_traslado = models.CharField(
+        max_length=300,
+        help_text="Motivo del traslado de mercadería"
+    )
+    
+    # Documento sustento (opcional)
+    cod_doc_sustento = models.CharField(
+        max_length=2,
+        blank=True,
+        help_text="Código del documento sustento (01=Factura, etc.)"
+    )
+    num_doc_sustento = models.CharField(
+        max_length=17,
+        blank=True,
+        help_text="Número del documento sustento (000-000-000000000)"
+    )
+    num_aut_doc_sustento = models.CharField(
+        max_length=49,
+        blank=True,
+        help_text="Número de autorización del documento sustento"
+    )
+    fecha_emision_doc_sustento = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Fecha de emisión del documento sustento"
+    )
+    
+    # Otros campos opcionales
+    doc_aduanero_unico = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text="Documento aduanero único"
+    )
+    cod_estab_destino = models.CharField(
+        max_length=3,
+        blank=True,
+        default='001',
+        help_text="Código de establecimiento de destino"
+    )
+    ruta = models.CharField(
+        max_length=300,
+        blank=True,
+        help_text="Ruta específica para este destinatario"
+    )
+    
+    # Auditoría
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'destinatario_guia'
+        verbose_name = 'Destinatario de Guía'
+        verbose_name_plural = 'Destinatarios de Guías'
+        ordering = ['id']
+    
+    def __str__(self):
+        return f"{self.razon_social_destinatario} - {self.identificacion_destinatario}"
+
+
+class DetalleDestinatarioGuia(models.Model):
+    """
+    Modelo para los detalles (productos) de cada destinatario en la Guía de Remisión
+    Cada destinatario puede tener múltiples productos
+    """
+    destinatario = models.ForeignKey(
+        DestinatarioGuia,
+        on_delete=models.CASCADE,
+        related_name='detalles'
+    )
+    
+    # Datos del producto
+    codigo_interno = models.CharField(
+        max_length=25,
+        help_text="Código interno del producto"
+    )
+    codigo_adicional = models.CharField(
+        max_length=25,
+        blank=True,
+        help_text="Código adicional del producto"
+    )
+    descripcion = models.CharField(
+        max_length=300,
+        help_text="Descripción del producto"
+    )
+    cantidad = models.DecimalField(
+        max_digits=14,
+        decimal_places=6,
+        help_text="Cantidad del producto"
+    )
+    
+    # Auditoría
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'detalle_destinatario_guia'
+        verbose_name = 'Detalle de Destinatario'
+        verbose_name_plural = 'Detalles de Destinatarios'
+        ordering = ['id']
+    
+    def __str__(self):
+        return f"{self.codigo_interno} - {self.descripcion[:50]}"
 
 
 class ConfiguracionGuiaRemision(models.Model):
