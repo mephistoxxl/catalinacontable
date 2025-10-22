@@ -2,213 +2,384 @@
 {% block content %}
 
 <style>
-  /* Compact inputs with improved borders and styling */
-  input, select, textarea { 
-    height: 22px; 
-    font-size: 11px; 
-    padding: 2px 6px;
+  /* Estilos ultra-compactos */
+  .guia-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 8px;
+  }
+
+  .guia-card {
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    padding: 10px;
+  }
+
+  .form-section {
+    margin-bottom: 8px;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .form-group label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 2px;
+  }
+
+  .form-control {
+    padding: 4px 8px;
     border: 1px solid #d1d5db;
     border-radius: 3px;
-    background: #ffffff;
-    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    font-size: 12px;
+    transition: all 0.15s;
+    height: 28px;
   }
-  input:focus, select:focus, textarea:focus {
+
+  .form-control:focus {
     outline: none;
     border-color: #3b82f6;
-    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.1);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.08);
   }
-  textarea { height: auto; min-height: 45px; padding: 4px 6px; }
-  label { font-size: 10px; margin-bottom: 2px; color: #111827; font-weight: 500; }
-  
-  .guia-form { max-width: 1050px; margin: 0 auto; }
-  .section-card { background: white; border-radius: 6px; border: 1px solid #e5e7eb; margin-bottom: 0.5rem; box-shadow: inset 0 0 0 1px #e5e7eb; }
-  .section-header { background: #f3f4f6; padding: 0.375rem 0.6rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; font-size: 10px; color: #111827; }
-  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.5rem; padding: 0.6rem; }
-  .form-field { display: flex; flex-direction: column; }
-  
-  input[readonly] { 
-    background: #f9fafb; 
-    cursor: not-allowed; 
-    border-color: #e5e7eb;
+
+  .form-control:read-only {
+    background-color: #f3f4f6;
     color: #6b7280;
+    cursor: not-allowed;
   }
-  
-  /* Bordered and compact table */
-  table.table-compact { border-collapse: collapse; width: 100%; }
-  table.table-compact th, table.table-compact td { border: 1px solid #d1d5db; padding: 2px 4px !important; }
-  table.table-compact thead th { background: #f3f4f6; font-weight: 600; color: #111827; font-size: 10px; }
-  table.table-compact input { 
-    height: 20px; 
-    font-size: 10px; 
-    padding: 1px 4px; 
-    border: 1px solid #d1d5db;
-    border-radius: 2px;
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #1f2937;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
-  table.table-compact input:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.1);
+
+  .btn-group {
+    display: flex;
+    gap: 6px;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #e5e7eb;
   }
-  
-  .btn-primary { background: #3b82f6; color: white; padding: 0.3rem 0.6rem; border-radius: 3px; border: none; font-size: 10px; cursor: pointer; font-weight: 500; }
-  .btn-primary:hover { background: #2563eb; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-  .btn-secondary { background: #6b7280; color: white; padding: 0.3rem 0.6rem; border-radius: 3px; border: none; font-size: 10px; cursor: pointer; font-weight: 500; }
-  .btn-secondary:hover { background: #4b5563; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-  
-  .text-right input { text-align: right; }
+
+  .btn {
+    padding: 4px 10px;
+    border: none;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+  }
+
+  .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+  }
+
+  .btn-success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+  }
+
+  .btn-secondary {
+    background: #1f2937;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #111827;
+  }
+
+  .btn-danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+  }
+
+  .header-section {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .header-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .header-title i {
+    font-size: 16px;
+  }
+
+  .header-info h2 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .header-info p {
+    margin: 1px 0 0 0;
+    font-size: 10px;
+    opacity: 0.8;
+  }
+
+  .secuencia-info {
+    text-align: right;
+  }
+
+  .secuencia-label {
+    font-size: 9px;
+    opacity: 0.7;
+    margin-bottom: 1px;
+  }
+
+  .secuencia-numero {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .input-group {
+    display: flex;
+    gap: 6px;
+  }
+
+  .input-group .form-control {
+    flex: 1;
+  }
+
+  .btn-icon {
+    padding: 4px 8px;
+    min-width: 28px;
+    width: auto;
+  }
+
+  .input-small {
+    width: 60px;
+  }
+
+  .btn i {
+    font-size: 10px;
+  }
+
+  .section-title i {
+    font-size: 10px;
+  }
+
+  /* Animaciones para notificaciones */
+  @keyframes slideIn {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideOut {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
 </style>
 
-<div class="bg-gray-50 p-2">
-  <div class="guia-form">
-    
-    <!-- Header -->
-    <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-2 py-1.5 mb-1.5 rounded-lg">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <i class="fas fa-truck text-white text-sm mr-2"></i>
-          <div>
-            <h2 class="text-sm font-semibold text-white">Emitir Guía de Remisión</h2>
-            <p class="text-gray-300 text-xs">Documento para el traslado de mercaderías</p>
-          </div>
-        </div>
-        <div class="text-right">
-          <div class="text-gray-300 text-xs">Próximo número</div>
-          <div class="text-white font-mono text-xs" id="siguiente-numero">001-001-000000001</div>
-        </div>
+<div class="guia-container">
+  <!-- Header ultra-compacto -->
+  <div class="header-section">
+    <div class="header-title">
+      <i class="fas fa-truck"></i>
+      <div class="header-info">
+        <h2>Guía de Remisión Electrónica</h2>
+        <p>Documento de traslado de mercaderías</p>
       </div>
     </div>
+    <div class="secuencia-info">
+      <div class="secuencia-label">Número siguiente</div>
+      <div class="secuencia-numero" id="numero-siguiente">001-001-000000001</div>
+    </div>
+  </div>
 
+  <!-- Formulario ultra-compacto -->
+  <div class="guia-card">
     <form method="post" id="form-guia-remision">
       {% csrf_token %}
       
-      <!-- Secuencia y Numeración -->
-      <div class="section-card">
-        <div class="section-header">
-          <i class="fas fa-list-ol mr-2"></i>Secuencia y Numeración (solo Guía de Remisión)
+      <!-- Numeración -->
+      <div class="form-section">
+        <div class="section-title">
+          <i class="fas fa-list-ol"></i> Numeración
         </div>
-        <div class="form-grid">
-          <div class="form-field">
-            <label for="secuencia_guia">Secuencia</label>
-            <select id="secuencia_guia" name="secuencia_guia">
-              <option value="">Seleccione una secuencia...</option>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Secuencia</label>
+            <select id="secuencia_guia" name="secuencia_guia" class="form-control" required>
+              <option value="">Seleccione...</option>
               {% for s in secuencias_guia %}
-                <option value="{{ s.id }}">{{ s.descripcion }} ({{ s.get_establecimiento_formatted }}-{{ s.get_punto_emision_formatted }})</option>
+                <option value="{{ s.id }}">{{ s.descripcion }}</option>
               {% endfor %}
             </select>
           </div>
-          <div class="form-field">
-            <label for="establecimiento">Establecimiento</label>
-            <input type="text" id="establecimiento" name="establecimiento" maxlength="3" readonly>
-          </div>
-          <div class="form-field">
-            <label for="punto_emision">Punto de Emisión</label>
-            <input type="text" id="punto_emision" name="punto_emision" maxlength="3" readonly>
-          </div>
-          <div class="form-field">
-            <label for="secuencial">Secuencial</label>
-            <input type="text" id="secuencial" name="secuencial" maxlength="9" readonly>
-          </div>
-        </div>
-      </div>
-
-      <!-- Datos Generales -->
-      <div class="section-card">
-        <div class="section-header">
-          <i class="fas fa-info-circle mr-2"></i>Datos Generales
-        </div>
-        <div class="form-grid">
-          <div class="form-field">
-            <label for="fecha_emision">Fecha de Emisión *</label>
-            <input type="date" id="fecha_emision" name="fecha_emision" required value="{{ fecha_hoy }}">
-          </div>
-          <div class="form-field">
-            <label for="fecha_inicio_traslado">Fecha y Hora Inicio Traslado *</label>
-            <input type="datetime-local" id="fecha_inicio_traslado" name="fecha_inicio_traslado" required>
-          </div>
-          <div class="form-field">
-            <label for="fecha_fin_traslado">Fecha y Hora Fin Traslado</label>
-            <input type="datetime-local" id="fecha_fin_traslado" name="fecha_fin_traslado">
-          </div>
-          <div class="form-field">
-            <label for="motivo_traslado">Motivo del Traslado *</label>
-            <select id="motivo_traslado" name="motivo_traslado" required>
-              <option value="">Seleccionar motivo...</option>
-              <option value="01">Venta</option>
-              <option value="02">Transformación</option>
-              <option value="03">Consignación</option>
-              <option value="04">Devolución</option>
-              <option value="05">Otros</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-  <!-- Datos del Destinatario (removidos por solicitud) -->
-
-      <!-- Datos del Transportista -->
-      <div class="section-card">
-        <div class="section-header">
-          <i class="fas fa-truck mr-2"></i>Datos del Transportista
-        </div>
-        <div class="form-grid">
-          <div class="form-field">
-            <label for="transportista_ruc">Cédula o RUC del Transportista *</label>
-            <div class="relative">
-              <input type="text" id="transportista_ruc" name="transportista_ruc" maxlength="13" required placeholder="10 o 13 dígitos">
-              <div class="absolute right-0.5 top-0.5">
-                <button type="button" class="btn-secondary text-xs px-1.5 py-0.5" onclick="buscarTransportista()">
-                  <i class="fas fa-search text-xs"></i>
-                </button>
-              </div>
+          <div class="form-group">
+            <label>Serie</label>
+            <div class="input-group">
+              <input type="text" id="establecimiento" name="establecimiento" value="001" maxlength="3" readonly class="form-control input-small">
+              <input type="text" id="punto_emision" name="punto_emision" value="001" maxlength="3" readonly class="form-control input-small">
             </div>
           </div>
-          <div class="form-field">
-            <label for="transportista_nombre">Razón Social del Transportista *</label>
-            <input type="text" id="transportista_nombre" name="transportista_nombre" required>
-          </div>
-          <div class="form-field">
-            <label for="placa">Placa del Vehículo *</label>
-            <input type="text" id="placa" name="placa" maxlength="10" required>
-          </div>
-
-        <div class="section-header">
-          <i class="fas fa-boxes mr-2"></i>Detalles de Productos a Trasladar
-        </div>
-        <div class="p-2">
-          <div class="mb-1.5">
-            <button type="button" class="btn-primary" onclick="agregarProducto()">
-              <i class="fas fa-plus mr-1"></i>Agregar Producto
-            </button>
-          </div>
-          
-          <div class="overflow-x-auto">
-            <table class="table-compact" id="tabla-productos">
-              <thead>
-                <tr>
-                  <th class="text-left">Código</th>
-                  <th class="text-left">Descripción</th>
-                  <th class="text-center">Cantidad</th>
-                  <th class="text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody id="productos-body">
-                <!-- Se llenarán dinámicamente -->
-              </tbody>
-            </table>
+          <div class="form-group">
+            <label>Secuencial</label>
+            <input type="text" id="secuencial" name="secuencial" value="000000001" maxlength="9" readonly class="form-control">
           </div>
         </div>
       </div>
 
-      <!-- Botones de Acción -->
-      <div class="flex justify-between items-center bg-white p-2 rounded-lg border">
-        <a href="{% url 'inventario:listar_guias_remision' %}" class="btn-secondary">
-          <i class="fas fa-arrow-left mr-1"></i>Cancelar
-        </a>
-        <div class="space-x-1.5">
-          <button type="button" class="btn-secondary" onclick="guardarBorrador()">
-            <i class="fas fa-save mr-1"></i>Guardar Borrador
+      <!-- Transportista y Transporte -->
+      <div class="form-section">
+        <div class="section-title">
+          <i class="fas fa-truck"></i> Datos de Transporte
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Cédula/RUC Transportista *</label>
+            <div class="input-group">
+              <input type="text" id="transportista_ruc" name="transportista_ruc" maxlength="13" placeholder="Ej: 1234567890" class="form-control" required>
+              <button type="button" class="btn btn-primary btn-icon" onclick="buscarTransportista()" title="Buscar datos del transportista">
+                <i class="fas fa-search"></i>
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Nombre Transportista</label>
+            <input type="text" id="transportista_nombre" name="transportista_nombre" placeholder="Nombre" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Placa Vehículo *</label>
+            <input type="text" id="placa" name="placa" maxlength="10" placeholder="PXA-1234" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Fecha Salida *</label>
+            <input type="date" id="fecha_inicio_traslado" name="fecha_inicio_traslado" value="{{ fecha_hoy }}" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Fecha Llegada</label>
+            <input type="date" id="fecha_fin_traslado" name="fecha_fin_traslado" class="form-control">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Dirección Partida *</label>
+            <input type="text" id="direccion_partida" name="direccion_partida" placeholder="Desde donde parte" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Dirección Llegada *</label>
+            <input type="text" id="direccion_destino" name="direccion_destino" placeholder="Donde llega" class="form-control" required>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla de Destinatarios -->
+      <div class="form-section">
+        <div class="section-title">
+          <i class="fas fa-users"></i> Destinatarios
+        </div>
+        <div style="margin-bottom: 6px;">
+          <button type="button" class="btn btn-primary" onclick="agregarDestinatario()">
+            <i class="fas fa-plus"></i> Agregar Actual
           </button>
-          <button type="submit" class="btn-primary">
-            <i class="fas fa-paper-plane mr-1"></i>Emitir Guía
+        </div>
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+            <thead>
+              <tr style="background: #f3f4f6;">
+                <th style="border: 1px solid #d1d5db; padding: 4px 6px; text-align: left; width: 100px;">RUC</th>
+                <th style="border: 1px solid #d1d5db; padding: 4px 6px; text-align: left;">Destinatario</th>
+                <th style="border: 1px solid #d1d5db; padding: 4px 6px; text-align: left;">Dirección</th>
+                <th style="border: 1px solid #d1d5db; padding: 4px 6px; text-align: left; width: 80px;">Motivo</th>
+                <th style="border: 1px solid #d1d5db; padding: 4px 6px; text-align: left; width: 100px;">Documento</th>
+                <th style="border: 1px solid #d1d5db; padding: 4px 6px; text-align: center; width: 50px;">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-destinatarios">
+              <!-- Filas dinámicas aquí -->
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top: 6px;">
+          <label style="font-size: 10px; font-weight: 600; color: #374151; margin-right: 8px;">Correo de envío:</label>
+          <input type="email" id="correo_envio" name="correo_envio" placeholder="correo@ejemplo.com" class="form-control" style="display: inline-block; width: auto; min-width: 250px;">
+        </div>
+      </div>
+
+      <!-- Información Adicional -->
+      <div class="form-section">
+        <div style="margin-bottom: 6px;">
+          <label style="font-size: 10px; font-weight: 600; color: #374151; margin-right: 8px;">Clave de Acceso:</label>
+          <input type="text" id="clave_acceso" name="clave_acceso" maxlength="49" placeholder="Se genera automáticamente" class="form-control" readonly style="display: inline-block; width: auto; min-width: 350px;">
+        </div>
+        <div style="margin-bottom: 6px;">
+          <label style="font-size: 10px; font-weight: 600; color: #374151; margin-right: 8px;">Información Adicional:</label>
+          <input type="text" id="informacion_adicional" name="informacion_adicional" placeholder="Información adicional del traslado" class="form-control" style="display: inline-block; width: auto; min-width: 400px;">
+        </div>
+        <div style="margin-bottom: 0px;">
+          <label style="font-size: 10px; font-weight: 600; color: #374151; margin-right: 8px;">Ruta:</label>
+          <input type="text" id="ruta" name="ruta" placeholder="Ruta del traslado" class="form-control" style="display: inline-block; width: auto; min-width: 400px;">
+        </div>
+      </div>
+
+      <!-- Botones ultra-compactos -->
+      <div class="btn-group">
+        <div style="display: flex; gap: 4px;">
+          <button type="button" class="btn btn-danger" onclick="eliminarGuia()">
+            <i class="fas fa-trash"></i> Eliminar
+          </button>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <button type="button" class="btn btn-secondary" onclick="guardarGuia()">
+            <i class="fas fa-save"></i> Guardar
+          </button>
+          <button type="submit" class="btn btn-success">
+            <i class="fas fa-paper-plane"></i> Emitir
           </button>
         </div>
       </div>
@@ -217,120 +388,256 @@
   </div>
 </div>
 
-<!-- Espacio adicional para evitar solapamiento con footer -->
-<div style="height: 80px;"></div>
-
 <script>
-// JavaScript para manejar la funcionalidad del formulario
-let contadorProductos = 0;
-
-// Manejar secuencia seleccionada => llenar establecimiento/punto/secuencial y el "Próximo número"
 document.addEventListener('DOMContentLoaded', function() {
   const selectSec = document.getElementById('secuencia_guia');
-  const lblNext = document.getElementById('siguiente-numero');
   const est = document.getElementById('establecimiento');
   const pemi = document.getElementById('punto_emision');
   const sec = document.getElementById('secuencial');
+  const lblNumero = document.getElementById('numero-siguiente');
+  
   if (selectSec) {
     selectSec.addEventListener('change', function() {
       const id = this.value;
       if (!id) {
-        est.value = '';
-        pemi.value = '';
-        sec.value = '';
-        lblNext.textContent = '001-001-000000001';
+        est.value = '001';
+        pemi.value = '001';
+        sec.value = '000000001';
+        lblNumero.textContent = '001-001-000000001';
         return;
       }
       fetch(`/inventario/obtener_datos_secuencia/${id}/`)
         .then(r => r.json())
         .then(data => {
           if (data.success) {
-            est.value = data.data.establecimiento || '';
-            pemi.value = data.data.punto_emision || '';
-            sec.value = data.data.secuencial || '';
-            lblNext.textContent = `${est.value || '---'}-${pemi.value || '---'}-${sec.value || '---------'}`;
-          } else {
-            alert(data.error || 'No se pudo obtener la secuencia');
+            est.value = data.data.establecimiento || '001';
+            pemi.value = data.data.punto_emision || '001';
+            sec.value = data.data.secuencial || '000000001';
+            lblNumero.textContent = `${est.value}-${pemi.value}-${sec.value}`;
           }
         })
-        .catch(err => {
-          console.error(err);
-          alert('Error de conexión al obtener la secuencia');
-        });
+        .catch(err => console.error(err));
     });
   }
 });
 
-function tipoDesdeIdentificacion(ident) {
-  if (!ident) return null;
-  const t = ident.trim();
-  if (/^\d{13}$/.test(t)) return '04'; // RUC
-  if (/^\d{10}$/.test(t)) return '05'; // Cédula
-  return null;
+let contadorDestinatarios = 0;
+
+function agregarDestinatario() {
+  const tbody = document.getElementById('tabla-destinatarios');
+  contadorDestinatarios++;
+  
+  const row = document.createElement('tr');
+  row.innerHTML = `
+    <td style="border: 1px solid #d1d5db; padding: 4px;">
+      <div style="display: flex; gap: 4px;">
+        <input type="text" name="destinatarios[${contadorDestinatarios}][ruc]" class="form-control destinatario-ruc" placeholder="RUC" maxlength="13" style="width: 100%; min-width: 90px;">
+        <button type="button" class="btn btn-primary" onclick="buscarDestinatario(this)" style="padding: 2px 6px; height: 24px; font-size: 10px; min-width: 24px;" title="Buscar datos">
+          <i class="fas fa-search"></i>
+        </button>
+      </div>
+    </td>
+    <td style="border: 1px solid #d1d5db; padding: 4px;">
+      <input type="text" name="destinatarios[${contadorDestinatarios}][nombre]" class="form-control destinatario-nombre" placeholder="Nombre del destinatario" style="width: 100%; min-width: 150px;">
+    </td>
+    <td style="border: 1px solid #d1d5db; padding: 4px;">
+      <input type="text" name="destinatarios[${contadorDestinatarios}][direccion]" class="form-control destinatario-direccion" placeholder="Dirección" style="width: 100%; min-width: 150px;">
+    </td>
+    <td style="border: 1px solid #d1d5db; padding: 4px;">
+      <select name="destinatarios[${contadorDestinatarios}][motivo]" class="form-control" style="width: 100%;">
+        <option value="">-</option>
+        <option value="01">Venta</option>
+        <option value="02">Transformación</option>
+        <option value="03">Consignación</option>
+        <option value="04">Devolución</option>
+        <option value="05">Otros</option>
+      </select>
+    </td>
+    <td style="border: 1px solid #d1d5db; padding: 4px;">
+      <input type="text" name="destinatarios[${contadorDestinatarios}][documento]" class="form-control" placeholder="Nro. Doc" style="width: 100%; min-width: 90px;">
+    </td>
+    <td style="border: 1px solid #d1d5db; padding: 4px; text-align: center;">
+      <button type="button" class="btn btn-danger" onclick="eliminarDestinatario(this)" style="padding: 2px 6px; height: 24px; font-size: 10px;">
+        <i class="fas fa-trash"></i>
+      </button>
+    </td>
+  `;
+  tbody.appendChild(row);
 }
 
+function eliminarDestinatario(btn) {
+  if (confirm('¿Eliminar este destinatario?')) {
+    btn.closest('tr').remove();
+  }
+}
+
+function eliminarGuia() { if (confirm('¿Eliminar esta guía?')) alert('Función en desarrollo'); }
+function guardarGuia() { if (confirm('¿Guardar esta guía?')) document.getElementById('form-guia-remision').submit(); }
+
+// Función para buscar transportista por RUC/Cédula
 function buscarTransportista() {
-  const doc = document.getElementById('transportista_ruc').value.trim();
-  if (!doc) { alert('Ingrese cédula o RUC del transportista'); return; }
-  const tipo = tipoDesdeIdentificacion(doc);
-  if (!tipo) { alert('Ingrese 10 (cédula) o 13 dígitos (RUC)'); return; }
-  fetch(`/inventario/consultar-identificacion/?identificacion=${encodeURIComponent(doc)}&tipo=${tipo}`)
-    .then(r => r.json())
+  const rucInput = document.getElementById('transportista_ruc');
+  const nombreInput = document.getElementById('transportista_nombre');
+  const ruc = rucInput.value.trim();
+  
+  if (!ruc) {
+    alert('Por favor ingrese un RUC o cédula para buscar');
+    rucInput.focus();
+    return;
+  }
+  
+  // Validar longitud (10 para cédula, 13 para RUC)
+  if (ruc.length !== 10 && ruc.length !== 13) {
+    alert('El RUC debe tener 13 dígitos o la cédula 10 dígitos');
+    rucInput.focus();
+    return;
+  }
+  
+  // Deshabilitar botón mientras se consulta
+  const btnBuscar = event.target;
+  const iconoOriginal = btnBuscar.innerHTML;
+  btnBuscar.disabled = true;
+  btnBuscar.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  
+  // Consultar API
+  fetch(`/inventario/api/empresa/${ruc}/`)
+    .then(response => response.json())
     .then(data => {
-      if (data && !data.error) {
-        document.getElementById('transportista_nombre').value = (data.razon_social || '').trim();
+      if (data.error) {
+        alert(`Error: ${data.message || 'No se encontró información para este RUC/Cédula'}`);
+        nombreInput.value = '';
       } else {
-        alert(data.message || 'Transportista no encontrado');
+        // Rellenar campos con la información obtenida
+        const nombre = data.razon_social || data.nombre_comercial || '';
+        nombreInput.value = nombre;
+        
+        // Guardar transportista en el sistema (si no existe)
+        guardarTransportistaEnSistema(ruc, nombre, data.direccion || '', data.telefono || '', data.correo || '');
+        
+        // Mensaje de éxito
+        const tipoDoc = ruc.length === 13 ? 'RUC' : 'Cédula';
+        console.log(`${tipoDoc} consultado exitosamente:`, data);
+        
+        // Mostrar notificación visual
+        mostrarNotificacion('Datos cargados correctamente', 'success');
       }
     })
-    .catch(err => { console.error(err); alert('Error al consultar transportista'); });
+    .catch(error => {
+      console.error('Error al consultar:', error);
+      alert('Error al consultar el RUC/Cédula. Por favor intente nuevamente.');
+      nombreInput.value = '';
+    })
+    .finally(() => {
+      // Restaurar botón
+      btnBuscar.disabled = false;
+      btnBuscar.innerHTML = iconoOriginal;
+    });
 }
 
-function buscarCliente() {
-    const identificacion = document.getElementById('destinatario_identificacion').value;
-    if (!identificacion) {
-        alert('Ingrese una identificación');
-        return;
-    }
-    
-    // TODO: Implementar búsqueda AJAX de cliente
-    console.log('Buscando cliente:', identificacion);
+// Función auxiliar para guardar transportista en el sistema
+function guardarTransportistaEnSistema(ruc, nombre, direccion, telefono, email) {
+  // Esta función guarda el transportista para uso futuro
+  // Se enviará al backend cuando se guarde la guía
+  const transportista = {
+    ruc_cedula: ruc,
+    nombre: nombre,
+    direccion: direccion || '',
+    telefono: telefono || '',
+    email: email || ''
+  };
+  
+  // Guardar en sessionStorage para reutilizar
+  sessionStorage.setItem(`transportista_${ruc}`, JSON.stringify(transportista));
 }
 
-function agregarProducto() {
-    const tbody = document.getElementById('productos-body');
-    const row = document.createElement('tr');
-    row.innerHTML = `
-        <td>
-            <input type="text" name="productos[${contadorProductos}][codigo]" class="w-full" placeholder="Código" required>
-        </td>
-        <td>
-            <input type="text" name="productos[${contadorProductos}][descripcion]" class="w-full" placeholder="Descripción" required>
-        </td>
-        <td>
-            <input type="number" name="productos[${contadorProductos}][cantidad]" class="w-full text-right" step="0.01" min="0" placeholder="0.00" required>
-        </td>
-        <td class="text-center">
-            <button type="button" class="text-red-600 hover:text-red-800 text-sm" onclick="eliminarProducto(this)">
-                <i class="fas fa-trash"></i>
-            </button>
-        </td>
-    `;
-    tbody.appendChild(row);
-    contadorProductos++;
+// Función auxiliar para mostrar notificaciones
+function mostrarNotificacion(mensaje, tipo) {
+  // Crear elemento de notificación
+  const notif = document.createElement('div');
+  notif.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 20px;
+    background: ${tipo === 'success' ? '#10b981' : '#ef4444'};
+    color: white;
+    border-radius: 4px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    z-index: 9999;
+    font-size: 13px;
+    animation: slideIn 0.3s ease;
+  `;
+  notif.textContent = mensaje;
+  document.body.appendChild(notif);
+  
+  // Remover después de 3 segundos
+  setTimeout(() => {
+    notif.style.animation = 'slideOut 0.3s ease';
+    setTimeout(() => notif.remove(), 300);
+  }, 3000);
 }
 
-function eliminarProducto(button) {
-    button.closest('tr').remove();
+// Función para buscar destinatario por RUC/Cédula en la tabla
+function buscarDestinatario(btn) {
+  const row = btn.closest('tr');
+  const rucInput = row.querySelector('.destinatario-ruc');
+  const nombreInput = row.querySelector('.destinatario-nombre');
+  const direccionInput = row.querySelector('.destinatario-direccion');
+  const ruc = rucInput.value.trim();
+  
+  if (!ruc) {
+    alert('Por favor ingrese un RUC o cédula para buscar');
+    rucInput.focus();
+    return;
+  }
+  
+  // Validar longitud (10 para cédula, 13 para RUC)
+  if (ruc.length !== 10 && ruc.length !== 13) {
+    alert('El RUC debe tener 13 dígitos o la cédula 10 dígitos');
+    rucInput.focus();
+    return;
+  }
+  
+  // Deshabilitar botón mientras se consulta
+  const iconoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  
+  // Consultar API
+  fetch(`/inventario/api/empresa/${ruc}/`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.error) {
+        alert(`Error: ${data.message || 'No se encontró información para este RUC/Cédula'}`);
+        nombreInput.value = '';
+        direccionInput.value = '';
+      } else {
+        // Rellenar campos con la información obtenida
+        const nombre = data.razon_social || data.nombre_comercial || '';
+        const direccion = data.direccion || '';
+        nombreInput.value = nombre;
+        direccionInput.value = direccion;
+        
+        // Mensaje de éxito en consola
+        const tipoDoc = ruc.length === 13 ? 'RUC' : 'Cédula';
+        console.log(`${tipoDoc} de destinatario consultado exitosamente:`, data);
+        
+        // Mostrar notificación visual
+        mostrarNotificacion('Datos del destinatario cargados correctamente', 'success');
+      }
+    })
+    .catch(error => {
+      console.error('Error al consultar:', error);
+      alert('Error al consultar el RUC/Cédula. Por favor intente nuevamente.');
+      nombreInput.value = '';
+      direccionInput.value = '';
+    })
+    .finally(() => {
+      // Restaurar botón
+      btn.disabled = false;
+      btn.innerHTML = iconoOriginal;
+    });
 }
-
-function guardarBorrador() {
-    // TODO: Implementar guardado como borrador
-    console.log('Guardando borrador...');
-}
-
-// Agregar un producto por defecto al cargar
-document.addEventListener('DOMContentLoaded', function() { agregarProducto(); });
 </script>
 
 {% endblock %}

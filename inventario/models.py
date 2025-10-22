@@ -3948,9 +3948,63 @@ def crear_detalles_factura(factura, codigos, cantidades, descuentos, porcentajes
 # MODELOS DE GUÍAS DE REMISIÓN
 # ===============================
 
+class Transportista(models.Model):
+    """
+    Modelo para gestionar transportistas frecuentes
+    """
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='transportistas',
+    )
+    
+    # Datos de identificación
+    ruc_cedula = models.CharField(
+        max_length=13,
+        help_text="Cédula o RUC del transportista"
+    )
+    nombre = models.CharField(max_length=300)
+    
+    # Datos adicionales
+    direccion = models.TextField(blank=True, default='')
+    telefono = models.CharField(max_length=50, blank=True, default='')
+    email = models.EmailField(blank=True, default='')
+    
+    # Vehículos asociados (puede tener múltiples placas)
+    placa_principal = models.CharField(
+        max_length=10,
+        blank=True,
+        default='',
+        help_text="Placa del vehículo principal"
+    )
+    
+    # Estado
+    activo = models.BooleanField(default=True)
+    
+    # Auditoría
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'transportista'
+        verbose_name = 'Transportista'
+        verbose_name_plural = 'Transportistas'
+        ordering = ['nombre']
+        unique_together = [['empresa', 'ruc_cedula']]
+        indexes = [
+            models.Index(fields=['ruc_cedula']),
+            models.Index(fields=['nombre']),
+            models.Index(fields=['activo']),
+        ]
+    
+    def __str__(self):
+        return f"{self.nombre} - {self.ruc_cedula}"
+
+
 class GuiaRemision(models.Model):
     """
-    Modelo para las Guías de Remisión según normativa SRI Ecuador
+    Modelo simplificado para Guías de Remisión
+    Campos según formulario real del sistema
     """
 
     empresa = models.ForeignKey(
@@ -3958,130 +4012,46 @@ class GuiaRemision(models.Model):
         on_delete=models.PROTECT,
         related_name='guias_remision',
     )
-
-    # Opciones para motivo de traslado según SRI
-    MOTIVOS_TRASLADO = [
-        ('01', 'Venta'),
-        ('02', 'Transformación'),
-        ('03', 'Consignación'),
-        ('04', 'Devolución'),
-        ('05', 'Otros'),
-    ]
     
-    # Estados de la guía
-    ESTADOS = [
-        ('borrador', 'Borrador'),
-        ('autorizada', 'Autorizada'),
-        ('anulada', 'Anulada'),
-        ('devuelta', 'Devuelta'),
-    ]
+    # Numeración
+    establecimiento = models.CharField(max_length=3, default='001')
+    punto_emision = models.CharField(max_length=3, default='001')
+    secuencial = models.CharField(max_length=9)
     
-    # Campos de numeración SRI
-    establecimiento = models.CharField(
-        max_length=3, 
-        default='001',
-        help_text="Código del establecimiento (3 dígitos)"
-    )
-    punto_emision = models.CharField(
-        max_length=3, 
-        default='001',
-        help_text="Código del punto de emisión (3 dígitos)"
-    )
-    secuencial = models.CharField(
-        max_length=9,
-        help_text="Número secuencial (9 dígitos)"
-    )
+    # Datos básicos
+    transportista_ruc = models.CharField(max_length=13, help_text="Cédula o RUC del transportista")
+    transportista_nombre = models.CharField(max_length=300, blank=True, default='')
+    direccion_partida = models.TextField()
+    direccion_destino = models.TextField()
     
-    # Datos generales
-    fecha_emision = models.DateField(
-        default=timezone.now,
-        help_text="Fecha de emisión de la guía"
-    )
-    fecha_inicio_traslado = models.DateTimeField(
-        help_text="Fecha y hora de inicio del traslado"
-    )
-    fecha_fin_traslado = models.DateTimeField(
-        null=True, 
-        blank=True,
-        help_text="Fecha y hora de fin del traslado"
-    )
-    motivo_traslado = models.CharField(
-        max_length=2, 
-        choices=MOTIVOS_TRASLADO,
-        help_text="Motivo del traslado según catálogo SRI"
-    )
+    # Fechas
+    fecha_inicio_traslado = models.DateField(help_text="Fecha de salida")
+    fecha_fin_traslado = models.DateField(null=True, blank=True, help_text="Fecha de llegada")
+    placa = models.CharField(max_length=10)
     
-    # Datos del destinatario
-    destinatario_identificacion = models.CharField(
-        max_length=13,
-        help_text="RUC, cédula o pasaporte del destinatario"
-    )
-    destinatario_nombre = models.CharField(
-        max_length=300,
-        help_text="Razón social o nombre del destinatario"
-    )
-    direccion_partida = models.TextField(
-        help_text="Dirección desde donde se envía la mercadería"
-    )
-    direccion_destino = models.TextField(
-        help_text="Dirección donde se entrega la mercadería"
-    )
+    # Información adicional
+    correo_envio = models.EmailField(blank=True, default='', help_text="Correo para envío del documento")
+    informacion_adicional = models.TextField(blank=True, default='', help_text="Información adicional del traslado")
+    ruta = models.TextField(blank=True, default='', help_text="Ruta del traslado")
     
-    # Datos del transportista
-    transportista_ruc = models.CharField(
-        max_length=13,
-        help_text="RUC del transportista"
-    )
-    transportista_nombre = models.CharField(
-        max_length=300,
-        help_text="Razón social del transportista"
-    )
-    placa = models.CharField(
-        max_length=10,
-        help_text="Placa del vehículo"
-    )
-    transportista_observaciones = models.TextField(
-        blank=True,
-        help_text="Observaciones adicionales del transportista"
-    )
+    # Campos SRI (para autorización futura)
+    clave_acceso = models.CharField(max_length=49, null=True, blank=True, unique=True)
+    numero_autorizacion = models.CharField(max_length=37, null=True, blank=True)
+    fecha_autorizacion = models.DateTimeField(null=True, blank=True)
+    xml_autorizado = models.TextField(null=True, blank=True)
     
-    # Campos SRI para autorización electrónica
-    clave_acceso = models.CharField(
-        max_length=49, 
-        null=True, 
-        blank=True,
-        unique=True,
-        help_text="Clave de acceso SRI (49 dígitos)"
-    )
-    numero_autorizacion = models.CharField(
-        max_length=37, 
-        null=True, 
-        blank=True,
-        help_text="Número de autorización del SRI"
-    )
-    fecha_autorizacion = models.DateTimeField(
-        null=True, 
-        blank=True,
-        help_text="Fecha y hora de autorización del SRI"
-    )
-    xml_autorizado = models.TextField(
-        null=True, 
-        blank=True,
-        help_text="XML autorizado por el SRI"
-    )
-    
-    # Estado y control
+    # Estado
     estado = models.CharField(
-        max_length=20, 
-        choices=ESTADOS, 
+        max_length=20,
+        choices=[
+            ('borrador', 'Borrador'),
+            ('autorizada', 'Autorizada'),
+            ('anulada', 'Anulada'),
+        ],
         default='borrador'
     )
-    observaciones = models.TextField(
-        blank=True,
-        help_text="Observaciones generales de la guía"
-    )
     
-    # Campos de auditoría
+    # Auditoría
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_modificacion = models.DateTimeField(auto_now=True)
     usuario_creacion = models.ForeignKey(
@@ -4103,17 +4073,16 @@ class GuiaRemision(models.Model):
         db_table = 'guia_remision'
         verbose_name = 'Guía de Remisión'
         verbose_name_plural = 'Guías de Remisión'
-        ordering = ['-fecha_emision', '-secuencial']
+        ordering = ['-fecha_inicio_traslado', '-secuencial']
         unique_together = [['empresa', 'establecimiento', 'punto_emision', 'secuencial']]
         indexes = [
-            models.Index(fields=['fecha_emision']),
+            models.Index(fields=['fecha_inicio_traslado']),
             models.Index(fields=['estado']),
-            models.Index(fields=['destinatario_identificacion']),
             models.Index(fields=['clave_acceso']),
         ]
     
     def __str__(self):
-        return f"Guía {self.numero_completo} - {self.destinatario_nombre}"
+        return f"Guía {self.numero_completo}"
     
     @property
     def numero_completo(self):
