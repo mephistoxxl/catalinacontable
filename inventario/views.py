@@ -6966,31 +6966,68 @@ def emitir_guia_remision(request):
                     guia.secuencial = str(int(secu_post)).zfill(9)
                 guia.save()
                 
-                # Procesar destinatarios según el formulario HTML
+                # Procesar destinatarios y sus productos
                 destinatarios = {}
-                for key in request.POST:
-                    if key.startswith('destinatarios[') and '][' in key:
-                        # Extraer índice y campo: destinatarios[0][ruc] -> índice=0, campo=ruc
-                        parts = key.replace('destinatarios[', '').replace(']', '').split('[')
-                        if len(parts) == 2:
-                            idx = parts[0]
-                            campo = parts[1]
-                            if idx not in destinatarios:
-                                destinatarios[idx] = {}
-                            destinatarios[idx][campo] = request.POST.get(key, '').strip()
+                productos = {}
                 
-                # Crear destinatarios
-                for idx, dest_data in destinatarios.items():
+                for key in request.POST:
+                    if key.startswith('destinatarios['):
+                        # Parsear estructura: destinatarios[1][ruc] o destinatarios[1][productos][1][codigo]
+                        parts = key.replace('destinatarios[', '').split(']')
+                        
+                        if len(parts) >= 2:
+                            idx_dest = parts[0]
+                            
+                            # Inicializar destinatario
+                            if idx_dest not in destinatarios:
+                                destinatarios[idx_dest] = {}
+                                productos[idx_dest] = {}
+                            
+                            # Verificar si es un producto o campo del destinatario
+                            if '[productos][' in key:
+                                # Es un producto: destinatarios[1][productos][2][codigo]
+                                idx_prod = parts[2]
+                                campo_prod = parts[3].replace('[', '')
+                                
+                                if idx_prod not in productos[idx_dest]:
+                                    productos[idx_dest][idx_prod] = {}
+                                
+                                productos[idx_dest][idx_prod][campo_prod] = request.POST.get(key, '').strip()
+                            else:
+                                # Es campo del destinatario: destinatarios[1][ruc]
+                                campo_dest = parts[1].replace('[', '')
+                                destinatarios[idx_dest][campo_dest] = request.POST.get(key, '').strip()
+                
+                # Crear destinatarios y sus productos
+                from inventario.models import DestinatarioGuia, DetalleDestinatarioGuia
+                
+                for idx_dest, dest_data in destinatarios.items():
                     if dest_data.get('ruc') and dest_data.get('nombre'):
-                        from inventario.models import DestinatarioGuia
-                        DestinatarioGuia.objects.create(
+                        # Crear destinatario
+                        destinatario_obj = DestinatarioGuia.objects.create(
                             guia=guia,
                             identificacion_destinatario=dest_data.get('ruc', ''),
                             razon_social_destinatario=dest_data.get('nombre', ''),
                             dir_destinatario=dest_data.get('direccion', ''),
                             motivo_traslado=dest_data.get('motivo', '01'),
-                            doc_aduanero_unico=dest_data.get('documento', '')
+                            doc_aduanero_unico=dest_data.get('documento', ''),
+                            cod_estab_destino=dest_data.get('cod_estab', '001')
                         )
+                        
+                        # Crear productos del destinatario
+                        if idx_dest in productos:
+                            for idx_prod, prod_data in productos[idx_dest].items():
+                                if prod_data.get('codigo') and prod_data.get('descripcion') and prod_data.get('cantidad'):
+                                    try:
+                                        cantidad_decimal = Decimal(str(prod_data.get('cantidad', '1')))
+                                        DetalleDestinatarioGuia.objects.create(
+                                            destinatario=destinatario_obj,
+                                            codigo_interno=prod_data.get('codigo', '')[:25],
+                                            descripcion=prod_data.get('descripcion', '')[:300],
+                                            cantidad=cantidad_decimal
+                                        )
+                                    except Exception as e:
+                                        logger.warning(f"Error al crear producto: {e}")
                 
                 # Generar clave de acceso usando el generador del XML
                 from inventario.guia_remision.xml_generator_guia import XMLGeneratorGuiaRemision
@@ -7151,6 +7188,46 @@ def anular_guia_remision(request, guia_id):
             'success': False,
             'message': f'Error al anular la guía: {str(e)}'
         })
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def buscar_transportista(request):
+    """Endpoint para consultar información de transportista por RUC/Cédula"""
+    identificacion = request.GET.get('q', '').strip()
+    if not identificacion:
+        return JsonResponse({'error': True, 'message': 'La identificación es requerida'}, status=400)
+    
+    try:
+        from services import consultar_identificacion as servicio_consultar_identificacion
+        resultado = servicio_consultar_identificacion(identificacion)
+        
+        # Determinar tipo de identificación según longitud
+        tipo_id = '05'  # Por defecto cédula
+        if len(identificacion) == 13:
+            tipo_id = '04'  # RUC
+        elif len(identificacion) == 10:
+            tipo_id = '05'  # Cédula
+        else:
+            tipo_id = '06'  # Pasaporte u otro
+        
+        respuesta = {
+            'error': False,
+            'razon_social': resultado.get('razon_social', ''),
+            'nombre_comercial': resultado.get('nombre_comercial', ''),
+            'direccion': resultado.get('direccion', ''),
+            'tipo_identificacion': tipo_id,
+            'rise': resultado.get('tipo_regimen', '') if resultado.get('tipo_regimen') == 'RISE' else '',
+            'obligado_contabilidad': resultado.get('obligado_contabilidad', 'NO'),
+        }
+        
+        return JsonResponse(respuesta)
+        
+    except Exception as e:
+        logger.error(f"Error en buscar_transportista: {e}")
+        return JsonResponse({
+            'error': True, 
+            'message': f'No se pudo consultar la identificación: {str(e)}'
+        }, status=500)
 
 @login_required
 def descargar_guia_pdf(request, guia_id):

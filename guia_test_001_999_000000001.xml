@@ -1,0 +1,59 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<guiaRemision xmlns="http://www.sri.gob.ec/DocElectronicos/guiaRemision/V1.1.0" id="comprobante" version="1.1.0">
+  <infoTributaria>
+    <ambiente>1</ambiente>
+    <tipoEmision>1</tipoEmision>
+    <razonSocial>PUMALPA MORILLO LINA YOLANDA</razonSocial>
+    <nombreComercial>MARIA SOLEDAD BOUTIQUE</nombreComercial>
+    <ruc>1713959011001</ruc>
+    <claveAcceso>2210202506171395901100110019990000000011300289410</claveAcceso>
+    <codDoc>06</codDoc>
+    <estab>001</estab>
+    <ptoEmi>999</ptoEmi>
+    <secuencial>000000001</secuencial>
+    <dirMatriz>SANTO DOMINGO DE LOS TSACHILAS / SANTO DOMINGO / CHIGUILPE / AV. QUITO SN  Y RIO YAMBOYA</dirMatriz>
+  </infoTributaria>
+  <infoGuiaRemision>
+    <dirEstablecimiento>AV. QUITO MATRIZ, QUITO</dirEstablecimiento>
+    <dirPartida>AV. AMAZONAS Y RIO COCA, QUITO</dirPartida>
+    <razonSocialTransportista>JUAN PEREZ TRANSPORTES</razonSocialTransportista>
+    <tipoIdentificacionTransportista>05</tipoIdentificacionTransportista>
+    <rucTransportista>1717328168</rucTransportista>
+    <obligadoContabilidad>NO</obligadoContabilidad>
+    <fechaIniTransporte>22/10/2025</fechaIniTransporte>
+    <fechaFinTransporte>22/10/2025</fechaFinTransporte>
+    <placa>PXA-1234</placa>
+  </infoGuiaRemision>
+  <destinatarios>
+    <destinatario>
+      <identificacionDestinatario>1790000000001</identificacionDestinatario>
+      <razonSocialDestinatario>EMPRESA DESTINO S.A.</razonSocialDestinatario>
+      <dirDestinatario>AV. OCCIDENTAL 123, QUITO</dirDestinatario>
+      <motivoTraslado>01</motivoTraslado>
+      <codEstabDestino>001</codEstabDestino>
+      <ruta>Ruta Norte</ruta>
+      <detalles>
+        <detalle>
+          <codigoInterno>PROD001</codigoInterno>
+          <descripcion>PRODUCTO DE PRUEBA 1</descripcion>
+          <cantidad>10.500000</cantidad>
+        </detalle>
+        <detalle>
+          <codigoInterno>PROD002</codigoInterno>
+          <descripcion>PRODUCTO DE PRUEBA 2</descripcion>
+          <cantidad>25.250000</cantidad>
+        </detalle>
+        <detalle>
+          <codigoInterno>SERV001</codigoInterno>
+          <descripcion>SERVICIO DE TRANSPORTE</descripcion>
+          <cantidad>1.000000</cantidad>
+        </detalle>
+      </detalles>
+    </destinatario>
+  </destinatarios>
+  <infoAdicional>
+    <campoAdicional nombre="Correo Electrónico">test@ejemplo.com</campoAdicional>
+    <campoAdicional nombre="Información Adicional">Guía de prueba generada automáticamente</campoAdicional>
+    <campoAdicional nombre="Ruta">Quito - Norte - Sur</campoAdicional>
+  </infoAdicional>
+</guiaRemision>

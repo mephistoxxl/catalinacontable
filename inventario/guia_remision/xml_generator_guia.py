@@ -59,6 +59,11 @@ class XMLGeneratorGuiaRemision:
             destinatarios_elem = self._generar_destinatarios()
             root.append(destinatarios_elem)
             
+            # Información adicional (opcional pero recomendado)
+            info_adicional = self._generar_info_adicional()
+            if info_adicional is not None:
+                root.append(info_adicional)
+            
             # Convertir a string con formato
             xml_string = etree.tostring(
                 root,
@@ -80,7 +85,7 @@ class XMLGeneratorGuiaRemision:
         
         # Ambiente (1=Pruebas, 2=Producción)
         ambiente = etree.SubElement(info_trib, "ambiente")
-        ambiente.text = str(self.opciones.ambiente_sri if self.opciones else 1)
+        ambiente.text = str(self.opciones.tipo_ambiente if self.opciones else '1')
         
         # Tipo de emisión (1=Normal)
         tipo_emision = etree.SubElement(info_trib, "tipoEmision")
@@ -88,16 +93,17 @@ class XMLGeneratorGuiaRemision:
         
         # Razón social
         razon_social = etree.SubElement(info_trib, "razonSocial")
-        razon_social.text = self.empresa.razon_social[:300]
+        razon_social.text = self.opciones.razon_social[:300] if self.opciones else "EMPRESA SIN CONFIGURAR"
         
-        # Nombre comercial
-        if self.empresa.nombre_comercial:
-            nombre_comercial = etree.SubElement(info_trib, "nombreComercial")
-            nombre_comercial.text = self.empresa.nombre_comercial[:300]
+        # Nombre comercial (opcional)
+        if self.opciones and self.opciones.nombre_comercial:
+            nombre_comercial_elem = etree.SubElement(info_trib, "nombreComercial")
+            nombre_comercial_elem.text = str(self.opciones.nombre_comercial)[:300]
         
         # RUC
         ruc = etree.SubElement(info_trib, "ruc")
-        ruc.text = self.opciones.ruc if self.opciones else self.empresa.ruc
+        ruc_value = self.opciones.ruc if self.opciones else '9999999999001'
+        ruc.text = str(ruc_value)
         
         # Clave de acceso
         clave_acceso = etree.SubElement(info_trib, "claveAcceso")
@@ -121,7 +127,7 @@ class XMLGeneratorGuiaRemision:
         
         # Dirección matriz
         dir_matriz = etree.SubElement(info_trib, "dirMatriz")
-        dir_matriz.text = self.empresa.direccion[:300]
+        dir_matriz.text = self.opciones.direccion_establecimiento[:300] if self.opciones else "DIRECCION SIN CONFIGURAR"
         
         return info_trib
     
@@ -161,7 +167,7 @@ class XMLGeneratorGuiaRemision:
             obligado_contabilidad.text = self.guia.obligado_contabilidad
         elif self.opciones:
             obligado_contabilidad = etree.SubElement(info_guia, "obligadoContabilidad")
-            obligado_contabilidad.text = self.opciones.obligado_contabilidad if hasattr(self.opciones, 'obligado_contabilidad') else "NO"
+            obligado_contabilidad.text = self.opciones.obligado if self.opciones.obligado else "NO"
         
         # Contribuyente especial (si aplica)
         if self.guia.contribuyente_especial:
@@ -190,57 +196,123 @@ class XMLGeneratorGuiaRemision:
         return info_guia
     
     def _generar_destinatarios(self):
-        """Genera la sección de destinatarios"""
-        destinatarios = etree.Element("destinatarios")
+        """Genera la sección de destinatarios desde la base de datos"""
+        destinatarios_elem = etree.Element("destinatarios")
         
-        # Aquí irán los destinatarios desde la tabla
-        # Por ahora dejamos un destinatario básico
-        destinatario = etree.SubElement(destinatarios, "destinatario")
+        # Obtener destinatarios reales de la base de datos
+        destinatarios_db = self.guia.destinatarios.all()
         
-        # Identificación del destinatario
-        identificacion = etree.SubElement(destinatario, "identificacionDestinatario")
-        identificacion.text = "9999999999999"  # Consumidor final por defecto
+        if not destinatarios_db.exists():
+            # Si no hay destinatarios, usar datos básicos de la guía
+            logger.warning(f"Guía {self.guia.id} no tiene destinatarios, usando datos básicos")
+            destinatario = etree.SubElement(destinatarios_elem, "destinatario")
+            
+            identificacion = etree.SubElement(destinatario, "identificacionDestinatario")
+            identificacion.text = "9999999999999"
+            
+            razon_social = etree.SubElement(destinatario, "razonSocialDestinatario")
+            razon_social.text = "CONSUMIDOR FINAL"
+            
+            dir_dest = etree.SubElement(destinatario, "dirDestinatario")
+            dir_dest.text = self.guia.direccion_destino[:300]
+            
+            motivo = etree.SubElement(destinatario, "motivoTraslado")
+            motivo.text = "01"  # Venta por defecto
+            
+            # Detalles vacíos
+            detalles = etree.SubElement(destinatario, "detalles")
+            detalle = etree.SubElement(detalles, "detalle")
+            
+            codigo_interno = etree.SubElement(detalle, "codigoInterno")
+            codigo_interno.text = "PROD001"
+            
+            descripcion = etree.SubElement(detalle, "descripcion")
+            descripcion.text = "PRODUCTO TRANSPORTADO"
+            
+            cantidad = etree.SubElement(detalle, "cantidad")
+            cantidad.text = "1.000000"
+        else:
+            # Generar XML para cada destinatario real
+            for dest in destinatarios_db:
+                destinatario = etree.SubElement(destinatarios_elem, "destinatario")
+                
+                # Identificación del destinatario
+                identificacion = etree.SubElement(destinatario, "identificacionDestinatario")
+                identificacion.text = dest.identificacion_destinatario[:20]
+                
+                # Razón social del destinatario
+                razon_social = etree.SubElement(destinatario, "razonSocialDestinatario")
+                razon_social.text = dest.razon_social_destinatario[:300]
+                
+                # Dirección del destinatario
+                dir_dest = etree.SubElement(destinatario, "dirDestinatario")
+                dir_dest.text = dest.dir_destinatario[:300]
+                
+                # Motivo traslado
+                motivo = etree.SubElement(destinatario, "motivoTraslado")
+                motivo.text = dest.motivo_traslado[:300]
+                
+                # Documento aduanero (opcional)
+                if dest.doc_aduanero_unico:
+                    doc_aduanero = etree.SubElement(destinatario, "docAduaneroUnico")
+                    doc_aduanero.text = dest.doc_aduanero_unico[:20]
+                
+                # Código establecimiento destino (opcional)
+                if dest.cod_estab_destino:
+                    cod_estab_dest = etree.SubElement(destinatario, "codEstabDestino")
+                    cod_estab_dest.text = dest.cod_estab_destino[:3]
+                
+                # Ruta (opcional)
+                if dest.ruta:
+                    ruta = etree.SubElement(destinatario, "ruta")
+                    ruta.text = dest.ruta[:300]
+                
+                # Documento sustento (opcional)
+                if dest.cod_doc_sustento:
+                    doc_sustento = etree.SubElement(destinatario, "docAduaneroUnico")
+                    doc_sustento.text = dest.cod_doc_sustento[:2]
+                
+                # Detalles (productos/servicios transportados)
+                detalles = etree.SubElement(destinatario, "detalles")
+                
+                # Obtener detalles del destinatario
+                detalles_db = dest.detalles.all()
+                
+                if detalles_db.exists():
+                    for det in detalles_db:
+                        detalle = etree.SubElement(detalles, "detalle")
+                        
+                        # Código interno
+                        codigo_interno = etree.SubElement(detalle, "codigoInterno")
+                        codigo_interno.text = det.codigo_interno[:25]
+                        
+                        # Código adicional (opcional)
+                        if det.codigo_adicional:
+                            codigo_adicional = etree.SubElement(detalle, "codigoAdicional")
+                            codigo_adicional.text = det.codigo_adicional[:25]
+                        
+                        # Descripción
+                        descripcion = etree.SubElement(detalle, "descripcion")
+                        descripcion.text = det.descripcion[:300]
+                        
+                        # Cantidad
+                        cantidad = etree.SubElement(detalle, "cantidad")
+                        # Formatear a 6 decimales
+                        cantidad.text = f"{det.cantidad:.6f}"
+                else:
+                    # Si no hay detalles, agregar uno genérico
+                    detalle = etree.SubElement(detalles, "detalle")
+                    
+                    codigo_interno = etree.SubElement(detalle, "codigoInterno")
+                    codigo_interno.text = "PROD001"
+                    
+                    descripcion = etree.SubElement(detalle, "descripcion")
+                    descripcion.text = "PRODUCTO TRANSPORTADO"
+                    
+                    cantidad = etree.SubElement(detalle, "cantidad")
+                    cantidad.text = "1.000000"
         
-        # Razón social del destinatario
-        razon_social = etree.SubElement(destinatario, "razonSocialDestinatario")
-        razon_social.text = "CONSUMIDOR FINAL"
-        
-        # Dirección del destinatario
-        dir_dest = etree.SubElement(destinatario, "dirDestinatario")
-        dir_dest.text = self.guia.direccion_destino[:300]
-        
-        # Motivo traslado
-        motivo = etree.SubElement(destinatario, "motivoTraslado")
-        motivo.text = "VENTA"
-        
-        # Ruta (opcional)
-        if self.guia.ruta:
-            ruta = etree.SubElement(destinatario, "ruta")
-            ruta.text = self.guia.ruta[:300]
-        
-        # Documento aduanero (opcional - para futuro)
-        # doc_aduanero = etree.SubElement(destinatario, "docAduaneroUnico")
-        
-        # Código establecimiento destino (opcional)
-        cod_estab_dest = etree.SubElement(destinatario, "codEstabDestino")
-        cod_estab_dest.text = "001"
-        
-        # Detalles (productos/servicios transportados)
-        detalles = etree.SubElement(destinatario, "detalles")
-        
-        # Detalle ejemplo (esto debe venir de la base de datos en el futuro)
-        detalle = etree.SubElement(detalles, "detalle")
-        
-        codigo_interno = etree.SubElement(detalle, "codigoInterno")
-        codigo_interno.text = "PROD001"
-        
-        descripcion = etree.SubElement(detalle, "descripcion")
-        descripcion.text = "PRODUCTO TRANSPORTADO"
-        
-        cantidad = etree.SubElement(detalle, "cantidad")
-        cantidad.text = "1.000000"
-        
-        return destinatarios
+        return destinatarios_elem
     
     def generar_clave_acceso(self):
         """
@@ -262,7 +334,7 @@ class XMLGeneratorGuiaRemision:
         ruc = (self.opciones.ruc if self.opciones else self.empresa.ruc).zfill(13)
         
         # 4. Ambiente (1 dígito) - 1=Pruebas, 2=Producción
-        ambiente = str(self.opciones.ambiente_sri if self.opciones else 1)
+        ambiente = str(self.opciones.tipo_ambiente if self.opciones else '1')
         
         # 5. Serie (6 dígitos) - establecimiento + punto emisión
         serie = f"{self.guia.establecimiento}{self.guia.punto_emision}"
@@ -320,3 +392,49 @@ class XMLGeneratorGuiaRemision:
             return 0  # Por convención del SRI
         else:
             return 11 - residuo
+    
+    def _generar_info_adicional(self):
+        """
+        Genera la sección de información adicional (opcional)
+        Máximo 15 campos adicionales según XSD V1.1.0
+        
+        Returns:
+            Element: Elemento infoAdicional o None si no hay información
+        """
+        campos_adicionales = []
+        
+        # Agregar correo si existe
+        if self.guia.correo_envio:
+            campos_adicionales.append({
+                'nombre': 'Correo Electrónico',
+                'valor': self.guia.correo_envio[:300]
+            })
+        
+        # Agregar información adicional si existe
+        if self.guia.informacion_adicional:
+            campos_adicionales.append({
+                'nombre': 'Información Adicional',
+                'valor': self.guia.informacion_adicional[:300]
+            })
+        
+        # Agregar ruta si existe
+        if self.guia.ruta:
+            campos_adicionales.append({
+                'nombre': 'Ruta',
+                'valor': self.guia.ruta[:300]
+            })
+        
+        # Si no hay campos adicionales, retornar None
+        if not campos_adicionales:
+            return None
+        
+        # Crear elemento infoAdicional
+        info_adicional = etree.Element("infoAdicional")
+        
+        # Agregar campos (máximo 15 según XSD)
+        for campo in campos_adicionales[:15]:
+            campo_elem = etree.SubElement(info_adicional, "campoAdicional")
+            campo_elem.set("nombre", campo['nombre'][:300])
+            campo_elem.text = campo['valor'][:300]
+        
+        return info_adicional

@@ -174,18 +174,45 @@
   }
 
   .input-group {
-    display: flex;
-    gap: 3px;
+    display: flex !important;
+    gap: 4px !important;
+    align-items: center !important;
+    width: 100% !important;
   }
 
   .input-group .form-control {
-    flex: 1;
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+  
+  .input-group .btn {
+    flex-shrink: 0 !important;
   }
 
   .btn-icon {
-    padding: 2px 6px;
-    min-width: 24px;
-    width: auto;
+    padding: 4px 8px !important;
+    min-width: 28px !important;
+    width: auto !important;
+    height: 24px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 2px !important;
+    cursor: pointer !important;
+  }
+  
+  .btn-icon:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+    transform: translateY(-1px);
+  }
+  
+  .btn-icon i {
+    font-size: 12px !important;
+    color: white !important;
   }
 
   .input-small {
@@ -282,10 +309,10 @@
         <div class="form-row">
           <div class="form-group">
             <label>Cédula/RUC Transportista *</label>
-            <div class="input-group">
-              <input type="text" id="transportista_ruc" name="transportista_ruc" maxlength="13" placeholder="Ej: 1234567890" class="form-control" required>
-              <button type="button" class="btn btn-primary btn-icon" onclick="buscarTransportista()" title="Buscar datos del transportista">
-                <i class="fas fa-search"></i>
+            <div class="input-group" style="display: flex !important; gap: 4px !important;">
+              <input type="text" id="transportista_ruc" name="transportista_ruc" maxlength="13" placeholder="Ej: 1234567890" class="form-control" required style="flex: 1;">
+              <button type="button" class="btn btn-primary btn-icon" onclick="buscarTransportista()" title="Buscar datos del transportista" style="padding: 4px 8px; height: 24px; min-width: 28px; background: #3b82f6; color: white; border: none; border-radius: 2px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">
+                <i class="fas fa-search" style="font-size: 12px; color: white;"></i>
               </button>
             </div>
           </div>
@@ -324,6 +351,28 @@
             <label>Dirección Llegada *</label>
             <input type="text" id="direccion_destino" name="direccion_destino" placeholder="Donde llega" class="form-control" required>
           </div>
+          <div class="form-group">
+            <label>Dirección Establecimiento</label>
+            <input type="text" id="dir_establecimiento" name="dir_establecimiento" placeholder="Dirección del establecimiento emisor" class="form-control">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>RISE</label>
+            <input type="text" id="rise" name="rise" maxlength="40" placeholder="Régimen RISE (si aplica)" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Obligado Contabilidad</label>
+            <select id="obligado_contabilidad" name="obligado_contabilidad" class="form-control">
+              <option value="">N/A</option>
+              <option value="SI">SI</option>
+              <option value="NO" selected>NO</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Contribuyente Especial</label>
+            <input type="text" id="contribuyente_especial" name="contribuyente_especial" maxlength="13" placeholder="Nº Resolución" class="form-control">
+          </div>
         </div>
       </div>
 
@@ -339,18 +388,8 @@
         </div>
         <div style="overflow-x: auto;">
           <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
-            <thead>
-              <tr style="background: #f3f4f6;">
-                <th style="border: 1px solid #d1d5db; padding: 2px 4px; text-align: left; width: 90px;">RUC</th>
-                <th style="border: 1px solid #d1d5db; padding: 2px 4px; text-align: left;">Destinatario</th>
-                <th style="border: 1px solid #d1d5db; padding: 2px 4px; text-align: left;">Dirección</th>
-                <th style="border: 1px solid #d1d5db; padding: 2px 4px; text-align: left; width: 70px;">Motivo</th>
-                <th style="border: 1px solid #d1d5db; padding: 2px 4px; text-align: left; width: 90px;">Documento</th>
-                <th style="border: 1px solid #d1d5db; padding: 2px 4px; text-align: center; width: 40px;">Acción</th>
-              </tr>
-            </thead>
             <tbody id="tabla-destinatarios">
-              <!-- Filas dinámicas aquí -->
+              <!-- Filas expandibles con destinatarios y productos -->
             </tbody>
           </table>
         </div>
@@ -459,41 +498,144 @@ function agregarDestinatario() {
   contadorDestinatarios++;
   
   const row = document.createElement('tr');
+  row.setAttribute('data-destinatario-id', contadorDestinatarios);
   row.innerHTML = `
-    <td style="border: 1px solid #d1d5db; padding: 2px;">
-      <div style="display: flex; gap: 2px;">
-        <input type="text" name="destinatarios[${contadorDestinatarios}][ruc]" class="form-control destinatario-ruc" placeholder="RUC" maxlength="13" style="width: 100%; min-width: 80px; font-size: 10px;">
-        <button type="button" class="btn btn-primary" onclick="buscarDestinatario(this)" style="padding: 1px 4px; height: 20px; font-size: 9px; min-width: 20px;" title="Buscar">
-          <i class="fas fa-search"></i>
-        </button>
+    <td colspan="6" style="border: 1px solid #d1d5db; padding: 4px; background: #f9fafb;">
+      <div style="border: 2px solid #3b82f6; border-radius: 4px; padding: 6px; background: white;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <strong style="color: #1f2937; font-size: 10px;">Destinatario #${contadorDestinatarios}</strong>
+          <button type="button" class="btn btn-danger" onclick="eliminarDestinatario(this)" style="padding: 2px 6px; height: 20px; font-size: 9px;">
+            <i class="fas fa-trash"></i> Eliminar
+          </button>
+        </div>
+        
+        <!-- Datos del destinatario -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 4px;">
+          <div>
+            <label style="font-size: 9px; font-weight: 600; margin-bottom: 1px; display: block;">RUC/Cédula *</label>
+            <div style="display: flex; gap: 2px;">
+              <input type="text" name="destinatarios[${contadorDestinatarios}][ruc]" class="form-control destinatario-ruc" placeholder="RUC" maxlength="13" required style="flex: 1; font-size: 10px;">
+              <button type="button" class="btn btn-primary" onclick="buscarDestinatario(this)" style="padding: 2px 4px; height: 24px; font-size: 9px; min-width: 24px;" title="Buscar">
+                <i class="fas fa-search"></i>
+              </button>
+            </div>
+          </div>
+          <div>
+            <label style="font-size: 9px; font-weight: 600; margin-bottom: 1px; display: block;">Nombre/Razón Social *</label>
+            <input type="text" name="destinatarios[${contadorDestinatarios}][nombre]" class="form-control destinatario-nombre" placeholder="Nombre" required style="font-size: 10px;">
+          </div>
+          <div>
+            <label style="font-size: 9px; font-weight: 600; margin-bottom: 1px; display: block;">Dirección *</label>
+            <input type="text" name="destinatarios[${contadorDestinatarios}][direccion]" class="form-control destinatario-direccion" placeholder="Dirección" required style="font-size: 10px;">
+          </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 4px;">
+          <div>
+            <label style="font-size: 9px; font-weight: 600; margin-bottom: 1px; display: block;">Motivo Traslado *</label>
+            <select name="destinatarios[${contadorDestinatarios}][motivo]" class="form-control" required style="font-size: 10px;">
+              <option value="">Seleccione...</option>
+              <option value="01">Venta</option>
+              <option value="02">Transformación</option>
+              <option value="03">Consignación</option>
+              <option value="04">Devolución</option>
+              <option value="05">Otros</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 9px; font-weight: 600; margin-bottom: 1px; display: block;">Doc. Aduanero</label>
+            <input type="text" name="destinatarios[${contadorDestinatarios}][documento]" class="form-control" placeholder="Documento" style="font-size: 10px;">
+          </div>
+          <div>
+            <label style="font-size: 9px; font-weight: 600; margin-bottom: 1px; display: block;">Cod. Estab. Destino</label>
+            <input type="text" name="destinatarios[${contadorDestinatarios}][cod_estab]" class="form-control" placeholder="001" maxlength="3" value="001" style="font-size: 10px;">
+          </div>
+        </div>
+        
+        <!-- Tabla de productos del destinatario -->
+        <div style="margin-top: 6px; border-top: 1px solid #e5e7eb; padding-top: 6px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+            <label style="font-size: 9px; font-weight: 600; color: #374151;">Productos a Transportar:</label>
+            <button type="button" class="btn btn-primary" onclick="agregarProducto(${contadorDestinatarios})" style="padding: 2px 6px; height: 20px; font-size: 9px;">
+              <i class="fas fa-plus"></i> Agregar Producto
+            </button>
+          </div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 9px;">
+            <thead>
+              <tr style="background: #f3f4f6;">
+                <th style="border: 1px solid #d1d5db; padding: 2px; text-align: left; width: 100px;">Código</th>
+                <th style="border: 1px solid #d1d5db; padding: 2px; text-align: left;">Descripción</th>
+                <th style="border: 1px solid #d1d5db; padding: 2px; text-align: left; width: 80px;">Cantidad</th>
+                <th style="border: 1px solid #d1d5db; padding: 2px; text-align: center; width: 40px;">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-productos-${contadorDestinatarios}">
+              <!-- Productos dinámicos -->
+            </tbody>
+          </table>
+        </div>
       </div>
     </td>
+  `;
+  tbody.appendChild(row);
+  
+  // Agregar automáticamente un producto vacío
+  agregarProducto(contadorDestinatarios);
+}
+
+// Función para agregar producto a un destinatario
+let contadorProductos = {};
+
+function agregarProducto(destinatarioId) {
+  if (!contadorProductos[destinatarioId]) {
+    contadorProductos[destinatarioId] = 0;
+  }
+  contadorProductos[destinatarioId]++;
+  
+  const tbody = document.getElementById(`tabla-productos-${destinatarioId}`);
+  const productoId = contadorProductos[destinatarioId];
+  
+  const row = document.createElement('tr');
+  row.innerHTML = `
     <td style="border: 1px solid #d1d5db; padding: 2px;">
-      <input type="text" name="destinatarios[${contadorDestinatarios}][nombre]" class="form-control destinatario-nombre" placeholder="Nombre" style="width: 100%; min-width: 120px; font-size: 10px;">
+      <input type="text" 
+             name="destinatarios[${destinatarioId}][productos][${productoId}][codigo]" 
+             class="form-control" 
+             placeholder="PROD001" 
+             maxlength="25" 
+             required 
+             style="font-size: 9px;">
     </td>
     <td style="border: 1px solid #d1d5db; padding: 2px;">
-      <input type="text" name="destinatarios[${contadorDestinatarios}][direccion]" class="form-control destinatario-direccion" placeholder="Dirección" style="width: 100%; min-width: 120px; font-size: 10px;">
+      <input type="text" 
+             name="destinatarios[${destinatarioId}][productos][${productoId}][descripcion]" 
+             class="form-control" 
+             placeholder="Descripción del producto" 
+             maxlength="300" 
+             required 
+             style="font-size: 9px;">
     </td>
     <td style="border: 1px solid #d1d5db; padding: 2px;">
-      <select name="destinatarios[${contadorDestinatarios}][motivo]" class="form-control" style="width: 100%; font-size: 10px;">
-        <option value="">-</option>
-        <option value="01">Venta</option>
-        <option value="02">Transformación</option>
-        <option value="03">Consignación</option>
-        <option value="04">Devolución</option>
-        <option value="05">Otros</option>
-      </select>
-    </td>
-    <td style="border: 1px solid #d1d5db; padding: 2px;">
-      <input type="text" name="destinatarios[${contadorDestinatarios}][documento]" class="form-control" placeholder="Doc" style="width: 100%; min-width: 80px; font-size: 10px;">
+      <input type="number" 
+             name="destinatarios[${destinatarioId}][productos][${productoId}][cantidad]" 
+             class="form-control" 
+             placeholder="1.000000" 
+             step="0.000001" 
+             min="0.000001" 
+             required 
+             style="font-size: 9px;">
     </td>
     <td style="border: 1px solid #d1d5db; padding: 2px; text-align: center;">
-      <button type="button" class="btn btn-danger" onclick="eliminarDestinatario(this)" style="padding: 1px 4px; height: 20px; font-size: 9px;">
-        <i class="fas fa-trash"></i>
+      <button type="button" class="btn btn-danger" onclick="eliminarProducto(this)" style="padding: 1px 4px; height: 18px; font-size: 8px;">
+        <i class="fas fa-times"></i>
       </button>
     </td>
   `;
   tbody.appendChild(row);
+}
+
+function eliminarProducto(btn) {
+  btn.closest('tr').remove();
 }
 
 function eliminarDestinatario(btn) {
@@ -509,6 +651,10 @@ function guardarGuia() { if (confirm('¿Guardar esta guía?')) document.getEleme
 function buscarTransportista() {
   const rucInput = document.getElementById('transportista_ruc');
   const nombreInput = document.getElementById('transportista_nombre');
+  const tipoIdInput = document.getElementById('tipo_identificacion_transportista');
+  const dirEstabInput = document.getElementById('dir_establecimiento');
+  const riseInput = document.getElementById('rise');
+  const obligadoContInput = document.getElementById('obligado_contabilidad');
   const ruc = rucInput.value.trim();
   
   if (!ruc) {
@@ -530,27 +676,47 @@ function buscarTransportista() {
   btnBuscar.disabled = true;
   btnBuscar.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
   
-  // Consultar API
-  fetch(`/inventario/api/empresa/${ruc}/`)
+  // Consultar API específica para transportistas
+  fetch(`/inventario/api/buscar-transportista/?q=${ruc}`)
     .then(response => response.json())
     .then(data => {
       if (data.error) {
         alert(`Error: ${data.message || 'No se encontró información para este RUC/Cédula'}`);
         nombreInput.value = '';
       } else {
-        // Rellenar campos con la información obtenida
+        // Rellenar campos básicos
         const nombre = data.razon_social || data.nombre_comercial || '';
         nombreInput.value = nombre;
         
+        // Rellenar tipo de identificación automáticamente
+        if (data.tipo_identificacion) {
+          tipoIdInput.value = data.tipo_identificacion;
+        }
+        
+        // Rellenar dirección del establecimiento
+        if (data.direccion && dirEstabInput) {
+          dirEstabInput.value = data.direccion;
+        }
+        
+        // Rellenar RISE si aplica
+        if (data.rise && riseInput) {
+          riseInput.value = data.rise;
+        }
+        
+        // Rellenar obligado contabilidad
+        if (data.obligado_contabilidad && obligadoContInput) {
+          obligadoContInput.value = data.obligado_contabilidad;
+        }
+        
         // Guardar transportista en el sistema (si no existe)
-        guardarTransportistaEnSistema(ruc, nombre, data.direccion || '', data.telefono || '', data.correo || '');
+        guardarTransportistaEnSistema(ruc, nombre, data.direccion || '', '', '');
         
         // Mensaje de éxito
         const tipoDoc = ruc.length === 13 ? 'RUC' : 'Cédula';
         console.log(`${tipoDoc} consultado exitosamente:`, data);
         
         // Mostrar notificación visual
-        mostrarNotificacion('Datos cargados correctamente', 'success');
+        mostrarNotificacion('✓ Datos del transportista cargados correctamente', 'success');
       }
     })
     .catch(error => {

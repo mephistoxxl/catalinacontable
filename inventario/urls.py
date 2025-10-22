@@ -164,6 +164,7 @@ urlpatterns = [
     path('guias-remision/<int:guia_id>/editar/', views.editar_guia_remision, name='editar_guia_remision'),
     path('guias-remision/<int:guia_id>/anular/', views.anular_guia_remision, name='anular_guia_remision'),
     path('guias-remision/<int:guia_id>/pdf/', views.descargar_guia_pdf, name='descargar_guia_pdf'),
+    path('api/buscar-transportista/', views.buscar_transportista, name='buscar_transportista'),
     path('api/buscar-cliente/', views.buscar_cliente_ajax, name='buscar_cliente_ajax'),
     path('api/clientes/buscar', views.buscar_cliente_api, name='buscar_cliente_api'),
     path('api/clientes/crear', views.crear_cliente_api, name='crear_cliente_api'),
