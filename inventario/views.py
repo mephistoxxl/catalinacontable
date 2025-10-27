@@ -98,6 +98,109 @@ if 'render_to_pdf' not in globals():
             return _HttpResponseForPDF(f"Error generando PDF placeholder: {e}")
 
 
+# ====== FUNCIÓN PARA VERIFICAR SI LA EMPRESA NECESITA CONFIGURACIÓN ======
+def necesita_configuracion(empresa):
+    """
+    Verifica si una empresa tiene TODOS los campos OBLIGATORIOS configurados.
+    
+    CAMPOS OBLIGATORIOS:
+    1. RUC (identificacion) - no puede ser '0000000000000' ni vacío
+    2. Razón Social - no puede ser 'PENDIENTE' ni vacío
+    3. Nombre Comercial - no puede estar vacío
+    4. Dirección - no puede estar vacía
+    5. Correo - no puede estar vacío ni ser 'pendiente@empresa.com'
+    6. Teléfono - no puede estar vacío ni ser '0000000000'
+    7. Obligado a llevar contabilidad - debe estar definido
+    8. Régimen tributario - debe estar definido
+    9. Mensaje en facturas - debe estar definido
+    10. Firma electrónica - debe estar cargada
+    
+    Args:
+        empresa: Instancia de Empresa
+        
+    Returns:
+        bool: True si NECESITA configuración, False si está TODO configurado
+    """
+    try:
+        # ✅ USAR EL MANAGER CORRECTO PARA TENANT
+        # Intentar con for_tenant primero, luego fallback a filter normal
+        try:
+            opciones = Opciones.objects.for_tenant(empresa).first()
+        except (AttributeError, TypeError):
+            # Si for_tenant no existe o falla, usar filter normal
+            opciones = Opciones.objects.filter(empresa=empresa).first()
+        
+        # Si no existe configuración, necesita configurarse
+        if not opciones:
+            logger.warning(f"❌ Empresa {empresa.ruc} - NO tiene opciones")
+            print(f"❌ Empresa {empresa.ruc} - NO tiene opciones")
+            return True
+        
+        # ✅ VERIFICAR CADA CAMPO OBLIGATORIO
+        campos_faltantes = []
+        
+        # 1. RUC
+        if not opciones.identificacion or opciones.identificacion == '0000000000000':
+            campos_faltantes.append('RUC')
+        
+        # 2. Razón Social
+        if not opciones.razon_social or opciones.razon_social == 'PENDIENTE':
+            campos_faltantes.append('Razón Social')
+        
+        # 3. Nombre Comercial
+        if not opciones.nombre_comercial or not opciones.nombre_comercial.strip():
+            campos_faltantes.append('Nombre Comercial')
+        
+        # 4. Dirección
+        if not opciones.direccion_establecimiento or not opciones.direccion_establecimiento.strip():
+            campos_faltantes.append('Dirección')
+        
+        # 5. Correo
+        if not opciones.correo or opciones.correo == 'pendiente@empresa.com':
+            campos_faltantes.append('Correo')
+        
+        # 6. Teléfono
+        if not opciones.telefono or opciones.telefono == '0000000000':
+            campos_faltantes.append('Teléfono')
+        
+        # 7. Obligado a llevar contabilidad
+        if opciones.obligado is None:
+            campos_faltantes.append('Obligado a llevar contabilidad')
+        
+        # 8. Régimen tributario (tipo_regimen)
+        if not opciones.tipo_regimen or not opciones.tipo_regimen.strip():
+            campos_faltantes.append('Régimen tributario')
+        
+        # 9. Mensaje en facturas
+        if not opciones.mensaje_factura or not opciones.mensaje_factura.strip():
+            campos_faltantes.append('Mensaje en facturas')
+        
+        # 10. Firma electrónica
+        if not opciones.firma_electronica:
+            campos_faltantes.append('Firma electrónica')
+        
+        # Si hay campos faltantes, necesita configuración
+        if campos_faltantes:
+            print(f"\n{'='*80}")
+            print(f"❌ EMPRESA {empresa.ruc} - FALTAN CAMPOS:")
+            for campo in campos_faltantes:
+                print(f"   - {campo}")
+            print(f"{'='*80}\n")
+            logger.warning(f"❌ Empresa {empresa.ruc} - Faltan campos: {', '.join(campos_faltantes)}")
+            return True
+        
+        # ✅ TODO ESTÁ CONFIGURADO - IR AL PANEL
+        print(f"\n{'='*80}")
+        print(f"✅ EMPRESA {empresa.ruc} - TODOS LOS CAMPOS OK - IR AL PANEL")
+        print(f"{'='*80}\n")
+        logger.info(f"✅ Empresa {empresa.ruc} ({opciones.razon_social}) - TODOS LOS CAMPOS OK - IR AL PANEL")
+        return False
+        
+    except Exception as e:
+        logger.error(f"❌ Error verificando empresa {empresa.id}: {e}", exc_info=True)
+        return True
+
+
 #Vistas endogenas.
 
 # =====================
@@ -788,18 +891,22 @@ class Login(View):
                 if empresa and logeado.empresas.filter(id=empresa.id).exists():
                     login(request, logeado)
                     request.session['empresa_activa'] = empresa.id
-                    if Opciones.objects.filter(empresa=empresa).exists():
-                        return HttpResponseRedirect('/inventario/panel')
-                    return redirect('inventario:configuracionGeneral')
+                    # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
+                    if necesita_configuracion(empresa):
+                        messages.warning(request, '⚠️ Complete la configuración de su empresa para facturar electrónicamente')
+                        return redirect('inventario:configuracionGeneral')
+                    return HttpResponseRedirect('/inventario/panel')
                 # Primer inicio con empresa indicada: si el usuario no tiene empresas aún, vincularlo
                 if empresa and logeado.empresas.count() == 0:
                     try:
                         UsuarioEmpresa.objects.get_or_create(usuario=logeado, empresa=empresa)
                         login(request, logeado)
                         request.session['empresa_activa'] = empresa.id
-                        if Opciones.objects.filter(empresa=empresa).exists():
-                            return HttpResponseRedirect('/inventario/panel')
-                        return redirect('inventario:configuracionGeneral')
+                        # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
+                        if necesita_configuracion(empresa):
+                            messages.warning(request, '⚠️ Complete la configuración de su empresa para facturar electrónicamente')
+                            return redirect('inventario:configuracionGeneral')
+                        return HttpResponseRedirect('/inventario/panel')
                     except Exception:
                         pass
 
@@ -810,17 +917,21 @@ class Login(View):
                         if logeado.empresas.filter(id=emp_ruc.id).exists():
                             login(request, logeado)
                             request.session['empresa_activa'] = emp_ruc.id
-                            if Opciones.objects.filter(empresa=emp_ruc).exists():
-                                return HttpResponseRedirect('/inventario/panel')
-                            return redirect('inventario:configuracionGeneral')
+                            # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
+                            if necesita_configuracion(emp_ruc):
+                                messages.warning(request, '⚠️ Complete la configuración de su empresa para facturar electrónicamente')
+                                return redirect('inventario:configuracionGeneral')
+                            return HttpResponseRedirect('/inventario/panel')
                         # Primer inicio: si el usuario no tiene empresas, vincular a esta
                         if logeado.empresas.count() == 0:
                             UsuarioEmpresa.objects.get_or_create(usuario=logeado, empresa=emp_ruc)
                             login(request, logeado)
                             request.session['empresa_activa'] = emp_ruc.id
-                            if Opciones.objects.filter(empresa=emp_ruc).exists():
-                                return HttpResponseRedirect('/inventario/panel')
-                            return redirect('inventario:configuracionGeneral')
+                            # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
+                            if necesita_configuracion(emp_ruc):
+                                messages.warning(request, '⚠️ Complete la configuración de su empresa para facturar electrónicamente')
+                                return redirect('inventario:configuracionGeneral')
+                            return HttpResponseRedirect('/inventario/panel')
                     except Empresa.DoesNotExist:
                         pass
 
@@ -830,9 +941,11 @@ class Login(View):
                     unica = empresas_usuario.first()
                     login(request, logeado)
                     request.session['empresa_activa'] = unica.id
-                    if Opciones.objects.filter(empresa=unica).exists():
-                        return HttpResponseRedirect('/inventario/panel')
-                    return redirect('inventario:configuracionGeneral')
+                    # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
+                    if necesita_configuracion(unica):
+                        messages.warning(request, '⚠️ Complete la configuración de su empresa para facturar electrónicamente')
+                        return redirect('inventario:configuracionGeneral')
+                    return HttpResponseRedirect('/inventario/panel')
                 elif empresas_usuario.count() > 1:
                     login(request, logeado)
                     return HttpResponseRedirect('/inventario/seleccionar_empresa/')
@@ -873,6 +986,10 @@ class SeleccionarEmpresa(LoginRequiredMixin, View):
             return redirect('inventario:configuracionGeneral')
         elif total_empresas == 1:
             request.session['empresa_activa'] = empresas.first().id
+            # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
+            if necesita_configuracion(empresas.first()):
+                messages.warning(request, '⚠️ Complete la configuración de su empresa para facturar electrónicamente')
+                return redirect('inventario:configuracionGeneral')
             return HttpResponseRedirect('/inventario/panel')
         return render(request, 'inventario/seleccionar_empresa.html', {'empresas': empresas})
 
@@ -881,9 +998,11 @@ class SeleccionarEmpresa(LoginRequiredMixin, View):
         if empresa_id and request.user.empresas.filter(id=empresa_id).exists():
             empresa = request.user.empresas.get(id=empresa_id)
             request.session['empresa_activa'] = empresa.id
-            if Opciones.objects.filter(empresa=empresa).exists():
-                return HttpResponseRedirect('/inventario/panel')
-            return redirect('inventario:configuracionGeneral')
+            # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
+            if necesita_configuracion(empresa):
+                messages.warning(request, '⚠️ Complete la configuración de su empresa para facturar electrónicamente')
+                return redirect('inventario:configuracionGeneral')
+            return HttpResponseRedirect('/inventario/panel')
         empresas = request.user.empresas.all()
         contexto = {'empresas': empresas, 'error': 'Seleccione una empresa válida'}
         return render(request, 'inventario/seleccionar_empresa.html', contexto)
@@ -920,8 +1039,15 @@ class Panel(LoginRequiredMixin, View):
         empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             return redirect('inventario:seleccionar_empresa')
-        if not Opciones.objects.filter(empresa_id=empresa_id).exists():
-            return redirect('inventario:configuracionGeneral')
+        
+        # ✅ Obtener la empresa y verificar si necesita configuración completa
+        try:
+            empresa = Empresa.objects.get(id=empresa_id)
+            if necesita_configuracion(empresa):
+                messages.warning(request, '⚠️ Complete la configuración de su empresa antes de usar el panel')
+                return redirect('inventario:configuracionGeneral')
+        except Empresa.DoesNotExist:
+            return redirect('inventario:seleccionar_empresa')
 
         #Recupera los datos del usuario despues del login
         contexto = {
