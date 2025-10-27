@@ -6939,8 +6939,18 @@ def emitir_guia_remision(request):
                     punto_emision = f"{str(punto_emision).zfill(3)}" if punto_emision else "001"
 
                 # Crear la guía con los campos correctos del modelo según XSD SRI
+                # Obtener factura relacionada (si existe)
+                factura_id = request.POST.get('factura_id')
+                factura_obj = None
+                if factura_id:
+                    try:
+                        factura_obj = Factura.objects.get(id=factura_id, empresa=empresa)
+                    except Factura.DoesNotExist:
+                        pass
+                
                 guia = GuiaRemision(
                     empresa=empresa,
+                    factura=factura_obj,  # ✅ Vincular factura si existe
                     establecimiento=establecimiento,
                     punto_emision=punto_emision,
                     fecha_inicio_traslado=request.POST.get('fecha_inicio_traslado'),
@@ -7003,7 +7013,7 @@ def emitir_guia_remision(request):
                 
                 for idx_dest, dest_data in destinatarios.items():
                     if dest_data.get('ruc') and dest_data.get('nombre'):
-                        # Crear destinatario
+                        # Crear destinatario con datos del documento sustento (factura)
                         destinatario_obj = DestinatarioGuia.objects.create(
                             guia=guia,
                             identificacion_destinatario=dest_data.get('ruc', ''),
@@ -7011,7 +7021,12 @@ def emitir_guia_remision(request):
                             dir_destinatario=dest_data.get('direccion', ''),
                             motivo_traslado=dest_data.get('motivo', '01'),
                             doc_aduanero_unico=dest_data.get('documento', ''),
-                            cod_estab_destino=dest_data.get('cod_estab', '001')
+                            cod_estab_destino=dest_data.get('cod_estab', '001'),
+                            # ✅ Campos del documento sustento (factura)
+                            cod_doc_sustento=dest_data.get('cod_doc_sustento', ''),
+                            num_doc_sustento=dest_data.get('num_doc_sustento', ''),
+                            num_aut_doc_sustento=dest_data.get('num_aut_doc_sustento', ''),
+                            fecha_emision_doc_sustento=dest_data.get('fecha_emision_doc_sustento') or None,
                         )
                         
                         # Crear productos del destinatario
@@ -7059,16 +7074,81 @@ def emitir_guia_remision(request):
         secuencias_guia = Secuencia.objects.filter(empresa=empresa, tipo_documento='06', activo=True).order_by('descripcion')
     else:
         secuencias_guia = Secuencia.objects.none()
+    
+    # Obtener facturas autorizadas de la empresa para vincular con guías
+    facturas_autorizadas = Factura.objects.filter(
+        empresa=empresa,
+        estado_sri='AUTORIZADA'
+    ).select_related('cliente').order_by('-fecha_emision')[:100]  # Últimas 100 facturas autorizadas
+    
     context = {
         'fecha_hoy': date.today().isoformat(),
         'configuracion': ConfiguracionGuiaRemision.get_configuracion(),
         'secuencias_guia': secuencias_guia,
+        'facturas_autorizadas': facturas_autorizadas,
     }
     
     # Agregar datos del usuario para el header
     context = complementarContexto(context, request.user)
     
     return render(request, 'inventario/guia_remision/emitirGuiaRemision.html', context)
+
+@login_required
+def obtener_datos_factura(request, factura_id):
+    """Vista AJAX para obtener datos de una factura y sus productos"""
+    empresa_id = request.session.get('empresa_activa')
+    empresa = None
+    if empresa_id:
+        empresa = request.user.empresas.filter(id=empresa_id).first()
+    
+    if not empresa:
+        return JsonResponse({'success': False, 'message': 'Empresa no válida'})
+    
+    try:
+        # Obtener factura con sus detalles
+        factura = Factura.objects.select_related('cliente').get(id=factura_id, empresa=empresa)
+        
+        # Obtener productos de la factura
+        from inventario.models import DetalleFactura
+        detalles = DetalleFactura.objects.filter(factura=factura).select_related('producto', 'servicio')
+        
+        productos = []
+        for detalle in detalles:
+            # Obtener codigo y descripcion desde producto o servicio
+            if detalle.producto:
+                codigo = detalle.producto.codigo
+                descripcion = detalle.producto.descripcion
+            elif detalle.servicio:
+                codigo = detalle.servicio.codigo
+                descripcion = detalle.servicio.descripcion
+            else:
+                codigo = 'SIN_CODIGO'
+                descripcion = 'Sin descripción'
+            
+            productos.append({
+                'codigo': codigo,
+                'descripcion': descripcion,
+                'cantidad': float(detalle.cantidad)
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'factura': {
+                'numero': f"{factura.establecimiento}-{factura.punto_emision}-{factura.secuencia}",
+                'clave_acceso': factura.clave_acceso or '',
+                'fecha_emision': factura.fecha_emision.isoformat(),
+            },
+            'cliente': {
+                'identificacion': factura.identificacion_cliente,
+                'nombre': factura.nombre_cliente,
+                'direccion': factura.cliente.direccion if factura.cliente else 'Sin dirección',
+            },
+            'productos': productos
+        })
+    except Factura.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Factura no encontrada'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)})
 
 @login_required
 def ver_guia_remision(request, guia_id):

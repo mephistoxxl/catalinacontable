@@ -267,10 +267,21 @@ class XMLGeneratorGuiaRemision:
                     ruta = etree.SubElement(destinatario, "ruta")
                     ruta.text = dest.ruta[:300]
                 
-                # Documento sustento (opcional)
-                if dest.cod_doc_sustento:
-                    doc_sustento = etree.SubElement(destinatario, "docAduaneroUnico")
-                    doc_sustento.text = dest.cod_doc_sustento[:2]
+                # ✅ Documento sustento (factura) - NUEVO según XSD SRI
+                if dest.cod_doc_sustento and dest.num_doc_sustento:
+                    cod_doc_sust = etree.SubElement(destinatario, "codDocSustento")
+                    cod_doc_sust.text = dest.cod_doc_sustento[:2]
+                    
+                    num_doc_sust = etree.SubElement(destinatario, "numDocSustento")
+                    num_doc_sust.text = dest.num_doc_sustento[:17]
+                    
+                    if dest.num_aut_doc_sustento:
+                        num_aut_doc_sust = etree.SubElement(destinatario, "numAutDocSustento")
+                        num_aut_doc_sust.text = dest.num_aut_doc_sustento[:49]
+                    
+                    if dest.fecha_emision_doc_sustento:
+                        fecha_emision_doc_sust = etree.SubElement(destinatario, "fechaEmisionDocSustento")
+                        fecha_emision_doc_sust.text = dest.fecha_emision_doc_sustento.strftime("%d/%m/%Y")
                 
                 # Detalles (productos/servicios transportados)
                 detalles = etree.SubElement(destinatario, "detalles")

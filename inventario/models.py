@@ -4013,6 +4013,16 @@ class GuiaRemision(models.Model):
         related_name='guias_remision',
     )
     
+    # Relación con Factura (cuando el traslado es por venta)
+    factura = models.ForeignKey(
+        'Factura',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='guias_remision',
+        help_text='Factura asociada (obligatorio cuando motivo es venta)'
+    )
+    
     # Numeración
     establecimiento = models.CharField(max_length=3, default='001')
     punto_emision = models.CharField(max_length=3, default='001')

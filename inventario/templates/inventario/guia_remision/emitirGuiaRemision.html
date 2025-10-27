@@ -301,6 +301,44 @@
         </div>
       </div>
 
+      <!-- Factura Relacionada (NUEVO) -->
+      <div class="form-section">
+        <div class="section-title">
+          <i class="fas fa-file-invoice"></i> Factura Relacionada (Opcional - Solo para traslados por venta)
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Seleccionar Factura Autorizada</label>
+            <select id="factura_id" name="factura_id" class="form-control" onchange="cargarDatosFactura()">
+              <option value="">Sin factura (traslado sin venta)</option>
+              {% for factura in facturas_autorizadas %}
+                <option value="{{ factura.id }}" 
+                        data-cliente-id="{{ factura.cliente.identificacion }}"
+                        data-cliente-nombre="{{ factura.cliente.razon_social }}"
+                        data-cliente-direccion="{{ factura.cliente.direccion }}"
+                        data-numero="{{ factura.establecimiento }}-{{ factura.punto_emision }}-{{ factura.secuencia }}"
+                        data-clave="{{ factura.clave_acceso }}"
+                        data-fecha="{{ factura.fecha_emision|date:'Y-m-d' }}">
+                  {{ factura.establecimiento }}-{{ factura.punto_emision }}-{{ factura.secuencia }} | {{ factura.cliente.razon_social }} | ${{ factura.monto_general }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Número Factura</label>
+            <input type="text" id="factura_numero" readonly class="form-control" placeholder="Se carga automáticamente">
+          </div>
+          <div class="form-group">
+            <label>Clave Acceso Factura</label>
+            <input type="text" id="factura_clave" readonly class="form-control" placeholder="Se carga automáticamente">
+          </div>
+        </div>
+        <div class="alert alert-info" style="font-size: 10px; padding: 4px 8px; margin-top: 4px; background: #dbeafe; border: 1px solid #93c5fd; border-radius: 2px;">
+          <i class="fas fa-info-circle"></i> 
+          <strong>¿Cuándo seleccionar factura?</strong> Solo cuando el motivo del traslado sea VENTA (código 01). Los datos del destinatario y productos se cargarán automáticamente desde la factura.
+        </div>
+      </div>
+
       <!-- Transportista y Transporte -->
       <div class="form-section">
         <div class="section-title">
@@ -437,7 +475,109 @@
 </div>
 
 <script>
+// Función para cargar datos desde una factura seleccionada
+function cargarDatosFactura() {
+  const selectFactura = document.getElementById('factura_id');
+  const facturaNumero = document.getElementById('factura_numero');
+  const facturaClave = document.getElementById('factura_clave');
+  
+  if (!selectFactura.value) {
+    // No hay factura seleccionada, limpiar campos
+    facturaNumero.value = '';
+    facturaClave.value = '';
+    return;
+  }
+  
+  const option = selectFactura.options[selectFactura.selectedIndex];
+  const facturaId = selectFactura.value;
+  const numero = option.getAttribute('data-numero');
+  const clave = option.getAttribute('data-clave');
+  const clienteId = option.getAttribute('data-cliente-id');
+  const clienteNombre = option.getAttribute('data-cliente-nombre');
+  const clienteDireccion = option.getAttribute('data-cliente-direccion');
+  const fecha = option.getAttribute('data-fecha');
+  
+  // Actualizar campos de factura
+  facturaNumero.value = numero;
+  facturaClave.value = clave;
+  
+  // Ahora buscar los productos de la factura via AJAX
+  fetch(`/inventario/obtener_datos_factura/${facturaId}/`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        console.log('Datos de factura:', data);
+        
+        // Limpiar destinatarios existentes
+        const tbody = document.getElementById('tabla-destinatarios');
+        tbody.innerHTML = '';
+        contadorDestinatarios = 0;
+        
+        // Crear UN destinatario automáticamente con los datos del cliente
+        agregarDestinatario();
+        
+        // Llenar los datos del cliente en el primer destinatario
+        const primerDestinatario = tbody.querySelector('tr[data-destinatario-id="1"]');
+        if (primerDestinatario) {
+          primerDestinatario.querySelector('input[name="destinatarios[1][ruc]"]').value = clienteId;
+          primerDestinatario.querySelector('input[name="destinatarios[1][nombre]"]').value = clienteNombre;
+          primerDestinatario.querySelector('input[name="destinatarios[1][direccion]"]').value = clienteDireccion;
+          primerDestinatario.querySelector('select[name="destinatarios[1][motivo]"]').value = '01'; // Venta
+          
+          // Llenar documento sustento (factura)
+          primerDestinatario.querySelector('input[name="destinatarios[1][cod_doc_sustento]"]').value = '01'; // Factura
+          primerDestinatario.querySelector('input[name="destinatarios[1][num_doc_sustento]"]').value = numero;
+          primerDestinatario.querySelector('input[name="destinatarios[1][num_aut_doc_sustento]"]').value = clave;
+          primerDestinatario.querySelector('input[name="destinatarios[1][fecha_emision_doc_sustento]"]').value = fecha;
+          
+          // Agregar productos de la factura
+          if (data.productos && data.productos.length > 0) {
+            const tablaProductos = primerDestinatario.querySelector(`#tabla-productos-1 tbody`);
+            tablaProductos.innerHTML = ''; // Limpiar
+            
+            data.productos.forEach((prod, idx) => {
+              const rowProd = document.createElement('tr');
+              rowProd.innerHTML = `
+                <td><input type="text" name="destinatarios[1][productos][${idx}][codigo]" value="${prod.codigo}" class="form-control" style="font-size: 10px;" required></td>
+                <td><input type="text" name="destinatarios[1][productos][${idx}][descripcion]" value="${prod.descripcion}" class="form-control" style="font-size: 10px;" required></td>
+                <td><input type="number" name="destinatarios[1][productos][${idx}][cantidad]" value="${prod.cantidad}" step="0.01" class="form-control" style="font-size: 10px;" required></td>
+                <td>
+                  <button type="button" class="btn btn-danger" onclick="eliminarProducto(this)" style="padding: 2px 4px; height: 20px; font-size: 9px;">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </td>
+              `;
+              tablaProductos.appendChild(rowProd);
+            });
+            
+            alert(`✅ Datos cargados desde factura ${numero}:\n- Cliente: ${clienteNombre}\n- ${data.productos.length} producto(s) cargado(s)`);
+          }
+        }
+      } else {
+        alert('Error al cargar datos de factura: ' + data.message);
+      }
+    })
+    .catch(err => {
+      console.error('Error:', err);
+      alert('Error al cargar datos de factura: ' + err.message);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+  // Verificar si viene factura_id en la URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const facturaIdParam = urlParams.get('factura_id');
+  
+  if (facturaIdParam) {
+    // Seleccionar la factura automáticamente
+    const selectFactura = document.getElementById('factura_id');
+    if (selectFactura) {
+      selectFactura.value = facturaIdParam;
+      // Cargar datos automáticamente
+      cargarDatosFactura();
+    }
+  }
+  
   const selectSec = document.getElementById('secuencia_guia');
   const est = document.getElementById('establecimiento');
   const pemi = document.getElementById('punto_emision');
@@ -551,6 +691,12 @@ function agregarDestinatario() {
             <input type="text" name="destinatarios[${contadorDestinatarios}][cod_estab]" class="form-control" placeholder="001" maxlength="3" value="001" style="font-size: 10px;">
           </div>
         </div>
+        
+        <!-- Campos ocultos para documento sustento (factura) -->
+        <input type="hidden" name="destinatarios[${contadorDestinatarios}][cod_doc_sustento]" value="">
+        <input type="hidden" name="destinatarios[${contadorDestinatarios}][num_doc_sustento]" value="">
+        <input type="hidden" name="destinatarios[${contadorDestinatarios}][num_aut_doc_sustento]" value="">
+        <input type="hidden" name="destinatarios[${contadorDestinatarios}][fecha_emision_doc_sustento]" value="">
         
         <!-- Tabla de productos del destinatario -->
         <div style="margin-top: 6px; border-top: 1px solid #e5e7eb; padding-top: 6px;">

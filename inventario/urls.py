@@ -160,6 +160,7 @@ urlpatterns = [
     # Guías de Remisión
     path('guias-remision/', views.listar_guias_remision, name='listar_guias_remision'),
     path('guias-remision/emitir/', views.emitir_guia_remision, name='emitir_guia_remision'),
+    path('obtener_datos_factura/<int:factura_id>/', views.obtener_datos_factura, name='obtener_datos_factura'),
     path('guias-remision/<int:guia_id>/', views.ver_guia_remision, name='ver_guia_remision'),
     path('guias-remision/<int:guia_id>/editar/', views.editar_guia_remision, name='editar_guia_remision'),
     path('guias-remision/<int:guia_id>/anular/', views.anular_guia_remision, name='anular_guia_remision'),
