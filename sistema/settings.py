@@ -207,13 +207,35 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 # (DEBUG ya está arriba)
 
+# ✅ ALLOWED_HOSTS - Dominios permitidos
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',') if os.environ.get('ALLOWED_HOSTS') else []
+# Agregar dominios personalizados
+ALLOWED_HOSTS.extend([
+    'catalinasoft-ec.com',
+    'www.catalinasoft-ec.com',
+    'localhost',
+    '127.0.0.1',
+])
+# Remover duplicados y vacíos
+ALLOWED_HOSTS = [h.strip() for h in ALLOWED_HOSTS if h.strip()]
 
 # Configuración CORS
 CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if os.environ.get('CORS_ALLOWED_ORIGINS') else []
+# Agregar orígenes CORS para los dominios personalizados
+CORS_ALLOWED_ORIGINS.extend([
+    'https://catalinasoft-ec.com',
+    'https://www.catalinasoft-ec.com',
+])
+CORS_ALLOWED_ORIGINS = [o.strip() for o in CORS_ALLOWED_ORIGINS if o.strip()]
 
 # Seguridad adicional
 CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if os.environ.get('CSRF_TRUSTED_ORIGINS') else []
+# Agregar orígenes confiables para CSRF
+CSRF_TRUSTED_ORIGINS.extend([
+    'https://catalinasoft-ec.com',
+    'https://www.catalinasoft-ec.com',
+])
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in CSRF_TRUSTED_ORIGINS if o.strip()]
 SECURE_REFERRER_POLICY = os.environ.get('SECURE_REFERRER_POLICY', 'same-origin')
 SECURE_CONTENT_TYPE_NOSNIFF = os.environ.get('SECURE_CONTENT_TYPE_NOSNIFF', 'True') == 'True'
 SECURE_BROWSER_XSS_FILTER = os.environ.get('SECURE_BROWSER_XSS_FILTER', 'True') == 'True'
