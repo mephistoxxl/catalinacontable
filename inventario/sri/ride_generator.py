@@ -619,9 +619,14 @@ class RIDEGenerator:
                     ])
                     print(f"  • {forma_descripcion}: {valor}")
             else:
-                # 🚫 NO MAS DEFAULTS - Solo usar pagos registrados
-                print("❌ RIDE: No se encontraron formas de pago registradas")
-                raise ValueError("RIDE requiere formas de pago registradas - verifique que la factura tenga pagos válidos")
+                # ✅ Usar valor por defecto: SIN UTILIZACIÓN DEL SISTEMA FINANCIERO
+                print("⚠️ RIDE: No se encontraron formas de pago, usando valor por defecto")
+                pago_data.append([
+                    Paragraph('SIN UTILIZACIÓN DEL SISTEMA FINANCIERO', self.styles['Campo']),
+                    Paragraph(f"${factura.total:.2f}", self.styles['Campo']),
+                    Paragraph('0', self.styles['Campo']),
+                    Paragraph('días', self.styles['Campo'])
+                ])
             # Ejemplo para la tabla de pagos
             tabla_pago = Table(pago_data, colWidths=[
                 ancho_tabla*0.46, ancho_tabla*0.18, ancho_tabla*0.13, ancho_tabla*0.23
