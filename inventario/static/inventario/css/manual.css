@@ -113,37 +113,37 @@ code {
 }
 
 #inicio-header {
-    background: white url(../imagenes/inicio/header.png) left no-repeat;
+    background: white; /* url(../imagenes/inicio/header.png) left no-repeat; */
     background-size: 300px;
 }
 
 #poo-header {
-    background: white url(../imagenes/poo/header.jpg) left no-repeat;
+    background: white; /* url(../imagenes/poo/header.jpg) left no-repeat; */
     background-size: 350px;
 }
 
 #html5-header {
-    background: white url(../imagenes/html5/header.gif) left no-repeat;
+    background: white; /* url(../imagenes/html5/header.gif) left no-repeat; */
     background-size: 220px;
 }
 
 #css3-header {
-    background: white url(../imagenes/css3/header.png) left no-repeat;
+    background: white; /* url(../imagenes/css3/header.png) left no-repeat; */
     background-size: 200px;
 }
 
 #js-header {
-    background: white url(../imagenes/js/header.png) left no-repeat;
+    background: white; /* url(../imagenes/js/header.png) left no-repeat; */
     background-size: 200px;
 }
 
 #php-header {
-    background: white url(../imagenes/php/header.png) left no-repeat;
+    background: white; /* url(../imagenes/php/header.png) left no-repeat; */
     background-size: 300px;
 }
 
 #autor-header {
-    background: #6dbec5 url(../imagenes/autores/header.jpg) left no-repeat;
+    background: #6dbec5; /* url(../imagenes/autores/header.jpg) left no-repeat; */
     background-size: 500px;
 }
 
