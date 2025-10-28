@@ -436,7 +436,7 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'emailapikey')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'wSsVR60jrkKlBqt9yjaqJOo8mAhXAlilE0R73lWi7H7/S6zEocdulkWaVwfzHKcfF2VoRztGpLkumUsJ1DcNjYl4zF9WDSiF9mqRe1U4J3x17qnvhDzPWWhdlBqKJY0IwwxrnWhkFMwr+g==')
 
 # Asegurar remitente por defecto acorde a Zeptomail
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@catalinasoft-ec.com')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noresponder@catalinasoft-ec.com')
 SERVER_EMAIL = os.environ.get('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
 
 # Configuración global de Django REST Framework
