@@ -899,11 +899,48 @@ Saludos cordiales,
             email.attach_alternative(html_content, "text/html")
 
             # Adjuntar RIDE PDF
+            ride_attached = False
             try:
-                with default_storage.open(factura.ride_autorizado.name, 'rb') as ride_file:
-                    email.attach(f"RIDE_{numero_factura}.pdf", ride_file.read(), 'application/pdf')
+                # Intentar primero con el campo ride_autorizado si existe
+                if hasattr(factura, 'ride_autorizado') and factura.ride_autorizado:
+                    ride_path = factura.ride_autorizado.name
+                    logger.info(f"Leyendo RIDE desde factura.ride_autorizado: {ride_path}")
+                    with default_storage.open(ride_path, 'rb') as ride_file:
+                        pdf_content = ride_file.read()
+                        email.attach(f"RIDE_{numero_factura}.pdf", pdf_content, 'application/pdf')
+                        logger.info(f"✅ RIDE adjuntado: {len(pdf_content)} bytes")
+                        ride_attached = True
             except Exception as e:
-                logger.error(f"Error adjuntando RIDE: {e}")
+                logger.warning(f"No se pudo adjuntar RIDE desde factura.ride_autorizado: {e}")
+            
+            # Si no se pudo adjuntar, intentar generar y adjuntar directamente
+            if not ride_attached:
+                try:
+                    logger.info("Generando RIDE directamente para adjuntar al email...")
+                    from ..sri.ride_generator import RIDEGenerator
+                    from ..utils.media_paths import build_factura_media_paths
+                    
+                    ride_gen = RIDEGenerator()
+                    media_paths = build_factura_media_paths(factura)
+                    
+                    # Generar RIDE en memoria
+                    detalles = factura.detallefactura_set.all()
+                    pdf_bytes = ride_gen.generar_ride_factura(
+                        factura,
+                        detalles,
+                        opciones,
+                        f"{media_paths.pdf_dir}/RIDE_{numero_factura}.pdf",
+                        clave_acceso=factura.clave_acceso,
+                    )
+                    
+                    email.attach(f"RIDE_{numero_factura}.pdf", pdf_bytes, 'application/pdf')
+                    logger.info(f"✅ RIDE generado y adjuntado directamente: {len(pdf_bytes)} bytes")
+                    ride_attached = True
+                except Exception as e:
+                    logger.error(f"❌ Error generando RIDE para adjuntar: {e}")
+
+            if not ride_attached:
+                logger.warning("⚠️ No se pudo adjuntar el RIDE PDF al email")
 
             # Adjuntar XML autorizado
             if factura.xml_autorizado:
