@@ -127,6 +127,10 @@ else:
     }
     print("⚠️ Usando almacenamiento local - Los archivos se pueden perder en Heroku")
 
+# ✅ Configuración de WhiteNoise - No fallar por archivos faltantes en CSS
+WHITENOISE_MANIFEST_STRICT = False
+WHITENOISE_ALLOW_ALL_ORIGINS = True
+
 # Directorio separado y seguro para certificados de firma electrónica
 FIRMAS_ROOT = os.environ.get('FIRMAS_ROOT', os.path.join(BASE_DIR, 'firmas_secure'))
 FIRMAS_STORAGE_PREFIX = os.environ.get('FIRMAS_STORAGE_PREFIX', 'firmas_secure').strip('/')
