@@ -26,13 +26,29 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
         raise ValueError("Factura no está autorizada; no se debe enviar correo todavía")
 
     # Verificar que los archivos existan (compatibilidad con S3 y filesystem local)
-    xml_exists = default_storage.exists(xml_path) if not os.path.isabs(xml_path) else os.path.exists(xml_path)
-    ride_exists = default_storage.exists(ride_path) if not os.path.isabs(ride_path) else os.path.exists(ride_path)
+    # Para S3, la ruta puede tener sufijos aleatorios, así que solo verificamos si podemos abrirlo
+    xml_exists = False
+    try:
+        if os.path.isabs(xml_path):
+            xml_exists = os.path.exists(xml_path)
+        else:
+            xml_exists = default_storage.exists(xml_path)
+    except Exception:
+        pass
+    
+    ride_exists = False
+    try:
+        if os.path.isabs(ride_path):
+            ride_exists = os.path.exists(ride_path)
+        else:
+            ride_exists = default_storage.exists(ride_path)
+    except Exception:
+        pass
     
     if not xml_exists:
-        raise FileNotFoundError(f"XML no encontrado: {xml_path}")
+        logger.warning(f"XML no encontrado en: {xml_path}, intentando leer directamente...")
     if not ride_exists:
-        raise FileNotFoundError(f"RIDE no encontrado: {ride_path}")
+        logger.warning(f"RIDE no encontrado en: {ride_path}, intentando leer directamente...")
 
     # Determinar correo cliente
     correo_cliente = getattr(factura.cliente, 'correo', None)
