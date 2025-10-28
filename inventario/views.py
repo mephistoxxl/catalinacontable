@@ -13,6 +13,7 @@ from django.http import (
     HttpResponseNotAllowed,
 )
 from urllib3 import request
+from io import BytesIO  # Para manejar datos binarios en memoria (PDFs, etc.)
 #el formulario de login
 from .forms import *
 # clase para crear vistas basadas en sub-clases

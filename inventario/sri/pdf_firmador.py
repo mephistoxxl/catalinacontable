@@ -4,17 +4,7 @@ import logging
 import os
 import datetime
 from pathlib import Path
-from cryptography.hazmat.primitives.serialization import pkcs12
-from inventario.models import Opciones
-
-logger = logging.getLogger(__name__)
-
-# inventario/sri/pdf_firmador.py
-
-import logging
-import os
-import datetime
-from pathlib import Path
+from io import BytesIO  # Para manejar datos binarios en memoria
 from cryptography.hazmat.primitives.serialization import pkcs12
 from inventario.models import Opciones
 

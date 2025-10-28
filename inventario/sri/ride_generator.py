@@ -198,7 +198,7 @@ class RIDEGenerator:
             if hasattr(opciones, 'imagen') and opciones.imagen:
                 try:
                     from reportlab.lib.utils import ImageReader
-                    from io import BytesIO
+                    # BytesIO ya está importado al inicio del archivo
                     
                     # Intentar leer desde storage (funciona con filesystem y S3)
                     with opciones.imagen.open('rb') as logo_file:
