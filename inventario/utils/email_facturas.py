@@ -79,37 +79,44 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
     
     # Leer y adjuntar archivos (compatible con S3 y filesystem local)
     try:
+        logger.info(f"Intentando adjuntar XML desde: {xml_path}")
         if os.path.isabs(xml_path) and os.path.exists(xml_path):
             # Filesystem local
+            logger.info(f"Leyendo XML desde filesystem local")
             with open(xml_path, 'rb') as f:
                 xml_content = f.read()
         else:
             # S3 o storage backend
+            logger.info(f"Leyendo XML desde storage (S3)")
             with default_storage.open(xml_path, 'rb') as f:
                 xml_content = f.read()
         
         email.attach(os.path.basename(xml_path), xml_content, 'application/xml')
-        logger.info(f"XML adjuntado: {os.path.basename(xml_path)} ({len(xml_content)} bytes)")
+        logger.info(f"✅ XML adjuntado exitosamente: {os.path.basename(xml_path)} ({len(xml_content)} bytes)")
     except Exception as e:
-        logger.error(f"Error adjuntando XML: {e}")
+        logger.error(f"❌ Error adjuntando XML: {e}")
         raise
     
     try:
+        logger.info(f"Intentando adjuntar PDF desde: {ride_path}")
         if os.path.isabs(ride_path) and os.path.exists(ride_path):
             # Filesystem local
+            logger.info(f"Leyendo PDF desde filesystem local")
             with open(ride_path, 'rb') as f:
                 pdf_content = f.read()
         else:
             # S3 o storage backend
+            logger.info(f"Leyendo PDF desde storage (S3)")
             with default_storage.open(ride_path, 'rb') as f:
                 pdf_content = f.read()
         
         email.attach(os.path.basename(ride_path), pdf_content, 'application/pdf')
-        logger.info(f"PDF adjuntado: {os.path.basename(ride_path)} ({len(pdf_content)} bytes)")
+        logger.info(f"✅ PDF adjuntado exitosamente: {os.path.basename(ride_path)} ({len(pdf_content)} bytes)")
     except Exception as e:
-        logger.error(f"Error adjuntando PDF: {e}")
+        logger.error(f"❌ Error adjuntando PDF: {e}")
         raise
 
+    logger.info(f"📧 Enviando email con {len(email.attachments)} adjuntos...")
     email.send(fail_silently=False)
-    logger.info(f"Correo de factura {factura.id} enviado a {correo_cliente} (cc={cc_list})")
+    logger.info(f"✅ Correo de factura {factura.id} enviado exitosamente a {correo_cliente} (cc={cc_list})")
     return True
