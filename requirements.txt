@@ -55,11 +55,8 @@ django-storages==1.14.4
 boto3==1.34.162
 
 # ============================================
-# DEPENDENCIAS FALTANTES - AGREGADAS 
+# DEPENDENCIAS ADICIONALES
 # ============================================
-
-# Django Anymail - Para envío de emails ⚠️ FALTABA (ERROR EN HEROKU)
-django-anymail[mailgun]>=12.0
 
 # PyOpenSSL - Manejo de certificados P12 firma electrónica
 pyOpenSSL>=24.0.0

@@ -78,7 +78,15 @@ if USE_REMOTE_MEDIA_STORAGE:
     if aws_location and not MEDIA_STORAGE_PREFIX:
         MEDIA_STORAGE_PREFIX = aws_location
 
-    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    # ✅ Django 5.1+ usa STORAGES en lugar de DEFAULT_FILE_STORAGE
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
 
     def _normalize_base_url(value: str) -> str:
         value = value.strip()
@@ -107,6 +115,17 @@ if USE_REMOTE_MEDIA_STORAGE:
             MEDIA_URL = f"{base_url}/"
 
     MEDIA_ROOT = ''
+else:
+    # ✅ Almacenamiento local (desarrollo o sin S3)
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+    print("⚠️ Usando almacenamiento local - Los archivos se pueden perder en Heroku")
 
 # Directorio separado y seguro para certificados de firma electrónica
 FIRMAS_ROOT = os.environ.get('FIRMAS_ROOT', os.path.join(BASE_DIR, 'firmas_secure'))
