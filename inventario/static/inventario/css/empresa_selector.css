@@ -1,0 +1,108 @@
+/* Custom Empresa Selector Styles */
+.custom-empresa-select {
+    background-image: 
+        linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.08) 50%, rgba(4, 120, 87, 0.08) 100%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath fill='%2310b981' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat, no-repeat;
+    background-position: center, right 0.75rem center;
+    background-size: auto, 1.25rem;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding-right: 2.5rem;
+    position: relative;
+}
+
+.custom-empresa-select:hover {
+    background-image: 
+        linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.12) 50%, rgba(4, 120, 87, 0.12) 100%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath fill='%23059669' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'/%3E%3C/svg%3E");
+    transform: translateY(-1px);
+}
+
+.custom-empresa-select:focus {
+    background-image: 
+        linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 50%, rgba(4, 120, 87, 0.15) 100%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath fill='%23059669' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'/%3E%3C/svg%3E");
+    outline: none;
+}
+
+.custom-empresa-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-image: 
+        linear-gradient(135deg, rgba(156, 163, 175, 0.1) 0%, rgba(209, 213, 219, 0.1) 100%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath fill='%239ca3af' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'/%3E%3C/svg%3E");
+}
+
+/* Animation for dropdown opening */
+@keyframes dropdown-slide {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.custom-empresa-select option {
+    padding: 12px 16px;
+    background-color: white;
+    color: #1f2937;
+    font-weight: 500;
+    font-size: 14px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.custom-empresa-select option:hover,
+.custom-empresa-select option:focus {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    font-weight: 600;
+}
+
+.custom-empresa-select option:checked {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    color: white;
+    font-weight: 600;
+}
+
+/* Loading state */
+.custom-empresa-select.loading {
+    background-image: 
+        linear-gradient(135deg, rgba(147, 51, 234, 0.1) 0%, rgba(219, 39, 119, 0.1) 50%, rgba(59, 130, 246, 0.1) 100%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='8' fill='none' stroke='%239333ea' stroke-width='2' stroke-dasharray='50' stroke-dashoffset='0'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0 10 10' to='360 10 10' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/svg%3E");
+    cursor: wait;
+}
+
+/* Wrapper for additional styling */
+.empresa-selector-wrapper {
+    position: relative;
+}
+
+/* Success state */
+.custom-empresa-select.success {
+    border-color: #10b981;
+    background-color: rgba(16, 185, 129, 0.05);
+}
+
+/* Pulse animation for loading */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.custom-empresa-select.loading {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Smooth transition for all states */
+.custom-empresa-select {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}

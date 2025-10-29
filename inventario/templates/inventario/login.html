@@ -7,6 +7,7 @@
     <title>Sistema de inventario - Iniciar sesión</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'inventario/css/empresa_selector.css' %}">
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-sm">
@@ -76,10 +77,12 @@
                 <!-- Empresa Field -->
                 <div>
                     <label for="{{ form.empresa.id_for_label }}" class="block text-xs font-medium text-gray-700 mb-1">
-                        <i class="fas fa-building mr-1 text-gray-500"></i>
+                        <i class="fas fa-building mr-1 text-green-600"></i>
                         {{ form.empresa.label }}
                     </label>
-                    {{ form.empresa }}
+                    <div class="empresa-selector-wrapper">
+                        {{ form.empresa }}
+                    </div>
                     {% if form.empresa.errors %}
                     <ul class="text-xs text-red-600 mt-1 list-disc list-inside">
                         {% for error in form.empresa.errors %}
@@ -183,25 +186,12 @@
                                 empresaSelect.appendChild(option);
                             });
 
+                            // Habilitar selector siempre, incluso con una sola empresa
+                            empresaSelect.disabled = data.empresas.length === 0;
+                            
+                            // Si solo hay una empresa, pre-seleccionarla pero dejar habilitado
                             if (data.empresas.length === 1) {
-                                empresaSelect.disabled = true;
                                 empresaSelect.options[0].selected = true;
-
-                                let hiddenInput = document.getElementById('empresa_hidden');
-                                if (!hiddenInput) {
-                                    hiddenInput = document.createElement('input');
-                                    hiddenInput.type = 'hidden';
-                                    hiddenInput.name = empresaSelect.name;
-                                    hiddenInput.id = 'empresa_hidden';
-                                    empresaSelect.form.appendChild(hiddenInput);
-                                }
-                                hiddenInput.value = data.empresas[0].id;
-                            } else {
-                                empresaSelect.disabled = data.empresas.length === 0;
-                                const hiddenInput = document.getElementById('empresa_hidden');
-                                if (hiddenInput) {
-                                    hiddenInput.remove();
-                                }
                             }
                         })
                         .catch(error => {
@@ -233,5 +223,8 @@
             }
         });
     </script>
+    
+    <!-- Empresa Selector Enhanced Script -->
+    <script src="{% static 'inventario/js/empresa_selector.js' %}"></script>
 </body>
 </html>

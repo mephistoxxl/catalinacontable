@@ -36,7 +36,10 @@ class LoginFormulario(forms.Form):
         label="Empresa",
         queryset=Empresa.objects.none(),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-control underlined', 'id': 'empresa'})
+        widget=forms.Select(attrs={
+            'class': 'custom-empresa-select w-full px-4 py-3 border-2 border-gray-300 bg-gradient-to-r from-green-50 via-emerald-50 to-teal-50 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 text-sm font-semibold text-gray-700 hover:border-green-400 cursor-pointer shadow-sm hover:shadow-md',
+            'id': 'empresa'
+        })
     )
 
     def __init__(self, *args, **kwargs):
