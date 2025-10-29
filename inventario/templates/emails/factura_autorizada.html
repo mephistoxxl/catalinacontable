@@ -8,13 +8,15 @@
 <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0;">
     <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
         
-        <!-- Header -->
-        <div style="background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); padding: 30px; text-align: center; color: white;">
+        <!-- Header BLANCO con logo destacado -->
+        <div style="background: #ffffff; padding: 40px 30px; text-align: center; border-bottom: 4px solid #10b981;">
             {% if logo_url %}
-            <img src="{{ logo_url }}" style="max-width: 200px; height: auto; margin-bottom: 15px;">
+            <img src="{{ logo_url }}" style="max-width: 180px; height: auto; margin-bottom: 20px;">
+            {% else %}
+            <img src="cid:logo-catalina" alt="CATALINA" style="max-width: 180px; height: auto; margin-bottom: 20px;">
             {% endif %}
-            <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: 2px; color: white;">CATALINA</h1>
-            <p style="margin: 5px 0 0 0; font-size: 14px; letter-spacing: 1px; color: white;">Factura Electrónica Autorizada</p>
+            <h1 style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: 2px; color: #1f2937;">CATALINA</h1>
+            <p style="margin: 10px 0 0 0; font-size: 16px; letter-spacing: 0.5px; color: #10b981; font-weight: 600;">Factura Electrónica Autorizada</p>
         </div>
 
         <!-- Content -->
@@ -53,10 +55,10 @@
                 <div style="font-family: 'Courier New', monospace; font-size: 12px; color: #333; word-break: break-all;">{{ clave_acceso }}</div>
             </div>
 
-            <!-- Total -->
-            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 4px; margin: 20px 0; text-align: center;">
-                <div style="font-size: 16px; font-weight: 600; color: #333; margin-bottom: 10px;">Total Incl. Impuesto:</div>
-                <div style="font-size: 32px; font-weight: 700; color: #2c3e50;">${{ total }}</div>
+            <!-- Total en VERDE -->
+            <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); padding: 25px; border-radius: 8px; margin: 20px 0; text-align: center; border: 2px solid #10b981;">
+                <div style="font-size: 16px; font-weight: 600; color: #047857; margin-bottom: 10px;">💰 Total Incl. Impuesto:</div>
+                <div style="font-size: 36px; font-weight: 700; color: #10b981;">${{ total }}</div>
             </div>
 
             <!-- Attachments -->
@@ -71,13 +73,15 @@
             </div>
         </div>
 
-        <!-- Footer -->
-        <div style="background-color: #2c3e50; color: white; padding: 25px; text-align: center; font-size: 12px;">
+        <!-- Footer VERDE -->
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; font-size: 12px;">
             {% if logo_url %}
             <img src="{{ logo_url }}" style="max-width: 150px; margin-bottom: 15px; filter: brightness(0) invert(1);">
+            {% else %}
+            <img src="cid:logo-catalina" alt="CATALINA" style="max-width: 150px; margin-bottom: 15px; filter: brightness(0) invert(1);">
             {% endif %}
 
-            <p style="margin: 15px 0 5px 0; color: white;">© {{ year }} <strong>CATALINA FACT</strong> - Todos los derechos reservados</p>
+            <p style="margin: 15px 0 5px 0; color: white; font-weight: 600;">© {{ year }} <strong>CATALINA FACT</strong> - Todos los derechos reservados</p>
             <p style="margin: 5px 0; color: white;">Santo Domingo - Ecuador</p>
         </div>
     </div>

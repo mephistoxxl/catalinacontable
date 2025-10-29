@@ -185,22 +185,36 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
     
     # Adjuntar logo embebido para que se vea en el email
     try:
-        logo_path = 'inventario/assets/logo/logo2.png'
-        logger.info(f"Intentando adjuntar logo embebido desde: {logo_path}")
+        # Probar varias rutas posibles del logo
+        logo_paths = [
+            'static/inventario/assets/logo/logo2.png',
+            'inventario/static/inventario/assets/logo/logo2.png',
+            'inventario/assets/logo/logo2.png',
+        ]
         
-        if default_storage.exists(logo_path):
-            with default_storage.open(logo_path, 'rb') as logo_file:
-                from email.mime.image import MIMEImage
-                logo_data = logo_file.read()
-                logo_img = MIMEImage(logo_data)
-                logo_img.add_header('Content-ID', '<logo-catalina>')
-                logo_img.add_header('Content-Disposition', 'inline', filename='logo.png')
-                email.attach(logo_img)
-                logger.info("✅ Logo embebido adjuntado correctamente")
-        else:
-            logger.warning(f"Logo no encontrado en storage: {logo_path}")
+        logo_attached = False
+        for logo_path in logo_paths:
+            try:
+                logger.info(f"Intentando adjuntar logo desde: {logo_path}")
+                if default_storage.exists(logo_path):
+                    with default_storage.open(logo_path, 'rb') as logo_file:
+                        from email.mime.image import MIMEImage
+                        logo_data = logo_file.read()
+                        logo_img = MIMEImage(logo_data)
+                        logo_img.add_header('Content-ID', '<logo-catalina>')
+                        logo_img.add_header('Content-Disposition', 'inline', filename='logo.png')
+                        email.attach(logo_img)
+                        logger.info(f"✅ Logo embebido adjuntado correctamente desde: {logo_path}")
+                        logo_attached = True
+                        break
+            except Exception as e:
+                logger.debug(f"No se encontró logo en {logo_path}: {e}")
+                continue
+        
+        if not logo_attached:
+            logger.warning("⚠️ No se pudo adjuntar el logo desde ninguna ruta")
     except Exception as e:
-        logger.warning(f"No se pudo adjuntar logo embebido: {e}")
+        logger.warning(f"Error general adjuntando logo embebido: {e}")
     
     # Leer y adjuntar archivos (compatible con S3 y filesystem local)
     try:

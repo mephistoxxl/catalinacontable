@@ -2,47 +2,94 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Factura autorizada</title>
-  <style>
-    body { font-family: Arial, sans-serif; background:#f7f7f9; margin:0; padding:0; }
-    .container { max-width:620px; margin:0 auto; background:#ffffff; border:1px solid #e5e7eb; border-radius:8px; padding:24px; }
-    h1 { font-size:18px; margin:0 0 12px; color:#111827; }
-    p { font-size:14px; line-height:1.5; color:#374151; margin:4px 0; }
-    .total { font-size:16px; font-weight:bold; color:#111827; margin-top:12px; }
-    .footer { font-size:12px; color:#6b7280; margin-top:24px; text-align:center; }
-    .badge { display:inline-block; background:#0369a1; color:#fff; padding:4px 8px; font-size:11px; border-radius:4px; letter-spacing:0.5px; }
-    table { width:100%; border-collapse:collapse; margin-top:16px; }
-    th, td { text-align:left; padding:6px 4px; font-size:12px; }
-    th { background:#f1f5f9; } 
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Factura Autorizada</title>
 </head>
-<body>
-  <div class="container">
-    <h1>Factura electrónica autorizada</h1>
-    <p>Estimado(a) {{ cliente.razon_social|default:factura.nombre_cliente }},</p>
-    <p>Su factura ha sido <strong>AUTORIZADA</strong> por el SRI.</p>
-    <p><span class="badge">{{ factura.establecimiento }}-{{ factura.punto_emision }}-{{ factura.secuencia }}</span></p>
-
-    <table>
-      <tr><th>Empresa</th><td>{{ empresa.razon_social }}</td></tr>
-      <tr><th>RUC</th><td>{{ empresa.ruc }}</td></tr>
-      <tr><th>Autorización</th><td>{{ numero_autorizacion }}</td></tr>
-      <tr><th>Fecha autorización</th><td>{{ fecha_autorizacion }}</td></tr>
-      <tr><th>Total</th><td>{{ total }}</td></tr>
-    </table>
-
-    <p>Adjuntamos los siguientes archivos:</p>
-    <ul>
-      <li>XML autorizado (estructura completa del comprobante)</li>
-      <li>RIDE en PDF (representación impresa)</li>
-    </ul>
-
-    <p class="total">Total a pagar: {{ total }}</p>
-    <p>Gracias por su preferencia.</p>
-    <div class="footer">
-      <p>Este es un correo automático, por favor no responder a esta dirección.</p>
-      <p>{{ empresa.nombre_comercial|default:empresa.razon_social }}</p>
-    </div>
-  </div>
+<body style="margin:0; padding:0; font-family: Arial, sans-serif; background-color:#f3f4f6;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6; padding:20px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          <!-- Header VERDE con logo -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding:40px 20px; text-align:center;">
+              <img src="cid:logo-catalina" alt="CATALINA" style="max-width: 150px; height: auto; margin-bottom: 15px; background:white; padding:10px; border-radius:8px;" />
+              <h1 style="margin:0; font-size:28px; font-weight:700; color:#ffffff; letter-spacing:1px;">CATALINA</h1>
+              <p style="margin:8px 0 0; font-size:14px; color:#ffffff; font-weight:300; letter-spacing:0.5px;">Factura Electrónica Autorizada</p>
+            </td>
+          </tr>
+          
+          <!-- Contenido -->
+          <tr>
+            <td style="padding:30px 40px;">
+              <p style="margin:0 0 20px; font-size:16px; color:#1f2937; line-height:1.6;">
+                ¡Estimado/a <strong>{{ cliente.razon_social|default:factura.nombre_cliente }}</strong>!
+              </p>
+              
+              <p style="margin:0 0 20px; font-size:14px; color:#4b5563; line-height:1.6;">
+                Su factura ha sido <strong style="color:#10b981;">AUTORIZADA</strong> exitosamente por el SRI. El documento es completamente válido.
+              </p>
+              
+              <!-- Badge número factura -->
+              <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding:12px 20px; border-radius:8px; display:inline-block; margin:10px 0;">
+                <span style="color:white; font-weight:600; font-size:14px; letter-spacing:0.5px;">
+                  📋 {{ factura.establecimiento }}-{{ factura.punto_emision }}-{{ factura.secuencia }}
+                </span>
+              </div>
+              
+              <!-- Tabla de detalles -->
+              <table width="100%" cellpadding="10" cellspacing="0" style="margin:20px 0; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
+                <tr style="background-color:#f9fafb;">
+                  <td style="font-weight:600; color:#374151; font-size:13px; border-bottom:1px solid #e5e7eb;">Empresa</td>
+                  <td style="color:#1f2937; font-size:13px; border-bottom:1px solid #e5e7eb;">{{ empresa.razon_social }}</td>
+                </tr>
+                <tr style="background-color:#ffffff;">
+                  <td style="font-weight:600; color:#374151; font-size:13px; border-bottom:1px solid #e5e7eb;">RUC</td>
+                  <td style="color:#1f2937; font-size:13px; border-bottom:1px solid #e5e7eb;">{{ empresa.ruc }}</td>
+                </tr>
+                <tr style="background-color:#f9fafb;">
+                  <td style="font-weight:600; color:#374151; font-size:13px; border-bottom:1px solid #e5e7eb;">Autorización</td>
+                  <td style="color:#1f2937; font-size:13px; font-family:monospace; border-bottom:1px solid #e5e7eb;">{{ numero_autorizacion }}</td>
+                </tr>
+                <tr style="background-color:#ffffff;">
+                  <td style="font-weight:600; color:#374151; font-size:13px; border-bottom:1px solid #e5e7eb;">Fecha autorización</td>
+                  <td style="color:#1f2937; font-size:13px; border-bottom:1px solid #e5e7eb;">{{ fecha_autorizacion }}</td>
+                </tr>
+                <tr style="background-color:#f0fdf4;">
+                  <td style="font-weight:700; color:#047857; font-size:14px;">💰 Total</td>
+                  <td style="font-weight:700; color:#047857; font-size:16px;">${{ total }}</td>
+                </tr>
+              </table>
+              
+              <!-- Archivos adjuntos -->
+              <div style="background-color:#eff6ff; border-left:4px solid #3b82f6; padding:15px; margin:20px 0; border-radius:4px;">
+                <p style="margin:0 0 8px; font-size:14px; color:#1e40af; font-weight:600;">📎 Archivos adjuntos:</p>
+                <ul style="margin:0; padding-left:20px; color:#1f2937; font-size:13px;">
+                  <li>XML autorizado (estructura del comprobante)</li>
+                  <li>RIDE en PDF (representación impresa)</li>
+                </ul>
+              </div>
+              
+              <p style="margin:20px 0 0; font-size:14px; color:#4b5563; line-height:1.6;">
+                Gracias por su preferencia. 🙏
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f9fafb; padding:20px 40px; border-top:1px solid #e5e7eb;">
+              <p style="margin:0 0 8px; font-size:12px; color:#6b7280; text-align:center;">
+                Este es un correo automático, por favor no responder a esta dirección.
+              </p>
+              <p style="margin:0; font-size:13px; color:#374151; text-align:center; font-weight:600;">
+                {{ empresa.nombre_comercial|default:empresa.razon_social }}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>
