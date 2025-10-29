@@ -75,14 +75,104 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
     try:
         body_html = render_to_string('inventario/email/factura_autorizada.html', context)
     except Exception:
-        # fallback simple
-        body_html = (
-            f"<p>Estimado(a) {factura.nombre_cliente},</p>"
-            f"<p>Adjuntamos su factura electrónica autorizada.</p>"
-            f"<p>Número de autorización: {factura.numero_autorizacion}</p>"
-            f"<p>Total: {factura.monto_general}</p>"
-            f"<p>Gracias por su compra.</p>"
-        )
+        # fallback con diseño profesional
+        body_html = f"""
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Factura Autorizada</title>
+</head>
+<body style="margin:0; padding:0; font-family: Arial, sans-serif; background-color:#f3f4f6;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6; padding:20px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          <!-- Header VERDE con logo -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding:40px 20px; text-align:center;">
+              <img src="cid:logo-catalina" alt="CATALINA" style="max-width: 150px; height: auto; margin-bottom: 15px; background:white; padding:10px; border-radius:8px;" />
+              <h1 style="margin:0; font-size:28px; font-weight:700; color:#ffffff; letter-spacing:1px;">CATALINA</h1>
+              <p style="margin:8px 0 0; font-size:14px; color:#ffffff; font-weight:300; letter-spacing:0.5px;">Factura Electrónica Autorizada</p>
+            </td>
+          </tr>
+          
+          <!-- Contenido -->
+          <tr>
+            <td style="padding:30px 40px;">
+              <p style="margin:0 0 20px; font-size:16px; color:#1f2937; line-height:1.6;">
+                ¡Estimado/a <strong>{factura.nombre_cliente}</strong>!
+              </p>
+              
+              <p style="margin:0 0 20px; font-size:14px; color:#4b5563; line-height:1.6;">
+                Su factura ha sido <strong style="color:#10b981;">AUTORIZADA</strong> exitosamente por el SRI. El documento es completamente válido.
+              </p>
+              
+              <!-- Badge número factura -->
+              <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding:12px 20px; border-radius:8px; display:inline-block; margin:10px 0;">
+                <span style="color:white; font-weight:600; font-size:14px; letter-spacing:0.5px;">
+                  📋 {factura.establecimiento}-{factura.punto_emision}-{factura.secuencia}
+                </span>
+              </div>
+              
+              <!-- Tabla de detalles -->
+              <table width="100%" cellpadding="10" cellspacing="0" style="margin:20px 0; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
+                <tr style="background-color:#f9fafb;">
+                  <td style="font-weight:600; color:#374151; font-size:13px; border-bottom:1px solid #e5e7eb;">Empresa</td>
+                  <td style="color:#1f2937; font-size:13px; border-bottom:1px solid #e5e7eb;">{factura.empresa.razon_social}</td>
+                </tr>
+                <tr style="background-color:#ffffff;">
+                  <td style="font-weight:600; color:#374151; font-size:13px; border-bottom:1px solid #e5e7eb;">RUC</td>
+                  <td style="color:#1f2937; font-size:13px; border-bottom:1px solid #e5e7eb;">{factura.empresa.ruc}</td>
+                </tr>
+                <tr style="background-color:#f9fafb;">
+                  <td style="font-weight:600; color:#374151; font-size:13px; border-bottom:1px solid #e5e7eb;">Autorización</td>
+                  <td style="color:#1f2937; font-size:13px; font-family:monospace; border-bottom:1px solid #e5e7eb;">{factura.numero_autorizacion}</td>
+                </tr>
+                <tr style="background-color:#ffffff;">
+                  <td style="font-weight:600; color:#374151; font-size:13px; border-bottom:1px solid #e5e7eb;">Fecha autorización</td>
+                  <td style="color:#1f2937; font-size:13px; border-bottom:1px solid #e5e7eb;">{factura.fecha_autorizacion}</td>
+                </tr>
+                <tr style="background-color:#f0fdf4;">
+                  <td style="font-weight:700; color:#047857; font-size:14px;">💰 Total</td>
+                  <td style="font-weight:700; color:#047857; font-size:16px;">${factura.monto_general}</td>
+                </tr>
+              </table>
+              
+              <!-- Archivos adjuntos -->
+              <div style="background-color:#eff6ff; border-left:4px solid #3b82f6; padding:15px; margin:20px 0; border-radius:4px;">
+                <p style="margin:0 0 8px; font-size:14px; color:#1e40af; font-weight:600;">📎 Archivos adjuntos:</p>
+                <ul style="margin:0; padding-left:20px; color:#1f2937; font-size:13px;">
+                  <li>XML autorizado (estructura del comprobante)</li>
+                  <li>RIDE en PDF (representación impresa)</li>
+                </ul>
+              </div>
+              
+              <p style="margin:20px 0 0; font-size:14px; color:#4b5563; line-height:1.6;">
+                Gracias por su preferencia. 🙏
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f9fafb; padding:20px 40px; border-top:1px solid #e5e7eb;">
+              <p style="margin:0 0 5px; font-size:12px; color:#6b7280; text-align:center;">
+                Este es un correo automático, por favor no responder.
+              </p>
+              <p style="margin:0; font-size:12px; color:#9ca3af; text-align:center;">
+                {factura.empresa.nombre_comercial or factura.empresa.razon_social}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+        """
 
     email = EmailMessage(
         subject=subject,
@@ -92,6 +182,25 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
         cc=cc_list,
     )
     email.content_subtype = 'html'
+    
+    # Adjuntar logo embebido para que se vea en el email
+    try:
+        logo_path = 'inventario/assets/logo/logo2.png'
+        logger.info(f"Intentando adjuntar logo embebido desde: {logo_path}")
+        
+        if default_storage.exists(logo_path):
+            with default_storage.open(logo_path, 'rb') as logo_file:
+                from email.mime.image import MIMEImage
+                logo_data = logo_file.read()
+                logo_img = MIMEImage(logo_data)
+                logo_img.add_header('Content-ID', '<logo-catalina>')
+                logo_img.add_header('Content-Disposition', 'inline', filename='logo.png')
+                email.attach(logo_img)
+                logger.info("✅ Logo embebido adjuntado correctamente")
+        else:
+            logger.warning(f"Logo no encontrado en storage: {logo_path}")
+    except Exception as e:
+        logger.warning(f"No se pudo adjuntar logo embebido: {e}")
     
     # Leer y adjuntar archivos (compatible con S3 y filesystem local)
     try:
