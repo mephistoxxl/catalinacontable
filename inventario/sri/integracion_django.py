@@ -947,6 +947,37 @@ Saludos cordiales,
                 xml_file = ContentFile(factura.xml_autorizado.encode('utf-8'))
                 email.attach(f"Factura_{numero_factura}.xml", xml_file.read(), 'application/xml')
 
+            # Adjuntar logo embebido para que se vea en el email
+            try:
+                from email.mime.image import MIMEImage
+                # Probar varias rutas posibles del logo
+                logo_paths = [
+                    'static/inventario/assets/logo/logo2.png',
+                    'inventario/static/inventario/assets/logo/logo2.png',
+                    'inventario/assets/logo/logo2.png',
+                ]
+                
+                logo_attached = False
+                for logo_path in logo_paths:
+                    try:
+                        if default_storage.exists(logo_path):
+                            with default_storage.open(logo_path, 'rb') as logo_file:
+                                logo_data = logo_file.read()
+                                logo_img = MIMEImage(logo_data)
+                                logo_img.add_header('Content-ID', '<logo-catalina>')
+                                logo_img.add_header('Content-Disposition', 'inline', filename='logo.png')
+                                email.attach(logo_img)
+                                logger.info(f"✅ Logo embebido adjuntado desde: {logo_path}")
+                                logo_attached = True
+                                break
+                    except Exception as e:
+                        continue
+                
+                if not logo_attached:
+                    logger.warning("⚠️ No se pudo adjuntar el logo al email")
+            except Exception as e:
+                logger.warning(f"Error adjuntando logo embebido: {e}")
+
             email.send(fail_silently=False)
             return {'success': True, 'message': 'Factura enviada por correo exitosamente'}
         except Exception as e:
