@@ -843,7 +843,7 @@ class SRIIntegration:
                 logo_url = opciones.imagen.url
             else:
                 # Usar logo estático por defecto - URL directa a S3
-                logo_url = 'https://catalina-media-prod.s3.us-east-2.amazonaws.com/static/inventario/assets/logo/logo2.png'
+                logo_url = 'https://catalina-media-prod.s3.us-east-2.amazonaws.com/static/inventario/assets/logo/logo-catalina.png'
                 logger.info(f"🔍 Usando logo por defecto: {logo_url}")
             
             logger.info(f"📸 Logo URL para email: {logo_url}")
