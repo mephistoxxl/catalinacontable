@@ -4,6 +4,7 @@ import random
 from datetime import datetime
 from django.conf import settings
 from django.core.files.storage import default_storage
+from django.contrib.staticfiles import finders
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMessage
 from django.utils import timezone
@@ -950,31 +951,19 @@ Saludos cordiales,
             # Adjuntar logo embebido para que se vea en el email
             try:
                 from email.mime.image import MIMEImage
-                # Probar varias rutas posibles del logo
-                logo_paths = [
-                    'static/inventario/assets/logo/logo2.png',
-                    'inventario/static/inventario/assets/logo/logo2.png',
-                    'inventario/assets/logo/logo2.png',
-                ]
-                
-                logo_attached = False
-                for logo_path in logo_paths:
-                    try:
-                        if default_storage.exists(logo_path):
-                            with default_storage.open(logo_path, 'rb') as logo_file:
-                                logo_data = logo_file.read()
-                                logo_img = MIMEImage(logo_data)
-                                logo_img.add_header('Content-ID', '<logo-catalina>')
-                                logo_img.add_header('Content-Disposition', 'inline', filename='logo.png')
-                                email.attach(logo_img)
-                                logger.info(f"✅ Logo embebido adjuntado desde: {logo_path}")
-                                logo_attached = True
-                                break
-                    except Exception as e:
-                        continue
-                
-                if not logo_attached:
-                    logger.warning("⚠️ No se pudo adjuntar el logo al email")
+
+                logo_path = finders.find('inventario/assets/logo/logo2.png')
+
+                if logo_path:
+                    with open(logo_path, 'rb') as logo_file:
+                        logo_data = logo_file.read()
+                        logo_img = MIMEImage(logo_data)
+                        logo_img.add_header('Content-ID', '<logo-catalina>')
+                        logo_img.add_header('Content-Disposition', 'inline', filename='logo.png')
+                        email.attach(logo_img)
+                        logger.info(f"✅ Logo embebido adjuntado desde: {logo_path}")
+                else:
+                    logger.warning("⚠️ No se pudo encontrar el logo estático para adjuntar")
             except Exception as e:
                 logger.warning(f"Error adjuntando logo embebido: {e}")
 
