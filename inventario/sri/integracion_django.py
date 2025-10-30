@@ -852,7 +852,7 @@ class SRIIntegration:
                 'email_empresa': getattr(opciones, 'correo', ''),
                 'telefono': getattr(opciones, 'telefono', ''),
                 'year': datetime.now().year,
-                'logo_url': opciones.imagen.url if hasattr(opciones, 'imagen') and opciones.imagen else None,
+                'logo_url': 'https://catalina-media-prod.s3.us-east-2.amazonaws.com/static/inventario/assets/logo/logo-catalina.png',
                 # Redes sociales (puedes agregar estos campos a Opciones si quieres)
                 'facebook_url': None,
                 'youtube_url': None,
@@ -947,25 +947,6 @@ Saludos cordiales,
             if factura.xml_autorizado:
                 xml_file = ContentFile(factura.xml_autorizado.encode('utf-8'))
                 email.attach(f"Factura_{numero_factura}.xml", xml_file.read(), 'application/xml')
-
-            # Adjuntar logo embebido para que se vea en el email
-            try:
-                from email.mime.image import MIMEImage
-
-                logo_path = finders.find('inventario/assets/logo/logo2.png')
-
-                if logo_path:
-                    with open(logo_path, 'rb') as logo_file:
-                        logo_data = logo_file.read()
-                        logo_img = MIMEImage(logo_data)
-                        logo_img.add_header('Content-ID', '<logo-catalina>')
-                        logo_img.add_header('Content-Disposition', 'inline', filename='logo.png')
-                        email.attach(logo_img)
-                        logger.info(f"✅ Logo embebido adjuntado desde: {logo_path}")
-                else:
-                    logger.warning("⚠️ No se pudo encontrar el logo estático para adjuntar")
-            except Exception as e:
-                logger.warning(f"Error adjuntando logo embebido: {e}")
 
             email.send(fail_silently=False)
             return {'success': True, 'message': 'Factura enviada por correo exitosamente'}
