@@ -837,6 +837,17 @@ class SRIIntegration:
                 return {'success': False, 'message': 'El cliente no tiene correo registrado'}
 
             # Contexto para el template HTML
+            # Determinar URL del logo
+            logo_url = None
+            if hasattr(opciones, 'imagen') and opciones.imagen:
+                logo_url = opciones.imagen.url
+            else:
+                # Usar logo estático por defecto - URL directa a S3
+                logo_url = 'https://catalina-media-prod.s3.us-east-2.amazonaws.com/static/inventario/assets/logo/logo2.png'
+                logger.info(f"🔍 Usando logo por defecto: {logo_url}")
+            
+            logger.info(f"📸 Logo URL para email: {logo_url}")
+            
             context = {
                 'nombre_cliente': factura.nombre_cliente,
                 'razon_social': opciones.razon_social,
@@ -851,7 +862,7 @@ class SRIIntegration:
                 'email_empresa': getattr(opciones, 'correo', ''),
                 'telefono': getattr(opciones, 'telefono', ''),
                 'year': datetime.now().year,
-                'logo_url': opciones.imagen.url if hasattr(opciones, 'imagen') and opciones.imagen else None,
+                'logo_url': logo_url,
                 # Redes sociales (puedes agregar estos campos a Opciones si quieres)
                 'facebook_url': None,
                 'youtube_url': None,
@@ -946,37 +957,6 @@ Saludos cordiales,
             if factura.xml_autorizado:
                 xml_file = ContentFile(factura.xml_autorizado.encode('utf-8'))
                 email.attach(f"Factura_{numero_factura}.xml", xml_file.read(), 'application/xml')
-
-            # Adjuntar logo embebido para que se vea en el email
-            try:
-                from email.mime.image import MIMEImage
-                # Probar varias rutas posibles del logo
-                logo_paths = [
-                    'static/inventario/assets/logo/logo2.png',
-                    'inventario/static/inventario/assets/logo/logo2.png',
-                    'inventario/assets/logo/logo2.png',
-                ]
-                
-                logo_attached = False
-                for logo_path in logo_paths:
-                    try:
-                        if default_storage.exists(logo_path):
-                            with default_storage.open(logo_path, 'rb') as logo_file:
-                                logo_data = logo_file.read()
-                                logo_img = MIMEImage(logo_data)
-                                logo_img.add_header('Content-ID', '<logo-catalina>')
-                                logo_img.add_header('Content-Disposition', 'inline', filename='logo.png')
-                                email.attach(logo_img)
-                                logger.info(f"✅ Logo embebido adjuntado desde: {logo_path}")
-                                logo_attached = True
-                                break
-                    except Exception as e:
-                        continue
-                
-                if not logo_attached:
-                    logger.warning("⚠️ No se pudo adjuntar el logo al email")
-            except Exception as e:
-                logger.warning(f"Error adjuntando logo embebido: {e}")
 
             email.send(fail_silently=False)
             return {'success': True, 'message': 'Factura enviada por correo exitosamente'}
