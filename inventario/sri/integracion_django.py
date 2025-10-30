@@ -837,16 +837,25 @@ class SRIIntegration:
                 return {'success': False, 'message': 'El cliente no tiene correo registrado'}
 
             # Contexto para el template HTML
-            # Determinar URL del logo
+            # Determinar URL del logo - usar imagen de opciones si existe
             logo_url = None
             if hasattr(opciones, 'imagen') and opciones.imagen:
-                logo_url = opciones.imagen.url
-            else:
-                # Usar logo estático por defecto - URL directa a S3
-                logo_url = 'https://catalina-media-prod.s3.us-east-2.amazonaws.com/static/inventario/assets/logo/logo-catalina.png'
-                logger.info(f"🔍 Usando logo por defecto: {logo_url}")
+                try:
+                    logo_url = opciones.imagen.url
+                    if not logo_url.startswith('http'):
+                        # Construir URL absoluta para S3
+                        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'catalina-media-prod')
+                        region = getattr(settings, 'AWS_S3_REGION_NAME', 'us-east-2')
+                        logo_url = f"https://{bucket}.s3.{region}.amazonaws.com/{logo_url.lstrip('/')}"
+                    logger.info(f"� Usando logo de opciones: {logo_url}")
+                except Exception as e:
+                    logger.warning(f"Error obteniendo logo de opciones: {e}")
+                    logo_url = None
             
-            logger.info(f"📸 Logo URL para email: {logo_url}")
+            if not logo_url:
+                # Logo de CATALINA (sistema) por defecto
+                logo_url = 'https://catalina-media-prod.s3.us-east-2.amazonaws.com/static/inventario/assets/logo/logo-catalina.png'
+                logger.info(f"📸 Usando logo CATALINA por defecto: {logo_url}")
             
             context = {
                 'nombre_cliente': factura.nombre_cliente,
