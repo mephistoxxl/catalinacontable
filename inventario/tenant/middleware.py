@@ -1,5 +1,9 @@
+from django.conf import settings
+from django.contrib.auth import get_user
 from django.utils.deprecation import MiddlewareMixin
+
 from inventario.models import Empresa
+
 from .queryset import set_current_tenant
 
 
@@ -42,7 +46,7 @@ class TenantMiddleware(MiddlewareMixin):
             if tenant:
                 return tenant
         header_value = request.headers.get(self.header_name)
-        if header_value:
+        if header_value and self._is_header_allowed(request):
             return (
                 Empresa.objects.filter(id=header_value).first()
                 or Empresa.objects.filter(ruc=header_value).first()
@@ -51,3 +55,27 @@ class TenantMiddleware(MiddlewareMixin):
         if empresa_id:
             return Empresa.objects.filter(id=empresa_id).first()
         return None
+
+    def _is_header_allowed(self, request):
+        """Return ``True`` when the X-Tenant header may be trusted."""
+
+        user = getattr(request, "user", None)
+        if user is None or not getattr(user, "is_authenticated", False):
+            # ``AuthenticationMiddleware`` runs after this middleware, so
+            # ``request.user`` might not be populated yet.
+            try:
+                user = get_user(request)
+            except Exception:
+                user = None
+
+        if user is not None and getattr(user, "is_authenticated", False):
+            if getattr(user, "is_staff", False) or getattr(user, "is_superuser", False):
+                return True
+
+        remote_addr = request.META.get("REMOTE_ADDR")
+        allowed_ips = getattr(settings, "TENANT_HEADER_ALLOWED_IPS", None)
+        if allowed_ips is None:
+            allowed_ips = getattr(settings, "INTERNAL_IPS", [])
+        if remote_addr and remote_addr in allowed_ips:
+            return True
+        return False

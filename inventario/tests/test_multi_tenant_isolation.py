@@ -9,9 +9,11 @@ from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.db import connection
-from django.test import Client
+from django.test import Client, RequestFactory
 from django.utils import timezone
 from django.conf import settings
+from django.contrib.sessions.middleware import SessionMiddleware
+from django.http import HttpResponse
 
 from django.contrib.messages import get_messages
 
@@ -85,6 +87,24 @@ class TestMultiTenantIsolation:
         return user
 
     @pytest.fixture
+    def staff_usuario(self, empresas):
+        User.objects.filter(username='staff').delete()
+        user = User.objects.create_user(
+            username='staff',
+            password='pass',
+            email='staff@example.com',
+            is_staff=True,
+        )
+        if hasattr(user, 'empresas'):
+            for e in empresas:
+                user.empresas.add(e)
+        return user
+
+    @pytest.fixture
+    def rf(self):
+        return RequestFactory()
+
+    @pytest.fixture
     def facturadores(self, empresas):
         f1 = Facturador.objects.create(nombres='Fac A1', correo='fa1@example.com', password='x', empresa=empresas[0], activo=True)
         f2 = Facturador.objects.create(nombres='Fac B1', correo='fb1@example.com', password='y', empresa=empresas[1], activo=True)
@@ -115,6 +135,15 @@ class TestMultiTenantIsolation:
         session = client.session
         session['empresa_activa'] = empresa_id
         session.save()
+
+    def _prepare_request(self, rf, path, empresa_id, user, header_value=None):
+        request = rf.get(path, **({'HTTP_X_TENANT': header_value} if header_value else {}))
+        session_middleware = SessionMiddleware(lambda req: None)
+        session_middleware.process_request(request)
+        request.session['empresa_activa'] = empresa_id
+        request.session.save()
+        request.user = user
+        return request
 
     def test_facturador_login_isolation(self, client, usuario, empresas, facturadores):
         self._login(client, usuario)
@@ -160,6 +189,52 @@ class TestMultiTenantIsolation:
         resp = client.get(reverse('inventario:buscar_producto'), {'q': 'S-B'})
         # Servicio S-B pertenece a empresa 2, no debe aparecer
         assert 'S-B' not in resp.content.decode()
+
+    def test_header_no_cambia_tenant_para_usuario_regular(self, rf, usuario, empresas, datos_base):
+        from inventario.tenant.middleware import TenantMiddleware
+
+        e1, e2 = empresas
+        request = self._prepare_request(
+            rf,
+            path='/clientes/',
+            empresa_id=e1.id,
+            user=usuario,
+            header_value=str(e2.id),
+        )
+
+        middleware = TenantMiddleware(lambda req: HttpResponse())
+        middleware.process_request(request)
+
+        assert getattr(request, 'tenant') == e1
+
+        clientes = list(Cliente.objects.all())
+        assert clientes
+        assert all(cliente.empresa_id == e1.id for cliente in clientes)
+
+        middleware.process_response(request, HttpResponse())
+
+    def test_header_permitido_para_staff(self, rf, staff_usuario, empresas, datos_base):
+        from inventario.tenant.middleware import TenantMiddleware
+
+        e1, e2 = empresas
+        request = self._prepare_request(
+            rf,
+            path='/clientes/',
+            empresa_id=e1.id,
+            user=staff_usuario,
+            header_value=str(e2.id),
+        )
+
+        middleware = TenantMiddleware(lambda req: HttpResponse())
+        middleware.process_request(request)
+
+        assert getattr(request, 'tenant') == e2
+
+        clientes = list(Cliente.objects.all())
+        assert clientes
+        assert all(cliente.empresa_id == e2.id for cliente in clientes)
+
+        middleware.process_response(request, HttpResponse())
 
     def test_emitir_proforma_rejects_cliente_de_otra_empresa(self, client, usuario, empresas, facturadores, datos_base):
         self._login(client, usuario)
