@@ -289,9 +289,6 @@ CSRF_TRUSTED_ORIGINS = [o.strip() for o in CSRF_TRUSTED_ORIGINS if o.strip()]
 SECURE_REFERRER_POLICY = os.environ.get('SECURE_REFERRER_POLICY', 'same-origin')
 SECURE_CONTENT_TYPE_NOSNIFF = os.environ.get('SECURE_CONTENT_TYPE_NOSNIFF', 'True') == 'True'
 SECURE_BROWSER_XSS_FILTER = os.environ.get('SECURE_BROWSER_XSS_FILTER', 'True') == 'True'
-# Permite forzar HTTPS mediante una variable de entorno dedicada
-# Establecer en True solo en entornos con HTTPS
-FORCE_SSL = os.environ.get('FORCE_SSL', 'False').lower() == 'true'
 
 # Application definition
 
@@ -389,15 +386,16 @@ CONN_MAX_AGE = 600
 
 # Ajustes de seguridad aplicados solo en producción
 if not DEBUG:
-    # Redirigir a HTTPS solo si se especifica explícitamente
-    SECURE_SSL_REDIRECT = FORCE_SSL
-    if FORCE_SSL:
-        # Reconoce el encabezado enviado por el proxy para detectar HTTPS
-        SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    # Redirige todo el tráfico a HTTPS cuando el proyecto no está en modo debug
+    SECURE_SSL_REDIRECT = True
+    # Reconoce el encabezado enviado por el proxy para detectar HTTPS (Heroku, Nginx, etc.)
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-    SESSION_COOKIE_SECURE = FORCE_SSL
-    CSRF_COOKIE_SECURE = FORCE_SSL
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 
 
 # Password validation
