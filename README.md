@@ -4,11 +4,11 @@
 
 ### Clave de cifrado de firmas (`FIRMAS_KEY`)
 
-La aplicación cifra los archivos de firmas electrónicas usando [Fernet](https://cryptography.io/en/latest/fernet/). **En producción debes definir** la variable de entorno `FIRMAS_KEY` con una clave Fernet válida y persistente. 
+La aplicación cifra los archivos de firmas electrónicas usando [Fernet](https://cryptography.io/en/latest/fernet/). **En producción debes definir** la variable de entorno `FIRMAS_KEY` con una clave Fernet válida y persistente.
 
-Desde la actualización reciente, si `FIRMAS_KEY` no está presente el sistema **ya no se detiene**: los archivos de firma se almacenarán en texto plano dentro del directorio `firmas_secure/`. Esto facilita el desarrollo y pruebas iniciales, pero:
+En entornos de desarrollo (cuando `ENVIRONMENT` **no** es `production`) la clave puede omitirse: se mostrará un `RuntimeWarning` y los archivos se almacenarán en texto plano dentro de `firmas_secure/`. **En producción la ausencia de `FIRMAS_KEY` detiene el arranque**, garantizando que los certificados nunca queden sin cifrar.
 
-> ⚠️ **ADVERTENCIA:** No ejecutes un entorno productivo sin `FIRMAS_KEY`. Los certificados quedarían sin cifrar en disco.
+> ⚠️ **ADVERTENCIA:** Define siempre `FIRMAS_KEY` antes de desplegar en producción. Los certificados no se cargarán si falta.
 
 1. **Genera la clave una sola vez** y guárdala en un lugar seguro:
 
@@ -73,8 +73,14 @@ Variables principales:
 | `AWS_S3_CUSTOM_DOMAIN` | Dominio CDN o CloudFront opcional para servir archivos. |
 | `AWS_MEDIA_LOCATION` | Prefijo dentro del bucket (por defecto sin prefijo). |
 | `MEDIA_STORAGE_PREFIX` | Prefijo adicional aplicado desde Django (útil si se comparte bucket). |
-| `FIRMAS_STORAGE_PREFIX` | Prefijo dentro del bucket para los certificados cifrados (`firmas/`). Por defecto `firmas_secure`. |
+| `FIRMAS_STORAGE_PREFIX` | Prefijo dentro del bucket para los certificados cifrados (`firmas/`). Obligatoria en producción. |
 | `MEDIA_URL` | URL pública para los archivos. Si no se define se genera automáticamente según el dominio/configuración anterior. |
+
+### Flujo seguro para firmas electrónicas
+
+- Ejecuta `python scripts/check_no_certificates.py` en CI para asegurarte de que ningún certificado `.p12/.pfx` quede versionado.
+- Antes de cargar o rotar una firma en producción, valida la configuración con `python manage.py verify_firmas_encryption`.
+- Sigue los pasos detallados en [docs/firmas/PROCESO_CARGA_ROTACION.md](docs/firmas/PROCESO_CARGA_ROTACION.md) para migraciones históricas y rotaciones periódicas.
 
 > 💡 En entornos locales sin `AWS_STORAGE_BUCKET_NAME` la aplicación continúa usando el sistema de archivos (`MEDIA_ROOT`) y las firmas se guardan en `FIRMAS_ROOT` como antes.
 

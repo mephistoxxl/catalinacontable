@@ -36,6 +36,36 @@ class EncryptedFirmaStorage(Storage):
 
         return getattr(self._storage, attr)
 
+    @property
+    def encryption_enabled(self) -> bool:
+        return getattr(settings, 'FIRMAS_KEY', None) is not None
+
+    @property
+    def using_remote_storage(self) -> bool:
+        return self._use_remote
+
+    def validate_configuration(self) -> list[str]:
+        """Devuelve una lista de errores de configuración detectados."""
+
+        errors: list[str] = []
+        if not self.using_remote_storage:
+            errors.append('El almacenamiento remoto no está activo (USE_REMOTE_MEDIA_STORAGE=False).')
+
+        if not self.encryption_enabled:
+            errors.append('FIRMAS_KEY no está configurada; los archivos se almacenarían sin cifrar.')
+        else:
+            try:
+                probe = self._encrypt(b'health-check')
+                if probe == b'health-check':
+                    errors.append('La clave de cifrado no se está aplicando al guardar archivos.')
+            except Exception as exc:  # pragma: no cover - solo diagnóstico
+                errors.append(f'No se pudo cifrar datos de prueba: {exc}')
+
+        if self.using_remote_storage and not self._prefix:
+            errors.append('FIRMAS_STORAGE_PREFIX no está definido; los certificados compartirían la raíz del bucket.')
+
+        return errors
+
     def _encrypt(self, data: bytes) -> bytes:
         if getattr(settings, 'FIRMAS_KEY', None) is None:
             return data

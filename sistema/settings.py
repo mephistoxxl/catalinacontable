@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
+import sys
 import warnings
 from dotenv import load_dotenv
 from cryptography.fernet import Fernet
@@ -21,10 +22,22 @@ from sentry_sdk.integrations.django import DjangoIntegration
 
 load_dotenv()
 
+ENVIRONMENT = (os.environ.get('ENVIRONMENT') or os.environ.get('DJANGO_ENV') or 'development').strip().lower() or 'development'
+IS_TEST_ENV = bool(os.environ.get('PYTEST_CURRENT_TEST')) or any(arg in ('test', 'pytest') for arg in sys.argv)
+IS_PRODUCTION = ENVIRONMENT in {'production', 'prod'} and not IS_TEST_ENV
+
 # Seguridad y configuración sensible desde .env
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+if IS_PRODUCTION and DEBUG:
+    warnings.warn('DEBUG está activo en producción; se forzará a False.', RuntimeWarning)
+    DEBUG = False
 # Tiempo de espera por defecto para los servicios del SRI (en segundos)
 SRI_TIMEOUT = int(os.environ.get('SRI_TIMEOUT', 30))
+
+if IS_PRODUCTION and not os.environ.get('AWS_STORAGE_BUCKET_NAME'):
+    raise RuntimeError(
+        'AWS_STORAGE_BUCKET_NAME es obligatorio en producción para almacenar las firmas en S3.'
+    )
 
 # Configuración de monitoreo con Sentry
 SENTRY_DSN = os.environ.get('SENTRY_DSN')
@@ -52,7 +65,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = os.environ.get('MEDIA_URL', '/media/')
 MEDIA_ROOT = os.environ.get('MEDIA_ROOT', os.path.join(BASE_DIR, 'media'))
 MEDIA_STORAGE_PREFIX = os.environ.get('MEDIA_STORAGE_PREFIX', '').strip('/')
-USE_REMOTE_MEDIA_STORAGE = bool(os.environ.get('AWS_STORAGE_BUCKET_NAME'))
+USE_REMOTE_MEDIA_STORAGE = bool(os.environ.get('AWS_STORAGE_BUCKET_NAME')) or IS_PRODUCTION
 
 if USE_REMOTE_MEDIA_STORAGE:
     # Añadiremos 'storages' luego de declarar INSTALLED_APPS (más abajo) para evitar NameError
@@ -133,15 +146,29 @@ WHITENOISE_ALLOW_ALL_ORIGINS = True
 
 # Directorio separado y seguro para certificados de firma electrónica
 FIRMAS_ROOT = os.environ.get('FIRMAS_ROOT', os.path.join(BASE_DIR, 'firmas_secure'))
-FIRMAS_STORAGE_PREFIX = os.environ.get('FIRMAS_STORAGE_PREFIX', 'firmas_secure').strip('/')
-# Clave utilizada para cifrar los archivos de firma; debe definirse en variables de entorno en producción
+
+raw_firmas_prefix = os.environ.get('FIRMAS_STORAGE_PREFIX')
+if raw_firmas_prefix:
+    FIRMAS_STORAGE_PREFIX = raw_firmas_prefix.strip('/')
+else:
+    if IS_PRODUCTION:
+        raise RuntimeError(
+            'FIRMAS_STORAGE_PREFIX es obligatorio en producción para aislar los certificados en S3.'
+        )
+    FIRMAS_STORAGE_PREFIX = 'firmas_secure'
+
+# Clave utilizada para cifrar los archivos de firma
 env_firmas_key = os.environ.get('FIRMAS_KEY')
 if not env_firmas_key:
+    if IS_PRODUCTION:
+        raise RuntimeError(
+            'FIRMAS_KEY es obligatoria en producción para cifrar los certificados (Fernet urlsafe base64 key).'
+        )
     # Permitir ausencia en desarrollo / pruebas, pero advertir claramente.
     FIRMAS_KEY = None
     warnings.warn(
         'FIRMAS_KEY no está configurada: las firmas electrónicas se almacenarán SIN CIFRAR. '
-        'Configura FIRMAS_KEY en producción para habilitar cifrado (Fernet urlsafe base64 key).',
+        'Configura FIRMAS_KEY al desplegar en producción para habilitar el cifrado.',
         RuntimeWarning
     )
 else:

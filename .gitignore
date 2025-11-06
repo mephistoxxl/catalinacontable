@@ -20,3 +20,13 @@ venv/
 .DS_Store
 Thumbs.db
 
+# Certificados de firma electrónica (protegidos)
+firmas_secure/firmas/
+*.p12
+*.pfx
+*.p7m
+*.pem
+*.cer
+*.crt
+*.key
+
