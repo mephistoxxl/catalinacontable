@@ -9,6 +9,9 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.text import capfirst
 from django.conf import settings
 from django.core.mail import send_mail
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 
 from .forms import LoginFormulario
 from .models import Usuario, Empresa, UsuarioEmpresa
@@ -175,6 +178,7 @@ class EmpresaAdminForm(forms.ModelForm):
 
 class EmpresaAdmin(admin.ModelAdmin):
     form = EmpresaAdminForm
+    readonly_fields = ("creada_en", "creada_por")
 
     def get_form(self, request, obj=None, **kwargs):  # type: ignore[override]
         form = super().get_form(request, obj, **kwargs)
@@ -185,16 +189,18 @@ class EmpresaAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):  # type: ignore[override]
         creating = not change
+        if creating and not obj.creada_por_id:
+            obj.creada_por = request.user
         super().save_model(request, obj, form, change)
         if creating:
             User = get_user_model()
             username = form.cleaned_data.get("username")
             email = form.cleaned_data.get("email")
-            password = form.cleaned_data.get("password") or User.objects.make_random_password()
+            raw_password = form.cleaned_data.get("password")
             usuario = User.objects.create_user(
                 username=username,
                 email=email,
-                password=password,
+                password=raw_password,
             )
             # Ajustar nivel y flags (ADMIN empresa, no root)
             if hasattr(usuario, 'nivel'):
@@ -203,17 +209,40 @@ class EmpresaAdmin(admin.ModelAdmin):
             usuario.is_superuser = False  # No es superusuario global
             usuario.save(update_fields=["nivel", "is_staff", "is_superuser"])
             UsuarioEmpresa.objects.create(usuario=usuario, empresa=obj)
-            send_mail(
-                "Credenciales de acceso",
-                f"Usuario: {username}\nContraseña: {password}",
-                getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@example.com"),
-                [email],
-                fail_silently=True,
-            )
+            self._send_password_setup_email(request, usuario, email)
             messages.info(
                 request,
-                f"Usuario {username} creado. Se enviaron las credenciales a {email}.",
+                (
+                    f"Usuario {username} creado. Se envió un enlace seguro a {email} "
+                    "para que establezca su contraseña."
+                ),
             )
+
+    def _send_password_setup_email(self, request, usuario, email):
+        if not email:
+            return
+        uid = urlsafe_base64_encode(force_bytes(usuario.pk))
+        token = default_token_generator.make_token(usuario)
+        reset_path = reverse(
+            "inventario:password_reset_confirm",
+            kwargs={"uidb64": uid, "token": token},
+        )
+        reset_url = request.build_absolute_uri(reset_path)
+        subject = "Configura tu contraseña"
+        message = (
+            "Se creó un usuario administrador para tu empresa.\n\n"
+            "Para establecer tu contraseña inicial, abre el siguiente enlace "
+            "(solo válido una vez):\n"
+            f"{reset_url}\n\n"
+            "Si no solicitaste este acceso, ignora este correo."
+        )
+        send_mail(
+            subject,
+            message,
+            getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@example.com"),
+            [email],
+            fail_silently=True,
+        )
 
 
 class UsuarioAdmin(UserAdmin):

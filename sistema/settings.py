@@ -311,6 +311,7 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'sistema.middleware.AdminIPAllowlistMiddleware',
     'inventario.tenant.middleware.TenantMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -318,6 +319,26 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+ADMIN_IP_ALLOWLIST = [
+    ip.strip()
+    for ip in os.environ.get('ADMIN_IP_ALLOWLIST', '').split(',')
+    if ip.strip()
+]
+ADMIN_TRUSTED_HEADER = os.environ.get('ADMIN_TRUSTED_HEADER')
+ADMIN_TRUSTED_HEADER_VALUES = [
+    value.strip()
+    for value in os.environ.get('ADMIN_TRUSTED_HEADER_VALUES', '').split(',')
+    if value.strip()
+]
+
+_root_admin_path = os.environ.get('ROOT_ADMIN_URL', 'admin').strip('/') or 'admin'
+_tenant_admin_segment = (
+    os.environ.get('TENANT_ADMIN_URL_SEGMENT', 'admin').strip('/') or 'admin'
+)
+
+ROOT_ADMIN_URL = _root_admin_path
+TENANT_ADMIN_URL_SEGMENT = _tenant_admin_segment
 
 ROOT_URLCONF = 'sistema.urls'
 

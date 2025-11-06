@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from decimal import Decimal, ROUND_HALF_UP
 from django.contrib.auth.models import AbstractUser, Group
@@ -152,6 +153,14 @@ class Empresa(models.Model):
         validators=[RegexValidator(r'^\d{13}$', 'El RUC debe tener exactamente 13 dígitos')],
     )
     razon_social = models.CharField(max_length=300)
+    creada_en = models.DateTimeField(auto_now_add=True)
+    creada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='empresas_creadas',
+    )
 
     AMBIENTE_CHOICES = [
         ('1', 'Pruebas'),

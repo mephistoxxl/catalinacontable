@@ -1,9 +1,10 @@
-from django.urls import path, include
+from django.urls import path, include, reverse_lazy
 from . import views
 from .views import FirmaElectronicaView, ConfiguracionGeneral
 from .liquidacion_compra import views as liquidacion_views
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib.auth import views as auth_views
 app_name = "inventario"
 
 urlpatterns = [
@@ -171,6 +172,23 @@ urlpatterns = [
     path('api/clientes/crear', views.crear_cliente_api, name='crear_cliente_api'),
     path('api/clientes/enriquecer', views.enriquecer_cliente_api, name='enriquecer_cliente_api'),
 
+    # Restablecimiento de contraseña para nuevos usuarios
+    path(
+        'cuentas/restablecer/<uidb64>/<token>/',
+        auth_views.PasswordResetConfirmView.as_view(
+            template_name='inventario/usuario/password_reset_confirm.html',
+            success_url=reverse_lazy('inventario:password_reset_complete'),
+        ),
+        name='password_reset_confirm',
+    ),
+    path(
+        'cuentas/restablecer/completo/',
+        auth_views.PasswordResetCompleteView.as_view(
+            template_name='inventario/usuario/password_reset_complete.html',
+            extra_context={'login_url': reverse_lazy('inventario:login')},
+        ),
+        name='password_reset_complete',
+    ),
 ]
 
 # Servir archivos de medios en desarrollo

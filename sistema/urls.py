@@ -13,13 +13,17 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.conf import settings
 from django.urls import path, include
 from django.views.generic import RedirectView
 from inventario.admin import tenant_admin_site, root_admin_site
 
 urlpatterns = [
-    path('admin/', root_admin_site.urls),
-    path('<str:tenant>/admin/', tenant_admin_site.urls),
+    path(f"{settings.ROOT_ADMIN_URL}/", root_admin_site.urls),
+    path(
+        f"<str:tenant>/{settings.TENANT_ADMIN_URL_SEGMENT}/",
+        tenant_admin_site.urls,
+    ),
     path('inventario/', include('inventario.urls')),
     path('', RedirectView.as_view(pattern_name='inventario:login', permanent=False)),
 ]
