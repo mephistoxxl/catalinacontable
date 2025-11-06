@@ -178,6 +178,43 @@ else:
     except ValueError as exc:
         raise ValueError('FIRMAS_KEY no es una clave Fernet válida') from exc
 
+# ✅ Cache distribuida y Redis para tareas asíncronas
+_raw_redis_sources = [
+    os.environ.get('RQ_REDIS_URL'),
+    os.environ.get('REDIS_URL'),
+    os.environ.get('REDIS_TLS_URL'),
+    os.environ.get('CACHE_URL'),
+    os.environ.get('REDISCLOUD_URL'),
+]
+REDIS_URL = next((url for url in _raw_redis_sources if url), None)
+CACHE_DEFAULT_TIMEOUT = int(os.environ.get('CACHE_DEFAULT_TIMEOUT', 300))
+
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'TIMEOUT': CACHE_DEFAULT_TIMEOUT,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',
+                'SOCKET_CONNECT_TIMEOUT': int(os.environ.get('REDIS_SOCKET_CONNECT_TIMEOUT', 5)),
+                'SOCKET_TIMEOUT': int(os.environ.get('REDIS_SOCKET_TIMEOUT', 5)),
+            },
+        }
+    }
+    DJANGO_REDIS_IGNORE_EXCEPTIONS = True
+    SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
+    SESSION_CACHE_ALIAS = 'default'
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'catalinafact-locmem',
+            'TIMEOUT': CACHE_DEFAULT_TIMEOUT,
+        }
+    }
+
 # ✅ CONFIGURACIÓN DE LOGGING (JSON, TENANT Y STDOUT)
 LOGGING = {
     'version': 1,
@@ -295,6 +332,7 @@ SECURE_BROWSER_XSS_FILTER = os.environ.get('SECURE_BROWSER_XSS_FILTER', 'True') 
 INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
+    'django_rq',
     'inventario.apps.InventarioConfig',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -499,3 +537,28 @@ REST_FRAMEWORK = {
         'anon': '100/day',
     },
 }
+
+# ✅ Configuración de colas asíncronas (django-rq)
+RQ_DEFAULT_TIMEOUT = int(os.environ.get('RQ_DEFAULT_TIMEOUT', 420))
+_rq_url = os.environ.get('RQ_REDIS_URL') or REDIS_URL or 'redis://127.0.0.1:6379/0'
+RQ_QUEUES = {
+    'default': {
+        'URL': _rq_url,
+        'DEFAULT_TIMEOUT': RQ_DEFAULT_TIMEOUT,
+    },
+    'sri': {
+        'URL': _rq_url,
+        'DEFAULT_TIMEOUT': int(os.environ.get('RQ_SRI_TIMEOUT', max(RQ_DEFAULT_TIMEOUT, 600))),
+    },
+    'reportes': {
+        'URL': _rq_url,
+        'DEFAULT_TIMEOUT': int(os.environ.get('RQ_REPORTES_TIMEOUT', max(RQ_DEFAULT_TIMEOUT, 900))),
+    },
+}
+
+_rq_handlers = [handler.strip() for handler in os.environ.get(
+    'RQ_EXCEPTION_HANDLERS',
+    'django_rq.handlers.move_to_failed_queue',
+).split(',') if handler.strip()]
+if _rq_handlers:
+    RQ_EXCEPTION_HANDLERS = _rq_handlers

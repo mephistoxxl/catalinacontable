@@ -27,3 +27,6 @@ urlpatterns = [
     path('inventario/', include('inventario.urls')),
     path('', RedirectView.as_view(pattern_name='inventario:login', permanent=False)),
 ]
+
+if 'django_rq' in settings.INSTALLED_APPS:
+    urlpatterns.append(path('django-rq/', include('django_rq.urls')))
