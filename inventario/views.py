@@ -58,6 +58,7 @@ import json
 import logging
 from django.contrib import admin
 from .sri.ride_generator import RIDEGenerator
+from sistema.aws_utils import build_storage_url_or_none
 from .proforma.ride_proformgenerator import ProformaRIDEGenerator
 from .utils.media_paths import build_factura_media_paths
 from .utils.storage_io import storage_read_text
@@ -624,15 +625,12 @@ def ride_proforma(request, p):
 
     # Resolver logo: primero el configurado en Opciones (MEDIA), sino fallback estático
     logo_url = None
-    try:
-        if opciones and getattr(opciones, 'imagen', None):
-            # URL pública del logo subido
-            logo_url = opciones.imagen.url
-        else:
-            base_static = settings.STATIC_URL.rstrip('/')
-            logo_url = f"{base_static}/inventario/assets/logo/logo2.png"
-    except Exception:
-        logo_url = None
+    if opciones and getattr(opciones, 'imagen', None):
+        logo_url = build_storage_url_or_none(opciones.imagen)
+
+    if not logo_url:
+        base_static = settings.STATIC_URL.rstrip('/')
+        logo_url = f"{base_static}/inventario/assets/logo/logo2.png"
 
     # Construir contexto de empresa para el encabezado
     empresa_ctx = {

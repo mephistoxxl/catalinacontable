@@ -10,6 +10,7 @@ from django.core.mail import EmailMessage
 from django.utils import timezone
 from inventario.models import Factura, DetalleFactura, Opciones
 from inventario.tenant.queryset import set_current_tenant
+from sistema.aws_utils import build_storage_url_or_none
 from .sri_client import SRIClient
 from .xml_generator import SRIXMLGenerator
 from .pdf_firmador import PDFFirmador
@@ -841,18 +842,10 @@ class SRIIntegration:
             # Determinar URL del logo - usar imagen de opciones si existe
             logo_url = None
             if hasattr(opciones, 'imagen') and opciones.imagen:
-                try:
-                    logo_url = opciones.imagen.url
-                    if not logo_url.startswith('http'):
-                        # Construir URL absoluta para S3
-                        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'catalina-media-prod')
-                        region = getattr(settings, 'AWS_S3_REGION_NAME', 'us-east-2')
-                        logo_url = f"https://{bucket}.s3.{region}.amazonaws.com/{logo_url.lstrip('/')}"
-                    logger.info(f"� Usando logo de opciones: {logo_url}")
-                except Exception as e:
-                    logger.warning(f"Error obteniendo logo de opciones: {e}")
-                    logo_url = None
-            
+                logo_url = build_storage_url_or_none(opciones.imagen)
+                if logo_url:
+                    logger.info(f"� Usando logo de opciones firmado temporalmente")
+
             if not logo_url:
                 # Logo de CATALINA (sistema) por defecto
                 logo_url = 'https://catalina-media-prod.s3.us-east-2.amazonaws.com/static/inventario/assets/logo/logo-catalina.png'
@@ -872,7 +865,7 @@ class SRIIntegration:
                 'email_empresa': getattr(opciones, 'correo', ''),
                 'telefono': getattr(opciones, 'telefono', ''),
                 'year': datetime.now().year,
-                'logo_url': 'https://catalina-media-prod.s3.us-east-2.amazonaws.com/static/inventario/assets/logo/logo-catalina.png',
+                'logo_url': logo_url,
                 # Redes sociales (puedes agregar estos campos a Opciones si quieres)
                 'facebook_url': None,
                 'youtube_url': None,

@@ -80,11 +80,22 @@ if USE_REMOTE_MEDIA_STORAGE:
     AWS_S3_SIGNATURE_VERSION = os.environ.get('AWS_S3_SIGNATURE_VERSION', 's3v4')
     AWS_S3_ADDRESSING_STYLE = os.environ.get('AWS_S3_ADDRESSING_STYLE')
     AWS_DEFAULT_ACL = os.environ.get('AWS_DEFAULT_ACL', 'private')
-    AWS_QUERYSTRING_AUTH = os.environ.get('AWS_S3_QUERYSTRING_AUTH', 'False').lower() == 'true'
+    # AWS_S3_QUERYSTRING_AUTH solo debe desactivarse (False) en pruebas locales controladas.
+    AWS_QUERYSTRING_AUTH = os.environ.get('AWS_S3_QUERYSTRING_AUTH', '').lower() != 'false'
     AWS_S3_FILE_OVERWRITE = False
+
+    AWS_S3_ENCRYPTION = True
+    AWS_S3_KMS_KEY_ID = os.environ.get('AWS_S3_KMS_KEY_ID') or os.environ.get('AWS_KMS_KEY_ID')
+    _default_sse = os.environ.get('AWS_S3_SERVER_SIDE_ENCRYPTION', 'aws:kms')
+
     AWS_S3_OBJECT_PARAMETERS = {
         'CacheControl': os.environ.get('AWS_S3_CACHE_CONTROL', 'max-age=86400'),
+        'ServerSideEncryption': _default_sse,
     }
+    if _default_sse == 'aws:kms' and AWS_S3_KMS_KEY_ID:
+        AWS_S3_OBJECT_PARAMETERS['SSEKMSKeyId'] = AWS_S3_KMS_KEY_ID
+
+    AWS_S3_PRESIGNED_TTL = int(os.environ.get('AWS_S3_PRESIGNED_TTL', 3600))
 
     aws_location = os.environ.get('AWS_MEDIA_LOCATION') or os.environ.get('AWS_LOCATION', '')
     aws_location = (aws_location or '').strip('/')
