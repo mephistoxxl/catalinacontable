@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 import os
 import sys
 import warnings
+from datetime import timedelta
+
 from dotenv import load_dotenv
 from cryptography.fernet import Fernet
 import dj_database_url
@@ -344,6 +346,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'django_rq',
+    'axes',
     'inventario.apps.InventarioConfig',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -358,6 +361,7 @@ if globals().get('_ADD_STORAGES'):
 MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'axes.middleware.AxesMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'sistema.middleware.AdminIPAllowlistMiddleware',
@@ -399,6 +403,29 @@ ROOT_ADMIN_URL = _root_admin_path
 TENANT_ADMIN_URL_SEGMENT = _tenant_admin_segment
 
 ROOT_URLCONF = 'sistema.urls'
+
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+AXES_FAILURE_LIMIT = int(os.environ.get('AXES_FAILURE_LIMIT', 5))
+AXES_RESET_ON_SUCCESS = True
+AXES_ONLY_USER_FAILURES = True
+AXES_LOCKOUT_PARAMETERS = ['username']
+_raw_axes_cooloff = os.environ.get('AXES_COOLOFF_MINUTES')
+if _raw_axes_cooloff:
+    try:
+        AXES_COOLOFF_TIME = timedelta(minutes=int(_raw_axes_cooloff))
+    except ValueError:
+        warnings.warn(
+            'AXES_COOLOFF_MINUTES debe ser un entero; se usará el valor por defecto de 15 minutos.',
+            RuntimeWarning,
+        )
+        AXES_COOLOFF_TIME = timedelta(minutes=15)
+else:
+    AXES_COOLOFF_TIME = timedelta(minutes=15)
+AXES_META_PRECEDENCE_ORDER = ['HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR']
 
 TEMPLATES = [
     {

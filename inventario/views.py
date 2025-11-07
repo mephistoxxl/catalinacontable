@@ -57,6 +57,7 @@ from django.http import JsonResponse
 import json
 import logging
 from django.contrib import admin
+from axes.handlers.proxy import AxesProxyHandler
 from .sri.ride_generator import RIDEGenerator
 from sistema.aws_utils import build_storage_url_or_none
 from .proforma.ride_proformgenerator import ProformaRIDEGenerator
@@ -862,6 +863,15 @@ class Login(View):
         if form.is_valid():
             identificacion = form.cleaned_data['identificacion']
             clave = form.cleaned_data['password']
+            credentials = {'username': identificacion}
+            lockout_message = (
+                'Hemos bloqueado temporalmente el acceso por múltiples intentos fallidos. '
+                'Intente nuevamente más tarde o contacte a soporte para restaurar su cuenta.'
+            )
+
+            if AxesProxyHandler.is_locked(request, credentials=credentials):
+                messages.error(request, lockout_message)
+                return render(request, 'inventario/login.html', {'form': form})
 
             logeado = authenticate(request, username=identificacion, password=clave)
 
@@ -894,8 +904,10 @@ class Login(View):
                 messages.warning(request, 'Su usuario no tiene empresas asociadas todavía. Seleccione o configure una para continuar.')
                 return HttpResponseRedirect('/inventario/seleccionar_empresa/')
 
-            # Credenciales inválidas
-            messages.error(request, 'Usuario o contraseña incorrectos')
+            if AxesProxyHandler.is_locked(request, credentials=credentials):
+                messages.error(request, lockout_message)
+            else:
+                messages.error(request, 'Usuario o contraseña incorrectos')
             return render(request, 'inventario/login.html', {'form': form})
         # Si el formulario no es válido, se vuelve a mostrar con errores
         return render(request, 'inventario/login.html', {'form': form})
