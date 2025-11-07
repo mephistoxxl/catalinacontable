@@ -358,9 +358,15 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+_raw_admin_ip_allowlist = os.environ.get('ADMIN_IP_ALLOWLIST')
+if IS_PRODUCTION and not (_raw_admin_ip_allowlist or '').strip():
+    raise RuntimeError(
+        'ADMIN_IP_ALLOWLIST es obligatorio en producción y debe incluir al menos una IP o red.'
+    )
+_raw_admin_ip_allowlist = (_raw_admin_ip_allowlist or '')
 ADMIN_IP_ALLOWLIST = [
     ip.strip()
-    for ip in os.environ.get('ADMIN_IP_ALLOWLIST', '').split(',')
+    for ip in _raw_admin_ip_allowlist.split(',')
     if ip.strip()
 ]
 ADMIN_TRUSTED_HEADER = os.environ.get('ADMIN_TRUSTED_HEADER')
@@ -370,7 +376,10 @@ ADMIN_TRUSTED_HEADER_VALUES = [
     if value.strip()
 ]
 
-_root_admin_path = os.environ.get('ROOT_ADMIN_URL', 'admin').strip('/') or 'admin'
+_raw_root_admin_url = os.environ.get('ROOT_ADMIN_URL')
+if IS_PRODUCTION and not (_raw_root_admin_url or '').strip():
+    raise RuntimeError('ROOT_ADMIN_URL es obligatorio en producción y no puede estar vacío.')
+_root_admin_path = (_raw_root_admin_url or 'admin').strip('/') or 'admin'
 _tenant_admin_segment = (
     os.environ.get('TENANT_ADMIN_URL_SEGMENT', 'admin').strip('/') or 'admin'
 )

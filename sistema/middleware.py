@@ -22,7 +22,8 @@ class AdminIPAllowlistMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         allowlist = getattr(settings, "ADMIN_IP_ALLOWLIST", [])
-        self.allow_all = not allowlist
+        is_production = getattr(settings, "IS_PRODUCTION", False)
+        self.allow_all = not allowlist and not is_production
         self.allowed_networks: List[ipaddress._BaseNetwork] = []
         for value in allowlist:
             try:
