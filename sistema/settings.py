@@ -570,19 +570,10 @@ except Exception:
     EMAIL_PORT = 587
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
 EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() == 'true'
-try:
-    EMAIL_HOST_USER = os.environ['EMAIL_HOST_USER']
-except KeyError as exc:
-    raise ImproperlyConfigured(
-        'EMAIL_HOST_USER no está configurado; define la variable en el entorno.'
-    ) from exc
 
-try:
-    EMAIL_HOST_PASSWORD = os.environ['EMAIL_HOST_PASSWORD']
-except KeyError as exc:
-    raise ImproperlyConfigured(
-        'EMAIL_HOST_PASSWORD no está configurada; define la variable en el entorno.'
-    ) from exc
+# Email credentials - opcionales para evitar crashes
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'noresponder@catalinasoft-ec.com')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 
 # Asegurar remitente por defecto acorde a Zeptomail
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noresponder@catalinasoft-ec.com')
