@@ -69,8 +69,8 @@ from django.conf import settings
 # Integración con Django REST Framework
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework import status
+from rest_framework.permissions import AllowAny
+from rest_framework.throttling import AnonRateThrottle
 # ===== AGREGAR ESTOS IMPORTS AL INICIO DE views.py =====
 
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
@@ -859,7 +859,12 @@ def get_factura_tenant(request, factura_id):
 class Login(View):
     #Si el usuario ya envio el formulario por metodo post
     def post(self, request):
-        form = LoginFormulario(request.POST)
+        # Crea una instancia del formulario y la llena con los datos.
+        # Se pasa un queryset de empresas para permitir la validación del
+        # campo `empresa`, pero la selección de una empresa continúa siendo
+        # opcional gracias a `required=False` en el formulario.
+        form = LoginFormulario(request.POST, empresas=Empresa.objects.all())
+        # Revisa si es valido:
         if form.is_valid():
             identificacion = form.cleaned_data['identificacion']
             clave = form.cleaned_data['password']
@@ -873,36 +878,91 @@ class Login(View):
                 messages.error(request, lockout_message)
                 return render(request, 'inventario/login.html', {'form': form})
 
+            # Obtener la empresa seleccionada en el formulario (si la hay).
+            # Si no se seleccionó ninguna, el formulario sigue siendo válido
+            # porque el campo es opcional.
+            empresa = form.cleaned_data.get('empresa')
+
+            # Compatibilidad: si el frontend envía un campo oculto
+            # `empresa_hidden`, usarlo en caso de que no exista selección
+            # explícita en el formulario.
+            if not empresa:
+                empresa_id = request.POST.get('empresa_hidden')
+                if empresa_id and str(empresa_id).isdigit():
+                    try:
+                        empresa = Empresa.objects.get(id=int(empresa_id))
+                    except Empresa.DoesNotExist:
+                        empresa = None
+
             logeado = authenticate(request, username=identificacion, password=clave)
 
             if logeado is not None:
-                login(request, logeado)
-
-                empresas_usuario = request.user.empresas.all()
-
-                # Intentar vincular automáticamente una empresa por RUC si el usuario no tiene asociadas
-                if empresas_usuario.count() == 0 and len(identificacion) == 13 and identificacion.isdigit():
-                    try:
-                        empresa_por_ruc = Empresa.objects.get(ruc=identificacion)
-                        UsuarioEmpresa.objects.get_or_create(usuario=request.user, empresa=empresa_por_ruc)
-                        empresas_usuario = request.user.empresas.all()
-                    except Empresa.DoesNotExist:
-                        pass
-
-                if empresas_usuario.count() == 1:
-                    empresa_unica = empresas_usuario.first()
-                    request.session['empresa_activa'] = empresa_unica.id
+                # 1) Empresa enviada explícitamente y válida
+                if empresa and logeado.empresas.filter(id=empresa.id).exists():
+                    login(request, logeado)
+                    request.session['empresa_activa'] = empresa.id
                     # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
-                    if necesita_configuracion(empresa_unica):
+                    if necesita_configuracion(empresa):
                         messages.warning(request, '⚠️ Complete la configuración de su empresa para facturar electrónicamente')
                         return redirect('inventario:configuracionGeneral')
                     return HttpResponseRedirect('/inventario/panel')
+                # Primer inicio con empresa indicada: si el usuario no tiene empresas aún, vincularlo
+                if empresa and logeado.empresas.count() == 0:
+                    try:
+                        UsuarioEmpresa.objects.get_or_create(usuario=logeado, empresa=empresa)
+                        login(request, logeado)
+                        request.session['empresa_activa'] = empresa.id
+                        # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
+                        if necesita_configuracion(empresa):
+                            messages.warning(request, '⚠️ Complete la configuración de su empresa para facturar electrónicamente')
+                            return redirect('inventario:configuracionGeneral')
+                        return HttpResponseRedirect('/inventario/panel')
+                    except Exception:
+                        pass
 
-                if empresas_usuario.count() > 1:
+                # 2) Intentar auto-detección por RUC (13 dígitos)
+                if not empresa and len(identificacion) == 13 and identificacion.isdigit():
+                    try:
+                        emp_ruc = Empresa.objects.get(ruc=identificacion)
+                        if logeado.empresas.filter(id=emp_ruc.id).exists():
+                            login(request, logeado)
+                            request.session['empresa_activa'] = emp_ruc.id
+                            # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
+                            if necesita_configuracion(emp_ruc):
+                                messages.warning(request, '⚠️ Complete la configuración de su empresa para facturar electrónicamente')
+                                return redirect('inventario:configuracionGeneral')
+                            return HttpResponseRedirect('/inventario/panel')
+                        # Primer inicio: si el usuario no tiene empresas, vincular a esta
+                        if logeado.empresas.count() == 0:
+                            UsuarioEmpresa.objects.get_or_create(usuario=logeado, empresa=emp_ruc)
+                            login(request, logeado)
+                            request.session['empresa_activa'] = emp_ruc.id
+                            # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
+                            if necesita_configuracion(emp_ruc):
+                                messages.warning(request, '⚠️ Complete la configuración de su empresa para facturar electrónicamente')
+                                return redirect('inventario:configuracionGeneral')
+                            return HttpResponseRedirect('/inventario/panel')
+                    except Empresa.DoesNotExist:
+                        pass
+
+                # 3) Resolver por cantidad de empresas asociadas
+                empresas_usuario = logeado.empresas.all()
+                if empresas_usuario.count() == 1:
+                    unica = empresas_usuario.first()
+                    login(request, logeado)
+                    request.session['empresa_activa'] = unica.id
+                    # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
+                    if necesita_configuracion(unica):
+                        messages.warning(request, '⚠️ Complete la configuración de su empresa para facturar electrónicamente')
+                        return redirect('inventario:configuracionGeneral')
+                    return HttpResponseRedirect('/inventario/panel')
+                elif empresas_usuario.count() > 1:
+                    login(request, logeado)
                     return HttpResponseRedirect('/inventario/seleccionar_empresa/')
 
-                messages.warning(request, 'Su usuario no tiene empresas asociadas todavía. Seleccione o configure una para continuar.')
-                return HttpResponseRedirect('/inventario/seleccionar_empresa/')
+                # 4) Si llega aquí, requiere selección explícita
+                messages.error(request, 'Seleccione una empresa válida para continuar')
+                return render(request, 'inventario/login.html', {'form': form})
 
             if AxesProxyHandler.is_locked(request, credentials=credentials):
                 messages.error(request, lockout_message)
@@ -911,13 +971,14 @@ class Login(View):
             return render(request, 'inventario/login.html', {'form': form})
         # Si el formulario no es válido, se vuelve a mostrar con errores
         return render(request, 'inventario/login.html', {'form': form})
-
+        
     # Si se llega por GET crearemos un formulario en blanco
     def get(self, request):
         if request.user.is_authenticated == True:
             return HttpResponseRedirect('/inventario/panel')
 
-        form = LoginFormulario()
+        # Mostrar el formulario con el listado completo de empresas disponibles.
+        form = LoginFormulario(empresas=Empresa.objects.all())
         return render(request, 'inventario/login.html', {'form': form})
 
 
@@ -964,14 +1025,16 @@ class SeleccionarEmpresa(LoginRequiredMixin, View):
 
 # API para obtener empresas de un usuario por identificación
 class EmpresasPorUsuario(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
+    throttle_classes = [AnonRateThrottle]
 
-    def get(self, request, identificacion=None):
-        if identificacion and identificacion != request.user.username:
-            return Response({'empresas': []}, status=status.HTTP_403_FORBIDDEN)
-
-        empresas = request.user.empresas.all()
-        data = [{'id': e.id, 'razon_social': e.razon_social} for e in empresas]
+    def get(self, request, identificacion):
+        try:
+            usuario = Usuario.objects.get(username=identificacion)
+            empresas = usuario.empresas.all()
+            data = [{'id': e.id, 'razon_social': e.razon_social} for e in empresas]
+        except Usuario.DoesNotExist:
+            data = []
         return Response({'empresas': data})
 
 
