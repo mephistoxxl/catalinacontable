@@ -46,6 +46,51 @@ Si ves encabezado legible típico PKCS#12 (`0x30 0x82 ...`) y puedes importar el
 
 Conservar la misma `FIRMAS_KEY` entre reinicios o nuevas réplicas garantiza que las firmas cifradas previamente continúen siendo accesibles.
 
+### Gestión de secretos en Heroku (Config Vars)
+
+Configura **todas** las credenciales sensibles mediante [Config Vars de Heroku](https://devcenter.heroku.com/articles/config-vars). Evita subir valores reales al repositorio: usa los placeholders de `.env`/`.env.example` como referencia local y exporta los secretos directamente al entorno del dyno.
+
+```bash
+# Establecer múltiples secretos de una sola vez
+echo "Generando claves..."
+heroku config:set \
+  SECRET_KEY="$(python - <<'PY'
+import secrets
+print(secrets.token_urlsafe(64))
+PY
+)" \
+  FIRMAS_KEY="$(python - <<'PY'
+from cryptography.fernet import Fernet
+print(Fernet.generate_key().decode())
+PY
+)" \
+  EMAIL_HOST_USER="<nuevo-usuario-zeptomail>" \
+  EMAIL_HOST_PASSWORD="<nueva-clave-zeptomail>" \
+  --app <tu-app>
+```
+
+> 💡 **Database URL**: al aprovisionar Heroku Postgres se crea la variable `DATABASE_URL` automáticamente. Si gestionas las credenciales manualmente, sincronízalas con los campos `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST` y `DB_PORT` en tu entorno local (`.env`).
+
+#### Rotación inmediata de secretos comprometidos
+
+1. **PostgreSQL**
+   - Rota la contraseña con `heroku pg:credentials:rotate DATABASE --app <tu-app>` (reemplaza `DATABASE` por el nombre del add-on si difiere).
+   - Actualiza la credencial local (`DB_PASSWORD`) descargando la nueva URL con `heroku pg:credentials:url DATABASE --app <tu-app>`.
+
+2. **ZeptoMail**
+   - Invalida la API Key comprometida desde el panel de ZeptoMail y genera una nueva.
+   - Guarda el `EMAIL_HOST_USER` y `EMAIL_HOST_PASSWORD` emitidos y publícalos en Heroku con `heroku config:set EMAIL_HOST_USER=... EMAIL_HOST_PASSWORD=... --app <tu-app>`.
+
+3. **`FIRMAS_KEY`**
+   - Genera una nueva clave con el snippet anterior de Fernet.
+   - Actualiza la Config Var `FIRMAS_KEY` y reinicia los dynos (`heroku ps:restart --app <tu-app>`). **Descarga y vuelve a cifrar** cualquier certificado existente con la nueva clave siguiendo [docs/firmas/PROCESO_CARGA_ROTACION.md](docs/firmas/PROCESO_CARGA_ROTACION.md).
+
+4. **`SECRET_KEY` de Django**
+   - Produce un valor aleatorio (token URL-safe) y publícalo con `heroku config:set SECRET_KEY=... --app <tu-app>`.
+   - Sustituye el valor local en `.env` o en tu gestor de secretos para mantener la coherencia entre entornos.
+
+Documenta en tu herramienta de gestión de incidencias cuándo y cómo se ejecutó cada rotación y quién custodiará los nuevos secretos. Así evitarás reutilizar accidentalmente valores revocados en despliegues posteriores.
+
 ### Logging y monitoreo
 
 - La configuración de Django usa un `logging.StreamHandler` que emite en formato JSON a **STDOUT**. No se genera el archivo `facturas.log`, por lo que Heroku y cualquier otra plataforma basada en contenedores capturarán directamente los eventos.

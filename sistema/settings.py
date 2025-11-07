@@ -15,6 +15,7 @@ import sys
 import warnings
 from datetime import timedelta
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 from cryptography.fernet import Fernet
 import dj_database_url
@@ -300,9 +301,10 @@ LOGGING = {
 
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY')
-if not SECRET_KEY:
-    raise Exception('SECRET_KEY no está configurada en el entorno')
+try:
+    SECRET_KEY = os.environ['SECRET_KEY']
+except KeyError as exc:
+    raise ImproperlyConfigured('SECRET_KEY no está configurada en el entorno') from exc
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # (DEBUG ya está arriba)
@@ -563,8 +565,19 @@ except Exception:
     EMAIL_PORT = 587
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
 EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() == 'true'
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'emailapikey')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'wSsVR60jrkKlBqt9yjaqJOo8mAhXAlilE0R73lWi7H7/S6zEocdulkWaVwfzHKcfF2VoRztGpLkumUsJ1DcNjYl4zF9WDSiF9mqRe1U4J3x17qnvhDzPWWhdlBqKJY0IwwxrnWhkFMwr+g==')
+try:
+    EMAIL_HOST_USER = os.environ['EMAIL_HOST_USER']
+except KeyError as exc:
+    raise ImproperlyConfigured(
+        'EMAIL_HOST_USER no está configurado; define la variable en el entorno.'
+    ) from exc
+
+try:
+    EMAIL_HOST_PASSWORD = os.environ['EMAIL_HOST_PASSWORD']
+except KeyError as exc:
+    raise ImproperlyConfigured(
+        'EMAIL_HOST_PASSWORD no está configurada; define la variable en el entorno.'
+    ) from exc
 
 # Asegurar remitente por defecto acorde a Zeptomail
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noresponder@catalinasoft-ec.com')
