@@ -15,6 +15,7 @@ import datetime
 from django.utils import timezone
 from .crypto_utils import EncryptedCharField
 from .tenant.queryset import TenantManager
+from .tenant.services import tenant_unsafe_service
 # Almacenamiento personalizado para firmas electrónicas cifradas
 from .storage import EncryptedFirmaStorage
 # Señales para asignar roles por defecto
@@ -190,7 +191,8 @@ class UsuarioEmpresa(models.Model):
     alias = models.CharField(max_length=120, null=True, blank=True, help_text="Nombre/alias a mostrar en esta empresa")
 
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     class Meta:
         unique_together = ('usuario', 'empresa')
@@ -423,7 +425,8 @@ class Opciones(models.Model):
     )
 
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     # MÉTODOS ÚTILES PARA XML:
     @property
@@ -563,7 +566,8 @@ class Producto(models.Model):
     costo_actual = models.DecimalField(max_digits=9, decimal_places=2)
 
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     # Campos calculados para el precio con IVA
     precio_iva1 = models.DecimalField(max_digits=9, decimal_places=2, editable=False, default=0)
@@ -724,7 +728,8 @@ class Cliente(models.Model):
     ])
 
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     @classmethod
     def numeroRegistrados(cls, empresa_id=None):
@@ -945,7 +950,8 @@ class Factura(models.Model):
         help_text="RIDE (PDF) autorizado"
     )
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     # ✅ VALIDACIONES de descuento
     def clean(self):
@@ -1342,7 +1348,12 @@ class Factura(models.Model):
         
         # Alinear cualquier forma de pago existente con el tenant correcto
         if self.empresa_id:
-            FormaPago.all_objects.filter(factura=self, empresa__isnull=True).update(empresa=self.empresa)
+            tenant_unsafe_service(FormaPago).update(
+                empresa_id=self.empresa_id,
+                allow_null_empresa=True,
+                filters={"factura": self, "empresa__isnull": True},
+                updates={"empresa": self.empresa},
+            )
 
         # Si no hay formas de pago, crear una por defecto
         if not self.formas_pago.exists():
@@ -1599,7 +1610,8 @@ class DetalleFactura(models.Model):
     total = models.DecimalField(max_digits=20, decimal_places=2)
 
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     # ✅ NUEVO: OBLIGATORIO según XSD
     descuento = models.DecimalField(
@@ -1923,7 +1935,8 @@ class Proveedor(models.Model):
     ], default='1')
 
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     @classmethod
     def cedulasRegistradas(self):
@@ -1965,7 +1978,8 @@ class Pedido(models.Model):
     presente = models.BooleanField(null=True)
 
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     @classmethod
     def recibido(self, pedido):
@@ -1997,7 +2011,8 @@ class DetallePedido(models.Model):
 
 # ------------------------------------NOTIFICACIONES------------------------------------
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
 class Notificaciones(models.Model):
     # id
@@ -2016,7 +2031,8 @@ class Notificaciones(models.Model):
 
 # ------------------------------------SECUENCIAS------------------------------------
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
 class Secuencia(models.Model):
     id = models.AutoField(
@@ -2086,7 +2102,8 @@ class Secuencia(models.Model):
     )
 
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     class Meta:
         verbose_name = "Secuencia"
@@ -2192,7 +2209,8 @@ class Facturador(AbstractBaseUser):
     REQUIRED_FIELDS = ['nombres']
     objects = FacturadorManager()
     tenant_objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     class Meta:
         verbose_name = 'Facturador'
@@ -2247,7 +2265,8 @@ class Almacen(models.Model):
     activo = models.BooleanField(default=True)  # Campo activo añadido
 
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     def __str__(self):
         return self.descripcion
@@ -2292,7 +2311,8 @@ class Caja(models.Model):
     )
     
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     class Meta:
         verbose_name = "Caja"
@@ -2421,7 +2441,8 @@ class FormaPago(models.Model):
     )
     
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     class Meta:
         verbose_name = "Forma de Pago"
@@ -2531,7 +2552,8 @@ class CampoAdicional(models.Model):
     )
     
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     class Meta:
         verbose_name = "Campo Adicional"
@@ -2721,7 +2743,8 @@ class MaquinaFiscal(models.Model):
     )
     
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     class Meta:
         verbose_name = "Máquina Fiscal"
@@ -2918,7 +2941,8 @@ class TipoNegociable(models.Model):
     )
     
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     class Meta:
         verbose_name = "Tipo Negociable"
@@ -3121,7 +3145,8 @@ class TotalImpuesto(models.Model):
     )
     
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     class Meta:
         verbose_name = "Total Impuesto"
@@ -3170,7 +3195,8 @@ class ImpuestoDetalle(models.Model):
     valor = models.DecimalField(max_digits=14, decimal_places=2)
     
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     def save(self, *args, **kwargs):
         # Auto-calcular valor
@@ -3216,7 +3242,8 @@ class DetalleAdicional(models.Model):
     )
     
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     class Meta:
         verbose_name = "Detalle Adicional"
@@ -3338,7 +3365,8 @@ class Banco(models.Model):
     )
     
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     class Meta:
         verbose_name = "Banco"
@@ -3471,7 +3499,8 @@ class Servicio(models.Model):
     fecha_modificacion = models.DateTimeField(auto_now=True)
 
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     def __str__(self):
         return self.descripcion
@@ -3595,7 +3624,8 @@ class Proforma(models.Model):
         help_text="Factura generada a partir de esta proforma"
     )
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
     
     @classmethod
     def siguiente_numero(cls, empresa):

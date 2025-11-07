@@ -10,6 +10,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from inventario.models import Opciones
 from inventario.storage import EncryptedFirmaStorage
+from inventario.tenant.services import tenant_unsafe_service
 
 
 class Command(BaseCommand):
@@ -46,6 +47,12 @@ class Command(BaseCommand):
             type=int,
             help='Límite opcional de registros a procesar (para migraciones progresivas).',
         )
+        parser.add_argument(
+            '--empresa-id',
+            type=int,
+            required=True,
+            help='ID de la empresa cuyas firmas se migrarán.',
+        )
 
     def handle(self, *args, **options):
         storage = EncryptedFirmaStorage()
@@ -65,8 +72,11 @@ class Command(BaseCommand):
         if not source_dir.exists():
             raise CommandError(f'El directorio de origen {source_dir} no existe.')
 
+        empresa_id = options.get('empresa_id')
         qs = (
-            Opciones.all_objects.exclude(firma_electronica__isnull=True)
+            tenant_unsafe_service(Opciones)
+            .filter(empresa_id=empresa_id)
+            .exclude(firma_electronica__isnull=True)
             .exclude(firma_electronica='')
             .order_by('id')
         )

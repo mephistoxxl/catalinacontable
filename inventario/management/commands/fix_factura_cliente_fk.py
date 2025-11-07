@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Exists, OuterRef
 from django.db import transaction, connection
 from inventario.models import Factura, Cliente, Empresa
+from inventario.tenant.services import tenant_unsafe_service
 
 
 class Command(BaseCommand):
@@ -19,6 +20,12 @@ class Command(BaseCommand):
             '--target-field', choices=['id', 'identificacion'], default=None,
             help='Forzar a mapear cliente_id hacia Cliente.id o Cliente.identificacion (por defecto: autodetectar)'
         )
+        parser.add_argument(
+            '--empresa-id',
+            type=int,
+            required=True,
+            help='ID de la empresa cuyas facturas serán reparadas',
+        )
 
     def handle(self, *args, **options):
         dry_run = options.get('dry_run')
@@ -27,8 +34,13 @@ class Command(BaseCommand):
         target_override = options.get('target_field')
 
         # Detectar facturas con cliente_id inválido
+        empresa_id = options.get('empresa_id')
         cliente_exist = Cliente.objects.filter(id=OuterRef('cliente_id'))
-        base_qs = Factura.all_objects.filter(cliente_id__isnull=False).annotate(has_cliente=Exists(cliente_exist)).filter(has_cliente=False)
+        factura_service = tenant_unsafe_service(Factura)
+        base_qs = factura_service.filter(
+            empresa_id=empresa_id,
+            cliente_id__isnull=False,
+        ).annotate(has_cliente=Exists(cliente_exist)).filter(has_cliente=False)
         if only:
             base_qs = base_qs.filter(id=only)
 
@@ -110,7 +122,11 @@ class Command(BaseCommand):
                     f"→ Factura {f.id}: set cliente_id {f.cliente_id} → {new_fk_value} (Cliente.{target_field})"
                 )
             else:
-                Factura.all_objects.filter(id=f.id).update(cliente_id=new_fk_value)
+                factura_service.update(
+                    empresa_id=empresa_id,
+                    filters={'id': f.id},
+                    updates={'cliente_id': new_fk_value},
+                )
             stats["fixed"] += 1
 
         if dry_run:

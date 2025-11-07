@@ -153,7 +153,8 @@ class LiquidacionCompra(models.Model):
     actualizado_en = models.DateTimeField(auto_now=True)
 
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     class Meta:
         indexes = [
@@ -512,7 +513,8 @@ class Prestador(models.Model):
     actualizado_en = models.DateTimeField(auto_now=True)
 
     objects = TenantManager()
-    all_objects = models.Manager()
+    # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.
+    _unsafe_objects = models.Manager()
 
     class Meta:
         verbose_name = "Prestador"

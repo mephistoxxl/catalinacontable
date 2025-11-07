@@ -3,6 +3,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from inventario.models import Factura
+from inventario.tenant.services import tenant_unsafe_service
 from inventario.sri.ambiente import obtener_ambiente_sri
 from inventario.sri.integracion_django import SRIIntegration
 
@@ -30,13 +31,21 @@ class Command(BaseCommand):
             type=int,
             help="ID de factura específica a procesar (opcional)",
         )
+        parser.add_argument(
+            "--empresa-id",
+            type=int,
+            required=True,
+            help="ID de la empresa sobre la cual ejecutar la corrección",
+        )
 
     def handle(self, *args, **options):
         dry_run = options.get("dry_run", False)
         regen_xml = options.get("regen_xml", False)
         only = options.get("only")
 
-        qs = Factura.all_objects.all()
+        empresa_id = options.get("empresa_id")
+
+        qs = tenant_unsafe_service(Factura).filter(empresa_id=empresa_id)
         if only:
             qs = qs.filter(id=only)
         else:

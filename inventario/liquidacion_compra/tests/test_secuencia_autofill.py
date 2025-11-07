@@ -23,7 +23,7 @@ class LiquidacionSecuenciaAutofillTests(TestCase):
         )
         set_current_tenant(self.empresa)
         self.addCleanup(lambda: set_current_tenant(None))
-        UsuarioEmpresa.all_objects.create(usuario=self.usuario, empresa=self.empresa)
+        UsuarioEmpresa._unsafe_objects.create(usuario=self.usuario, empresa=self.empresa)
         self.almacen = Almacen.objects.create(
             empresa=self.empresa,
             descripcion="Matriz",
@@ -145,7 +145,7 @@ class LiquidacionSecuenciaAutofillTests(TestCase):
         expected_redirect = reverse("inventario:liquidaciones_compra_listar")
         self.assertTrue(response["Location"].endswith(expected_redirect))
 
-        liquidacion = LiquidacionCompra.all_objects.get()
+        liquidacion = LiquidacionCompra._unsafe_objects.get()
         self.assertEqual(liquidacion.secuencia, secuencia_info["valor"])
         self.assertEqual(liquidacion.establecimiento, secuencia_info["establecimiento"])
         self.assertEqual(liquidacion.punto_emision, secuencia_info["punto_emision"])

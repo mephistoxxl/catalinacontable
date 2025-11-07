@@ -61,7 +61,7 @@ def test_crear_facturador_view_uses_manager():
         password='supersegura',
         email='admin@example.com',
     )
-    UsuarioEmpresa.all_objects.create(usuario=usuario, empresa=empresa)
+    UsuarioEmpresa._unsafe_objects.create(usuario=usuario, empresa=empresa)
 
     client = Client()
     client.defaults['HTTP_HOST'] = 'localhost'

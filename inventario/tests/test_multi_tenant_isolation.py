@@ -300,7 +300,7 @@ class TestMultiTenantIsolation:
         almacen_a = datos_base['almacen_a']
 
         # Crear productos exclusivos para la prueba con el manager global
-        prod_a = Producto.all_objects.create(
+        prod_a = Producto._unsafe_objects.create(
             empresa=e1,
             codigo='TENANT-A',
             codigo_barras='TENANT-A',
@@ -312,7 +312,7 @@ class TestMultiTenantIsolation:
             iva='2',
             costo_actual=Decimal('2.50'),
         )
-        prod_b = Producto.all_objects.create(
+        prod_b = Producto._unsafe_objects.create(
             empresa=e2,
             codigo='TENANT-B',
             codigo_barras='TENANT-B',
@@ -326,7 +326,7 @@ class TestMultiTenantIsolation:
         )
 
         # Crear facturas en ambas empresas usando el manager global
-        factura_a = Factura.all_objects.create(
+        factura_a = Factura._unsafe_objects.create(
             empresa=e1,
             cliente=cliente_a,
             almacen=almacen_a,
@@ -343,7 +343,7 @@ class TestMultiTenantIsolation:
             base_imponible=Decimal('50.00'),
             monto_general=Decimal('56.00'),
         )
-        factura_b = Factura.all_objects.create(
+        factura_b = Factura._unsafe_objects.create(
             empresa=e2,
             cliente=cliente_b,
             almacen=None,
@@ -371,17 +371,17 @@ class TestMultiTenantIsolation:
         codigos_a = set(Producto.objects.values_list('codigo', flat=True))
         assert 'TENANT-A' in codigos_a
         assert 'TENANT-B' not in codigos_a
-        assert Producto.all_objects.filter(codigo__in=['TENANT-A', 'TENANT-B']).count() >= 2
+        assert Producto._unsafe_objects.filter(codigo__in=['TENANT-A', 'TENANT-B']).count() >= 2
 
         facturas_a_ids = set(Factura.objects.values_list('id', flat=True))
         assert factura_a.id in facturas_a_ids
         assert factura_b.id not in facturas_a_ids
 
-        expected_a_count = Factura.all_objects.filter(empresa=e1).count()
+        expected_a_count = Factura._unsafe_objects.filter(empresa=e1).count()
         assert Factura.numeroRegistrados() == expected_a_count
 
         expected_a_total = sum(
-            (f.monto_general for f in Factura.all_objects.filter(empresa=e1)),
+            (f.monto_general for f in Factura._unsafe_objects.filter(empresa=e1)),
             Decimal('0.00')
         )
         assert Factura.ingresoTotal() == expected_a_total
@@ -396,11 +396,11 @@ class TestMultiTenantIsolation:
         assert factura_b.id in facturas_b_ids
         assert factura_a.id not in facturas_b_ids
 
-        expected_b_count = Factura.all_objects.filter(empresa=e2).count()
+        expected_b_count = Factura._unsafe_objects.filter(empresa=e2).count()
         assert Factura.numeroRegistrados() == expected_b_count
 
         expected_b_total = sum(
-            (f.monto_general for f in Factura.all_objects.filter(empresa=e2)),
+            (f.monto_general for f in Factura._unsafe_objects.filter(empresa=e2)),
             Decimal('0.00')
         )
         assert Factura.ingresoTotal() == expected_b_total

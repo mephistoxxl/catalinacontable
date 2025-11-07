@@ -6,26 +6,25 @@ from django.core.files.temp import NamedTemporaryFile
 from django.shortcuts import get_object_or_404
 
 from .models import Producto
+from .tenant.services import tenant_unsafe_service
 
 
 def obtenerIdProducto(descripcion, empresa):
     """Devuelve el ID del producto filtrando por empresa."""
 
     empresa_id = getattr(empresa, 'id', empresa)
-    id_producto = Producto.all_objects.filter(
-        descripcion=descripcion,
+    producto = tenant_unsafe_service(Producto).get(
         empresa_id=empresa_id,
-    ).get()
-    resultado = id_producto.id
-
-    return resultado
+        descripcion=descripcion,
+    )
+    return producto.id
 
 def obtenerProducto(idProducto, empresa):
     """Obtiene el producto filtrando por la empresa proporcionada."""
 
     empresa_id = getattr(empresa, 'id', empresa)
-    producto = get_object_or_404(Producto.all_objects, id=idProducto, empresa_id=empresa_id)
-    return producto
+    qs = tenant_unsafe_service(Producto).filter(empresa_id=empresa_id)
+    return get_object_or_404(qs, id=idProducto)
 
 
 def complementarContexto(contexto,datos):

@@ -78,6 +78,7 @@ from .forms import FirmaElectronicaForm  # Asegúrate de tener este formulario
 from django.urls import reverse
 from .mixins import RequireEmpresaActivaMixin, require_empresa_activa, get_empresa_activa
 from django.db.models import Q
+from .tenant.services import tenant_unsafe_service
 
 logger = logging.getLogger(__name__)
 
@@ -2952,8 +2953,18 @@ class DetallesFactura(LoginRequiredMixin, View):
             factura.refresh_from_db()
 
             if factura.empresa_id:
-                FormaPago.all_objects.filter(factura=factura, empresa__isnull=True).update(empresa=factura.empresa)
-                CampoAdicional.all_objects.filter(factura=factura, empresa__isnull=True).update(empresa=factura.empresa)
+                tenant_unsafe_service(FormaPago).update(
+                    empresa_id=factura.empresa_id,
+                    allow_null_empresa=True,
+                    filters={"factura": factura, "empresa__isnull": True},
+                    updates={"empresa": factura.empresa},
+                )
+                tenant_unsafe_service(CampoAdicional).update(
+                    empresa_id=factura.empresa_id,
+                    allow_null_empresa=True,
+                    filters={"factura": factura, "empresa__isnull": True},
+                    updates={"empresa": factura.empresa},
+                )
 
             # 🔍 DEBUG: Logging detallado antes de validar pagos
             logger.info(f"📊 VALIDACIÓN FINAL:")

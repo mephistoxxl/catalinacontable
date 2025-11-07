@@ -2,6 +2,7 @@ import logging
 from django.core.management.base import BaseCommand
 from inventario.sri.integracion_django import SRIIntegration
 from inventario.models import Factura
+from inventario.tenant.services import tenant_unsafe_service
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +30,17 @@ class Command(BaseCommand):
             action='store_true',
             help='Verificar disponibilidad de servicios SRI'
         )
+        parser.add_argument(
+            '--empresa-id',
+            type=int,
+            required=True,
+            help='ID de la empresa cuyas facturas se procesarán',
+        )
 
     def handle(self, *args, **options):
+        self.empresa_id = options['empresa_id']
+        self.factura_service = tenant_unsafe_service(Factura)
+
         # Diagnóstico de servicios
         if options['diagnostico']:
             self.diagnosticar_servicios()
@@ -52,9 +62,10 @@ class Command(BaseCommand):
     def diagnosticar_servicios(self):
         """Verificar disponibilidad de servicios SRI"""
         self.stdout.write(self.style.SUCCESS('=== DIAGNÓSTICO SRI ==='))
-        
+
         try:
-            empresa = Factura.all_objects.first().empresa if Factura.all_objects.exists() else None
+            qs = self.factura_service.filter(empresa_id=self.empresa_id)
+            empresa = qs.first().empresa if qs.exists() else None
             integration = SRIIntegration(empresa=empresa)
             estado = integration.cliente.verificar_servicio()
 
@@ -73,7 +84,7 @@ class Command(BaseCommand):
     def procesar_factura_especifica(self, factura_id, solo_consultar=False):
         """Procesar una factura específica"""
         try:
-            factura = Factura.all_objects.get(id=factura_id)
+            factura = self.factura_service.get(empresa_id=self.empresa_id, id=factura_id)
             self.stdout.write(f"Procesando factura: {factura.numero_factura}")
 
             integration = SRIIntegration(empresa=factura.empresa)
@@ -90,8 +101,8 @@ class Command(BaseCommand):
 
     def procesar_facturas_por_estado(self, estado, solo_consultar=False):
         """Procesar todas las facturas con un estado específico"""
-        facturas = Factura.all_objects.filter(estado=estado)
-        
+        facturas = self.factura_service.filter(empresa_id=self.empresa_id, estado=estado)
+
         if not facturas.exists():
             self.stdout.write(f"No hay facturas con estado {estado}")
             return
@@ -115,7 +126,10 @@ class Command(BaseCommand):
 
     def procesar_facturas_pendientes(self, solo_consultar=False):
         """Procesar todas las facturas pendientes"""
-        facturas = Factura.all_objects.filter(estado__in=['PENDIENTE', 'RECIBIDA'])
+        facturas = self.factura_service.filter(
+            empresa_id=self.empresa_id,
+            estado__in=['PENDIENTE', 'RECIBIDA']
+        )
         
         if not facturas.exists():
             self.stdout.write("No hay facturas pendientes")
