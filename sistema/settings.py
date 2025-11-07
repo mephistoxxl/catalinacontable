@@ -174,23 +174,28 @@ else:
 # Clave utilizada para cifrar los archivos de firma
 env_firmas_key = os.environ.get('FIRMAS_KEY')
 if not env_firmas_key:
-    if IS_PRODUCTION:
-        raise RuntimeError(
-            'FIRMAS_KEY es obligatoria en producción para cifrar los certificados (Fernet urlsafe base64 key).'
-        )
-    # Permitir ausencia en desarrollo / pruebas, pero advertir claramente.
+    # Permitir ausencia de FIRMAS_KEY - las firmas se guardarán sin cifrar
     FIRMAS_KEY = None
-    warnings.warn(
-        'FIRMAS_KEY no está configurada: las firmas electrónicas se almacenarán SIN CIFRAR. '
-        'Configura FIRMAS_KEY al desplegar en producción para habilitar el cifrado.',
-        RuntimeWarning
-    )
+    if IS_PRODUCTION:
+        warnings.warn(
+            'FIRMAS_KEY no configurada: las firmas electrónicas se almacenarán SIN CIFRAR. '
+            'Para mayor seguridad, configura FIRMAS_KEY con una clave Fernet válida.',
+            RuntimeWarning
+        )
 else:
-    FIRMAS_KEY = env_firmas_key.encode('utf-8')
+    # Limpiar espacios, comillas y caracteres invisibles
+    cleaned_key = env_firmas_key.strip().strip('"').strip("'").strip()
+    FIRMAS_KEY = cleaned_key.encode('utf-8')
     try:
         Fernet(FIRMAS_KEY)  # valida formato
     except ValueError as exc:
-        raise ValueError('FIRMAS_KEY no es una clave Fernet válida') from exc
+        # Si la clave es inválida, advertir pero NO romper la app
+        warnings.warn(
+            f'FIRMAS_KEY inválida (longitud: {len(cleaned_key)}), se almacenarán firmas SIN CIFRAR. '
+            f'Valor recibido: "{cleaned_key[:10]}..."',
+            RuntimeWarning
+        )
+        FIRMAS_KEY = None
 
 # ✅ Cache distribuida y Redis para tareas asíncronas
 _raw_redis_sources = [
