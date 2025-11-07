@@ -23,34 +23,24 @@ class LoginFormulario(forms.Form):
         label="Identificación",
         widget=forms.TextInput(attrs={
             'placeholder': 'Cédula o RUC',
-            'class': 'form-control underlined',
+            'class': 'w-full px-3 py-2 border border-gray-300 bg-white rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent transition duration-200 text-sm',
             'type': 'text',
             'id': 'identificacion',
             'maxlength': '13',
             'pattern': '[0-9]*',
-            'inputmode': 'numeric'
+            'inputmode': 'numeric',
+            'autocomplete': 'username'
         })
     )
-
-    empresa = forms.ModelChoiceField(
-        label="Empresa",
-        queryset=Empresa.objects.none(),
-        required=False,
-        widget=forms.Select(attrs={
-            'class': 'custom-empresa-select w-full px-4 py-3 border-2 border-gray-300 bg-gradient-to-r from-green-50 via-emerald-50 to-teal-50 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 text-sm font-semibold text-gray-700 hover:border-green-400 cursor-pointer shadow-sm hover:shadow-md',
-            'id': 'empresa'
-        })
-    )
-
-    def __init__(self, *args, **kwargs):
-        empresas = kwargs.pop('empresas', None)
-        super().__init__(*args, **kwargs)
-        if empresas is not None:
-            self.fields['empresa'].queryset = empresas
 
     password = forms.CharField(
         label="Contraseña",
-        widget=forms.PasswordInput(attrs={'placeholder': 'Contraseña', 'class': 'form-control underlined', 'id': 'password'})
+        widget=forms.PasswordInput(attrs={
+            'placeholder': 'Contraseña',
+            'class': 'w-full px-3 py-2 border border-gray-300 bg-white rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent transition duration-200 text-sm',
+            'id': 'password',
+            'autocomplete': 'current-password'
+        })
     )
 
     def clean_identificacion(self):
