@@ -2333,13 +2333,39 @@ class EmitirFactura(LoginRequiredMixin, View):
                 (a.id, a.descripcion) for a in almacenes
             ]
 
+            # ✅ AGREGAR: Obtener las cajas activas (solo de la empresa)
+            cajas_activas = Caja.objects.filter(activo=True, empresa_id=empresa_id).order_by('descripcion')
+            
+            # ✅ Formas de pago SRI desde el modelo
+            formas_pago_sri = getattr(FormaPago, 'FORMAS_PAGO_CHOICES', [])
+
+            # ✅ Lista de bancos: nombres únicos desde DB + fallback estático
+            try:
+                if hasattr(Banco, 'bancos_disponibles'):
+                    bancos_db = set(Banco.bancos_disponibles())
+                else:
+                    bancos_db = set(Banco.objects.filter(empresa_id=empresa_id).values_list('banco', flat=True))
+            except Exception:
+                bancos_db = set()
+
+            bancos_fallback = {
+                'Pichincha', 'Produbanco', 'Pacifico', 'Machala', 'Guayaquil', 'Banecuador',
+                'Internacional', 'Procredit', 'Austro', 'Bolivariano', 'Loja', 'Amazonas', 'Ruminahui'
+            }
+            lista_bancos = sorted({*(bancos_db or set()), *bancos_fallback})
+
             # Preparar el contexto
             contexto = {
                 'form': form,
                 'cedulas': cedulas,
                 'secuencias': secuencias,
                 'almacenes': almacenes,
-                'facturador': facturador  # ✅ AGREGAR INFO DEL FACTURADOR
+                'facturador': facturador,  # ✅ AGREGAR INFO DEL FACTURADOR
+                'cajas': cajas_activas,
+                'formas_pago_sri': formas_pago_sri,
+                'bancos_lista_nombres': lista_bancos,
+                'bancos_db': Banco.objects.filter(activo=True, empresa_id=empresa_id).order_by('banco'),
+                'now': timezone.now()  # Para la fecha por defecto en cheques
             }
             contexto = complementarContexto(contexto, request.user)
 
@@ -2351,9 +2377,13 @@ class EmitirFactura(LoginRequiredMixin, View):
             return redirect('inventario:panel')
 
     def post(self, request):
-        """Procesa el formulario para crear la factura"""
+        """Procesa el formulario para crear la factura CON productos y formas de pago"""
         try:
-            # Imprimir datos recibidos para depuración (puede reducirse en producción)
+            from django.db import transaction
+            from decimal import Decimal, ROUND_HALF_UP
+            import json
+            
+            # Imprimir datos recibidos para depuración
             print("[EmitirFactura.post] Datos formulario:", dict(request.POST))
 
             # ✅ RECUPERAR Y VALIDAR FACTURADOR DESDE SESIÓN
@@ -2366,7 +2396,6 @@ class EmitirFactura(LoginRequiredMixin, View):
                 facturador = Facturador.tenant_objects.get(id=facturador_id, activo=True)
             except Facturador.DoesNotExist:
                 messages.error(request, 'El facturador no existe o no está activo.')
-                # Limpiar sesión de facturador inválido
                 if 'facturador_id' in request.session:
                     del request.session['facturador_id']
                 if 'facturador_nombre' in request.session:
@@ -2384,6 +2413,34 @@ class EmitirFactura(LoginRequiredMixin, View):
                 messages.error(request, 'La empresa seleccionada no existe.')
                 return redirect('inventario:panel')
 
+            # ✅ VALIDAR QUE HAYA PRODUCTOS
+            codigos = request.POST.getlist('productos_codigos[]')
+            cantidades = request.POST.getlist('productos_cantidades[]')
+            
+            if not codigos:
+                codigos = request.POST.getlist('productos_codigos')
+                cantidades = request.POST.getlist('productos_cantidades')
+            
+            if not codigos or not cantidades:
+                raise ValueError("Debe agregar al menos un producto a la factura.")
+            
+            if len(codigos) != len(cantidades):
+                raise ValueError("Error en los datos de productos. Contacte al administrador.")
+            
+            print(f"📦 Productos recibidos: {len(codigos)}")
+            
+            # ✅ VALIDAR FORMAS DE PAGO
+            pagos_json = request.POST.get('pagos_efectivo', '[]')
+            try:
+                pagos_list = json.loads(pagos_json)
+            except json.JSONDecodeError:
+                raise ValueError("Error al procesar las formas de pago.")
+            
+            if not pagos_list:
+                raise ValueError("Debe agregar al menos una forma de pago.")
+            
+            print(f"💰 Formas de pago recibidas: {len(pagos_list)}")
+
             # Recuperar datos del cliente
             cliente_id = request.POST.get('cliente_id')
             if not cliente_id:
@@ -2393,20 +2450,18 @@ class EmitirFactura(LoginRequiredMixin, View):
 
             # Actualizar correo del cliente
             correo_cliente = request.POST.get('correo_cliente', '').strip()
-            if not correo_cliente:
-                raise ValueError("El correo del cliente es obligatorio.")
-            cliente.correo = correo_cliente
-            cliente.save()
+            if correo_cliente:
+                cliente.correo = correo_cliente
+                cliente.save()
 
             # Recuperar datos del almacén
             almacen_id = request.POST.get('almacen')
             if almacen_id:
-                # Validar que el almacén pertenezca a la empresa activa
                 almacen = get_object_or_404(Almacen, pk=almacen_id, empresa=empresa)
             else:
                 almacen = None
 
-            # Convertir fechas de cadena a objetos datetime.date
+            # Convertir fechas
             from datetime import datetime
             fecha_emision_str = request.POST.get('fecha_emision')
             if not fecha_emision_str:
@@ -2421,8 +2476,7 @@ class EmitirFactura(LoginRequiredMixin, View):
             # Recuperar datos de secuencia
             establecimiento = (request.POST.get('establecimiento') or '').strip()
             punto_emision = (request.POST.get('punto_emision') or '').strip()
-            secuencia_id = request.POST.get('secuencia')  # ESTE es el select del modelo Secuencia
-            secuencia_visible = request.POST.get('secuencia_valor')  # campo solo informativo mostrado
+            secuencia_id = request.POST.get('secuencia')
             concepto = request.POST.get('concepto', 'Sin concepto')
 
             if not establecimiento or not punto_emision or not secuencia_id:
@@ -2433,23 +2487,15 @@ class EmitirFactura(LoginRequiredMixin, View):
             except (Secuencia.DoesNotExist, ValueError, TypeError):
                 raise ValueError('La secuencia seleccionada no es válida para esta empresa.')
 
-            # Validar coherencia de establecimiento/punto (el usuario NO debería poder cambiarlo a otros valores manualmente)
             if (str(secuencia_obj.get_establecimiento_formatted()) != str(establecimiento) or
                 str(secuencia_obj.get_punto_emision_formatted()) != str(punto_emision)):
                 raise ValueError('Los datos de establecimiento/punto de emisión no coinciden con la secuencia seleccionada.')
 
-            from django.db import transaction
-
             def reservar_siguiente_secuencia(secuencia):
-                """Reserva de forma segura el siguiente número secuencial.
-                Bloquea la fila, sincroniza si está atrasada y retorna el nuevo formateado."""
                 from django.db.models import Max
-                # Bloquear la misma secuencia (misma empresa + PK)
                 bloqueada = (Secuencia.objects.select_for_update()
                              .get(id=secuencia.id, empresa_id=secuencia.empresa_id))
                 base = int(bloqueada.secuencial or 0)
-
-                # Sincronizar con Factura existente por seguridad (si alguien creó por fuera)
                 max_fact = (Factura.objects.filter(
                     empresa_id=bloqueada.empresa_id,
                     establecimiento=bloqueada.get_establecimiento_formatted(),
@@ -2462,15 +2508,15 @@ class EmitirFactura(LoginRequiredMixin, View):
                             base = max_fact_int
                     except ValueError:
                         pass
-
                 nuevo = base + 1
                 bloqueada.secuencial = nuevo
                 bloqueada.save(update_fields=['secuencial'])
                 return f"{nuevo:09d}"
 
+            # ✅ TRANSACCIÓN ATÓMICA: Factura + Detalles + Formas de Pago
             with transaction.atomic():
+                # 1. Crear la factura
                 secuencia_formateada = reservar_siguiente_secuencia(secuencia_obj)
-
                 factura = Factura(
                     empresa=empresa,
                     cliente=cliente,
@@ -2486,20 +2532,163 @@ class EmitirFactura(LoginRequiredMixin, View):
                     nombre_cliente=f"{cliente.razon_social} {cliente.nombre_comercial if cliente.nombre_comercial else ''}".strip(),
                 )
                 factura.save()
-                request.session['factura_id'] = factura.id
+                
+                print(f"✅ Factura creada: {factura.id}")
+                
+                # 2. Procesar productos (COPIADO DE DetallesFactura)
+                MAPEO_IVA = {
+                    '0': Decimal('0.00'), '5': Decimal('0.05'), '2': Decimal('0.12'),
+                    '10': Decimal('0.13'), '3': Decimal('0.14'), '4': Decimal('0.15'),
+                    '9': Decimal('0.15'), '6': Decimal('0.00'), '7': Decimal('0.00'), '8': Decimal('0.08'),
+                }
+                
+                sub_monto = Decimal('0.00')
+                base_imponible = Decimal('0.00')
+                monto_general = Decimal('0.00')
+                total_iva = Decimal('0.00')
+                
+                for codigo, cantidad_str in zip(codigos, cantidades):
+                    cantidad = int(cantidad_str)
+                    
+                    # Buscar producto o servicio
+                    producto = Producto.objects.filter(empresa_id=empresa_id, codigo=codigo).first()
+                    servicio = Servicio.objects.filter(empresa_id=empresa_id, codigo=codigo).first() if not producto else None
+                    
+                    if not producto and not servicio:
+                        print(f"⚠️ Producto/Servicio no encontrado: {codigo}")
+                        continue
+                    
+                    if producto:
+                        precio_unitario = producto.precio
+                        iva_code = str(producto.iva.iva if hasattr(producto.iva, 'iva') else producto.iva)
+                        descripcion = producto.descripcion
+                    elif servicio:
+                        precio_unitario = servicio.precio1
+                        iva_code = str(servicio.iva.iva if hasattr(servicio.iva, 'iva') else servicio.iva)
+                        descripcion = servicio.descripcion
+                    
+                    iva_percent = MAPEO_IVA.get(iva_code, Decimal('0.12'))
+                    
+                    # Cálculo exacto como en DetallesFactura
+                    precio_con_iva_unitario = precio_unitario * (Decimal('1.00') + iva_percent)
+                    total = precio_con_iva_unitario * cantidad
+                    subtotal = precio_unitario * cantidad
+                    valor_iva = total - subtotal
+                    
+                    # Redondear
+                    subtotal = subtotal.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    valor_iva = valor_iva.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    total = total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    
+                    # Crear detalle
+                    detalle = DetalleFactura.objects.create(
+                        factura=factura,
+                        empresa=empresa,  # ✅ CRÍTICO: Asignar empresa para TenantManager
+                        producto=producto if producto else None,
+                        servicio=servicio if servicio else None,
+                        cantidad=cantidad,
+                        sub_total=subtotal,
+                        total=total,
+                        descuento=Decimal('0.00'),
+                        porcentaje_descuento=Decimal('0.00')
+                    )
+                    
+                    # Forzar valores correctos después del save
+                    DetalleFactura.objects.filter(id=detalle.id).update(
+                        sub_total=subtotal,
+                        total=total
+                    )
+                    
+                    # Acumular totales
+                    sub_monto += subtotal
+                    if iva_percent > 0:
+                        base_imponible += subtotal
+                        total_iva += valor_iva
+                    monto_general += total
+                    
+                    print(f"   ✅ Detalle: {descripcion} x{cantidad} = ${total}")
+                
+                # Redondear totales finales
+                sub_monto = sub_monto.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                base_imponible = base_imponible.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                monto_general = monto_general.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                
+                # 3. Actualizar totales de la factura
+                factura.sub_monto = sub_monto
+                factura.base_imponible = base_imponible
+                factura.monto_general = monto_general
+                factura.total_descuento = Decimal('0.00')
+                factura.save()
+                
+                # Forzar valores después del save
+                Factura.objects.filter(id=factura.id).update(
+                    sub_monto=sub_monto,
+                    base_imponible=base_imponible,
+                    monto_general=monto_general
+                )
+                factura.refresh_from_db()
+                
+                print(f"✅ Totales: Subtotal=${sub_monto}, IVA=${total_iva}, Total=${monto_general}")
+                
+                # 4. Procesar formas de pago (COPIADO DE DetallesFactura)
+                PRECISION_DOS_DECIMALES = Decimal('0.01')
+                
+                for i, pago in enumerate(pagos_list):
+                    print(f"💳 PROCESANDO PAGO {i+1}: {pago}")
+                    
+                    sri_pago = pago.get('sri_pago')
+                    if not sri_pago:
+                        raise Exception("Código SRI de forma de pago es requerido")
+                    
+                    # Normalizar monto
+                    monto_str = str(pago.get('monto', '0')).replace(',', '.')
+                    monto = Decimal(monto_str).quantize(PRECISION_DOS_DECIMALES, rounding=ROUND_HALF_UP)
+                    
+                    if monto <= 0:
+                        raise Exception("El monto debe ser mayor a cero")
+                    
+                    # Obtener caja (opcional para depósitos)
+                    tipo_pago = str(pago.get('tipo', '')).lower()
+                    caja = None
+                    if tipo_pago != 'deposito':
+                        caja_id = pago.get('caja') or pago.get('caja_id')
+                        if caja_id:
+                            try:
+                                caja = Caja.objects.get(id=caja_id, activo=True, empresa_id=empresa_id)
+                            except Caja.DoesNotExist:
+                                print(f"⚠️ Caja no encontrada: {caja_id}")
+                    
+                    # Crear forma de pago
+                    FormaPago.objects.create(
+                        factura=factura,
+                        forma_pago=sri_pago,
+                        total=monto,
+                        caja=caja,
+                        empresa=empresa
+                    )
+                    
+                    print(f"   ✅ Forma de pago: {tipo_pago} ${monto}")
+                
+                # Generar clave de acceso si no existe
+                if not factura.clave_acceso:
+                    factura.save()
+                    factura.refresh_from_db()
+                
+                # Crear totales de impuestos automáticamente
+                if hasattr(factura, 'crear_totales_impuestos_automatico'):
+                    factura.crear_totales_impuestos_automatico()
+                    factura.save()
 
-            print(f"✅ Factura creada exitosamente con ID: {factura.id}")
-            print(f"   - Facturador: {facturador.nombres}")
-            print(f"   - Cliente: {cliente.razon_social}")
-            print(f"   - Número: {establecimiento}-{punto_emision}-{secuencia_formateada} (Secuencia ID {secuencia_obj.id})")
-
-            messages.success(request, f'Factura generada exitosamente por {facturador.nombres}. Agregue los productos en el detalle de factura.')
-            return redirect('inventario:detallesDeFactura')
+            print(f"🎉 FACTURA COMPLETADA: {establecimiento}-{punto_emision}-{secuencia_formateada}")
+            messages.success(request, f'¡Factura {establecimiento}-{punto_emision}-{secuencia_formateada} creada exitosamente!')
+            
+            # Redirigir directamente a VER la factura (verFactura.html)
+            return redirect('inventario:verFactura', p=factura.id)
 
         except ValueError as e:
             print(f"Error de validación: {e}")
             messages.error(request, f"Error: {e}")
-            return self.get(request)  # Volver a mostrar el formulario
+            return self.get(request)
 
         except Exception as e:
             print(f"Error inesperado: {e}")
@@ -3028,63 +3217,59 @@ class DetallesFactura(LoginRequiredMixin, View):
             return redirect('inventario:emitirFactura')
 
     def get(self, request):
-        try:
-            # Obtener empresa activa y validar pertenencia
-            empresa_id = request.session.get('empresa_activa')
-            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
-                messages.error(request, 'Seleccione una empresa válida')
-                return redirect('inventario:seleccionar_empresa')
+        # Obtener empresa activa y validar pertenencia
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            messages.error(request, 'Seleccione una empresa válida')
+            return redirect('inventario:seleccionar_empresa')
 
-            # ✅ AGREGAR: Obtener las cajas activas (solo de la empresa)
-            cajas_activas = Caja.objects.filter(activo=True, empresa_id=empresa_id).order_by('descripcion') if empresa_id else Caja.objects.none()
-            
-            # ✅ AGREGAR: Obtener la factura de la sesión para mostrarla
-            factura_id = request.session.get('factura_id')
-            factura = None
-            if factura_id:
-                factura = Factura.objects.filter(pk=factura_id, empresa_id=empresa_id).first()
-                if not factura:
-                    # Comprobar si existe en otra empresa para mensaje apropiado
-                    if Factura.objects.filter(pk=factura_id).exists():
-                        messages.error(request, 'Acceso no autorizado a factura de otra empresa.')
-                    else:
-                        messages.error(request, 'No se pudo encontrar la factura. Por favor, cree una nueva factura.')
-                    request.session.pop('factura_id', None)
-                    return redirect('inventario:emitirFactura')
-            else:
-                messages.error(request, 'No se encontró la factura. Por favor, cree una nueva factura.')
-                return redirect('inventario:emitirFactura')
-            
-            # ✅ Formas de pago SRI desde el modelo (evitar hardcode)
-            formas_pago_sri = getattr(FormaPago, 'FORMAS_PAGO_CHOICES', [])
-
-            # ✅ Lista de bancos: nombres únicos desde DB + fallback estático (por si la BD aún no tiene todos)
-            try:
-                if hasattr(Banco, 'bancos_disponibles'):
-                    bancos_db = set(Banco.bancos_disponibles())
+        # ✅ AGREGAR: Obtener las cajas activas (solo de la empresa)
+        cajas_activas = Caja.objects.filter(activo=True, empresa_id=empresa_id).order_by('descripcion')
+        
+        # ✅ AGREGAR: Obtener la factura de la sesión para mostrarla
+        factura_id = request.session.get('factura_id')
+        factura = None
+        if factura_id:
+            factura = Factura.objects.filter(pk=factura_id, empresa_id=empresa_id).first()
+            if not factura:
+                # Comprobar si existe en otra empresa para mensaje apropiado
+                if Factura.objects.filter(pk=factura_id).exists():
+                    messages.error(request, 'Acceso no autorizado a factura de otra empresa.')
                 else:
-                    bancos_db = set(Banco.objects.filter(empresa_id=empresa_id).values_list('banco', flat=True))
-            except Exception:
-                bancos_db = set()
-
-            bancos_fallback = {
-                'Pichincha', 'Produbanco', 'Pacifico', 'Machala', 'Guayaquil', 'Banecuador',
-                'Internacional', 'Procredit', 'Austro', 'Bolivariano', 'Loja', 'Amazonas', 'Ruminahui'
-            }
-            lista_bancos = sorted({*(bancos_db or set()), *bancos_fallback})
-
-            contexto = {
-                'cajas': cajas_activas,
-                'factura': factura,
-                'formas_pago_sri': formas_pago_sri,
-                'bancos_lista_nombres': lista_bancos,
-                'bancos_db': (Banco.get_activos().filter(empresa_id=empresa_id) if hasattr(Banco, 'get_activos') and hasattr(Banco.get_activos(), 'filter') else Banco.objects.filter(activo=True, empresa_id=empresa_id).order_by('banco'))
-            }
-            contexto = complementarContexto(contexto, request.user)
-            return render(request, 'inventario/factura/detallesFactura.html', contexto)
-        except Exception as e:
-            messages.error(request, f'Error al cargar detalles de factura: {str(e)}')
+                    messages.error(request, 'No se pudo encontrar la factura. Por favor, cree una nueva factura.')
+                request.session.pop('factura_id', None)
+                return redirect('inventario:emitirFactura')
+        else:
+            messages.error(request, 'No se encontró la factura. Por favor, cree una nueva factura.')
             return redirect('inventario:emitirFactura')
+        
+        # ✅ Formas de pago SRI desde el modelo (evitar hardcode)
+        formas_pago_sri = getattr(FormaPago, 'FORMAS_PAGO_CHOICES', [])
+
+        # ✅ Lista de bancos: nombres únicos desde DB + fallback estático
+        try:
+            if hasattr(Banco, 'bancos_disponibles'):
+                bancos_db = set(Banco.bancos_disponibles())
+            else:
+                bancos_db = set(Banco.objects.filter(empresa_id=empresa_id).values_list('banco', flat=True))
+        except Exception:
+            bancos_db = set()
+
+        bancos_fallback = {
+            'Pichincha', 'Produbanco', 'Pacifico', 'Machala', 'Guayaquil', 'Banecuador',
+            'Internacional', 'Procredit', 'Austro', 'Bolivariano', 'Loja', 'Amazonas', 'Ruminahui'
+        }
+        lista_bancos = sorted({*(bancos_db or set()), *bancos_fallback})
+
+        contexto = {
+            'cajas': cajas_activas,
+            'factura': factura,
+            'formas_pago_sri': formas_pago_sri,
+            'bancos_lista_nombres': lista_bancos,
+            'bancos_db': Banco.objects.filter(activo=True, empresa_id=empresa_id).order_by('banco')
+        }
+        contexto = complementarContexto(contexto, request.user)
+        return render(request, 'inventario/factura/detallesFactura.html', contexto)
     
     def _obtener_codigo_porcentaje_iva(self, iva_percent):
         """

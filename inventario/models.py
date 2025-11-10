@@ -262,8 +262,20 @@ class Opciones(models.Model):
                 logger.info(f"Procesando archivo de firma: {self.firma_electronica.name}")
                 from cryptography.hazmat.primitives.serialization import pkcs12
                 from cryptography.hazmat.backends import default_backend
-                with self.firma_electronica.open('rb') as f:
-                    p12_data = f.read()
+                
+                # ✅ CAPTURAR ERROR DE S3 AQUÍ
+                try:
+                    with self.firma_electronica.open('rb') as f:
+                        p12_data = f.read()
+                except Exception as s3_error:
+                    # Si es error de permisos S3, loguear pero continuar
+                    if '403' in str(s3_error) or 'Forbidden' in str(s3_error):
+                        logger.warning(f"⚠️ No se pudo acceder al certificado en S3 (permisos): {s3_error}")
+                        logger.warning("Continuando sin validar certificado. Configure permisos S3 o certificado local.")
+                        return  # Salir sin error
+                    else:
+                        raise  # Re-lanzar si es otro tipo de error
+                
                 password = self.password_firma.encode()
                 try:
                     private_key, certificate, additional_certificates = pkcs12.load_key_and_certificates(

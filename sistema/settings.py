@@ -68,7 +68,9 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = os.environ.get('MEDIA_URL', '/media/')
 MEDIA_ROOT = os.environ.get('MEDIA_ROOT', os.path.join(BASE_DIR, 'media'))
 MEDIA_STORAGE_PREFIX = os.environ.get('MEDIA_STORAGE_PREFIX', '').strip('/')
-USE_REMOTE_MEDIA_STORAGE = bool(os.environ.get('AWS_STORAGE_BUCKET_NAME')) or IS_PRODUCTION
+
+# ✅ FORZAR ALMACENAMIENTO LOCAL EN DESARROLLO-LOCAL
+USE_REMOTE_MEDIA_STORAGE = False  # ¡¡SIEMPRE LOCAL EN ESTA RAMA!!
 
 if USE_REMOTE_MEDIA_STORAGE:
     # Añadiremos 'storages' luego de declarar INSTALLED_APPS (más abajo) para evitar NameError
