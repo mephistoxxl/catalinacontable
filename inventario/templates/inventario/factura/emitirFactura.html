@@ -413,7 +413,39 @@ input[type="number"][readonly] {
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
-                                    <!-- Filas dinámicas se agregarán aquí -->
+                                    <!-- ✅ 4 FILAS PRELLENADAS VACÍAS -->
+                                    <tr class="fila-vacia">
+                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                    </tr>
+                                    <tr class="fila-vacia">
+                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                    </tr>
+                                    <tr class="fila-vacia">
+                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                    </tr>
+                                    <tr class="fila-vacia">
+                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                    </tr>
                                 </tbody>
                                 <tfoot class="bg-gray-50">
                                     <tr>
@@ -676,8 +708,8 @@ input[type="number"][readonly] {
             </div>
         </div>
         
-        <!-- Espaciado mínimo para el footer -->
-        <div class="h-3"></div>
+        <!-- ✅ ESPACIADO AMPLIO PARA SEPARAR DEL FOOTER -->
+        <div class="h-24 md:h-32"></div>
     </div>
 </div>
 
@@ -1169,6 +1201,12 @@ function agregarProducto() {
 function agregarFilaTabla(producto) {
     const tabla = document.getElementById('tabla-productos').getElementsByTagName('tbody')[0];
     
+    // ✅ ELIMINAR FILAS VACÍAS AL AGREGAR EL PRIMER PRODUCTO REAL
+    const filasVacias = tabla.querySelectorAll('.fila-vacia');
+    if (filasVacias.length > 0) {
+        filasVacias.forEach(fila => fila.remove());
+    }
+    
     let nuevaFila = document.createElement('tr');
     nuevaFila.setAttribute('data-producto-id', producto.id);
     
@@ -1256,6 +1294,45 @@ function eliminarProducto(productoId) {
     const fila = document.querySelector(`tr[data-producto-id="${productoId}"]`);
     if (fila) {
         fila.remove();
+    }
+    
+    // ✅ RESTAURAR FILAS VACÍAS SI NO HAY PRODUCTOS
+    if (productosAgregados.length === 0) {
+        const tabla = document.getElementById('tabla-productos').getElementsByTagName('tbody')[0];
+        tabla.innerHTML = `
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+        `;
     }
     
     actualizarCamposOcultos();
