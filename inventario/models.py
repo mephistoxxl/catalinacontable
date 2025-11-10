@@ -4508,3 +4508,42 @@ class ConfiguracionGuiaRemision(models.Model):
             }
         )
         return config
+
+
+# ========== MODELO PARA RESETEO DE CONTRASEÑA ==========
+class PasswordResetToken(models.Model):
+    """
+    Token temporal para reseteo de contraseña.
+    Válido por 1 hora.
+    """
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.CASCADE,
+        related_name='password_reset_tokens'
+    )
+    token = models.CharField(max_length=100, unique=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    used = models.BooleanField(default=False)
+    
+    class Meta:
+        db_table = 'password_reset_tokens'
+        verbose_name = 'Token de Reseteo de Contraseña'
+        verbose_name_plural = 'Tokens de Reseteo de Contraseña'
+    
+    def is_valid(self):
+        """Verifica si el token es válido (no usado y no expirado)"""
+        if self.used:
+            return False
+        
+        # Token válido por 1 hora
+        expiration_time = self.created_at + timezone.timedelta(hours=1)
+        return timezone.now() < expiration_time
+    
+    def mark_as_used(self):
+        """Marca el token como usado"""
+        self.used = True
+        self.save()
+    
+    def __str__(self):
+        return f"Token para {self.usuario.username} - {'Usado' if self.used else 'Activo'}"
+

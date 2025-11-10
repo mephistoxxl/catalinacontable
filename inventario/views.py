@@ -900,6 +900,13 @@ class Login(View):
                 # 1) Empresa enviada explícitamente y válida
                 if empresa and logeado.empresas.filter(id=empresa.id).exists():
                     login(request, logeado)
+                    
+                    # ✅ RECORDARME: Configurar duración de sesión
+                    if request.POST.get('remember'):
+                        request.session.set_expiry(1209600)  # 14 días
+                    else:
+                        request.session.set_expiry(0)  # Se cierra al cerrar navegador
+                    
                     request.session['empresa_activa'] = empresa.id
                     # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
                     if necesita_configuracion(empresa):
@@ -911,6 +918,13 @@ class Login(View):
                     try:
                         UsuarioEmpresa.objects.get_or_create(usuario=logeado, empresa=empresa)
                         login(request, logeado)
+                        
+                        # ✅ RECORDARME: Configurar duración de sesión
+                        if request.POST.get('remember'):
+                            request.session.set_expiry(1209600)  # 14 días
+                        else:
+                            request.session.set_expiry(0)  # Se cierra al cerrar navegador
+                        
                         request.session['empresa_activa'] = empresa.id
                         # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
                         if necesita_configuracion(empresa):
@@ -926,6 +940,13 @@ class Login(View):
                         emp_ruc = Empresa.objects.get(ruc=identificacion)
                         if logeado.empresas.filter(id=emp_ruc.id).exists():
                             login(request, logeado)
+                            
+                            # ✅ RECORDARME: Configurar duración de sesión
+                            if request.POST.get('remember'):
+                                request.session.set_expiry(1209600)  # 14 días
+                            else:
+                                request.session.set_expiry(0)  # Se cierra al cerrar navegador
+                            
                             request.session['empresa_activa'] = emp_ruc.id
                             # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
                             if necesita_configuracion(emp_ruc):
@@ -936,6 +957,13 @@ class Login(View):
                         if logeado.empresas.count() == 0:
                             UsuarioEmpresa.objects.get_or_create(usuario=logeado, empresa=emp_ruc)
                             login(request, logeado)
+                            
+                            # ✅ RECORDARME: Configurar duración de sesión
+                            if request.POST.get('remember'):
+                                request.session.set_expiry(1209600)  # 14 días
+                            else:
+                                request.session.set_expiry(0)  # Se cierra al cerrar navegador
+                            
                             request.session['empresa_activa'] = emp_ruc.id
                             # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
                             if necesita_configuracion(emp_ruc):
@@ -950,6 +978,13 @@ class Login(View):
                 if empresas_usuario.count() == 1:
                     unica = empresas_usuario.first()
                     login(request, logeado)
+                    
+                    # ✅ RECORDARME: Configurar duración de sesión
+                    if request.POST.get('remember'):
+                        request.session.set_expiry(1209600)  # 14 días
+                    else:
+                        request.session.set_expiry(0)  # Se cierra al cerrar navegador
+                    
                     request.session['empresa_activa'] = unica.id
                     # ✅ VERIFICACIÓN COMPLETA: Solo redirigir a configuración si REALMENTE lo necesita
                     if necesita_configuracion(unica):
@@ -958,6 +993,13 @@ class Login(View):
                     return HttpResponseRedirect('/inventario/panel')
                 elif empresas_usuario.count() > 1:
                     login(request, logeado)
+                    
+                    # ✅ RECORDARME: Configurar duración de sesión (antes de redirigir a seleccionar empresa)
+                    if request.POST.get('remember'):
+                        request.session.set_expiry(1209600)  # 14 días
+                    else:
+                        request.session.set_expiry(0)  # Se cierra al cerrar navegador
+                    
                     return HttpResponseRedirect('/inventario/seleccionar_empresa/')
 
                 # 4) Si llega aquí, requiere selección explícita
