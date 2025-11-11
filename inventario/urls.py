@@ -2,7 +2,8 @@ from django.urls import path, include, reverse_lazy
 from . import views
 from .views import FirmaElectronicaView, ConfiguracionGeneral
 from .liquidacion_compra import views as liquidacion_views
-from .views_password_reset import SolicitarResetPassword, ResetPassword
+# TEMPORAL: Deshabilitado password reset por error en producción
+# from .views_password_reset import SolicitarResetPassword, ResetPassword
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib.auth import views as auth_views
@@ -14,9 +15,9 @@ urlpatterns = [
     path('seleccionar_empresa/', views.SeleccionarEmpresa.as_view(), name='seleccionar_empresa'),
     path('api/empresas/<str:identificacion>/', views.EmpresasPorUsuario.as_view(), name='empresas_por_usuario'),
     
-    # Password Reset
-    path('solicitar-reset-password', SolicitarResetPassword.as_view(), name='solicitar_reset_password'),
-    path('reset-password/<str:token>/', ResetPassword.as_view(), name='reset_password'),
+    # Password Reset - TEMPORAL: Deshabilitado
+    # path('solicitar-reset-password', SolicitarResetPassword.as_view(), name='solicitar_reset_password'),
+    # path('reset-password/<str:token>/', ResetPassword.as_view(), name='reset_password'),
     
     path('panel', views.Panel.as_view(), name='panel'),
     path('salir', views.Salir.as_view(), name='salir'),
