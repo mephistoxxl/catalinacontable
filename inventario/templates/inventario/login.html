@@ -120,9 +120,11 @@
                         <input type="checkbox" name="remember" id="remember" value="1" class="rounded border-gray-300 text-black bg-white focus:ring-gray-400">
                         <span class="ml-2 text-sm text-gray-700">Recordar credenciales</span>
                     </label>
+                    <!-- Temporalmente deshabilitado
                     <a href="#" onclick="abrirModalRecuperacion(event)" class="text-sm text-blue-600 hover:text-blue-500 transition duration-200">
                         ¿Olvidaste la contraseña?
                     </a>
+                    -->
                 </div>
 
                 <!-- Submit Button -->
@@ -225,6 +227,7 @@
     </script>
     
     <!-- ========== MODAL RECUPERAR CONTRASEÑA ========== -->
+    <!-- Temporalmente deshabilitado hasta implementar correctamente
     <div id="modalRecuperacion" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-md w-full" onclick="event.stopPropagation()">
             <!-- Header -->
@@ -405,6 +408,7 @@
             }
         });
     </script>
+    -->
     
     <!-- Empresa Selector Enhanced Script -->
     <script src="{% static 'inventario/js/empresa_selector.js' %}"></script>
