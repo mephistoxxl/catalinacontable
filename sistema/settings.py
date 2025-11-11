@@ -69,8 +69,8 @@ MEDIA_URL = os.environ.get('MEDIA_URL', '/media/')
 MEDIA_ROOT = os.environ.get('MEDIA_ROOT', os.path.join(BASE_DIR, 'media'))
 MEDIA_STORAGE_PREFIX = os.environ.get('MEDIA_STORAGE_PREFIX', '').strip('/')
 
-# ✅ FORZAR ALMACENAMIENTO LOCAL EN DESARROLLO-LOCAL
-USE_REMOTE_MEDIA_STORAGE = False  # ¡¡SIEMPRE LOCAL EN ESTA RAMA!!
+# ✅ Usar S3 en producción (Heroku) y local en desarrollo
+USE_REMOTE_MEDIA_STORAGE = bool(os.environ.get('AWS_STORAGE_BUCKET_NAME')) or IS_PRODUCTION
 
 if USE_REMOTE_MEDIA_STORAGE:
     # Añadiremos 'storages' luego de declarar INSTALLED_APPS (más abajo) para evitar NameError
