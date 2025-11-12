@@ -1401,6 +1401,12 @@ class Eliminar(LoginRequiredMixin, View):
             return HttpResponseRedirect('/inventario/listarUsuarios')
 
         usuario_obj = get_object_or_404(Usuario, id=p)
+        
+        # ✅ ADMIN no puede eliminar a otro ADMIN
+        if request.user.nivel == Usuario.ADMIN and usuario_obj.nivel == Usuario.ADMIN:
+            messages.error(request, 'No puedes eliminar a otro administrador.')
+            return HttpResponseRedirect('/inventario/listarUsuarios')
+        
         # Si Usuario tiene relación M2M con empresas, validar pertenencia
         if hasattr(usuario_obj, 'empresas') and not usuario_obj.empresas.filter(id=empresa_id).exists():
             messages.error(request, 'El usuario no pertenece a la empresa activa.')

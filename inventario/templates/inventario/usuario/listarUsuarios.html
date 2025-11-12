@@ -137,12 +137,19 @@ td {
                                                         <a href="/inventario/perfil/ver/{{ fila.id }}" class="block px-2 py-1 text-xs text-gray-700 hover:bg-gray-100">
                                                             <i class="fa fa-eye mr-1 text-xs"></i>Ver usuario
                                                         </a>
-                                                        <form method="post" action="{% url 'inventario:eliminar' 'usuario' fila.id %}" onsubmit="return confirm('¿Estás seguro de eliminar este usuario?');" class="m-0">
-                                                            {% csrf_token %}
-                                                            <button type="submit" class="w-full text-left px-2 py-1 text-xs text-red-700 hover:bg-red-50">
-                                                                <i class="fa fa-trash mr-1 text-xs"></i>Eliminar usuario
-                                                            </button>
-                                                        </form>
+                                                        {% comment %} Solo mostrar eliminar si: no es usuario ID 1, no es el mismo usuario, y si es ADMIN no puede eliminar a otro ADMIN {% endcomment %}
+                                                        {% if fila.id != 1 and fila.id != user.id %}
+                                                            {% if user.nivel == 1 and fila.nivel == 1 %}
+                                                                {% comment %} ADMIN no puede eliminar a otro ADMIN - botón oculto {% endcomment %}
+                                                            {% else %}
+                                                            <form method="post" action="{% url 'inventario:eliminar' 'usuario' fila.id %}" onsubmit="return confirm('¿Estás seguro de eliminar este usuario?');" class="m-0">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="w-full text-left px-2 py-1 text-xs text-red-700 hover:bg-red-50">
+                                                                    <i class="fa fa-trash mr-1 text-xs"></i>Eliminar usuario
+                                                                </button>
+                                                            </form>
+                                                            {% endif %}
+                                                        {% endif %}
                                                     </div>
                                                 </div>
                                             </div>

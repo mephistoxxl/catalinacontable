@@ -1184,11 +1184,8 @@ class NuevoUsuarioFormulario(forms.Form):
         if password and rep_password and password != rep_password:
             self.add_error('rep_password', 'Las claves no coinciden')
 
-        if password:
-            try:
-                validate_password(password)
-            except ValidationError as exc:
-                self.add_error('password', exc)
+        # ✅ Validación de contraseña compleja REMOVIDA para rapidez
+        # Solo verifica que las contraseñas coincidan
 
         return cleaned_data
 
@@ -1243,11 +1240,8 @@ class ClaveFormulario(forms.Form):
         if clave_nueva and repetir_clave and clave_nueva != repetir_clave:
             self.add_error('repetir_clave', 'Las claves nuevas no coinciden')
 
-        if clave_nueva:
-            try:
-                validate_password(clave_nueva, user=self.user)
-            except ValidationError as exc:
-                self.add_error('clave_nueva', exc)
+        # ✅ Validación de contraseña compleja REMOVIDA para rapidez
+        # Solo verifica que las contraseñas coincidan
 
         return cleaned_data
 
