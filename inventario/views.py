@@ -1162,6 +1162,11 @@ class Perfil(LoginRequiredMixin, View):
             perf = Usuario.objects.get(id=p)
             editandoSuperAdmin = False
 
+            # ✅ NUEVO: Usuarios vendedores (USER) no pueden editar perfiles
+            if request.user.nivel == Usuario.USER:
+                messages.error(request, 'No tienes permisos para editar perfiles')
+                return HttpResponseRedirect('/inventario/panel')
+
             if request.user.nivel == Usuario.ROOT:
                 empresas_queryset = Empresa.objects.all()
             else:
@@ -1211,6 +1216,12 @@ class Perfil(LoginRequiredMixin, View):
 
         elif modo == 'clave':
             perf = Usuario.objects.get(id=p)
+            
+            # ✅ NUEVO: Usuarios vendedores (USER) no pueden cambiar claves
+            if request.user.nivel == Usuario.USER:
+                messages.error(request, 'No tienes permisos para cambiar claves')
+                return HttpResponseRedirect('/inventario/panel')
+            
             if p == 1:
                 if request.user.nivel != Usuario.ROOT:
                     messages.error(request,
@@ -1247,6 +1258,11 @@ class Perfil(LoginRequiredMixin, View):
 
     def post(self, request, modo, p):
         if modo == 'editar':
+            # ✅ NUEVO: Usuarios vendedores (USER) no pueden editar perfiles
+            if request.user.nivel == Usuario.USER:
+                messages.error(request, 'No tienes permisos para editar perfiles')
+                return HttpResponseRedirect('/inventario/panel')
+            
             # Crea una instancia del formulario y la llena con los datos:
             if request.user.nivel == Usuario.ROOT:
                 empresas_queryset = Empresa.objects.all()
@@ -1292,6 +1308,11 @@ class Perfil(LoginRequiredMixin, View):
                 return render(request, 'inventario/perfil/perfil.html', {'form': form})
 
         elif modo == 'clave':
+            # ✅ NUEVO: Usuarios vendedores (USER) no pueden cambiar claves
+            if request.user.nivel == Usuario.USER:
+                messages.error(request, 'No tienes permisos para cambiar claves')
+                return HttpResponseRedirect('/inventario/panel')
+            
             usuario = Usuario.objects.get(id=p)
             form = ClaveFormulario(request.POST, user=usuario)
 
@@ -1393,10 +1414,9 @@ class Eliminar(LoginRequiredMixin, View):
 
 
 #Muestra una lista de 10 productos por pagina----------------------------------------#
-class ListarProductos(PermissionRequiredMixin, View):
+class ListarProductos(LoginRequiredMixin, View):
     login_url = '/inventario/login'
     redirect_field_name = None
-    permission_required = 'inventario.view_producto'
 
     def get(self, request):
         from django.db import models
@@ -1421,7 +1441,7 @@ class ListarProductos(PermissionRequiredMixin, View):
 from django.views import View
 from django.http import HttpResponse
 
-class ExportarProductosExcel(PermissionRequiredMixin, View):
+class ExportarProductosExcel(LoginRequiredMixin, View):
     """Exporta todos los productos de la empresa activa a un archivo Excel XLSX.
 
     Columnas requeridas:
@@ -1429,7 +1449,6 @@ class ExportarProductosExcel(PermissionRequiredMixin, View):
     """
     login_url = '/inventario/login'
     redirect_field_name = None
-    permission_required = 'inventario.view_producto'
 
     def get(self, request):
         import io, csv
@@ -1485,11 +1504,10 @@ class ExportarProductosExcel(PermissionRequiredMixin, View):
             return response
 
 
-class PlantillaProductosExcel(PermissionRequiredMixin, View):
+class PlantillaProductosExcel(LoginRequiredMixin, View):
     """Entrega una plantilla vacía para importar productos."""
     login_url = '/inventario/login'
     redirect_field_name = None
-    permission_required = 'inventario.add_producto'
 
     def get(self, request):
         import io, csv

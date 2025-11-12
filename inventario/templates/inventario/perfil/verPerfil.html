@@ -101,6 +101,8 @@
                     <h1 class="profile-title text-lg font-bold text-gray-900">Ver Perfil de '{{perfil.username}}'</h1>
                     <p class="profile-subtitle text-gray-600 text-sm">Observe los datos actuales de este perfil o use los otros módulos de abajo</p>
                 </div>
+                {% comment %} Solo ADMIN y ROOT pueden editar perfiles y cambiar claves {% endcomment %}
+                {% if user.nivel != 0 %}
                 <div class="profile-actions flex gap-2">
                     <a href="/inventario/perfil/editar/{{ perfil.id }}" 
                        class="profile-btn inline-flex items-center px-3 py-1.5 bg-black hover:bg-gray-800 text-white text-sm font-medium rounded-md transition-colors duration-200 no-underline">
@@ -117,6 +119,7 @@
                         Cambiar clave
                     </a>
                 </div>
+                {% endif %}
             </div>
         </div>
 
