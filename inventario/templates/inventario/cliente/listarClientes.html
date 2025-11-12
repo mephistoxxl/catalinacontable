@@ -458,8 +458,13 @@
         document.querySelectorAll('[id^="clientes-dropdown-panel-"]').forEach(d => d.classList.add('hidden'));
     }
     function clientesToggleDropdown(btn, key) {
+        console.log('Toggle dropdown clientes:', key); // Debug
         const panel = document.getElementById('clientes-dropdown-panel-' + key);
-        if (!panel) return;
+        console.log('Panel encontrado:', panel); // Debug
+        if (!panel) {
+            console.error('No se encontró panel con ID: clientes-dropdown-panel-' + key);
+            return;
+        }
         // Si ya está visible, ocultar y salir (toggle real)
         const isOpen = !panel.classList.contains('hidden');
         if (isOpen) {

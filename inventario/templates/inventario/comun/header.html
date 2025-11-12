@@ -19,7 +19,7 @@
                         <!-- NOMBRE DEL USUARIO ACTUAL -->
                             <li class="profile dropdown relative">
                                 <button class="flex items-center space-x-2 px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" 
-                                        onclick="toggleDropdown()" 
+                                        onclick="toggleProfileDropdown()" 
                                         id="dropdownProfile">
                                     <em class="fa fa-user text-gray-600"></em>
                                     <div class="flex flex-col text-left leading-tight">
@@ -45,7 +45,7 @@
                 </header>
 
                 <script>
-                    function toggleDropdown() {
+                    function toggleProfileDropdown() {
                         const dropdown = document.getElementById('profileDropdown');
                         dropdown.classList.toggle('hidden');
                     }

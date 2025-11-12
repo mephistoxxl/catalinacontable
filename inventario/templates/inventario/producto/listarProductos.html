@@ -165,12 +165,24 @@
                     </div>
                 </div>
                 <!-- Botones acciones productos -->
-                <div class="flex items-center space-x-2">
-                    <a href="{% url 'inventario:importarProductos' %}" class="inline-flex items-center px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md shadow transition" title="Importar Productos">
-                        <i class="fas fa-file-import mr-1"></i> Importar
+                <div class="flex items-center space-x-3">
+                    <a href="{% url 'inventario:importarProductos' %}" 
+                       class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 no-underline" 
+                       style="text-decoration: none !important; color: white !important;"
+                       title="Importar Productos desde Excel">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        <span style="color: white !important;">Importar</span>
                     </a>
-                    <a href="{% url 'inventario:exportar_productos_excel' %}" class="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-md shadow transition" title="Exportar a Excel">
-                        <i class="fas fa-file-excel mr-1"></i> Exportar
+                    <a href="{% url 'inventario:exportar_productos_excel' %}" 
+                       class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-sm font-semibold rounded-lg shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 no-underline" 
+                       style="text-decoration: none !important; color: white !important;"
+                       title="Exportar a Excel">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span style="color: white !important;">Exportar</span>
                     </a>
                 </div>
             </div>
