@@ -2055,6 +2055,16 @@ class FirmaElectronicaForm(forms.ModelForm):
 
         return password
 
+    def clean_firma_electronica(self):
+        """Preserva la firma existente si no se sube una nueva"""
+        firma = self.cleaned_data.get('firma_electronica')
+        
+        # Si no se subió una nueva firma pero existe una en la instancia actual, preservarla
+        if not firma and self.instance and getattr(self.instance, 'firma_electronica', None):
+            return self.instance.firma_electronica
+        
+        return firma
+
 from django import forms
 from .models import Servicio
 
