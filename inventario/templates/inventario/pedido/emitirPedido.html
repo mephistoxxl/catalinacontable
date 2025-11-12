@@ -1,47 +1,196 @@
 {% extends "inventario/comun/base.html" %}
 
 {% block content %}
-<article class="content forms-page">
-	    <div class="title-block">
-          <h3 class="title">Emitir pedido</h3>
-          <p class="title-description">Introduzca la cedula del proveedor y el numero de
-          productos a comprar para generar los campos</p>
-        </div>
-<section class="section">
-    <div class="row sameheight-container">
-	<div class="col-md-12">
-		          {% if messages %}
-                  {% for message in messages %}
-                  	         <div class="card card-primary">
-            <div class="card-header"> 
-                <div class="header-block">
-                    <em class="fa fa-check"></em>
-                        <p class="title">{{ message }}</p>
+<style>
+    /* Compact helpers */
+    .form-header-icon { font-size: 16px !important; }
+    .label-icon { font-size: 12px !important; width: 14px !important; height: 14px !important; line-height: 14px !important; display: inline-block !important; text-align: center !important; }
+</style>
+
+<div class="bg-gray-50 p-2" style="padding-top: 6px; padding-bottom: 8px;">
+    <div class="max-w-6xl mx-auto" style="max-width: 68rem;">
+
+        <!-- Messages Section -->
+        {% if messages %}
+            <div class="mb-2">
+                {% for message in messages %}
+                    <div class="bg-white rounded-lg shadow-md p-2 border-l-4 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                {% if message.tags == 'success' %}
+                                    <i class="fa fa-check-circle text-green-500 text-sm"></i>
+                                {% elif message.tags == 'error' %}
+                                    <i class="fa fa-exclamation-circle text-red-500 text-sm"></i>
+                                {% elif message.tags == 'warning' %}
+                                    <i class="fa fa-exclamation-triangle text-yellow-500 text-sm"></i>
+                                {% else %}
+                                    <i class="fa fa-info-circle text-blue-500 text-sm"></i>
+                                {% endif %}
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-[11px] font-medium {% if message.tags == 'success' %}text-green-800{% elif message.tags == 'error' %}text-red-800{% elif message.tags == 'warning' %}text-yellow-800{% else %}text-blue-800{% endif %}">
+                                    {{ message }}
+                                </p>
+                            </div>
+                        </div>
                     </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+                
+        <!-- Header Section -->
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-1.5 mb-0 rounded-lg mt-0">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fa fa-shopping-cart text-white form-header-icon"></i>
                 </div>
-         </div>
-         {% endfor %}
-        {%endif%}       
-
-		<div class="card card-block sameheight-item">
-			<form role="form" method="POST" onsubmit="return validarTodo('pedido')">
-			{% csrf_token %}
-
-				{% for field in form %}
-				<div class="form-group">
-				<label for="{{ field.name }}">
-				{{field.label}}
-				</label>
-				{{field}}
-				</div>
-				{% endfor %}
-		<div class="form-group">
-            <button type="submit" class="btn btn-primary">Ingresar</button>
+                <div class="ml-3">
+                    <h2 class="text-sm font-semibold text-white">Emitir pedido</h2>
+                    <p class="text-gray-300 text-[11px]">Introduzca la cedula del proveedor y el numero de productos a comprar para generar los campos</p>
+                </div>
+            </div>
         </div>
-			</form>
-		</div>
-	</div>
-	</div>
-</section>
-</article>
+
+        <!-- Main Form -->
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden mt-1">
+            <form role="form" method="POST" onsubmit="return validarTodo('pedido')" class="p-2">
+                {% csrf_token %}
+                
+                <div class="space-y-1">
+                    {% for field in form %}
+                    <div class="group">
+                        <label for="{{ field.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">
+                            <i class="fa fa-{% if 'proveedor' in field.name %}user{% elif 'producto' in field.name %}box{% else %}edit{% endif %} text-gray-500 mr-1 label-icon"></i>
+                            {{ field.label }}
+                        </label>
+                        {{ field }}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Botones de Acción -->
+                <div class="flex justify-center items-center mt-2 pt-2 border-t border-gray-200 mb-1">
+                    <button type="submit" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-all duration-200">
+                        <i class="fa fa-paper-plane mr-2"></i>
+                        Ingresar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ ESTILOS PERSONALIZADOS PARA INPUTS COMPACTOS Y FINOS -->
+<style>
+    /* Inputs de texto, email, password, number, etc. (densos) */
+    input[type="text"], 
+    input[type="email"], 
+    input[type="password"], 
+    input[type="number"], 
+    input[type="tel"], 
+    input[type="url"],
+    input[type="date"],
+    input[type="datetime-local"],
+    textarea,
+    select {
+        width: 100% !important;
+        padding: 3px 7px !important;
+        border: 0.5px solid #d1d5db !important;
+        border-radius: 4px !important;
+        font-size: 12px !important;
+        background-color: #ffffff !important;
+        transition: all 0.15s ease !important;
+        box-shadow: none !important;
+        height: 26px !important;
+        line-height: 1.2 !important;
+    }
+
+    /* Estados focus - bordes aún más sutiles */
+    input[type="text"]:focus, 
+    input[type="email"]:focus, 
+    input[type="password"]:focus, 
+    input[type="number"]:focus, 
+    input[type="tel"]:focus, 
+    input[type="url"]:focus,
+    input[type="date"]:focus,
+    input[type="datetime-local"]:focus,
+    textarea:focus,
+    select:focus {
+        outline: none !important;
+        border-color: #60a5fa !important;
+        box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.08) !important;
+    }
+
+    /* Estados hover - interacción sutil */
+    input[type="text"]:hover, 
+    input[type="email"]:hover, 
+    input[type="password"]:hover, 
+    input[type="number"]:hover, 
+    input[type="tel"]:hover, 
+    input[type="url"]:hover,
+    input[type="date"]:hover,
+    input[type="datetime-local"]:hover,
+    textarea:hover,
+    select:hover {
+        border-color: #9ca3af !important;
+    }
+
+    /* Selects específicos */
+    select {
+        background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"></polyline></svg>') !important;
+        background-repeat: no-repeat !important;
+        background-position: right 6px center !important;
+        background-size: 14px !important;
+        padding-right: 28px !important;
+        appearance: none !important;
+        -webkit-appearance: none !important;
+        -moz-appearance: none !important;
+    }
+
+    /* Checkboxes y radios */
+    input[type="checkbox"],
+    input[type="radio"] {
+        width: auto !important;
+        margin-right: 8px !important;
+        accent-color: #60a5fa !important;
+    }
+
+    /* Espaciado compacto */
+    .space-y-1 > * + * {
+        margin-top: 0.25rem !important;
+    }
+
+    /* Labels más compactos */
+    label {
+        margin-bottom: 2px !important;
+        font-size: 11px !important;
+    }
+
+    /* Estados disabled más sutiles */
+    input:disabled,
+    select:disabled,
+    textarea:disabled {
+        background-color: #f9fafb !important;
+        border-color: #e5e7eb !important;
+        color: #9ca3af !important;
+        cursor: not-allowed !important;
+    }
+
+    /* Textarea específico */
+    textarea {
+        resize: vertical !important;
+        min-height: 64px !important;
+    }
+
+    /* Override para campos con error */
+    .border-red-500 {
+        border-color: #ef4444 !important;
+        background-color: #fef2f2 !important;
+    }
+
+    .border-red-500:focus {
+        border-color: #dc2626 !important;
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1) !important;
+    }
+</style>
 {% endblock %}
