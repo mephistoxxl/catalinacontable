@@ -118,6 +118,17 @@
         padding: 6px 12px !important;
         font-size: 12px !important;
     }
+
+    /* ✅ DROPDOWN FIXED PARA PRODUCTOS */
+    .producto-dropdown-wrapper .dropdown-panel { 
+        position: fixed; 
+        width: 11rem; 
+        background: #fff; 
+        border: 1px solid rgba(0,0,0,0.08); 
+        border-radius: 0.5rem; 
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); 
+        z-index: 9999; 
+    }
 </style>
 
 <div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-2" style="min-height: auto; padding-top: 0px; padding-bottom: 10px;">
@@ -244,13 +255,13 @@
                                             {% endif %}
                                         </td>
                                         <td class="px-3 py-2 whitespace-nowrap text-xs font-medium">
-                                            <div class="relative inline-block text-left" id="dropdown-{{ forloop.counter }}">
-                                                <button type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-2 py-1 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="toggleDropdown('{{ forloop.counter }}')">
+                                            <div class="relative inline-block text-left producto-dropdown-wrapper" id="dropdown-{{ forloop.counter }}">
+                                                <button type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-2 py-1 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="productosToggleDropdown(this,'{{ forloop.counter }}')">
                                                     Acciones
                                                     <i class="fa fa-chevron-down ml-1 -mr-0.5 h-3 w-3"></i>
                                                 </button>
                                                 
-                                                <div class="origin-top-right absolute right-0 mt-1 w-40 rounded-md shadow-xl bg-white ring-1 ring-black ring-opacity-5 hidden z-[9999]" id="dropdown-menu-{{ forloop.counter }}">
+                                                <div class="dropdown-panel hidden" id="productos-dropdown-panel-{{ forloop.counter }}">
                                                     <div class="py-1">
                                                         <a href="{% url 'inventario:editarProducto' fila.id %}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                                                             <i class="fa fa-edit mr-2 text-blue-500 text-xs"></i>
@@ -321,61 +332,56 @@
 </div>
 
 <script>
-        function toggleDropdown(counter) {
-                console.log('Abriendo dropdown:', counter); // Debug
-                
-                const dropdown = document.getElementById('dropdown-menu-' + counter);
-                const allDropdowns = document.querySelectorAll('[id^="dropdown-menu-"]');
-                
-                // Cerrar todos los otros dropdowns
-                allDropdowns.forEach(d => {
-                        if (d !== dropdown) {
-                                d.classList.add('hidden');
-                        }
-                });
-                
-                // Toggle el dropdown actual
-                if (dropdown) {
-                        dropdown.classList.toggle('hidden');
-                        console.log('Dropdown visibility:', !dropdown.classList.contains('hidden')); // Debug
-                        
-                        // Ajustar posición del dropdown en móviles
-                        if (window.innerWidth < 768) {
-                                const button = event.target;
-                                const rect = button.getBoundingClientRect();
-                                dropdown.style.position = 'fixed';
-                                dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
-                                dropdown.style.left = 'auto';
-                                dropdown.style.right = '10px';
-                                dropdown.style.zIndex = '9999';
-                        }
-                } else {
-                        console.error('No se encontró dropdown-menu-' + counter);
-                }
+        // ✅ FUNCIONES DROPDOWN PRODUCTOS CON POSICIONAMIENTO FIXED
+        function productosCloseAllDropdowns() {
+            document.querySelectorAll('[id^="productos-dropdown-panel-"]').forEach(d => d.classList.add('hidden'));
         }
-
+        
+        function productosToggleDropdown(btn, key) {
+            const panel = document.getElementById('productos-dropdown-panel-' + key);
+            if (!panel) return;
+            
+            // Si ya está visible, ocultar y salir
+            const isOpen = !panel.classList.contains('hidden');
+            if (isOpen) {
+                panel.classList.add('hidden');
+                return;
+            }
+            
+            // Cerrar otros dropdowns
+            productosCloseAllDropdowns();
+            
+            // Mostrar para medir y posicionar
+            panel.classList.remove('hidden');
+            panel.style.visibility = 'hidden';
+            
+            const rect = btn.getBoundingClientRect();
+            const panelWidth = panel.offsetWidth || 176;
+            const panelHeight = panel.offsetHeight || 120;
+            
+            let left = Math.min(rect.right - panelWidth, window.innerWidth - panelWidth - 8);
+            if (left < 8) left = 8;
+            
+            let top = rect.bottom + 4;
+            if (top + panelHeight > window.innerHeight - 8) {
+                top = Math.max(8, rect.top - panelHeight - 4);
+            }
+            
+            panel.style.left = left + 'px';
+            panel.style.top = top + 'px';
+            panel.style.visibility = 'visible';
+        }
+        
+        // Cerrar al hacer clic fuera
         document.addEventListener('click', function(event) {
-                if (!event.target.closest('.relative')) {
-                        document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
-                                d.classList.add('hidden');
-                                d.style.position = '';
-                                d.style.top = '';
-                                d.style.left = '';
-                                d.style.right = '';
-                        });
-                }
+            const insideWrapper = event.target.closest('.producto-dropdown-wrapper');
+            const isPanel = event.target.closest('[id^="productos-dropdown-panel-"]');
+            if (!insideWrapper && !isPanel) {
+                productosCloseAllDropdowns();
+            }
         });
         
-        // Resetear posición al cambiar tamaño de ventana
-        window.addEventListener('resize', function() {
-                document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
-                        d.classList.add('hidden');
-                        d.style.position = '';
-                        d.style.top = '';
-                        d.style.left = '';
-                        d.style.right = '';
-                });
-        });
+        window.addEventListener('resize', productosCloseAllDropdowns);
 
         // ✅ NUEVA FUNCIÓN MODERNIZADA SIN JQUERY
         function abrir_modal_eliminacion(url) {
@@ -394,10 +400,8 @@
                 const modal = document.getElementById('modalEliminacion');
                 if (modal) {
                         modal.classList.remove('hidden');
-                        // Cerrar dropdown si está abierto
-                        document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
-                                d.classList.add('hidden');
-                        });
+                        // Cerrar dropdown si está abierto (productos)
+                        productosCloseAllDropdowns();
                 } else {
                         console.error('No se encontró el modal modalEliminacion');
                 }

@@ -36,6 +36,17 @@ td {
     padding: 4px 8px !important;
     font-size: 11px !important;
 }
+
+/* ✅ DROPDOWN FIXED PARA USUARIOS */
+.usuario-dropdown-wrapper .dropdown-panel { 
+    position: fixed; 
+    width: 11rem; 
+    background: #fff; 
+    border: 1px solid rgba(0,0,0,0.08); 
+    border-radius: 0.5rem; 
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); 
+    z-index: 9999; 
+}
 </style>
 
 <script src='{% static "inventario/js/eliminarEntradas.js" %}'></script>
@@ -127,12 +138,12 @@ td {
                                             {% endif %}
                                         </td>
                                         <td class="px-2 py-2 text-center text-sm font-medium">
-                                            <div class="relative inline-block text-left" id="dropdown-{{ forloop.counter }}">
-                                                <button type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-2 py-1 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="toggleDropdown('{{ forloop.counter }}')">
+                                            <div class="relative inline-block text-left usuario-dropdown-wrapper" id="dropdown-{{ forloop.counter }}">
+                                                <button type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-2 py-1 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="usuariosToggleDropdown(this,'{{ forloop.counter }}')">
                                                     Acciones
                                                     <i class="fas fa-chevron-down ml-1 -mr-0.5 text-xs"></i>
                                                 </button>
-                                                <div class="absolute right-0 top-full mt-1 w-32 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 hidden z-[9999]" id="dropdown-menu-{{ forloop.counter }}">
+                                                <div class="dropdown-panel hidden" id="usuarios-dropdown-panel-{{ forloop.counter }}">
                                                     <div class="py-1">
                                                         <a href="/inventario/perfil/ver/{{ fila.id }}" class="block px-2 py-1 text-xs text-gray-700 hover:bg-gray-100">
                                                             <i class="fa fa-eye mr-1 text-xs"></i>Ver usuario
@@ -175,25 +186,56 @@ td {
     </div>
 </div>
 <script>
-    function toggleDropdown(counter) {
-        const dropdown = document.getElementById('dropdown-menu-' + counter);
-        const allDropdowns = document.querySelectorAll('[id^="dropdown-menu-"]');
-        
-        allDropdowns.forEach(d => {
-            if (d !== dropdown) {
-                d.classList.add('hidden');
-            }
-        });
-        
-        dropdown.classList.toggle('hidden');
+    // ✅ FUNCIONES DROPDOWN USUARIOS CON POSICIONAMIENTO FIXED
+    function usuariosCloseAllDropdowns() {
+        document.querySelectorAll('[id^="usuarios-dropdown-panel-"]').forEach(d => d.classList.add('hidden'));
     }
+    
+    function usuariosToggleDropdown(btn, key) {
+        const panel = document.getElementById('usuarios-dropdown-panel-' + key);
+        if (!panel) return;
+        
+        // Si ya está visible, ocultar y salir
+        const isOpen = !panel.classList.contains('hidden');
+        if (isOpen) {
+            panel.classList.add('hidden');
+            return;
+        }
+        
+        // Cerrar otros dropdowns
+        usuariosCloseAllDropdowns();
+        
+        // Mostrar para medir y posicionar
+        panel.classList.remove('hidden');
+        panel.style.visibility = 'hidden';
+        
+        const rect = btn.getBoundingClientRect();
+        const panelWidth = panel.offsetWidth || 176;
+        const panelHeight = panel.offsetHeight || 120;
+        
+        let left = Math.min(rect.right - panelWidth, window.innerWidth - panelWidth - 8);
+        if (left < 8) left = 8;
+        
+        let top = rect.bottom + 4;
+        if (top + panelHeight > window.innerHeight - 8) {
+            top = Math.max(8, rect.top - panelHeight - 4);
+        }
+        
+        panel.style.left = left + 'px';
+        panel.style.top = top + 'px';
+        panel.style.visibility = 'visible';
+    }
+    
+    // Cerrar al hacer clic fuera
     document.addEventListener('click', function(event) {
-        if (!event.target.closest('.relative')) {
-            document.querySelectorAll('[id^="dropdown-menu-"]').forEach(d => {
-                d.classList.add('hidden');
-            });
+        const insideWrapper = event.target.closest('.usuario-dropdown-wrapper');
+        const isPanel = event.target.closest('[id^="usuarios-dropdown-panel-"]');
+        if (!insideWrapper && !isPanel) {
+            usuariosCloseAllDropdowns();
         }
     });
+    
+    window.addEventListener('resize', usuariosCloseAllDropdowns);
     
     // Reset dropdowns on window resize
     window.addEventListener('resize', function() {
