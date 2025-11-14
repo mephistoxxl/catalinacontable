@@ -522,6 +522,91 @@
 
         <section>
           <div class="flex items-center pb-1 border-b border-gray-200 mb-1">
+            <i class="fa fa-user text-slate-600 text-[9px] mr-1"></i>
+            <h2 class="text-[10px] font-semibold text-gray-800">{% trans "Datos del Proveedor" %}</h2>
+          </div>
+
+          <div id="proveedor-identificacion-messages" class="hidden mb-1 rounded border-l-2 px-1.5 py-1 flex items-center gap-1 text-[8px] bg-white shadow-sm">
+            <i id="proveedor-identificacion-message-icon" class="fa fa-info-circle text-blue-500 text-[8px]"></i>
+            <span id="proveedor-identificacion-message-text" class="text-blue-800 font-medium"></span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-1">
+            {% with field=form.beneficiario_tipo_identificacion %}
+            <div class="group hidden">
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.beneficiario_identificacion %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+                <span class="text-red-500">*</span>
+                <span id="loading-identificacion-proveedor" class="hidden ml-1 inline-flex items-center gap-0.5 text-gray-500" style="display:none;">
+                  <i class="fa fa-spinner fa-spin text-[8px]"></i>
+                  <span class="text-[8px] font-medium">{% trans "Consultando" %}...</span>
+                </span>
+              </label>
+              <div class="flex items-center gap-1">
+                <div class="flex-1">
+                  {{ field }}
+                </div>
+                <button type="button" id="buscar-identificacion-proveedor" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-gray-800 text-white text-[8px] font-semibold rounded hover:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-600 transition-colors">
+                  <i class="fa fa-search text-[7px]"></i>
+                  <span>{% trans "Buscar" %}</span>
+                </button>
+              </div>
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.beneficiario_nombre %}
+            <div class="group md:col-span-2">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+                <span class="text-red-500">*</span>
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.beneficiario_direccion %}
+            <div class="group md:col-span-2">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.beneficiario_correo %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.beneficiario_telefono %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+          </div>
+        </section>
+
+        <section>
+          <div class="flex items-center pb-1 border-b border-gray-200 mb-1">
             <i class="fa fa-id-card-o text-slate-600 text-[9px] mr-1"></i>
             <h2 class="text-[10px] font-semibold text-gray-800">{% trans "Datos Generales" %}</h2>
           </div>
@@ -543,6 +628,16 @@
             <div class="group">
               <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
                 {{ field.label }}{% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.forma_pago_simple %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}<span class="text-red-500">*</span>
               </label>
               {{ field }}
               {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
@@ -641,129 +736,16 @@
           </div>
         </section>
 
-        <section>
-          <div class="flex items-center pb-1 border-b border-gray-200 mb-1">
-            <i class="fa fa-credit-card text-slate-600 text-[9px] mr-1"></i>
-            <h2 class="text-[10px] font-semibold text-gray-800">{% trans "Forma de Pago" %}</h2>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-1">
-            {{ pago_formset.management_form }}
-            <div id="formas-pago-container" class="hidden">
-              {% for pago_form in pago_formset %}
-                {% include "inventario/liquidacion_compra/_forma_pago_form.html" with form=pago_form index=forloop.counter0 numero=forloop.counter can_delete=pago_formset.can_delete %}
-              {% empty %}
-                {% with form=pago_formset.empty_form %}
-                  {% include "inventario/liquidacion_compra/_forma_pago_form.html" with form=form index=0 numero=1 can_delete=pago_formset.can_delete %}
-                {% endwith %}
-              {% endfor %}
-            </div>
-            <div class="group">
-              <label for="forma_pago_simple" class="block text-[9px] font-medium text-gray-700">
-                {% trans "Forma de pago" %}<span class="text-red-500">*</span>
-              </label>
-              <select id="forma_pago_simple" name="forma_pago_simple" class="form-control">
-                <option value="01">{% trans "Sin utilización del sistema financiero" %}</option>
-                <option value="15">{% trans "Compensación de deudas" %}</option>
-                <option value="16">{% trans "Tarjeta de débito" %}</option>
-                <option value="17">{% trans "Dinero electrónico" %}</option>
-                <option value="18">{% trans "Tarjeta prepago" %}</option>
-                <option value="19">{% trans "Tarjeta de crédito" %}</option>
-                <option value="20">{% trans "Otros con utilización del sistema financiero" %}</option>
-                <option value="21">{% trans "Endoso de títulos" %}</option>
-              </select>
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <div class="flex items-center pb-1 border-b border-gray-200 mb-1">
-            <i class="fa fa-user text-slate-600 text-[9px] mr-1"></i>
-            <h2 class="text-[10px] font-semibold text-gray-800">{% trans "Datos del Proveedor" %}</h2>
-          </div>
-
-          <div id="proveedor-identificacion-messages" class="hidden mb-1 rounded border-l-2 px-1.5 py-1 flex items-center gap-1 text-[8px] bg-white shadow-sm">
-            <i id="proveedor-identificacion-message-icon" class="fa fa-info-circle text-blue-500 text-[8px]"></i>
-            <span id="proveedor-identificacion-message-text" class="text-blue-800 font-medium"></span>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-1">
-            {% with field=form.beneficiario_tipo_identificacion %}
-            <div class="group">
-              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
-                {{ field.label }}
-                <span class="text-red-500">*</span>
-              </label>
-              {{ field }}
-              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
-            </div>
+        {{ pago_formset.management_form }}
+        <div id="formas-pago-container" class="hidden">
+          {% for pago_form in pago_formset %}
+            {% include "inventario/liquidacion_compra/_forma_pago_form.html" with form=pago_form index=forloop.counter0 numero=forloop.counter can_delete=pago_formset.can_delete %}
+          {% empty %}
+            {% with form=pago_formset.empty_form %}
+              {% include "inventario/liquidacion_compra/_forma_pago_form.html" with form=form index=0 numero=1 can_delete=pago_formset.can_delete %}
             {% endwith %}
-
-            {% with field=form.beneficiario_identificacion %}
-            <div class="group">
-              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
-                {{ field.label }}
-                <span class="text-red-500">*</span>
-                <span id="loading-identificacion-proveedor" class="hidden ml-1 inline-flex items-center gap-0.5 text-gray-500" style="display:none;">
-                  <i class="fa fa-spinner fa-spin text-[8px]"></i>
-                  <span class="text-[8px] font-medium">{% trans "Consultando" %}...</span>
-                </span>
-              </label>
-              <div class="flex items-center gap-1">
-                <div class="flex-1">
-                  {{ field }}
-                </div>
-                <button type="button" id="buscar-identificacion-proveedor" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-gray-800 text-white text-[8px] font-semibold rounded hover:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-600 transition-colors">
-                  <i class="fa fa-search text-[7px]"></i>
-                  <span>{% trans "Buscar" %}</span>
-                </button>
-              </div>
-              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
-            </div>
-            {% endwith %}
-
-            {% with field=form.beneficiario_nombre %}
-            <div class="group md:col-span-2">
-              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
-                {{ field.label }}
-                <span class="text-red-500">*</span>
-              </label>
-              {{ field }}
-              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
-            </div>
-            {% endwith %}
-
-            {% with field=form.beneficiario_direccion %}
-            <div class="group md:col-span-2">
-              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
-                {{ field.label }}
-              </label>
-              {{ field }}
-              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
-            </div>
-            {% endwith %}
-
-            {% with field=form.beneficiario_correo %}
-            <div class="group">
-              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
-                {{ field.label }}
-              </label>
-              {{ field }}
-              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
-            </div>
-            {% endwith %}
-
-            {% with field=form.beneficiario_telefono %}
-            <div class="group">
-              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
-                {{ field.label }}
-              </label>
-              {{ field }}
-              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
-            </div>
-            {% endwith %}
-          </div>
-        </section>
+          {% endfor %}
+        </div>
 
         <section>
           <div class="flex items-center pb-1 border-b border-gray-200 mb-1">
@@ -1101,43 +1083,45 @@
 
       let consultaEnProgreso = false;
       let ultimaConsulta = 0;
-      const DEBOUNCE_MS = 1000;
+      const DEBOUNCE_MS = 800;
+      let timeoutId = null;
 
-      botonBuscar.addEventListener('click', async (event) => {
-        event.preventDefault();
+      // Función para detectar automáticamente el tipo según la longitud
+      function detectarTipoIdentificacion(identificacion) {
+        const longitud = identificacion.length;
+        if (longitud === 13) {
+          return '04'; // RUC
+        } else if (longitud === 10) {
+          return '05'; // Cédula
+        }
+        return null;
+      }
 
+      // Función para consultar automáticamente
+      async function consultarAutomatico() {
         if (consultaEnProgreso) {
           return;
         }
+
+        const identificacion = identificacionInput.value.trim();
+        
+        if (!identificacion || identificacion.length < 10) {
+          return;
+        }
+
+        const tipo = detectarTipoIdentificacion(identificacion);
+        if (!tipo) {
+          return;
+        }
+
+        // Actualizar el select automáticamente
+        tipoSelect.value = tipo;
 
         const ahora = Date.now();
         if (ahora - ultimaConsulta < DEBOUNCE_MS) {
           return;
         }
         ultimaConsulta = ahora;
-
-        const identificacion = identificacionInput.value.trim();
-        const tipo = tipoSelect.value;
-
-        if (!identificacion) {
-          mostrarMensajeProveedor(MSG_PROV_IDENT_EMPTY, 'warning');
-          identificacionInput.focus();
-          return;
-        }
-
-        if (!['04', '05'].includes(tipo)) {
-          mostrarMensajeProveedor(MSG_PROV_TIPO_INVALIDO, 'warning');
-          tipoSelect.focus();
-          return;
-        }
-
-        const longitud = identificacion.length;
-        const longitudValida = (tipo === '04' && longitud === 13) || (tipo === '05' && (longitud === 10 || longitud === 13));
-        if (!longitudValida) {
-          mostrarMensajeProveedor(MSG_PROV_LONGITUD_INVALIDA, 'warning');
-          identificacionInput.focus();
-          return;
-        }
 
         consultaEnProgreso = true;
         botonBuscar.disabled = true;
@@ -1149,6 +1133,72 @@
           consultaEnProgreso = false;
           botonBuscar.disabled = false;
           botonBuscar.classList.remove('opacity-70', 'cursor-not-allowed');
+        }
+      }
+
+      // Listener para detectar cuando se ingresa la identificación completa
+      identificacionInput.addEventListener('input', () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+
+        const identificacion = identificacionInput.value.trim();
+        const tipo = detectarTipoIdentificacion(identificacion);
+        
+        // Actualizar el select automáticamente
+        if (tipo) {
+          tipoSelect.value = tipo;
+          
+          // Consultar automáticamente después de un pequeño delay
+          timeoutId = setTimeout(() => {
+            consultarAutomatico();
+          }, DEBOUNCE_MS);
+        }
+      });
+
+      // Mantener el botón de búsqueda manual
+      botonBuscar.addEventListener('click', async (event) => {
+        event.preventDefault();
+
+        if (consultaEnProgreso) {
+          return;
+        }
+
+        const identificacion = identificacionInput.value.trim();
+        
+        if (!identificacion) {
+          mostrarMensajeProveedor(MSG_PROV_IDENT_EMPTY, 'warning');
+          identificacionInput.focus();
+          return;
+        }
+
+        const tipo = detectarTipoIdentificacion(identificacion);
+        if (!tipo) {
+          mostrarMensajeProveedor('Ingrese una cédula (10 dígitos) o RUC (13 dígitos) válido', 'warning');
+          identificacionInput.focus();
+          return;
+        }
+
+        tipoSelect.value = tipo;
+
+        consultaEnProgreso = true;
+        botonBuscar.disabled = true;
+        botonBuscar.classList.add('opacity-70', 'cursor-not-allowed');
+
+        try {
+          await consultarIdentificacionProveedor(identificacion, tipo);
+        } finally {
+          consultaEnProgreso = false;
+          botonBuscar.disabled = false;
+          botonBuscar.classList.remove('opacity-70', 'cursor-not-allowed');
+        }
+      });
+
+      // También permitir búsqueda con Enter
+      identificacionInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          botonBuscar.click();
         }
       });
     }
