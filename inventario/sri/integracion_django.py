@@ -674,32 +674,73 @@ class SRIIntegration:
                     if fecha_str:
                         try:
                             from datetime import datetime
-                            # El SRI envía formato: "16/11/2025 06:00:06" o "2025-11-16T06:00:06"
-                            # Intentar ambos formatos
+                            from django.utils import timezone
+                            
+                            # El SRI envía varios formatos posibles:
+                            # 1. ISO 8601: "2015-05-21T14:22:30.764-05:00" (con milisegundos y timezone)
+                            # 2. ISO simple: "2025-11-16T06:00:06"
+                            # 3. Formato local: "16/11/2025 06:00:06"
+                            
+                            fecha_dt = None
+                            
                             if 'T' in str(fecha_str):
-                                # Formato ISO: 2025-11-16T06:00:06
-                                factura.fecha_autorizacion = datetime.fromisoformat(
-                                    str(fecha_str).replace('Z', '+00:00')
-                                )
+                                # Formato ISO con T
+                                fecha_limpia = str(fecha_str).strip()
+                                
+                                # Manejar diferentes variantes ISO
+                                if '-05:00' in fecha_limpia or '+' in fecha_limpia or 'Z' in fecha_limpia:
+                                    # ISO 8601 completo con timezone
+                                    fecha_limpia = fecha_limpia.replace('Z', '+00:00')
+                                    # Remover milisegundos si existen (ej: .764)
+                                    if '.' in fecha_limpia:
+                                        partes = fecha_limpia.split('.')
+                                        # Mantener solo timezone después del punto
+                                        if len(partes) == 2:
+                                            # partes[0] = "2015-05-21T14:22:30"
+                                            # partes[1] = "764-05:00"
+                                            timezone_part = partes[1]
+                                            # Extraer solo el timezone
+                                            if '-' in timezone_part:
+                                                tz = '-' + timezone_part.split('-')[1]
+                                            elif '+' in timezone_part:
+                                                tz = '+' + timezone_part.split('+')[1]
+                                            else:
+                                                tz = ''
+                                            fecha_limpia = partes[0] + tz
+                                    
+                                    fecha_dt = datetime.fromisoformat(fecha_limpia)
+                                else:
+                                    # ISO simple sin timezone
+                                    fecha_dt = datetime.fromisoformat(fecha_limpia)
+                                    # Hacer timezone-aware (Ecuador UTC-5)
+                                    fecha_dt = timezone.make_aware(fecha_dt)
+                            
                             elif '/' in str(fecha_str):
-                                # Formato SRI: 16/11/2025 06:00:06
-                                factura.fecha_autorizacion = datetime.strptime(
-                                    str(fecha_str), '%d/%m/%Y %H:%M:%S'
-                                )
+                                # Formato SRI local: "16/11/2025 06:00:06"
+                                fecha_dt = datetime.strptime(str(fecha_str), '%d/%m/%Y %H:%M:%S')
+                                # Hacer timezone-aware (Ecuador UTC-5)
+                                fecha_dt = timezone.make_aware(fecha_dt)
+                            
+                            if fecha_dt:
+                                factura.fecha_autorizacion = fecha_dt
+                                logger.info(f"✅ Fecha autorización ASIGNADA al objeto: {factura.fecha_autorizacion}")
+                                logger.info(f"   Tipo: {type(factura.fecha_autorizacion)}")
                             else:
-                                logger.warning(f"Formato de fecha desconocido: {fecha_str}")
+                                logger.warning(f"⚠️ No se pudo parsear fecha: {fecha_str}")
                                 factura.fecha_autorizacion = None
                             
-                            logger.info(f"✅ Fecha autorización guardada: {factura.fecha_autorizacion}")
                         except Exception as e:
-                            logger.warning(
-                                f"Error parseando fecha autorización: {fecha_str} - Error: {e}"
+                            logger.error(
+                                f"❌ Error parseando fecha autorización: {fecha_str} - Error: {e}"
                             )
+                            logger.error(f"Traceback completo:")
                             traceback.print_exc()
+                            factura.fecha_autorizacion = None
                     else:
                         logger.warning(
                             f"Factura {factura.id} autorizada sin fechaAutorizacion en resultado"
                         )
+                        factura.fecha_autorizacion = None
                 if hasattr(factura, 'xml_autorizado'):
                     xml_aut = aut.get('comprobante') or aut.get('xml_autorizado')
                     if xml_aut:
@@ -767,10 +808,17 @@ class SRIIntegration:
             factura.mensaje_sri_detalle = str(resultado.get('mensajes', []))
         
         # 🔧 FIX: SIEMPRE guardar los cambios
+        logger.info(f"💾 Guardando factura {factura.id} en BD...")
+        logger.info(f"   ANTES DE SAVE - fecha_autorizacion: {factura.fecha_autorizacion}")
         factura.save()
-        logger.info(f"✅ Factura {factura.id} actualizada y guardada en BD")
-        logger.info(f"   📅 fecha_autorizacion en BD: {factura.fecha_autorizacion}")
-        logger.info(f"   📅 fecha_emision en BD: {factura.fecha_emision}")
+        
+        # 🔍 VERIFICACIÓN POST-SAVE: Re-cargar desde BD para confirmar
+        factura.refresh_from_db()
+        logger.info(f"✅ Factura {factura.id} guardada y verificada en BD")
+        logger.info(f"   📅 fecha_autorizacion (desde BD): {factura.fecha_autorizacion}")
+        logger.info(f"   📅 fecha_emision (desde BD): {factura.fecha_emision}")
+        logger.info(f"   🔢 numero_autorizacion (desde BD): {factura.numero_autorizacion}")
+        logger.info(f"   📊 estado_sri (desde BD): {factura.estado_sri}")
     
     def _firmar_xml_xades_bes(self, xml_path, xml_firmado_path, empresa=None):
         """Firma un XML utilizando el esquema XAdES-BES."""

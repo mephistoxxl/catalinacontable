@@ -283,12 +283,30 @@ class RIDEGenerator:
             # === CUADRO DE INFORMACIÓN - LIMPIO Y CENTRADO ===
             clave_acceso_factura = getattr(factura, 'clave_acceso', clave_acceso or '')
             numero_factura = f"{getattr(factura, 'establecimiento_formatted', getattr(factura, 'establecimiento', '001'))}-{getattr(factura, 'punto_emision_formatted', getattr(factura, 'punto_emision', '001'))}-{getattr(factura, 'secuencia_formatted', str(getattr(factura, 'secuencia', 1)).zfill(9))}"
-            # ✅ Usar fecha_autorizacion (del SRI), si no existe usar fecha_emision como fallback
-            fecha_aut = getattr(factura, 'fecha_autorizacion', None) or getattr(factura, 'fecha_emision', None)
+            
+            # ✅ CORREGIDO: Usar SOLO fecha_autorizacion (del SRI)
+            # NUNCA usar fecha_emision como fecha de autorización (son conceptualmente diferentes)
+            fecha_autorizacion_sri = getattr(factura, 'fecha_autorizacion', None)
+            
+            # 🔍 DEBUG: Log de la fecha de autorización
+            logger.info(f"🔍 RIDE Generator - Factura #{factura.id}")
+            logger.info(f"   fecha_autorizacion del objeto: {fecha_autorizacion_sri}")
+            logger.info(f"   Tipo: {type(fecha_autorizacion_sri)}")
+            logger.info(f"   Es None?: {fecha_autorizacion_sri is None}")
+            
+            # Formatear fecha de autorización
+            if fecha_autorizacion_sri:
+                # Fecha autorizada por el SRI
+                fecha_aut_val = fecha_autorizacion_sri.strftime('%d/%m/%Y %H:%M:%S')
+                logger.info(f"   ✅ Mostrará en RIDE: {fecha_aut_val}")
+            else:
+                # Factura NO autorizada aún
+                fecha_aut_val = 'PENDIENTE DE AUTORIZACIÓN'
+                logger.warning(f"   ⚠️ Mostrará en RIDE: {fecha_aut_val}")
+            
             ambiente = getattr(opciones, 'ambiente_descripcion', self._obtener_ambiente(str(getattr(factura, 'ambiente', '2'))))
             emision = self._obtener_tipo_emision(str(getattr(factura, 'tipo_emision', '1')))
             identificacion_val = getattr(opciones, 'identificacion', '')
-            fecha_aut_val = fecha_aut.strftime('%d/%m/%Y %H:%M:%S') if fecha_aut else 'PENDIENTE DE AUTORIZACIÓN'
 
             # 1. ENCABEZADO "FACTURA" - LIMPIO
             encabezado_factura = Paragraph('FACTURA', self.styles['EncabezadoLimpio'])
