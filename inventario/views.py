@@ -1553,28 +1553,42 @@ class AgregarProducto(LoginRequiredMixin, View):
     def post(self, request):
         empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
-            form = ProductoFormulario(request.POST)
+            form = ProductoFormulario(request.POST, request.FILES)
             messages.error(request, "No hay una empresa activa seleccionada.")
             return render(request, 'inventario/producto/agregarProducto.html', {'form': form})
         try:
             empresa = Empresa.objects.get(id=empresa_id)
         except Empresa.DoesNotExist:
-            form = ProductoFormulario(request.POST)
+            form = ProductoFormulario(request.POST, request.FILES)
             messages.error(request, "No hay una empresa activa seleccionada.")
             return render(request, 'inventario/producto/agregarProducto.html', {'form': form})
 
         form = ProductoFormulario(request.POST, request.FILES, empresa=empresa)
         if form.is_valid():
-            # ✅ Usar form.save() en vez de crear manualmente para manejar imagen
-            prod = form.save(commit=False)
-            prod.empresa = empresa
-            prod.save()  # El método save() del modelo calculará precio_iva1 y precio_iva2
+            try:
+                # ✅ Usar form.save() en vez de crear manualmente para manejar imagen
+                prod = form.save(commit=False)
+                prod.empresa = empresa
+                prod.save()  # El método save() del modelo calculará precio_iva1 y precio_iva2
+                
+                print(f"✅ Producto guardado exitosamente: {prod.codigo} - {prod.descripcion}")
 
-            form = ProductoFormulario()
-            messages.success(request, '✓ Producto agregado exitosamente')
-            request.session['productoProcesado'] = 'agregado'
-            return HttpResponseRedirect("/inventario/agregarProducto")
+                form = ProductoFormulario()
+                messages.success(request, '✓ Producto agregado exitosamente')
+                request.session['productoProcesado'] = 'agregado'
+                return HttpResponseRedirect("/inventario/agregarProducto")
+            except Exception as e:
+                print(f"❌ ERROR al guardar producto: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                messages.error(request, f'Error al guardar el producto: {str(e)}')
+                return render(request, 'inventario/producto/agregarProducto.html', {'form': form})
         else:
+            # Mostrar errores de validación
+            print(f"❌ Formulario NO válido. Errores: {form.errors}")
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
             return render(request, 'inventario/producto/agregarProducto.html', {'form': form})
 
     def get(self, request):

@@ -108,8 +108,8 @@ class ProductoFormulario(forms.ModelForm):
             'codigo_barras': forms.TextInput(attrs={'placeholder': 'Código de barras del producto', 'id': 'codigo_barras', 'class': 'form-control'}),
             'descripcion': forms.TextInput(attrs={'placeholder': 'Descripción', 'id': 'descripcion', 'class': 'form-control'}),
             'categoria': forms.Select(attrs={'class': 'form-control', 'id': 'categoria'}),
-            'disponible': forms.NumberInput(attrs={'placeholder': 'Cantidad disponible', 'id': 'disponible', 'class': 'form-control'}),
-            'costo_actual': forms.TextInput(attrs={'placeholder': 'Costo actual', 'id': 'costo_actual', 'class': 'form-control'}),
+            'disponible': forms.NumberInput(attrs={'placeholder': 'Cantidad disponible', 'id': 'disponible', 'class': 'form-control', 'step': '1', 'min': '0'}),
+            'costo_actual': forms.NumberInput(attrs={'placeholder': 'Costo actual', 'id': 'costo_actual', 'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'imagen': forms.FileInput(attrs={'class': 'form-control', 'id': 'imagen', 'accept': 'image/*'}),
         }
 
