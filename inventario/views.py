@@ -6313,9 +6313,9 @@ class FirmaElectronicaView(LoginRequiredMixin, View):
                     messages.success(request, 'Firma electrónica actualizada correctamente.')
                 else:
                     messages.success(request, 'Configuración actualizada correctamente.')
-                # Recargar la instancia para mostrar datos actualizados
-                opciones.refresh_from_db()
-                form = FirmaElectronicaForm(instance=opciones)
+                
+                # Redirigir para evitar que el mensaje aparezca en el panel principal
+                return redirect('inventario:firmaElectronica')
                 
             except ValidationError as e:
                 messages.error(request, f'Error de validación: {e.message}')
