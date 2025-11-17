@@ -682,10 +682,17 @@ class SRIIntegration:
                             # 3. Formato local: "16/11/2025 06:00:06"
                             
                             fecha_dt = None
+                            fecha_str_trabajo = str(fecha_str).strip()
                             
-                            if 'T' in str(fecha_str):
+                            # ✅ Normalizar formato: espacio → T (algunos servicios usan espacio)
+                            # "2025-11-10 15:10:32-05:00" → "2025-11-10T15:10:32-05:00"
+                            if ' ' in fecha_str_trabajo and ('-' in fecha_str_trabajo.split(' ')[-1] or '+' in fecha_str_trabajo.split(' ')[-1]):
+                                # Tiene espacio y timezone, reemplazar espacio por T
+                                fecha_str_trabajo = fecha_str_trabajo.replace(' ', 'T', 1)
+                            
+                            if 'T' in fecha_str_trabajo:
                                 # Formato ISO con T
-                                fecha_limpia = str(fecha_str).strip()
+                                fecha_limpia = fecha_str_trabajo
                                 
                                 # Manejar diferentes variantes ISO
                                 if '-05:00' in fecha_limpia or '+' in fecha_limpia or 'Z' in fecha_limpia:
@@ -715,9 +722,9 @@ class SRIIntegration:
                                     # Hacer timezone-aware (Ecuador UTC-5)
                                     fecha_dt = timezone.make_aware(fecha_dt)
                             
-                            elif '/' in str(fecha_str):
+                            elif '/' in fecha_str_trabajo:
                                 # Formato SRI local: "16/11/2025 06:00:06"
-                                fecha_dt = datetime.strptime(str(fecha_str), '%d/%m/%Y %H:%M:%S')
+                                fecha_dt = datetime.strptime(fecha_str_trabajo, '%d/%m/%Y %H:%M:%S')
                                 # Hacer timezone-aware (Ecuador UTC-5)
                                 fecha_dt = timezone.make_aware(fecha_dt)
                             

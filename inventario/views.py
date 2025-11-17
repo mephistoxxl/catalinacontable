@@ -3725,16 +3725,7 @@ def consultar_estado_sri(request, factura_id):
         if resultado.get('success'):
             estado_anterior = factura.estado_sri
             res_estado = resultado.get('estado') or resultado.get('resultado', {}).get('estado') or 'DESCONOCIDO'
-            
-            # ✅ NORMALIZAR estado para que coincida con choices del modelo
-            # El SRI puede enviar 'AUTORIZADO' pero el modelo requiere 'AUTORIZADA'
-            estado_normalizado = res_estado.upper().strip()
-            if estado_normalizado == 'AUTORIZADO':
-                estado_normalizado = 'AUTORIZADA'
-            elif estado_normalizado == 'RECHAZADO':
-                estado_normalizado = 'RECHAZADA'
-            
-            factura.estado_sri = estado_normalizado
+            factura.estado_sri = res_estado
             # Mapear posibles estructuras
             numero_aut = resultado.get('numero_autorizacion') or resultado.get('resultado', {}).get('numero_autorizacion')
             fecha_aut = resultado.get('fecha_autorizacion') or resultado.get('resultado', {}).get('fecha_autorizacion')
