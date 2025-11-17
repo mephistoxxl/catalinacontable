@@ -576,6 +576,12 @@ class Producto(models.Model):
     categoria = models.CharField(max_length=20, choices=decisiones)
     iva = models.CharField(max_length=10, choices=tiposIVA)
     costo_actual = models.DecimalField(max_digits=9, decimal_places=2)
+    imagen = models.ImageField(
+        upload_to='productos/',
+        null=True,
+        blank=True,
+        help_text='Imagen del producto'
+    )
 
     objects = TenantManager()
     # ⚠️ Uso exclusivo para migraciones/tests: evita filtros multi-tenant automáticos.

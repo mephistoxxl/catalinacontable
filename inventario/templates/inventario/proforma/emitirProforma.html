@@ -4,9 +4,9 @@
 <style>
   /* Compact inputs with improved borders and styling */
   input, select, textarea { 
-    height: 26px; 
-    font-size: 12px; 
-    padding: 4px 8px;
+    height: 32px; 
+    font-size: 13px; 
+    padding: 6px 10px;
     border: 1px solid #d1d5db;
     border-radius: 4px;
     background: #ffffff;
@@ -18,33 +18,17 @@
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
   }
   textarea { height: auto; min-height: 72px; padding: 6px 8px; }
-  label { font-size: 11px; margin-bottom: 3px; color: #111827; font-weight: 500; }
-  /* Tabla estilo planilla */
-  #proforma-rows tr:nth-child(even) { background: #fafafa; }
-  td.pf-iva-cell { background: #e5e7eb; }
+  label { font-size: 12px; margin-bottom: 4px; color: #111827; font-weight: 500; }
+  /* Tabla estilo factura */
+  #proforma-rows tr:hover { background: #f9fafb; }
+  td.pf-iva-cell { background: transparent; }
   td.pf-iva-cell .pf-iva { cursor: pointer; }
   input[readonly] { 
-    background: #f9fafb; 
-    cursor: not-allowed; 
-    border-color: #e5e7eb;
-    color: #6b7280;
+    background: transparent; 
+    cursor: default; 
+    border-color: transparent;
+    color: #111827;
   }
-  /* Bordered and compact table */
-  table.table-compact { border-collapse: collapse; width: 100%; }
-  table.table-compact th, table.table-compact td { border: 1px solid #d1d5db; padding: 4px 6px !important; }
-  table.table-compact thead th { background: #f3f4f6; font-weight: 600; color: #111827; }
-  table.table-compact input { 
-    height: 24px; 
-    font-size: 12px; 
-    padding: 2px 6px; 
-    border: 1px solid #d1d5db;
-    border-radius: 3px;
-  }
-  table.table-compact input:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.1);
-  }
-  .text-right input { text-align: right; }
   /* Card for top section (above the table) */
   .form-card { box-shadow: inset 0 0 0 1px #e5e7eb; }
   
@@ -203,38 +187,40 @@
 
             <!-- Detalles Proforma (grid fijo dentro de esta vista) -->
             <div class="space-y-2">
-              <div class="overflow-x-auto border border-gray-300 rounded-md">
-                <table class="min-w-full text-[11px] table-compact">
-                  <thead class="bg-gray-50">
-                    <tr>
-                      <th class="px-2 py-1 text-left w-40">Código</th>
-                      <th class="px-2 py-1 text-left">Descripción</th>
-                      <th class="px-2 py-1 text-right w-20">Cantidad</th>
-                      <th class="px-2 py-1 text-right w-28">Precio</th>
-                      <th class="px-2 py-1 text-right w-20">Desc. %</th>
-                      <th class="px-2 py-1 text-right w-16">IVA</th>
-                      <th class="px-2 py-1 text-right w-28">Total</th>
-                      <th class="px-2 py-1 text-center w-12">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody id="proforma-rows">
-                    <!-- Fila plantilla; el JS duplicará hasta 7 filas vacías -->
-                    <tr class="border-t">
-                      <td class="px-2 py-1"><input name="codigo[]" class="w-full border rounded px-2 py-1" readonly /></td>
-                      <td class="px-2 py-1"><input name="descripcion[]" class="w-full border rounded px-2 py-1" readonly /></td>
-                      <td class="px-2 py-1 text-right"><input name="cantidad[]" type="number" step="0.01" value="" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()" /></td>
-                      <td class="px-2 py-1 text-right"><input name="precio[]" type="number" step="0.01" value="" class="w-full border rounded px-2 py-1 text-right" readonly /></td>
-                      <td class="px-2 py-1 text-right"><input name="descuento[]" type="number" step="0.01" value="" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()" /></td>
-                      <td class="px-2 py-1 text-right pf-iva-cell"><span class="pf-iva" data-iva="0.15" title="Click para cambiar IVA">15%</span><input type="hidden" name="iva[]" value="0.15"></td>
-                      <td class="px-2 py-1 text-right"><span class="pf-total">0.00</span></td>
-                      <td class="px-2 py-1 text-center">
-                        <button type="button" onclick="pf_eliminarFila(this)" class="inline-flex items-center justify-center w-6 h-6 border border-red-300 text-red-600 bg-red-50 hover:bg-red-100 rounded text-xs" title="Eliminar producto">
-                          <i class="fa fa-trash"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div class="bg-white rounded-md border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200" id="tabla-proforma">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
+                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Desc. %</th>
+                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">IVA</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody id="proforma-rows" class="bg-white divide-y divide-gray-200">
+                      <!-- Fila plantilla; el JS duplicará hasta 7 filas vacías -->
+                      <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-2"><input name="codigo[]" class="w-full border-0 bg-transparent text-xs focus:ring-1 focus:ring-blue-500 rounded px-2 py-1" readonly /></td>
+                        <td class="px-3 py-2"><input name="descripcion[]" class="w-full border-0 bg-transparent text-xs focus:ring-1 focus:ring-blue-500 rounded px-2 py-1" readonly /></td>
+                        <td class="px-3 py-2 text-center"><input name="cantidad[]" type="number" step="0.01" value="" class="w-20 border-0 bg-transparent text-xs text-center focus:ring-1 focus:ring-blue-500 rounded px-2 py-1" oninput="pf_recalc()" /></td>
+                        <td class="px-3 py-2 text-right"><input name="precio[]" type="number" step="0.01" value="" class="w-24 border-0 bg-transparent text-xs text-right focus:ring-1 focus:ring-blue-500 rounded px-2 py-1" readonly /></td>
+                        <td class="px-3 py-2 text-right"><input name="descuento[]" type="number" step="0.01" value="" class="w-20 border-0 bg-transparent text-xs text-right focus:ring-1 focus:ring-blue-500 rounded px-2 py-1" oninput="pf_recalc()" /></td>
+                        <td class="px-3 py-2 text-center pf-iva-cell"><span class="pf-iva text-xs font-semibold text-blue-600 cursor-pointer hover:text-blue-800" data-iva="0.15" title="Click para cambiar IVA">15%</span><input type="hidden" name="iva[]" value="0.15"></td>
+                        <td class="px-3 py-2 text-right"><span class="pf-total text-xs font-semibold text-gray-900">$0.00</span></td>
+                        <td class="px-3 py-2 text-center">
+                          <button type="button" onclick="pf_eliminarFila(this)" class="inline-flex items-center justify-center w-7 h-7 border border-red-300 text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors text-xs" title="Eliminar">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -304,46 +290,52 @@ function buscarCliente() {
     return;
   }
 
-  console.log('Buscando cliente:', cedula);
+  // Determinar el tipo de consulta según la longitud
+  const tipo = cedula.length === 10 ? '05' : '04'; // 05 = Cédula, 04 = RUC
+  
+  console.log('Consultando API externa:', cedula, 'tipo:', tipo);
 
-  fetch(`/inventario/buscar_cliente/?q=${cedula}`)
-    .then(response => response.json())
+  // Consultar la API externa de identificación
+  fetch(`/inventario/consultar-identificacion/?identificacion=${encodeURIComponent(cedula)}&tipo=${tipo}`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Error en la respuesta del servidor');
+      }
+      return response.json();
+    })
     .then(data => {
-      console.log('Respuesta del servidor:', data);
+      console.log('Respuesta de la API:', data);
       
-      if (data.error) {
-        alert(data.message || 'Cliente no encontrado.');
-        const nombreCliente = document.getElementById('id_nombre_cliente');
-        const clienteId = document.getElementById('cliente_id');
-        const correoCliente = document.getElementById('id_correo_cliente');
-        if (nombreCliente) nombreCliente.value = '';
-        if (clienteId) clienteId.value = '';
-        if (correoCliente) correoCliente.value = '';
+      if (data.error || !data.razon_social) {
+        alert(data.message || 'No se encontró información para esta identificación en los registros públicos.');
         return;
       }
 
       const nombreCliente = document.getElementById('id_nombre_cliente');
-      const clienteId = document.getElementById('cliente_id');
       const correoCliente = document.getElementById('id_correo_cliente');
       
-      console.log('Elementos encontrados:', {
-        nombreCliente: nombreCliente,
-        clienteId: clienteId,
-        correoCliente: correoCliente
-      });
+      // Asignar la razón social obtenida de la API
+      let nombreCompleto = data.razon_social || '';
+      if (data.nombre_comercial && data.nombre_comercial.trim()) {
+        nombreCompleto += ` (${data.nombre_comercial})`;
+      }
       
-      const nombreCompleto = data.nombre_comercial ? `${data.razon_social} ${data.nombre_comercial}` : data.razon_social;
-      console.log('Nombre a asignar:', nombreCompleto);
+      console.log('Datos obtenidos de la API:', nombreCompleto);
       
-      if (nombreCliente) nombreCliente.value = nombreCompleto;
-      if (clienteId) clienteId.value = data.id;
-      if (correoCliente) correoCliente.value = data.correo || '';
+      if (nombreCliente) {
+        nombreCliente.value = nombreCompleto;
+        nombreCliente.removeAttribute('placeholder');
+      }
       
-      console.log('Campos actualizados');
+      if (correoCliente && !correoCliente.value) {
+        correoCliente.setAttribute('placeholder', 'Ingrese el correo del cliente');
+      }
+      
+      console.log('Información del cliente cargada desde la API');
     })
     .catch(error => {
-      console.error('Error al buscar cliente:', error);
-      alert('Error de conexión al buscar cliente.');
+      console.error('Error al consultar la API:', error);
+      alert('Error al consultar la información. Verifique la identificación e intente nuevamente.');
     });
 }
 
@@ -484,18 +476,24 @@ function pf_renderProductosModal(lista){
     const iva = Number(item.iva_percent || 0); 
     const pIva = Number(item.precio_con_iva || (precio * (1 + iva)));
     
+    tr.style.cssText = 'border-bottom:1px solid #e5e7eb; transition:all 0.2s; cursor:pointer;';
+    tr.onmouseover = function() { this.style.background = '#f3f4f6'; };
+    tr.onmouseout = function() { this.style.background = '#fff'; };
+    
     tr.innerHTML = `
-      <td class="text-center">
-        <button type="button" class="btn btn-success btn-sm" 
+      <td style="padding:12px 16px; text-align:center;">
+        <button type="button" 
                 title="Seleccionar ${item.nombre}" 
-                style="padding: 4px 8px; cursor: pointer; z-index: 9999; position: relative;">
+                style="width:32px; height:32px; background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:#fff; border:none; border-radius:8px; cursor:pointer; transition:all 0.2s; box-shadow:0 2px 8px rgba(16,185,129,0.3); display:flex; align-items:center; justify-content:center;"
+                onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 4px 12px rgba(16,185,129,0.4)'"
+                onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 8px rgba(16,185,129,0.3)'">
           <i class="fa fa-check"></i>
         </button>
       </td>
-      <td>${item.codigo || ''}</td>
-      <td>${(item.nombre || '').replace(/</g, '&lt;')}</td>
-      <td class="text-right">${precio.toFixed(2)}</td>
-      <td class="text-right">${pIva.toFixed(2)}</td>
+      <td style="padding:12px 16px; font-size:13px; color:#374151; font-family:monospace;">${item.codigo || '-'}</td>
+      <td style="padding:12px 16px; font-size:13px; color:#1f2937; font-weight:500;">${(item.nombre || '').replace(/</g, '&lt;')}</td>
+      <td style="padding:12px 16px; text-align:right; font-size:13px; color:#10b981; font-weight:600;">$${precio.toFixed(2)}</td>
+      <td style="padding:12px 16px; text-align:right; font-size:13px; color:#1f2937; font-weight:600;">$${pIva.toFixed(2)}</td>
     `;
     
     const button = tr.querySelector('button');
@@ -1212,26 +1210,58 @@ function pf_procederGuardado() {
 </script>
 
 <!-- Modal productos para Proforma -->
-<div id="pf-modal-productos" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1050;">
-  <div style="background:#fff; width:95%; max-width:980px; max-height:85vh; overflow:hidden; border-radius:6px; box-shadow:0 10px 25px rgba(0,0,0,.2); margin:40px auto; position:relative; z-index:1051;">
-    <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid #e5e7eb;">
-      <div style="display:flex; align-items:center; gap:8px;"><i class="fa fa-list-alt"></i><strong>Seleccionar producto o servicio</strong></div>
-      <button type="button" onclick="pf_cerrarModalProductos()" class="btn btn-light"><i class="fa fa-times"></i></button>
+<div id="pf-modal-productos" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1050; backdrop-filter: blur(2px);" onclick="if(event.target===this) pf_cerrarModalProductos()">
+  <div style="background:#fff; width:90%; max-width:900px; max-height:80vh; overflow:hidden; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.3); margin:60px auto; position:relative; z-index:1051;">
+    <!-- Header mejorado -->
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:2px solid #e5e7eb; background:linear-gradient(135deg, #1f2937 0%, #111827 100%);">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="width:40px; height:40px; background:rgba(16,185,129,0.2); border-radius:10px; display:flex; align-items:center; justify-content:center;">
+          <i class="fa fa-shopping-cart" style="color:#10b981; font-size:18px;"></i>
+        </div>
+        <div>
+          <h3 style="margin:0; color:#fff; font-size:18px; font-weight:600;">Seleccionar Producto</h3>
+          <p style="margin:0; color:rgba(255,255,255,0.7); font-size:12px;">Busque y seleccione el producto o servicio</p>
+        </div>
+      </div>
+      <button type="button" onclick="pf_cerrarModalProductos()" style="width:36px; height:36px; border-radius:8px; background:rgba(255,255,255,0.1); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'" title="Cerrar">
+        <i class="fa fa-times" style="color:#fff; font-size:18px;"></i>
+      </button>
     </div>
-    <div style="padding:10px 12px; border-bottom:1px solid #e5e7eb; display:flex; gap:8px; align-items:center;">
-      <label style="margin:0; font-size:.85rem;">Buscar:</label>
-      <input id="pf-modal-buscar-input" type="text" placeholder="Código (parcial o completo)" style="flex:1; min-width:160px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px;">
-      <button type="button" class="btn btn-primary" onclick="pf_cargarProductosModal(document.getElementById('pf-modal-buscar-input').value)"><i class="fa fa-search"></i></button>
+    
+    <!-- Búsqueda mejorada -->
+    <div style="padding:16px 20px; background:#f8f9fa; border-bottom:1px solid #e5e7eb;">
+      <div style="display:flex; gap:12px; align-items:center;">
+        <div style="flex:1; position:relative;">
+          <i class="fa fa-search" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#9ca3af; font-size:14px;"></i>
+          <input id="pf-modal-buscar-input" type="text" placeholder="Buscar por código o nombre del producto..." style="width:100%; padding:10px 12px 10px 40px; border:2px solid #e5e7eb; border-radius:8px; font-size:14px; transition:all 0.2s;" onfocus="this.style.borderColor='#10b981'" onblur="this.style.borderColor='#e5e7eb'">
+        </div>
+        <button type="button" onclick="pf_cargarProductosModal(document.getElementById('pf-modal-buscar-input').value)" style="padding:10px 24px; background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:#fff; border:none; border-radius:8px; font-weight:600; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 12px rgba(16,185,129,0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(16,185,129,0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(16,185,129,0.3)'">
+          <i class="fa fa-search mr-1"></i>Buscar
+        </button>
+      </div>
     </div>
-    <div class="table-responsive" style="max-height:65vh; overflow:auto;">
-      <table class="table table-sm table-striped table-hover" style="margin:0;">
-        <thead class="thead-light"><tr><th style="width:40px;">✓</th><th style="width:140px;">Código</th><th>Descripción</th><th style="width:110px;" class="text-right">Precio</th><th style="width:110px;" class="text-right">Precio c/IVA</th></tr></thead>
+    
+    <!-- Tabla mejorada -->
+    <div style="max-height:50vh; overflow:auto; padding:0;">
+      <table style="width:100%; border-collapse:collapse; margin:0;">
+        <thead style="position:sticky; top:0; background:#fff; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+          <tr style="border-bottom:2px solid #e5e7eb;">
+            <th style="padding:12px 16px; text-align:center; font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; width:60px;">Acción</th>
+            <th style="padding:12px 16px; text-align:left; font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; width:140px;">Código</th>
+            <th style="padding:12px 16px; text-align:left; font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px;">Descripción</th>
+            <th style="padding:12px 16px; text-align:right; font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; width:120px;">Precio</th>
+            <th style="padding:12px 16px; text-align:right; font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; width:120px;">Precio c/IVA</th>
+          </tr>
+        </thead>
         <tbody id="pf-modal-tbody"></tbody>
       </table>
     </div>
-    <div id="pf-modal-vacio" style="display:none; padding:16px; color:#64748b;">Sin resultados.</div>
+    <div id="pf-modal-vacio" style="display:none; padding:40px 20px; text-align:center;">
+      <i class="fa fa-inbox" style="font-size:48px; color:#d1d5db; margin-bottom:12px;"></i>
+      <p style="color:#6b7280; font-size:14px; margin:0;">No se encontraron productos</p>
+    </div>
   </div>
-  <div id="pf-modal-loader" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; z-index:1052;"><div class="spinner-border" role="status"><span class="sr-only">Cargando…</span></div></div>
+  <div id="pf-modal-loader" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; z-index:1052; background:rgba(255,255,255,0.9);"><div class="spinner-border" style="color:#10b981;" role="status"><span class="sr-only">Cargando…</span></div></div>
 </div>
 
 <!-- Modal de confirmación de eliminación -->

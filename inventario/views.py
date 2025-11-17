@@ -20,6 +20,7 @@ from .forms import *
 from django.views import View
 #autentificacion de usuario e inicio de sesion
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 #verifica si el usuario esta logeado
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth.models import Group
@@ -249,7 +250,7 @@ class EmitirProforma(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                 return redirect('inventario:login_proformador')
 
             try:
-                data = signing.loads(token, salt='proformador', max_age=120)
+                data = signing.loads(token, salt='proformador', max_age=1800)
                 facturador_id = data.get('fid')
             except Exception:
                 messages.error(request, 'Sesión de proformador expirada. Inicie sesión nuevamente.')
@@ -314,7 +315,7 @@ class EmitirProforma(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                 if not token:
                     return JsonResponse({'success': False, 'message': 'Debe iniciar sesión como facturador para emitir proformas.'})
                 try:
-                    token_data = signing.loads(token, salt='proformador', max_age=120)
+                    token_data = signing.loads(token, salt='proformador', max_age=1800)
                     facturador_id = token_data.get('fid')
                 except Exception:
                     return JsonResponse({'success': False, 'message': 'Sesión de proformador expirada. Inicie sesión nuevamente.'})
@@ -463,7 +464,7 @@ class EmitirProforma(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
             messages.warning(request, 'Debe iniciar sesión como facturador antes de emitir proformas.')
             return redirect('inventario:login_proformador')
         try:
-            token_data = signing.loads(token, salt='proformador', max_age=120)
+            token_data = signing.loads(token, salt='proformador', max_age=1800)
             facturador_id = token_data.get('fid')
         except Exception:
             messages.error(request, 'Sesión de proformador expirada. Inicie sesión nuevamente.')
@@ -1596,7 +1597,7 @@ class AgregarProducto(LoginRequiredMixin, View):
             prod.save()
 
             form = ProductoFormulario()
-            messages.success(request, 'Ingresado exitosamente bajo la ID %s.' % prod.id)
+            messages.success(request, '✓ Producto agregado exitosamente')
             request.session['productoProcesado'] = 'agregado'
             return HttpResponseRedirect("/inventario/agregarProducto")
         else:
@@ -1968,7 +1969,7 @@ class AgregarCliente(LoginRequiredMixin, View):
 
             cliente.save()
             form = ClienteFormulario()
-            messages.success(request, 'Ingresado exitosamente bajo la ID %s.' % cliente.id)
+            messages.success(request, '✓ Cliente agregado exitosamente')
             request.session['clienteProcesado'] = 'agregado'
             return HttpResponseRedirect("/inventario/agregarCliente")
         else:
@@ -2042,6 +2043,79 @@ def consultar_identificacion(request):
             'message': f'Error interno del servidor: {str(e)}',
             'status_code': 500
         }, status=500)
+
+
+@require_http_methods(["POST"])
+@login_required
+def guardar_cliente_automatico(request):
+    """Vista para guardar automáticamente un cliente después de consultar la API externa"""
+    try:
+        import json
+        data = json.loads(request.body)
+        
+        identificacion = data.get('identificacion', '').strip()
+        razon_social = data.get('razon_social', '').strip()
+        tipo = data.get('tipo', '').strip()
+        
+        if not identificacion or not razon_social:
+            return JsonResponse({
+                'success': False,
+                'message': 'Faltan datos requeridos'
+            })
+        
+        # Obtener empresa activa
+        empresa = get_empresa_activa(request)
+        if not empresa:
+            return JsonResponse({
+                'success': False,
+                'message': 'No hay empresa activa'
+            })
+        
+        # Verificar si el cliente ya existe
+        cliente_existente = Cliente.objects.filter(
+            identificacion=identificacion,
+            empresa=empresa
+        ).first()
+        
+        if cliente_existente:
+            return JsonResponse({
+                'success': True,
+                'message': 'Cliente ya existe',
+                'cliente_id': cliente_existente.id,
+                'ya_existia': True
+            })
+        
+        # Crear nuevo cliente
+        cliente = Cliente.objects.create(
+            empresa=empresa,
+            identificacion=identificacion,
+            razon_social=razon_social,
+            correo='',
+            telefono='',
+            direccion='Por definir',
+            tipoIdentificacion=tipo,
+            tipoVenta='1',
+            tipoRegimen='1',
+            tipoCliente='1'
+        )
+        
+        logger.info(f"Cliente creado automáticamente: {cliente.id} - {razon_social}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Cliente guardado exitosamente',
+            'cliente_id': cliente.id,
+            'ya_existia': False
+        })
+        
+    except Exception as e:
+        logger.error(f"Error al guardar cliente automáticamente: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return JsonResponse({
+            'success': False,
+            'message': f'Error al guardar cliente: {str(e)}'
+        })
 
 
 def validar_ruc_ecuatoriano(ruc):
