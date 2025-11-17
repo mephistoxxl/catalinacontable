@@ -2733,6 +2733,14 @@ class EmitirFactura(LoginRequiredMixin, View):
                         porcentaje_descuento=Decimal('0.00')
                     )
                     
+                    # ✅ DESCONTAR INVENTARIO: Restar cantidad del stock disponible
+                    if producto:
+                        if producto.disponible is None:
+                            producto.disponible = 0
+                        producto.disponible -= cantidad
+                        producto.save()
+                        print(f"   📦 Inventario actualizado: {producto.codigo} - Stock restante: {producto.disponible}")
+                    
                     # Forzar valores correctos después del save
                     DetalleFactura.objects.filter(id=detalle.id).update(
                         sub_total=subtotal,
@@ -3015,6 +3023,14 @@ class DetallesFactura(LoginRequiredMixin, View):
                         porcentaje_descuento=porcentaje_descuento,
                         precio_sin_subsidio=precio_sin_subsidio
                     )
+                    
+                    # ✅ DESCONTAR INVENTARIO: Restar cantidad del stock disponible
+                    if producto:
+                        if producto.disponible is None:
+                            producto.disponible = 0
+                        producto.disponible -= cantidad
+                        producto.save()
+                        logger.info(f"   📦 Inventario actualizado: {producto.codigo} - Stock restante: {producto.disponible}")
                     
                     # 🔧 CRÍTICO: Actualizar el detalle CON LOS VALORES CORRECTOS después del save()
                     # El método save() del modelo puede recalcular, así que forzamos nuestros valores
