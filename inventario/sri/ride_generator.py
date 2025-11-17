@@ -223,10 +223,17 @@ class RIDEGenerator:
                 logger.warning("⚠️ No hay logo configurado en Opciones")
 
             # Datos de empresa
-            # ✅ USAR NOMBRE COMERCIAL si existe, sino razon_social
+            # ✅ Mostrar RAZÓN SOCIAL y NOMBRE COMERCIAL (ambos en negrita)
             nombre_comercial = getattr(opciones, 'nombre_comercial', '')
             razon_social = getattr(opciones, 'razon_social', '')
-            nombre_emisor = nombre_comercial if nombre_comercial and nombre_comercial != '[CONFIGURAR NOMBRE COMERCIAL]' else razon_social
+            
+            # Mostrar razón social arriba
+            linea_razon_social = f"<b>{razon_social}</b><br/>" if razon_social else ""
+            
+            # Mostrar nombre comercial solo si es diferente y está configurado
+            linea_nombre_comercial = ""
+            if nombre_comercial and nombre_comercial != '[CONFIGURAR NOMBRE COMERCIAL]' and nombre_comercial != razon_social:
+                linea_nombre_comercial = f"<b>{nombre_comercial}</b><br/>"
             
             dir_matriz = getattr(opciones, 'direccion_matriz', getattr(opciones, 'direccion_establecimiento', ''))
             dir_sucursal = getattr(opciones, 'direccion_establecimiento', '')
@@ -235,8 +242,7 @@ class RIDEGenerator:
             agente_retencion = getattr(opciones, 'agente_retencion', '') if hasattr(opciones, 'agente_retencion') else ''
             
             datos_empresa = f"""
-<b>{nombre_emisor}</b><br/>
-<b>Dirección Matriz:</b> {dir_matriz}<br/>
+{linea_razon_social}{linea_nombre_comercial}<b>Dirección Matriz:</b> {dir_matriz}<br/>
 <b>Dirección Sucursal:</b> {dir_sucursal}<br/>
 {'<b>Contribuyente Especial Nro</b> ' + contribuyente_especial + '<br/>' if contribuyente_especial else ''}
 <b>OBLIGADO A LLEVAR CONTABILIDAD:</b> {obligado}<br/>
@@ -277,11 +283,12 @@ class RIDEGenerator:
             # === CUADRO DE INFORMACIÓN - LIMPIO Y CENTRADO ===
             clave_acceso_factura = getattr(factura, 'clave_acceso', clave_acceso or '')
             numero_factura = f"{getattr(factura, 'establecimiento_formatted', getattr(factura, 'establecimiento', '001'))}-{getattr(factura, 'punto_emision_formatted', getattr(factura, 'punto_emision', '001'))}-{getattr(factura, 'secuencia_formatted', str(getattr(factura, 'secuencia', 1)).zfill(9))}"
-            fecha_aut = getattr(factura, 'fecha_autorizacion', None) or getattr(factura, 'fecha_emision', None) or datetime.now()
+            # ✅ Usar SOLO fecha_autorizacion (la que devuelve el SRI)
+            fecha_aut = getattr(factura, 'fecha_autorizacion', None)
             ambiente = getattr(opciones, 'ambiente_descripcion', self._obtener_ambiente(str(getattr(factura, 'ambiente', '2'))))
             emision = self._obtener_tipo_emision(str(getattr(factura, 'tipo_emision', '1')))
             identificacion_val = getattr(opciones, 'identificacion', '')
-            fecha_aut_val = fecha_aut.strftime('%d/%m/%Y %H:%M:%S') if fecha_aut else datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+            fecha_aut_val = fecha_aut.strftime('%d/%m/%Y %H:%M:%S') if fecha_aut else 'PENDIENTE DE AUTORIZACIÓN'
 
             # 1. ENCABEZADO "FACTURA" - LIMPIO
             encabezado_factura = Paragraph('FACTURA', self.styles['EncabezadoLimpio'])
