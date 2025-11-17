@@ -283,8 +283,8 @@ class RIDEGenerator:
             # === CUADRO DE INFORMACIÓN - LIMPIO Y CENTRADO ===
             clave_acceso_factura = getattr(factura, 'clave_acceso', clave_acceso or '')
             numero_factura = f"{getattr(factura, 'establecimiento_formatted', getattr(factura, 'establecimiento', '001'))}-{getattr(factura, 'punto_emision_formatted', getattr(factura, 'punto_emision', '001'))}-{getattr(factura, 'secuencia_formatted', str(getattr(factura, 'secuencia', 1)).zfill(9))}"
-            # ✅ Usar SOLO fecha_autorizacion (la que devuelve el SRI)
-            fecha_aut = getattr(factura, 'fecha_autorizacion', None)
+            # ✅ Usar fecha_autorizacion (del SRI), si no existe usar fecha_emision como fallback
+            fecha_aut = getattr(factura, 'fecha_autorizacion', None) or getattr(factura, 'fecha_emision', None)
             ambiente = getattr(opciones, 'ambiente_descripcion', self._obtener_ambiente(str(getattr(factura, 'ambiente', '2'))))
             emision = self._obtener_tipo_emision(str(getattr(factura, 'tipo_emision', '1')))
             identificacion_val = getattr(opciones, 'identificacion', '')
