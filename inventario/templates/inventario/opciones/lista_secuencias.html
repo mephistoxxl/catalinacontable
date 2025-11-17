@@ -37,8 +37,11 @@
                                 <h3 class="text-sm font-semibold text-gray-800">Secuencias Registradas</h3>
                                 <div class="flex items-center space-x-2">
                                     <span class="text-xs text-gray-600">Total: {{ secuencias|length }} secuencias</span>
-                                    <a href="/inventario/secuencias/crear/" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-lg shadow-sm text-white bg-gray-900 hover:bg-gray-800">
-                                        <i class="fa fa-plus mr-2 action-icon"></i> Agregar
+                                    <a href="/inventario/secuencias/crear/" 
+                                       class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
+                                       style="text-decoration: none !important;">
+                                        <i class="fa fa-plus mr-2" style="color: white;"></i>
+                                        <span style="color: white;">Agregar</span>
                                     </a>
                                 </div>
                             </div>

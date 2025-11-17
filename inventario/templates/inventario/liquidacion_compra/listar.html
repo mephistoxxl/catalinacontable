@@ -5,8 +5,9 @@
 <div class="container mx-auto px-6 py-6">
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-semibold">{% trans "Liquidaciones de Compra" %}</h1>
-    <a class="btn btn-primary" href="{% url 'inventario:liquidaciones_compra_crear' %}">
-      {% trans "Nueva Liquidación" %}
+    <a style="text-decoration: none !important;" class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm" href="{% url 'inventario:liquidaciones_compra_crear' %}">
+      <i class="fa fa-plus mr-2" style="color: white;"></i>
+      <span style="color: white;">{% trans "Nueva Liquidación" %}</span>
     </a>
   </div>
 

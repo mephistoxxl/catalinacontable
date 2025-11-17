@@ -522,6 +522,91 @@
 
         <section>
           <div class="flex items-center pb-1 border-b border-gray-200 mb-1">
+            <i class="fa fa-user text-slate-600 text-[9px] mr-1"></i>
+            <h2 class="text-[10px] font-semibold text-gray-800">{% trans "Datos del Proveedor" %}</h2>
+          </div>
+
+          <div id="proveedor-identificacion-messages" class="hidden mb-1 rounded border-l-2 px-1.5 py-1 flex items-center gap-1 text-[8px] bg-white shadow-sm">
+            <i id="proveedor-identificacion-message-icon" class="fa fa-info-circle text-blue-500 text-[8px]"></i>
+            <span id="proveedor-identificacion-message-text" class="text-blue-800 font-medium"></span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-1">
+            {% with field=form.beneficiario_tipo_identificacion %}
+            <div class="group hidden">
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.beneficiario_identificacion %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+                <span class="text-red-500">*</span>
+                <span id="loading-identificacion-proveedor" class="hidden ml-1 inline-flex items-center gap-0.5 text-gray-500" style="display:none;">
+                  <i class="fa fa-spinner fa-spin text-[8px]"></i>
+                  <span class="text-[8px] font-medium">{% trans "Consultando" %}...</span>
+                </span>
+              </label>
+              <div class="flex items-center gap-1">
+                <div class="flex-1">
+                  {{ field }}
+                </div>
+                <button type="button" id="buscar-identificacion-proveedor" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-gray-800 text-white text-[8px] font-semibold rounded hover:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-600 transition-colors">
+                  <i class="fa fa-search text-[7px]"></i>
+                  <span>{% trans "Buscar" %}</span>
+                </button>
+              </div>
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.beneficiario_nombre %}
+            <div class="group md:col-span-2">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+                <span class="text-red-500">*</span>
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.beneficiario_direccion %}
+            <div class="group md:col-span-2">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.beneficiario_correo %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.beneficiario_telefono %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+          </div>
+        </section>
+
+        <section>
+          <div class="flex items-center pb-1 border-b border-gray-200 mb-1">
             <i class="fa fa-id-card-o text-slate-600 text-[9px] mr-1"></i>
             <h2 class="text-[10px] font-semibold text-gray-800">{% trans "Datos Generales" %}</h2>
           </div>
@@ -543,6 +628,16 @@
             <div class="group">
               <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
                 {{ field.label }}{% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
+              </label>
+              {{ field }}
+              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
+            </div>
+            {% endwith %}
+
+            {% with field=form.forma_pago_simple %}
+            <div class="group">
+              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
+                {{ field.label }}<span class="text-red-500">*</span>
               </label>
               {{ field }}
               {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
@@ -641,127 +736,16 @@
           </div>
         </section>
 
-        <section>
-          <div class="flex items-center pb-1 border-b border-gray-200 mb-1">
-            <i class="fa fa-credit-card text-slate-600 text-[9px] mr-1"></i>
-            <h2 class="text-[10px] font-semibold text-gray-800">{% trans "Formas de Pago" %}</h2>
-          </div>
-
-          <div class="bg-gray-50 border border-gray-200 rounded p-1 space-y-1">
-            {{ pago_formset.management_form }}
-            <div id="formas-pago-container" class="space-y-1">
-              {% for pago_form in pago_formset %}
-                {% include "inventario/liquidacion_compra/_forma_pago_form.html" with form=pago_form index=forloop.counter0 numero=forloop.counter can_delete=pago_formset.can_delete %}
-              {% empty %}
-                {% with form=pago_formset.empty_form %}
-                  {% include "inventario/liquidacion_compra/_forma_pago_form.html" with form=form index=0 numero=1 can_delete=pago_formset.can_delete %}
-                {% endwith %}
-              {% endfor %}
-            </div>
-            <div class="flex items-center gap-1">
-              <button type="button" id="btn-agregar-forma-pago" class="inline-flex items-center gap-1 px-2 py-1 text-[9px] font-semibold rounded bg-slate-800 text-white hover:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-600">
-                <i class="fa fa-plus text-[8px]"></i>
-                <span>{% trans "Agregar forma de pago" %}</span>
-              </button>
-              <p class="text-[8px] text-slate-500">{% trans "Registre una o más formas de pago con el total correspondiente." %}</p>
-            </div>
-          </div>
-        </section>
-
-        <template id="forma-pago-empty-form-template">
-          {% with form=pago_formset.empty_form %}
-            {% include "inventario/liquidacion_compra/_forma_pago_form.html" with form=form index="__prefix__" numero=None can_delete=pago_formset.can_delete %}
-          {% endwith %}
-        </template>
-
-        <section>
-          <div class="flex items-center pb-1 border-b border-gray-200 mb-1">
-            <i class="fa fa-user text-slate-600 text-[9px] mr-1"></i>
-            <h2 class="text-[10px] font-semibold text-gray-800">{% trans "Datos del Proveedor" %}</h2>
-          </div>
-
-          <div id="proveedor-identificacion-messages" class="hidden mb-1 rounded border-l-2 px-1.5 py-1 flex items-center gap-1 text-[8px] bg-white shadow-sm">
-            <i id="proveedor-identificacion-message-icon" class="fa fa-info-circle text-blue-500 text-[8px]"></i>
-            <span id="proveedor-identificacion-message-text" class="text-blue-800 font-medium"></span>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-1">
-            {% with field=form.beneficiario_tipo_identificacion %}
-            <div class="group">
-              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
-                {{ field.label }}
-                <span class="text-red-500">*</span>
-              </label>
-              {{ field }}
-              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
-            </div>
+        {{ pago_formset.management_form }}
+        <div id="formas-pago-container" class="hidden">
+          {% for pago_form in pago_formset %}
+            {% include "inventario/liquidacion_compra/_forma_pago_form.html" with form=pago_form index=forloop.counter0 numero=forloop.counter can_delete=pago_formset.can_delete %}
+          {% empty %}
+            {% with form=pago_formset.empty_form %}
+              {% include "inventario/liquidacion_compra/_forma_pago_form.html" with form=form index=0 numero=1 can_delete=pago_formset.can_delete %}
             {% endwith %}
-
-            {% with field=form.beneficiario_identificacion %}
-            <div class="group">
-              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
-                {{ field.label }}
-                <span class="text-red-500">*</span>
-                <span id="loading-identificacion-proveedor" class="hidden ml-1 inline-flex items-center gap-0.5 text-gray-500" style="display:none;">
-                  <i class="fa fa-spinner fa-spin text-[8px]"></i>
-                  <span class="text-[8px] font-medium">{% trans "Consultando" %}...</span>
-                </span>
-              </label>
-              <div class="flex items-center gap-1">
-                <div class="flex-1">
-                  {{ field }}
-                </div>
-                <button type="button" id="buscar-identificacion-proveedor" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-gray-800 text-white text-[8px] font-semibold rounded hover:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-600 transition-colors">
-                  <i class="fa fa-search text-[7px]"></i>
-                  <span>{% trans "Buscar" %}</span>
-                </button>
-              </div>
-              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
-            </div>
-            {% endwith %}
-
-            {% with field=form.beneficiario_nombre %}
-            <div class="group md:col-span-2">
-              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
-                {{ field.label }}
-                <span class="text-red-500">*</span>
-              </label>
-              {{ field }}
-              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
-            </div>
-            {% endwith %}
-
-            {% with field=form.beneficiario_direccion %}
-            <div class="group md:col-span-2">
-              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
-                {{ field.label }}
-              </label>
-              {{ field }}
-              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
-            </div>
-            {% endwith %}
-
-            {% with field=form.beneficiario_correo %}
-            <div class="group">
-              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
-                {{ field.label }}
-              </label>
-              {{ field }}
-              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
-            </div>
-            {% endwith %}
-
-            {% with field=form.beneficiario_telefono %}
-            <div class="group">
-              <label for="{{ field.id_for_label }}" class="block text-[9px] font-medium text-gray-700">
-                {{ field.label }}
-              </label>
-              {{ field }}
-              {% for error in field.errors %}<p class="form-error text-[8px]">{{ error }}</p>{% endfor %}
-            </div>
-            {% endwith %}
-          </div>
-        </section>
+          {% endfor %}
+        </div>
 
         <section>
           <div class="flex items-center pb-1 border-b border-gray-200 mb-1">
@@ -1099,14 +1083,39 @@
 
       let consultaEnProgreso = false;
       let ultimaConsulta = 0;
-      const DEBOUNCE_MS = 1000;
+      const DEBOUNCE_MS = 800;
+      let timeoutId = null;
 
-      botonBuscar.addEventListener('click', async (event) => {
-        event.preventDefault();
+      // Función para detectar automáticamente el tipo según la longitud
+      function detectarTipoIdentificacion(identificacion) {
+        const longitud = identificacion.length;
+        if (longitud === 13) {
+          return '04'; // RUC
+        } else if (longitud === 10) {
+          return '05'; // Cédula
+        }
+        return null;
+      }
 
+      // Función para consultar automáticamente
+      async function consultarAutomatico() {
         if (consultaEnProgreso) {
           return;
         }
+
+        const identificacion = identificacionInput.value.trim();
+        
+        if (!identificacion || identificacion.length < 10) {
+          return;
+        }
+
+        const tipo = detectarTipoIdentificacion(identificacion);
+        if (!tipo) {
+          return;
+        }
+
+        // Actualizar el select automáticamente
+        tipoSelect.value = tipo;
 
         const ahora = Date.now();
         if (ahora - ultimaConsulta < DEBOUNCE_MS) {
@@ -1114,28 +1123,63 @@
         }
         ultimaConsulta = ahora;
 
-        const identificacion = identificacionInput.value.trim();
-        const tipo = tipoSelect.value;
+        consultaEnProgreso = true;
+        botonBuscar.disabled = true;
+        botonBuscar.classList.add('opacity-70', 'cursor-not-allowed');
 
+        try {
+          await consultarIdentificacionProveedor(identificacion, tipo);
+        } finally {
+          consultaEnProgreso = false;
+          botonBuscar.disabled = false;
+          botonBuscar.classList.remove('opacity-70', 'cursor-not-allowed');
+        }
+      }
+
+      // Listener para detectar cuando se ingresa la identificación completa
+      identificacionInput.addEventListener('input', () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+
+        const identificacion = identificacionInput.value.trim();
+        const tipo = detectarTipoIdentificacion(identificacion);
+        
+        // Actualizar el select automáticamente
+        if (tipo) {
+          tipoSelect.value = tipo;
+          
+          // Consultar automáticamente después de un pequeño delay
+          timeoutId = setTimeout(() => {
+            consultarAutomatico();
+          }, DEBOUNCE_MS);
+        }
+      });
+
+      // Mantener el botón de búsqueda manual
+      botonBuscar.addEventListener('click', async (event) => {
+        event.preventDefault();
+
+        if (consultaEnProgreso) {
+          return;
+        }
+
+        const identificacion = identificacionInput.value.trim();
+        
         if (!identificacion) {
           mostrarMensajeProveedor(MSG_PROV_IDENT_EMPTY, 'warning');
           identificacionInput.focus();
           return;
         }
 
-        if (!['04', '05'].includes(tipo)) {
-          mostrarMensajeProveedor(MSG_PROV_TIPO_INVALIDO, 'warning');
-          tipoSelect.focus();
-          return;
-        }
-
-        const longitud = identificacion.length;
-        const longitudValida = (tipo === '04' && longitud === 13) || (tipo === '05' && (longitud === 10 || longitud === 13));
-        if (!longitudValida) {
-          mostrarMensajeProveedor(MSG_PROV_LONGITUD_INVALIDA, 'warning');
+        const tipo = detectarTipoIdentificacion(identificacion);
+        if (!tipo) {
+          mostrarMensajeProveedor('Ingrese una cédula (10 dígitos) o RUC (13 dígitos) válido', 'warning');
           identificacionInput.focus();
           return;
         }
+
+        tipoSelect.value = tipo;
 
         consultaEnProgreso = true;
         botonBuscar.disabled = true;
@@ -1149,6 +1193,14 @@
           botonBuscar.classList.remove('opacity-70', 'cursor-not-allowed');
         }
       });
+
+      // También permitir búsqueda con Enter
+      identificacionInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          botonBuscar.click();
+        }
+      });
     }
 
     const MSG_BUSCA_PRODUCTO = '{{ _("Debe buscar un producto válido antes de agregarlo.")|escapejs }}';
@@ -1159,8 +1211,6 @@
     const MSG_ERROR_BUSCAR = '{{ _("Error al buscar el producto. Inténtelo de nuevo.")|escapejs }}';
     const MSG_SIN_PRODUCTOS = '{{ _("Debe agregar al menos un producto o servicio.")|escapejs }}';
     const TEXT_ELIMINAR = '{{ _("Eliminar")|escapejs }}';
-    const MSG_FORMA_PAGO_MINIMA = '{{ _("Debe existir al menos una forma de pago activa.")|escapejs }}';
-    const LABEL_FORMA_PAGO = '{{ _("Forma de pago")|escapejs }}';
 
     const productosAgregados = [];
     let contadorProductos = 0;
@@ -1207,186 +1257,7 @@
       }
     }
 
-    function obtenerContenedorFormasPago() {
-      return document.getElementById('formas-pago-container');
-    }
 
-    function obtenerCampoTotalFormsPago() {
-      return document.getElementById('id_pagos-TOTAL_FORMS');
-    }
-
-    function obtenerFormasPagoActivas() {
-      const container = obtenerContenedorFormasPago();
-      if (!container) {
-        return [];
-      }
-      return Array.from(container.querySelectorAll('.pago-form')).filter((form) => form.dataset.eliminado !== '1');
-    }
-
-    function actualizarIndicesFormasPago() {
-      const activos = obtenerFormasPagoActivas();
-      activos.forEach((form, idx) => {
-        const title = form.querySelector('.forma-pago-title');
-        if (title) {
-          title.textContent = `${LABEL_FORMA_PAGO} #${idx + 1}`;
-        }
-      });
-    }
-
-    function sincronizarTotalesFormasPago(totalGeneral) {
-      const activos = obtenerFormasPagoActivas();
-      if (!activos.length) {
-        return;
-      }
-      const primerFormulario = activos[0];
-      const totalInput = primerFormulario.querySelector('input[name$="-total"]');
-      if (!totalInput) {
-        return;
-      }
-      const editado = totalInput.dataset.userEdited === '1';
-      const valorActual = toNumber(totalInput.value, 0);
-      if (!editado || valorActual <= 0) {
-        totalInput.value = formatDecimal(totalGeneral, 2);
-      }
-    }
-
-    function adjuntarEventosFormaPago(formElement) {
-      if (!formElement) {
-        return;
-      }
-
-      const deleteField = formElement.querySelector('.pago-delete-field input');
-      const removeBtn = formElement.querySelector('.btn-eliminar-forma-pago');
-      if (removeBtn && deleteField) {
-        removeBtn.addEventListener('click', (event) => {
-          event.preventDefault();
-          eliminarFormaPago(formElement, deleteField);
-        });
-      }
-
-      const totalInput = formElement.querySelector('input[name$="-total"]');
-      if (totalInput) {
-        if (toNumber(totalInput.value, 0) > 0) {
-          totalInput.dataset.userEdited = '1';
-        }
-        totalInput.addEventListener('input', () => {
-          totalInput.dataset.userEdited = '1';
-        });
-      }
-
-      if (deleteField && deleteField.type === 'checkbox' && deleteField.checked) {
-        formElement.dataset.eliminado = '1';
-        formElement.classList.add('hidden');
-      } else {
-        formElement.dataset.eliminado = formElement.dataset.eliminado || '0';
-      }
-    }
-
-    function eliminarFormaPago(formElement, deleteField) {
-      if (!formElement || !deleteField) {
-        return;
-      }
-      const activos = obtenerFormasPagoActivas();
-      if (activos.length <= 1) {
-        alert(MSG_FORMA_PAGO_MINIMA);
-        return;
-      }
-
-      if (deleteField.type === 'checkbox') {
-        deleteField.checked = true;
-      } else {
-        deleteField.value = 'on';
-      }
-
-      formElement.dataset.eliminado = '1';
-      formElement.classList.add('hidden');
-      actualizarIndicesFormasPago();
-    }
-
-    function agregarFormaPago() {
-      const container = obtenerContenedorFormasPago();
-      const totalFormsInput = obtenerCampoTotalFormsPago();
-      const template = document.getElementById('forma-pago-empty-form-template');
-      if (!container || !totalFormsInput || !template) {
-        return;
-      }
-
-      const index = parseInt(totalFormsInput.value, 10) || 0;
-      const html = template.innerHTML.replace(/__prefix__/g, index);
-      const wrapper = document.createElement('div');
-      wrapper.innerHTML = html.trim();
-      const nuevoFormulario = wrapper.firstElementChild;
-      if (!nuevoFormulario) {
-        return;
-      }
-
-      nuevoFormulario.dataset.eliminado = '0';
-      container.appendChild(nuevoFormulario);
-      totalFormsInput.value = index + 1;
-
-      nuevoFormulario.querySelectorAll('input, select, textarea').forEach((field) => {
-        if (field.name && field.name.endsWith('-DELETE')) {
-          if (field.type === 'checkbox') {
-            field.checked = false;
-          } else {
-            field.value = '';
-          }
-          return;
-        }
-        if (field.tagName === 'INPUT') {
-          if (field.type === 'checkbox' || field.type === 'radio') {
-            field.checked = false;
-          } else if (field.type !== 'hidden') {
-            field.value = '';
-          }
-        } else if (field.tagName === 'SELECT') {
-          field.selectedIndex = 0;
-        } else if (field.tagName === 'TEXTAREA') {
-          field.value = '';
-        }
-      });
-
-      adjuntarEventosFormaPago(nuevoFormulario);
-      actualizarIndicesFormasPago();
-    }
-
-    function inicializarFormasPago() {
-      const container = obtenerContenedorFormasPago();
-      const addButton = document.getElementById('btn-agregar-forma-pago');
-      const totalFormsInput = obtenerCampoTotalFormsPago();
-      if (!container || !totalFormsInput) {
-        return;
-      }
-
-      Array.from(container.querySelectorAll('.pago-form')).forEach((formElement) => {
-        adjuntarEventosFormaPago(formElement);
-      });
-      actualizarIndicesFormasPago();
-
-      if (addButton) {
-        addButton.addEventListener('click', (event) => {
-          event.preventDefault();
-          agregarFormaPago();
-        });
-      }
-    }
-
-    function validarFormasPago() {
-      const activos = obtenerFormasPagoActivas();
-      if (!activos.length) {
-        alert(MSG_FORMA_PAGO_MINIMA);
-        return false;
-      }
-      const totalesValidos = activos.some((formElement) => {
-        const totalInput = formElement.querySelector('input[name$="-total"]');
-        return totalInput && toNumber(totalInput.value, 0) > 0;
-      });
-      if (!totalesValidos) {
-        alert(MSG_FORMA_PAGO_MINIMA);
-        return false;
-      }
-      return true;
-    }
 
     const IVA_CODE_PERCENT_MAP = Object.freeze({
       '0': 0,
@@ -1650,7 +1521,6 @@
         totalCell.textContent = `$${formatNumber(total)}`;
       }
       actualizarPanelTotales(resumen);
-      sincronizarTotalesFormasPago(resumen.total);
     }
 
     function actualizarEstadoTabla() {
@@ -1997,10 +1867,52 @@
         alert(MSG_SIN_PRODUCTOS);
         return false;
       }
-      if (!validarFormasPago()) {
+      if (!prepararFormaPagoSimple()) {
         return false;
       }
       actualizarCamposOcultos();
+      return true;
+    }
+
+    function prepararFormaPagoSimple() {
+      const formaPagoSelect = document.getElementById('forma_pago_simple');
+      if (!formaPagoSelect) {
+        alert('Error: No se encontró el selector de forma de pago');
+        return false;
+      }
+
+      const formaPago = formaPagoSelect.value;
+      if (!formaPago) {
+        alert('Por favor seleccione una forma de pago');
+        return false;
+      }
+
+      const resumen = calcularResumenTotales();
+      const totalGeneral = resumen.total;
+
+      // Ocultar el formset y crear un solo registro con el total
+      const container = document.getElementById('formas-pago-container');
+      if (container) {
+        container.innerHTML = '';
+        
+        // Crear inputs hidden para el formset
+        const totalFormsInput = document.getElementById('id_pagos-TOTAL_FORMS');
+        if (totalFormsInput) {
+          totalFormsInput.value = '1';
+        }
+
+        // Crear los campos para una sola forma de pago
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = `
+          <input type="hidden" name="pagos-0-forma_pago" value="${formaPago}">
+          <input type="hidden" name="pagos-0-total" value="${formatDecimal(totalGeneral, 2)}">
+          <input type="hidden" name="pagos-0-plazo" value="">
+          <input type="hidden" name="pagos-0-unidad_tiempo" value="">
+          <input type="hidden" name="pagos-0-DELETE" value="">
+        `;
+        container.appendChild(wrapper);
+      }
+
       return true;
     }
 
@@ -2247,7 +2159,6 @@
     document.addEventListener('DOMContentLoaded', () => {
       inicializarEventos();
       inicializarBusquedaProveedor();
-      inicializarFormasPago();
       if (productosIniciales.length) {
         productosIniciales.forEach((item) => agregarProductoDesdeObjeto(item, { actualizar: false }));
         actualizarCamposOcultos();

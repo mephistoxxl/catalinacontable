@@ -73,31 +73,6 @@
                             </ul>
                         </li>
 
-                        <!-- Pedidos -->
-                        <li class="w-full">
-                            <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
-                                <div class="flex items-center">
-                                    <i class="fa fa-gift mr-3 w-4 text-gray-600"></i>
-                                    Pedidos
-                                </div>
-                                <i class="fa fa-chevron-down text-xs transform transition-transform text-gray-600"></i>
-                            </button>
-                            <ul class="dropdown-menu hidden pl-0 mt-1 space-y-1">
-                                <li class="w-full">
-                                    <a href="/inventario/listarPedidos" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                        <i class="fa fa-list mr-3 w-4 text-gray-600"></i>
-                                        Listar pedidos
-                                    </a>
-                                </li>
-                                <li class="w-full">
-                                    <a href="/inventario/agregarPedido" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                        <i class="fa fa-plus mr-3 w-4 text-gray-600"></i>
-                                        Añadir pedido
-                                    </a>
-                                </li>
-                            </ul>
-                        </li>
-
                         <!-- Factura -->
                         <li class="w-full">
                             <button class="dropdown-btn flex items-center justify-between w-full px-6 py-4 text-sm hover:bg-gray-100 transition-colors text-black font-medium">
@@ -112,12 +87,6 @@
                                     <a href="/inventario/listarFacturas" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
                                         <i class="fa fa-list mr-3 w-4 text-gray-600"></i>
                                         Listar facturas
-                                    </a>
-                                </li>
-                                <li class="w-full">
-                                    <a href="{% url 'inventario:facturas_sri_problemas' %}" class="flex items-center w-full px-4 py-3 text-sm hover:bg-gray-100 transition-colors no-underline text-black bg-white">
-                                        <i class="fa fa-exclamation-triangle mr-3 w-4 text-red-600"></i>
-                                        <span class="text-red-600">Problemas SRI</span>
                                     </a>
                                 </li>
                                 <li class="w-full">

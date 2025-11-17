@@ -135,6 +135,7 @@ urlpatterns = [
 
     # Consultar identificación (RUC o cédula)
     path('consultar-identificacion/', views.consultar_identificacion, name='consultar_identificacion'),
+    path('guardar_cliente_automatico/', views.guardar_cliente_automatico, name='guardar_cliente_automatico'),
 
     # Firma Electrónica
     path('configuracion/firma-electronica/', FirmaElectronicaView.as_view(), name='firma_electronica'),

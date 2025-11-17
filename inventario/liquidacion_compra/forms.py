@@ -130,12 +130,25 @@ class LiquidacionCompraForm(forms.ModelForm):
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
     )
 
+    forma_pago_simple = forms.ChoiceField(
+        label=_("Forma de pago"),
+        choices=[
+            ("01", _("Efectivo")),
+            ("16", _("Tarjeta débito")),
+            ("19", _("Tarjeta crédito")),
+            ("17", _("Dinero electrónico")),
+        ],
+        initial="01",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+
     class Meta:
         model = LiquidacionCompra
         fields = [
             "proveedor",
             "almacen",
             "fecha_emision",
+            "forma_pago_simple",
             "establecimiento",
             "punto_emision",
             "secuencia",
