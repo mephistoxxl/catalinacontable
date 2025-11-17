@@ -95,12 +95,13 @@ class ProductoFormulario(forms.ModelForm):
 
     class Meta:
         model = Producto
-        fields = ['codigo', 'codigo_barras', 'descripcion', 'precio', 'precio2', 'categoria', 'disponible', 'iva', 'costo_actual']
+        fields = ['codigo', 'codigo_barras', 'descripcion', 'precio', 'precio2', 'categoria', 'disponible', 'iva', 'costo_actual', 'imagen']
         labels = {
             'descripcion': 'Descripción',
             'disponible': 'Disponible',
             'iva': 'I.V.A:',
             'costo_actual': 'Costo actual:',
+            'imagen': 'Imagen del producto',
         }
         widgets = {
             'codigo': forms.TextInput(attrs={'placeholder': 'Código del producto', 'id': 'codigo', 'class': 'form-control'}),
@@ -109,6 +110,7 @@ class ProductoFormulario(forms.ModelForm):
             'categoria': forms.Select(attrs={'class': 'form-control', 'id': 'categoria'}),
             'disponible': forms.NumberInput(attrs={'placeholder': 'Cantidad disponible', 'id': 'disponible', 'class': 'form-control'}),
             'costo_actual': forms.TextInput(attrs={'placeholder': 'Costo actual', 'id': 'costo_actual', 'class': 'form-control'}),
+            'imagen': forms.FileInput(attrs={'class': 'form-control', 'id': 'imagen', 'accept': 'image/*'}),
         }
 
     # Campos de solo lectura para mostrar el precio con IVA calculado

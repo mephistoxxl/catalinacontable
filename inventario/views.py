@@ -1563,38 +1563,12 @@ class AgregarProducto(LoginRequiredMixin, View):
             messages.error(request, "No hay una empresa activa seleccionada.")
             return render(request, 'inventario/producto/agregarProducto.html', {'form': form})
 
-        form = ProductoFormulario(request.POST, empresa=empresa)
+        form = ProductoFormulario(request.POST, request.FILES, empresa=empresa)
         if form.is_valid():
-            codigo = form.cleaned_data['codigo']
-            codigo_barras = form.cleaned_data['codigo_barras']
-            descripcion = form.cleaned_data['descripcion']
-            precio = form.cleaned_data['precio']
-            precio2 = form.cleaned_data.get('precio2', None)
-            categoria = form.cleaned_data['categoria']
-            disponible = form.cleaned_data['disponible']
-            iva = form.cleaned_data['iva']
-            costo_actual = form.cleaned_data['costo_actual']
-
-            iva_percent = Decimal(dict(Producto.tiposIVA).get(iva).replace('%', '')) / 100
-
-            precio_iva1 = precio * (Decimal('1.00') + iva_percent)
-            precio_iva2 = precio2 * (Decimal('1.00') + iva_percent) if precio2 else None
-
-            prod = Producto(
-                codigo=codigo,
-                codigo_barras=codigo_barras,
-                descripcion=descripcion,
-                precio=precio,
-                precio2=precio2,
-                categoria=categoria,
-                disponible=disponible,
-                iva=iva,
-                costo_actual=costo_actual,
-                precio_iva1=precio_iva1,
-                precio_iva2=precio_iva2,
-                empresa=empresa,
-            )
-            prod.save()
+            # ✅ Usar form.save() en vez de crear manualmente para manejar imagen
+            prod = form.save(commit=False)
+            prod.empresa = empresa
+            prod.save()  # El método save() del modelo calculará precio_iva1 y precio_iva2
 
             form = ProductoFormulario()
             messages.success(request, '✓ Producto agregado exitosamente')
