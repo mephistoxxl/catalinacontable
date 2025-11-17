@@ -23,15 +23,15 @@
                                         id="dropdownProfile">
                                     <em class="fa fa-user text-gray-600"></em>
                                     <div class="flex flex-col text-left leading-tight">
-                                        <span class="text-sm font-medium">{{ nombre }} {{ apellido }}</span>
-                                        <span class="text-xs text-gray-500">{{ usuario }}</span>
+                                        <span class="text-sm font-medium">{{ user.first_name }} {{ user.last_name }}</span>
+                                        <span class="text-xs text-gray-500">{{ user.username }}</span>
                                     </div>
                                     <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </button>
                                 <div id="profileDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200">
-                                    <a class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" href="/inventario/perfil/ver/{{ id_usuario }}">
+                                    <a class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" href="/inventario/perfil/ver/{{ user.id }}">
                                         <i class="fa fa-user mr-2"></i>Perfil
                                     </a>
                                     <div class="border-t border-gray-200"></div>
