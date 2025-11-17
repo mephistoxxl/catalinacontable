@@ -671,6 +671,7 @@ class SRIIntegration:
                 if hasattr(factura, 'fecha_autorizacion'):
                     fecha_str = aut.get('fechaAutorizacion') or aut.get('fecha_autorizacion')
                     logger.info(f"🔍 Fecha de autorización del SRI (raw): {fecha_str}")
+                    logger.info(f"🔍 Tipo de dato recibido: {type(fecha_str)}")
                     if fecha_str:
                         try:
                             from datetime import datetime
@@ -716,17 +717,28 @@ class SRIIntegration:
                                             fecha_limpia = partes[0] + tz
                                     
                                     fecha_dt = datetime.fromisoformat(fecha_limpia)
+                                    # ✅ Convertir a zona horaria Ecuador
+                                    import pytz
+                                    ecuador_tz = pytz.timezone('America/Guayaquil')
+                                    if fecha_dt.tzinfo is not None:
+                                        # Ya tiene timezone, convertir a Ecuador
+                                        fecha_dt = fecha_dt.astimezone(ecuador_tz)
                                 else:
                                     # ISO simple sin timezone
                                     fecha_dt = datetime.fromisoformat(fecha_limpia)
-                                    # Hacer timezone-aware (Ecuador UTC-5)
-                                    fecha_dt = timezone.make_aware(fecha_dt)
+                                    # Hacer timezone-aware en Ecuador
+                                    import pytz
+                                    ecuador_tz = pytz.timezone('America/Guayaquil')
+                                    if fecha_dt.tzinfo is None:
+                                        fecha_dt = ecuador_tz.localize(fecha_dt)
                             
                             elif '/' in fecha_str_trabajo:
                                 # Formato SRI local: "16/11/2025 06:00:06"
                                 fecha_dt = datetime.strptime(fecha_str_trabajo, '%d/%m/%Y %H:%M:%S')
-                                # Hacer timezone-aware (Ecuador UTC-5)
-                                fecha_dt = timezone.make_aware(fecha_dt)
+                                # Hacer timezone-aware en Ecuador
+                                import pytz
+                                ecuador_tz = pytz.timezone('America/Guayaquil')
+                                fecha_dt = ecuador_tz.localize(fecha_dt)
                             
                             if fecha_dt:
                                 factura.fecha_autorizacion = fecha_dt
