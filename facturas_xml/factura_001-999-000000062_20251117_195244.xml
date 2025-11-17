@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<factura id="comprobante" version="1.1.0">
+  <infoTributaria>
+    <ambiente>1</ambiente>
+    <tipoEmision>1</tipoEmision>
+    <razonSocial>PUMALPA MORILLO LINA YOLANDA</razonSocial>
+    <nombreComercial>MARIA SOLEDAD BOUTIQUE</nombreComercial>
+    <ruc>1713959011001</ruc>
+    <claveAcceso>1611202501171395901100110019990000000628221185311</claveAcceso>
+    <codDoc>01</codDoc>
+    <estab>001</estab>
+    <ptoEmi>999</ptoEmi>
+    <secuencial>000000062</secuencial>
+    <dirMatriz>SANTO DOMINGO DE LOS TSACHILAS / SANTO DOMINGO / CHIGUILPE / AV. QUITO SN Y RIO YAMBOYA</dirMatriz>
+  </infoTributaria>
+  <infoFactura>
+    <fechaEmision>16/11/2025</fechaEmision>
+    <dirEstablecimiento>SANTO DOMINGO DE LOS TSACHILAS / SANTO DOMINGO / CHIGUILPE / AV. QUITO SN Y RIO YAMBOYA</dirEstablecimiento>
+    <obligadoContabilidad>NO</obligadoContabilidad>
+    <tipoIdentificacionComprador>05</tipoIdentificacionComprador>
+    <razonSocialComprador>CALDERON PUMALPA CAMILO ANDRES</razonSocialComprador>
+    <identificacionComprador>2300617863</identificacionComprador>
+    <direccionComprador>NO ESPECIFICADA</direccionComprador>
+    <totalSinImpuestos>50.00</totalSinImpuestos>
+    <totalDescuento>0.00</totalDescuento>
+    <totalConImpuestos>
+      <totalImpuesto>
+        <codigo>2</codigo>
+        <codigoPorcentaje>4</codigoPorcentaje>
+        <baseImponible>50.00</baseImponible>
+        <tarifa>15</tarifa>
+        <valor>7.50</valor>
+      </totalImpuesto>
+    </totalConImpuestos>
+    <propina>0.00</propina>
+    <importeTotal>57.50</importeTotal>
+    <moneda>DOLAR</moneda>
+    <pagos>
+      <pago>
+        <formaPago>01</formaPago>
+        <total>57.50</total>
+      </pago>
+    </pagos>
+  </infoFactura>
+  <detalles>
+    <detalle>
+      <codigoPrincipal>S000000001</codigoPrincipal>
+      <descripcion>BORDADO DE TELA</descripcion>
+      <unidadMedida>unidad</unidadMedida>
+      <cantidad>1.00</cantidad>
+      <precioUnitario>50.00</precioUnitario>
+      <descuento>0.00</descuento>
+      <precioTotalSinImpuesto>50.00</precioTotalSinImpuesto>
+      <impuestos>
+        <impuesto>
+          <codigo>2</codigo>
+          <codigoPorcentaje>4</codigoPorcentaje>
+          <tarifa>15.00</tarifa>
+          <baseImponible>50.00</baseImponible>
+          <valor>7.50</valor>
+        </impuesto>
+      </impuestos>
+    </detalle>
+  </detalles>
+  <infoAdicional>
+    <campoAdicional nombre="E-MAIL">linapumalpa3@gmail.com</campoAdicional>
+    <campoAdicional nombre="TELÉFONO">0991116753</campoAdicional>
+    <campoAdicional nombre="DIRECCIÓN">SANTO DOMINGO DE LOS TSACHILAS / SANTO DOMINGO / CHIGUILPE / AV. QUITO SN Y RIO YAMBOYA</campoAdicional>
+  </infoAdicional>
+</factura>

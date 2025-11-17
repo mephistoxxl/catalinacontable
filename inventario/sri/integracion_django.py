@@ -1,6 +1,7 @@
 import os
 import logging
 import random
+import traceback
 from datetime import datetime
 from django.conf import settings
 from django.core.files.storage import default_storage
@@ -657,6 +658,9 @@ class SRIIntegration:
                     }
 
             if aut:
+                # 🔍 DEBUG: Ver qué datos trae la autorización
+                logger.info(f"🔍 Datos de autorización recibidos del SRI: {aut}")
+                
                 if hasattr(factura, 'numero_autorizacion'):
                     numero_aut = aut.get('numeroAutorizacion') or aut.get('numero_autorizacion')
                     factura.numero_autorizacion = numero_aut
@@ -666,16 +670,32 @@ class SRIIntegration:
                         )
                 if hasattr(factura, 'fecha_autorizacion'):
                     fecha_str = aut.get('fechaAutorizacion') or aut.get('fecha_autorizacion')
+                    logger.info(f"🔍 Fecha de autorización del SRI (raw): {fecha_str}")
                     if fecha_str:
                         try:
                             from datetime import datetime
-                            factura.fecha_autorizacion = datetime.fromisoformat(
-                                fecha_str.replace('Z', '+00:00')
-                            )
-                        except Exception:
+                            # El SRI envía formato: "16/11/2025 06:00:06" o "2025-11-16T06:00:06"
+                            # Intentar ambos formatos
+                            if 'T' in str(fecha_str):
+                                # Formato ISO: 2025-11-16T06:00:06
+                                factura.fecha_autorizacion = datetime.fromisoformat(
+                                    str(fecha_str).replace('Z', '+00:00')
+                                )
+                            elif '/' in str(fecha_str):
+                                # Formato SRI: 16/11/2025 06:00:06
+                                factura.fecha_autorizacion = datetime.strptime(
+                                    str(fecha_str), '%d/%m/%Y %H:%M:%S'
+                                )
+                            else:
+                                logger.warning(f"Formato de fecha desconocido: {fecha_str}")
+                                factura.fecha_autorizacion = None
+                            
+                            logger.info(f"✅ Fecha autorización guardada: {factura.fecha_autorizacion}")
+                        except Exception as e:
                             logger.warning(
-                                f"Error parseando fecha autorización: {fecha_str}"
+                                f"Error parseando fecha autorización: {fecha_str} - Error: {e}"
                             )
+                            traceback.print_exc()
                     else:
                         logger.warning(
                             f"Factura {factura.id} autorizada sin fechaAutorizacion en resultado"
@@ -748,7 +768,9 @@ class SRIIntegration:
         
         # 🔧 FIX: SIEMPRE guardar los cambios
         factura.save()
-        logger.info(f"Factura {factura.id} actualizada y guardada en BD")
+        logger.info(f"✅ Factura {factura.id} actualizada y guardada en BD")
+        logger.info(f"   📅 fecha_autorizacion en BD: {factura.fecha_autorizacion}")
+        logger.info(f"   📅 fecha_emision en BD: {factura.fecha_emision}")
     
     def _firmar_xml_xades_bes(self, xml_path, xml_firmado_path, empresa=None):
         """Firma un XML utilizando el esquema XAdES-BES."""
