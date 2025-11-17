@@ -223,7 +223,11 @@ class RIDEGenerator:
                 logger.warning("⚠️ No hay logo configurado en Opciones")
 
             # Datos de empresa
+            # ✅ USAR NOMBRE COMERCIAL si existe, sino razon_social
+            nombre_comercial = getattr(opciones, 'nombre_comercial', '')
             razon_social = getattr(opciones, 'razon_social', '')
+            nombre_emisor = nombre_comercial if nombre_comercial and nombre_comercial != '[CONFIGURAR NOMBRE COMERCIAL]' else razon_social
+            
             dir_matriz = getattr(opciones, 'direccion_matriz', getattr(opciones, 'direccion_establecimiento', ''))
             dir_sucursal = getattr(opciones, 'direccion_establecimiento', '')
             contribuyente_especial = getattr(opciones, 'contribuyente_especial', '') if hasattr(opciones, 'contribuyente_especial') else ''
@@ -231,7 +235,7 @@ class RIDEGenerator:
             agente_retencion = getattr(opciones, 'agente_retencion', '') if hasattr(opciones, 'agente_retencion') else ''
             
             datos_empresa = f"""
-<b>{razon_social}</b><br/>
+<b>{nombre_emisor}</b><br/>
 <b>Dirección Matriz:</b> {dir_matriz}<br/>
 <b>Dirección Sucursal:</b> {dir_sucursal}<br/>
 {'<b>Contribuyente Especial Nro</b> ' + contribuyente_especial + '<br/>' if contribuyente_especial else ''}
@@ -438,14 +442,14 @@ class RIDEGenerator:
                     else:
                         descripcion = str(detalle)
 
-                precio_unitario = f"{getattr(detalle, 'precio_unitario', getattr(detalle, 'precio', 0.0)):.4f}"
-                descuento = f"{getattr(detalle, 'descuento', 0.0):.2f}"
+                precio_unitario = f"${getattr(detalle, 'precio_unitario', getattr(detalle, 'precio', 0.0)):.2f}"
+                descuento = f"${getattr(detalle, 'descuento', 0.0):.2f}"
                 # Calculate subtotal without IVA: (precio_unitario * cantidad) - descuento
                 precio_unitario_val = float(getattr(detalle, 'precio_unitario', getattr(detalle, 'precio', 0.0)))
                 cantidad_val = float(getattr(detalle, 'cantidad', 1))
                 descuento_val = float(getattr(detalle, 'descuento', 0.0))
                 subtotal = (precio_unitario_val * cantidad_val) - descuento_val
-                precio_total = f"{subtotal:.2f}"
+                precio_total = f"${subtotal:.2f}"
                 fila = [
                     Paragraph(str(cod_principal), self.styles['Campo']),
                     Paragraph(str(cantidad), self.styles['Campo']),
@@ -608,8 +612,8 @@ class RIDEGenerator:
                     # Mapear códigos SRI a descripción legible
                     forma_descripcion = self._obtener_descripcion_forma_pago(forma_pago.forma_pago)
                     valor = f"${forma_pago.total:.2f}"
-                    plazo = str(getattr(forma_pago, 'plazo', '0'))
-                    tiempo_dias = str(getattr(forma_pago, 'unidad_tiempo', 'días'))
+                    plazo = str(getattr(forma_pago, 'plazo', '0')) if getattr(forma_pago, 'plazo', None) is not None else '0'
+                    tiempo_dias = str(getattr(forma_pago, 'unidad_tiempo', 'días')) if getattr(forma_pago, 'unidad_tiempo', None) is not None else 'días'
                     
                     pago_data.append([
                         Paragraph(forma_descripcion, self.styles['Campo']),

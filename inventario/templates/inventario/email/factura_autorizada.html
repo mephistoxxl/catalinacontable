@@ -13,8 +13,8 @@
           <!-- Header VERDE con logo -->
           <tr>
             <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding:40px 20px; text-align:center;">
-              <img src="cid:logo-catalina" alt="CATALINA" style="max-width: 150px; height: auto; margin-bottom: 15px; background:white; padding:10px; border-radius:8px;" />
-              <h1 style="margin:0; font-size:28px; font-weight:700; color:#ffffff; letter-spacing:1px;">CATALINA</h1>
+              <img src="cid:logo-catalina" alt="{{ nombre_emisor }}" style="max-width: 150px; height: auto; margin-bottom: 15px; background:white; padding:10px; border-radius:8px;" />
+              <h1 style="margin:0; font-size:28px; font-weight:700; color:#ffffff; letter-spacing:1px;">{{ nombre_emisor }}</h1>
               <p style="margin:8px 0 0; font-size:14px; color:#ffffff; font-weight:300; letter-spacing:0.5px;">Factura Electrónica Autorizada</p>
             </td>
           </tr>
@@ -40,8 +40,8 @@
               <!-- Tabla de detalles -->
               <table width="100%" cellpadding="10" cellspacing="0" style="margin:20px 0; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
                 <tr style="background-color:#f9fafb;">
-                  <td style="font-weight:600; color:#374151; font-size:13px; border-bottom:1px solid #e5e7eb;">Empresa</td>
-                  <td style="color:#1f2937; font-size:13px; border-bottom:1px solid #e5e7eb;">{{ empresa.razon_social }}</td>
+                  <td style="font-weight:600; color:#374151; font-size:13px; border-bottom:1px solid #e5e7eb;">Emisor</td>
+                  <td style="color:#1f2937; font-size:13px; border-bottom:1px solid #e5e7eb;">{{ nombre_emisor }}</td>
                 </tr>
                 <tr style="background-color:#ffffff;">
                   <td style="font-weight:600; color:#374151; font-size:13px; border-bottom:1px solid #e5e7eb;">RUC</td>
@@ -83,7 +83,7 @@
                 Este es un correo automático, por favor no responder a esta dirección.
               </p>
               <p style="margin:0; font-size:13px; color:#374151; text-align:center; font-weight:600;">
-                {{ empresa.nombre_comercial|default:empresa.razon_social }}
+                {{ nombre_emisor }}
               </p>
             </td>
           </tr>

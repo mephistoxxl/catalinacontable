@@ -65,6 +65,11 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
 
     subject = f"Factura electrónica {factura.establecimiento}-{factura.punto_emision}-{factura.secuencia} AUTORIZADA"
 
+    # ✅ Obtener nombre comercial de Opciones
+    from inventario.models import Opciones
+    opciones = Opciones.objects.filter(empresa=factura.empresa).first()
+    nombre_emisor = opciones.nombre_comercial if opciones and opciones.nombre_comercial and opciones.nombre_comercial != '[CONFIGURAR NOMBRE COMERCIAL]' else factura.empresa.razon_social
+
     context = {
         'factura': factura,
         'empresa': factura.empresa,
@@ -72,6 +77,7 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
         'numero_autorizacion': factura.numero_autorizacion,
         'fecha_autorizacion': factura.fecha_autorizacion,
         'total': factura.monto_general,
+        'nombre_emisor': nombre_emisor,
     }
     try:
         body_html = render_to_string('inventario/email/factura_autorizada.html', context)
@@ -93,8 +99,8 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
           <!-- Header VERDE con logo -->
           <tr>
             <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding:40px 20px; text-align:center;">
-              <img src="cid:logo-catalina" alt="CATALINA" style="max-width: 150px; height: auto; margin-bottom: 15px; background:white; padding:10px; border-radius:8px;" />
-              <h1 style="margin:0; font-size:28px; font-weight:700; color:#ffffff; letter-spacing:1px;">CATALINA</h1>
+              <img src="cid:logo-catalina" alt="{nombre_emisor}" style="max-width: 150px; height: auto; margin-bottom: 15px; background:white; padding:10px; border-radius:8px;" />
+              <h1 style="margin:0; font-size:28px; font-weight:700; color:#ffffff; letter-spacing:1px;">{nombre_emisor}</h1>
               <p style="margin:8px 0 0; font-size:14px; color:#ffffff; font-weight:300; letter-spacing:0.5px;">Factura Electrónica Autorizada</p>
             </td>
           </tr>
@@ -120,8 +126,8 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
               <!-- Tabla de detalles -->
               <table width="100%" cellpadding="10" cellspacing="0" style="margin:20px 0; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
                 <tr style="background-color:#f9fafb;">
-                  <td style="font-weight:600; color:#374151; font-size:13px; border-bottom:1px solid #e5e7eb;">Empresa</td>
-                  <td style="color:#1f2937; font-size:13px; border-bottom:1px solid #e5e7eb;">{factura.empresa.razon_social}</td>
+                  <td style="font-weight:600; color:#374151; font-size:13px; border-bottom:1px solid #e5e7eb;">Emisor</td>
+                  <td style="color:#1f2937; font-size:13px; border-bottom:1px solid #e5e7eb;">{nombre_emisor}</td>
                 </tr>
                 <tr style="background-color:#ffffff;">
                   <td style="font-weight:600; color:#374151; font-size:13px; border-bottom:1px solid #e5e7eb;">RUC</td>
@@ -163,7 +169,7 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
                 Este es un correo automático, por favor no responder.
               </p>
               <p style="margin:0; font-size:12px; color:#9ca3af; text-align:center;">
-                {factura.empresa.nombre_comercial or factura.empresa.razon_social}
+                {nombre_emisor}
               </p>
             </td>
           </tr>
