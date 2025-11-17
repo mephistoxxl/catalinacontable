@@ -5,7 +5,7 @@ import base64
 import qrcode
 import tempfile
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -296,9 +296,10 @@ class RIDEGenerator:
             
             # Formatear fecha de autorización
             if fecha_autorizacion_sri:
-                # Fecha autorizada por el SRI
-                fecha_aut_val = fecha_autorizacion_sri.strftime('%d/%m/%Y %H:%M:%S')
-                logger.info(f"   ✅ Mostrará en RIDE: {fecha_aut_val}")
+                # Fecha autorizada por el SRI (ajustada -5 horas para despliegue)
+                fecha_aut_ajustada = fecha_autorizacion_sri - timedelta(hours=5)
+                fecha_aut_val = fecha_aut_ajustada.strftime('%d/%m/%Y %H:%M:%S')
+                logger.info(f"   ✅ Mostrará en RIDE (ajustada -5h): {fecha_aut_val}")
             else:
                 # Factura NO autorizada aún
                 fecha_aut_val = 'PENDIENTE DE AUTORIZACIÓN'

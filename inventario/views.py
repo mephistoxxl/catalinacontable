@@ -3744,6 +3744,16 @@ def consultar_estado_sri(request, factura_id):
                 except Exception:
                     pass
             factura.save()
+
+            # Ajustar fecha de autorización para mostrar (restar 5 horas)
+            fecha_aut_respuesta = ''
+            if factura.fecha_autorizacion:
+                from datetime import timedelta
+                fecha_aut_respuesta = (
+                    factura.fecha_autorizacion - timedelta(hours=5)
+                ).strftime('%d/%m/%Y %H:%M:%S')
+            elif fecha_aut:
+                fecha_aut_respuesta = fecha_aut
             # =============================
             # Envío automático de email si pasó a AUTORIZADA y no se había enviado
             # =============================
@@ -3792,7 +3802,7 @@ def consultar_estado_sri(request, factura_id):
                 'mensaje': mensaje_principal,
                 'detalle': mensaje_detalle,
                 'numero_autorizacion': numero_aut or '',
-                'fecha_autorizacion': fecha_aut or '',
+                'fecha_autorizacion': fecha_aut_respuesta,
                 'estado_cambio': estado_cambio
             })
         else:
