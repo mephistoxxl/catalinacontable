@@ -717,12 +717,15 @@ class SRIIntegration:
                                             fecha_limpia = partes[0] + tz
                                     
                                     fecha_dt = datetime.fromisoformat(fecha_limpia)
-                                    # ✅ Convertir a zona horaria Ecuador
+                                    # ✅ IMPORTANTE: El SRI envía hora de Ecuador con -05:00
+                                    # Quitamos el timezone y lo tratamos como hora local de Ecuador
                                     import pytz
                                     ecuador_tz = pytz.timezone('America/Guayaquil')
                                     if fecha_dt.tzinfo is not None:
-                                        # Ya tiene timezone, convertir a Ecuador
-                                        fecha_dt = fecha_dt.astimezone(ecuador_tz)
+                                        # Convertir a hora naive (sin timezone) manteniendo la hora
+                                        fecha_dt = fecha_dt.replace(tzinfo=None)
+                                    # Ahora localizamos como hora de Ecuador
+                                    fecha_dt = ecuador_tz.localize(fecha_dt)
                                 else:
                                     # ISO simple sin timezone
                                     fecha_dt = datetime.fromisoformat(fecha_limpia)
