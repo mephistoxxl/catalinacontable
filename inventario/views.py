@@ -6313,7 +6313,7 @@ class FirmaElectronicaView(LoginRequiredMixin, View):
                     messages.success(request, 'Configuración actualizada correctamente.')
                 
                 # Redirigir para evitar que el mensaje aparezca en el panel principal
-                return redirect('inventario:firmaElectronica')
+                return redirect('inventario:firma_electronica')
                 
             except ValidationError as e:
                 messages.error(request, f'Error de validación: {e.message}')

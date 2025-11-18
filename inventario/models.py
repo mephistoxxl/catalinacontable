@@ -1096,7 +1096,11 @@ class Factura(models.Model):
             opciones = Opciones.objects.for_tenant(self.empresa).first()
             if not opciones:
                 if self.empresa:
-                    opciones = Opciones.objects.create(empresa=self.empresa, identificacion=self.empresa.ruc)
+                    opciones = Opciones.objects.create(
+                        empresa=self.empresa, 
+                        identificacion=self.empresa.ruc,
+                        tipo_ambiente=self.empresa.tipo_ambiente  # ✅ COPIAR AMBIENTE DE EMPRESA
+                    )
                 else:
                     raise ValueError("RUC no configurado correctamente en Opciones")
             ruc_emisor = opciones.identificacion.zfill(13)
@@ -1111,7 +1115,11 @@ class Factura(models.Model):
         try:
             opciones = Opciones.objects.for_tenant(self.empresa).first()
             if not opciones and self.empresa:
-                opciones = Opciones.objects.create(empresa=self.empresa, identificacion=self.empresa.ruc)
+                opciones = Opciones.objects.create(
+                    empresa=self.empresa, 
+                    identificacion=self.empresa.ruc,
+                    tipo_ambiente=self.empresa.tipo_ambiente  # ✅ COPIAR AMBIENTE DE EMPRESA
+                )
             if opciones and opciones.tipo_ambiente in ['1', '2']:
                 tipo_ambiente = opciones.tipo_ambiente
             else:
