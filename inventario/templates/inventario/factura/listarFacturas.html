@@ -59,9 +59,21 @@
     <div class="bg-white rounded-lg shadow-lg border border-gray-200 relative overflow-hidden mt-2">
             <div class="p-3">
                 <div class="relative">
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 space-y-2 sm:space-y-0">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 space-y-2 sm:space-y-0 gap-3">
                         <h3 class="text-sm font-semibold text-gray-800">Facturas Registradas</h3>
-                        <span class="text-xs text-gray-600">Total: {{ tabla|length }} facturas</span>
+                        <div class="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
+                            <div class="relative">
+                                <input 
+                                    type="text" 
+                                    id="buscar-factura" 
+                                    placeholder="Buscar por ID, cliente, fecha..." 
+                                    class="w-full sm:w-64 px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pl-8"
+                                    onkeyup="buscarFactura()"
+                                />
+                                <i class="fa fa-search absolute left-2.5 top-2 text-gray-400 text-xs"></i>
+                            </div>
+                            <span class="text-xs text-gray-600 whitespace-nowrap">Total: <span id="total-visible">{{ tabla|length }}</span> facturas</span>
+                        </div>
                     </div>
                     
                     <div class="overflow-x-auto">
@@ -298,25 +310,58 @@
     const elementosPorPagina = 5;
     let totalElementos = 0;
     let totalPaginas = 0;
+    let filasOriginales = []; // Para almacenar todas las filas
+    let filasFiltradas = []; // Para almacenar filas filtradas
 
     // ✅ INICIALIZAR PAGINACIÓN AL CARGAR LA PÁGINA
     document.addEventListener('DOMContentLoaded', function() {
+        // Guardar referencia a todas las filas
+        filasOriginales = Array.from(document.querySelectorAll('.factura-row'));
+        filasFiltradas = [...filasOriginales];
         inicializarPaginacion();
     });
 
+    // ✅ FUNCIÓN DE BÚSQUEDA
+    function buscarFactura() {
+        const textoBusqueda = document.getElementById('buscar-factura').value.toLowerCase().trim();
+        
+        if (!textoBusqueda) {
+            // Si no hay búsqueda, mostrar todas las filas
+            filasFiltradas = [...filasOriginales];
+        } else {
+            // Filtrar filas basándose en el texto de búsqueda
+            filasFiltradas = filasOriginales.filter(fila => {
+                const textoFila = fila.textContent.toLowerCase();
+                return textoFila.includes(textoBusqueda);
+            });
+        }
+        
+        // Actualizar contador visible
+        const totalVisible = document.getElementById('total-visible');
+        if (totalVisible) {
+            totalVisible.textContent = filasFiltradas.length;
+        }
+        
+        // Reiniciar paginación con las filas filtradas
+        paginaActual = 1;
+        inicializarPaginacion();
+    }
+
     function inicializarPaginacion() {
-        const filas = document.querySelectorAll('.factura-row');
-        totalElementos = filas.length;
+        // Primero ocultar TODAS las filas originales
+        filasOriginales.forEach(fila => fila.style.display = 'none');
+        
+        totalElementos = filasFiltradas.length;
         totalPaginas = Math.ceil(totalElementos / elementosPorPagina);
         
-        console.log(`Total elementos: ${totalElementos}, Total páginas: ${totalPaginas}`);
+        console.log(`Total elementos filtrados: ${totalElementos}, Total páginas: ${totalPaginas}`);
         
         // Ocultar paginación si hay 5 o menos elementos
         const contenedorPaginacion = document.getElementById('paginacion-container');
         if (totalElementos <= elementosPorPagina) {
             contenedorPaginacion.style.display = 'none';
-            // Mostrar todos los elementos
-            filas.forEach(fila => fila.style.display = '');
+            // Mostrar solo los elementos filtrados
+            filasFiltradas.forEach(fila => fila.style.display = '');
         } else {
             contenedorPaginacion.style.display = 'flex';
             mostrarPagina(1);
@@ -327,12 +372,14 @@
     }
 
     function mostrarPagina(numeroPagina) {
-        const filas = document.querySelectorAll('.factura-row');
+        // Primero ocultar TODAS las filas originales
+        filasOriginales.forEach(fila => fila.style.display = 'none');
+        
         const inicio = (numeroPagina - 1) * elementosPorPagina;
         const fin = inicio + elementosPorPagina;
 
-        // Ocultar todas las filas
-        filas.forEach((fila, index) => {
+        // Mostrar solo las filas filtradas de la página actual
+        filasFiltradas.forEach((fila, index) => {
             if (index >= inicio && index < fin) {
                 fila.style.display = '';
             } else {
