@@ -3342,6 +3342,8 @@ class Banco(models.Model):
     )
     
     fecha_apertura = models.DateField(
+        blank=True,
+        null=True,
         verbose_name="Fecha Apertura",
         help_text="Fecha en que se abrió la cuenta"
     )
