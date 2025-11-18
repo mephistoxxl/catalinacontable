@@ -255,6 +255,13 @@ class Opciones(models.Model):
                 is_new_file = True
         else:
             is_new_file = True
+        
+        # ✅ SINCRONIZAR tipo_ambiente con Empresa
+        if self.empresa and self.empresa.tipo_ambiente != self.tipo_ambiente:
+            logger.info(f"Sincronizando ambiente: Empresa {self.empresa.tipo_ambiente} → {self.tipo_ambiente}")
+            self.empresa.tipo_ambiente = self.tipo_ambiente
+            self.empresa.save()
+        
         super().save(*args, **kwargs)
         # Solo procesar si hay archivo y contraseña, y si el archivo es nuevo o la fecha no está
         if self.firma_electronica and self.password_firma and (is_new_file or not self.fecha_caducidad_firma):
