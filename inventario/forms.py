@@ -1830,12 +1830,13 @@ class BancoFormulario(forms.ModelForm):
     
     fecha_apertura = forms.DateField(
         label='Fecha Apertura',
+        required=False,
         widget=forms.DateInput(attrs={
             'class': 'form-control',
             'type': 'date',
             'id': 'fecha_apertura'
         }),
-        help_text='Fecha en que se abrió la cuenta'
+        help_text='Fecha en que se abrió la cuenta (opcional)'
     )
     
     telefono = forms.CharField(
@@ -1854,6 +1855,7 @@ class BancoFormulario(forms.ModelForm):
     
     secuencial_cheque = forms.IntegerField(
         label='Secuencial Cheque',
+        required=False,
         min_value=1,
         initial=1,
         widget=forms.NumberInput(attrs={
@@ -1861,7 +1863,7 @@ class BancoFormulario(forms.ModelForm):
             'min': '1',
             'id': 'secuencial_cheque'
         }),
-        help_text='Próximo número de cheque a utilizar'
+        help_text='Próximo número de cheque a utilizar (opcional)'
     )
     
     
