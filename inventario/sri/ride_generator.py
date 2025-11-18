@@ -531,10 +531,8 @@ class RIDEGenerator:
             
             info_adicional = f"""
             <b>Información Adicional</b><br/>
-            Sistema: Catalina Fact<br/>
             Vendedor: {facturador_nombre}<br/>
-            Teléfono: {empresa_telefono}<br/>
-            Correo: {empresa_correo}
+            Sistema: Catalina Fact
             """
 
             # --- TOTALES DINÁMICOS E INTELIGENTES ---

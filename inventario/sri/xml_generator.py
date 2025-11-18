@@ -686,33 +686,28 @@ class SRIXMLGenerator:
 
     def _agregar_info_adicional(self, root, factura, emisor):
         """Agregar información adicional"""
-        # Solo agregar si hay campos adicionales
+        # Solo agregar campos adicionales guardados en la factura
         campos_adicionales = list(factura.campos_adicionales.all())
         
-        # Agregar datos del emisor si no están en campos adicionales
+        # Agregar nombre del vendedor si existe
         nombres_existentes = [campo.nombre.upper() for campo in campos_adicionales]
         
-        # Auto-agregar email si no existe
-        if emisor.correo and 'E-MAIL' not in nombres_existentes:
+        if hasattr(factura, 'facturador') and factura.facturador and 'VENDEDOR' not in nombres_existentes:
             from inventario.models import CampoAdicional
-            campo_email = CampoAdicional(nombre='E-MAIL', valor=emisor.correo)
-            campos_adicionales.append(campo_email)
-        
-        # Auto-agregar teléfono si no existe
-        if emisor.telefono and 'TELÉFONO' not in nombres_existentes:
-            from inventario.models import CampoAdicional
-            campo_telefono = CampoAdicional(nombre='TELÉFONO', valor=emisor.telefono)
-            campos_adicionales.append(campo_telefono)
-        
-        # Auto-agregar dirección si no existe
-        direccion_emisor = getattr(emisor, 'direccion_establecimiento', None)
-        if direccion_emisor and 'DIRECCIÓN' not in nombres_existentes:
-            from inventario.models import CampoAdicional
-            campo_direccion = CampoAdicional(
-                nombre='DIRECCIÓN', 
-                valor=self._limpiar_texto(direccion_emisor)
+            campo_vendedor = CampoAdicional(
+                nombre='VENDEDOR',
+                valor=factura.facturador.nombres
             )
-            campos_adicionales.append(campo_direccion)
+            campos_adicionales.append(campo_vendedor)
+        
+        # Agregar sistema si no existe
+        if 'SISTEMA' not in nombres_existentes:
+            from inventario.models import CampoAdicional
+            campo_sistema = CampoAdicional(
+                nombre='SISTEMA',
+                valor='Catalina Fact'
+            )
+            campos_adicionales.append(campo_sistema)
         
         # Si hay campos adicionales, crear la sección
         if campos_adicionales:
