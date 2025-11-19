@@ -315,6 +315,13 @@ class EmpresaAdmin(admin.ModelAdmin):
             # Eliminar opciones
             Opciones._unsafe_objects.filter(empresa=empresa).delete()
             
+            # Eliminar usuarios asociados a la empresa
+            usuarios_empresa = empresa.usuarios.all()
+            for usuario in usuarios_empresa:
+                # Solo eliminar si no es superusuario y solo pertenece a esta empresa
+                if not usuario.is_superuser and usuario.empresas.count() == 1:
+                    usuario.delete()
+            
             # Finalmente eliminar la empresa
             empresa.delete()
         
@@ -361,13 +368,23 @@ class EmpresaAdmin(admin.ModelAdmin):
         # Eliminar opciones
         Opciones._unsafe_objects.filter(empresa=obj).delete()
         
+        # Eliminar usuarios asociados a la empresa
+        usuarios_count = 0
+        usuarios_empresa = obj.usuarios.all()
+        for usuario in usuarios_empresa:
+            # Solo eliminar si no es superusuario y solo pertenece a esta empresa
+            if not usuario.is_superuser and usuario.empresas.count() == 1:
+                usuario.delete()
+                usuarios_count += 1
+        
         # Finalmente eliminar la empresa
         obj.delete()
         
         messages.success(
             request,
             f'Empresa "{empresa_nombre}" eliminada exitosamente junto con '
-            f'{facturas_count} facturas, {clientes_count} clientes, {productos_count} productos y todos sus datos relacionados.'
+            f'{facturas_count} facturas, {clientes_count} clientes, {productos_count} productos, '
+            f'{usuarios_count} usuarios y todos sus datos relacionados.'
         )
 
     def get_form(self, request, obj=None, **kwargs):  # type: ignore[override]
