@@ -186,7 +186,8 @@ class EmpresaAdmin(admin.ModelAdmin):
     
     def total_facturas(self, obj):
         """Muestra el total de facturas de la empresa"""
-        return obj.facturas.count()
+        from inventario.models import Factura
+        return Factura._unsafe_objects.filter(empresa=obj).count()
     total_facturas.short_description = "Facturas"
     
     def total_usuarios(self, obj):
