@@ -280,112 +280,101 @@ class EmpresaAdmin(admin.ModelAdmin):
         return to_delete, model_count, perms_needed, protected
 
     def delete_queryset(self, request, queryset):
-        """Elimina múltiples empresas"""
+        """Elimina múltiples empresas con TODOS sus datos relacionados"""
         for empresa in queryset:
-            # Usar el manager _unsafe_objects para eliminar sin restricciones de tenant
-            from inventario.models import (
-                Factura, Cliente, Producto, Banco, Facturador, 
-                Almacen, Servicio, Proforma, Opciones
-            )
-            
-            # Eliminar todas las facturas (esto eliminará en cascada detalles, impuestos, etc)
-            Factura._unsafe_objects.filter(empresa=empresa).delete()
-            
-            # Eliminar clientes
-            Cliente._unsafe_objects.filter(empresa=empresa).delete()
-            
-            # Eliminar productos
-            Producto._unsafe_objects.filter(empresa=empresa).delete()
-            
-            # Eliminar bancos
-            Banco._unsafe_objects.filter(empresa=empresa).delete()
-            
-            # Eliminar facturadores
-            Facturador._unsafe_objects.filter(empresa=empresa).delete()
-            
-            # Eliminar almacenes
-            Almacen._unsafe_objects.filter(empresa=empresa).delete()
-            
-            # Eliminar servicios
-            Servicio._unsafe_objects.filter(empresa=empresa).delete()
-            
-            # Eliminar proformas
-            Proforma._unsafe_objects.filter(empresa=empresa).delete()
-            
-            # Eliminar opciones
-            Opciones._unsafe_objects.filter(empresa=empresa).delete()
-            
-            # Eliminar usuarios asociados a la empresa
-            usuarios_empresa = empresa.usuarios.all()
-            for usuario in usuarios_empresa:
-                # Solo eliminar si no es superusuario y solo pertenece a esta empresa
-                if not usuario.is_superuser and usuario.empresas.count() == 1:
-                    usuario.delete()
-            
-            # Finalmente eliminar la empresa
-            empresa.delete()
+            self._delete_empresa_completa(empresa)
         
-        messages.success(request, f"Se eliminaron {queryset.count()} empresas y todos sus datos relacionados.")
+        messages.success(request, f"Se eliminaron {queryset.count()} empresas y TODOS sus datos relacionados.")
 
     def delete_model(self, request, obj):
-        """Elimina una empresa individual con todos sus datos"""
-        from inventario.models import (
-            Factura, Cliente, Producto, Banco, Facturador,
-            Almacen, Servicio, Proforma, Opciones
-        )
-        
+        """Elimina una empresa individual con TODOS sus datos"""
         empresa_nombre = obj.razon_social
         
-        # Contar elementos antes de eliminar
+        # Contar algunos elementos antes de eliminar
+        from inventario.models import Factura, Cliente, Producto
         facturas_count = Factura._unsafe_objects.filter(empresa=obj).count()
         clientes_count = Cliente._unsafe_objects.filter(empresa=obj).count()
         productos_count = Producto._unsafe_objects.filter(empresa=obj).count()
+        usuarios_count = obj.usuarios.exclude(is_superuser=True).count()
         
-        # Eliminar todas las facturas (esto eliminará en cascada detalles, impuestos, etc)
-        Factura._unsafe_objects.filter(empresa=obj).delete()
-        
-        # Eliminar clientes
-        Cliente._unsafe_objects.filter(empresa=obj).delete()
-        
-        # Eliminar productos
-        Producto._unsafe_objects.filter(empresa=obj).delete()
-        
-        # Eliminar bancos
-        Banco._unsafe_objects.filter(empresa=obj).delete()
-        
-        # Eliminar facturadores
-        Facturador._unsafe_objects.filter(empresa=obj).delete()
-        
-        # Eliminar almacenes
-        Almacen._unsafe_objects.filter(empresa=obj).delete()
-        
-        # Eliminar servicios
-        Servicio._unsafe_objects.filter(empresa=obj).delete()
-        
-        # Eliminar proformas
-        Proforma._unsafe_objects.filter(empresa=obj).delete()
-        
-        # Eliminar opciones
-        Opciones._unsafe_objects.filter(empresa=obj).delete()
-        
-        # Eliminar usuarios asociados a la empresa
-        usuarios_count = 0
-        usuarios_empresa = obj.usuarios.all()
-        for usuario in usuarios_empresa:
-            # Solo eliminar si no es superusuario y solo pertenece a esta empresa
-            if not usuario.is_superuser and usuario.empresas.count() == 1:
-                usuario.delete()
-                usuarios_count += 1
-        
-        # Finalmente eliminar la empresa
-        obj.delete()
+        # Eliminar todo
+        self._delete_empresa_completa(obj)
         
         messages.success(
             request,
             f'Empresa "{empresa_nombre}" eliminada exitosamente junto con '
             f'{facturas_count} facturas, {clientes_count} clientes, {productos_count} productos, '
-            f'{usuarios_count} usuarios y todos sus datos relacionados.'
+            f'{usuarios_count} usuarios y TODOS los datos relacionados.'
         )
+    
+    def _delete_empresa_completa(self, empresa):
+        """Método privado que elimina ABSOLUTAMENTE TODO de una empresa"""
+        from inventario.models import (
+            # Modelos principales
+            Factura, Cliente, Producto, Banco, Servicio, Proforma,
+            Almacen, Opciones,
+            # Modelos de pedidos
+            Proveedor, Pedido, DetallePedido,
+            # Modelos de configuración
+            Notificaciones, Secuencia, Caja, MaquinaFiscal,
+            # Modelos de guías de remisión
+            GuiaRemision, DetalleGuiaRemision, DestinatarioGuia, 
+            DetalleDestinatarioGuia, ConfiguracionGuiaRemision, Transportista,
+            # Otros
+            TipoNegociable
+        )
+        
+        # ELIMINAR TODO EN ORDEN (los CASCADE se encargarán de relaciones)
+        # 1. Facturas y todo lo relacionado (detalles, impuestos, formas pago, etc se borran en CASCADE)
+        Factura._unsafe_objects.filter(empresa=empresa).delete()
+        
+        # 2. Proformas y detalles (CASCADE)
+        Proforma._unsafe_objects.filter(empresa=empresa).delete()
+        
+        # 3. Guías de remisión y todo relacionado (CASCADE)
+        GuiaRemision._unsafe_objects.filter(empresa=empresa).delete()
+        DestinatarioGuia._unsafe_objects.filter(empresa=empresa).delete()
+        ConfiguracionGuiaRemision._unsafe_objects.filter(empresa=empresa).delete()
+        
+        # 4. Pedidos y detalles (CASCADE)
+        Pedido._unsafe_objects.filter(empresa=empresa).delete()
+        
+        # 5. Clientes, Productos, Servicios
+        Cliente._unsafe_objects.filter(empresa=empresa).delete()
+        Producto._unsafe_objects.filter(empresa=empresa).delete()
+        Servicio._unsafe_objects.filter(empresa=empresa).delete()
+        
+        # 6. Proveedores y Transportistas
+        Proveedor._unsafe_objects.filter(empresa=empresa).delete()
+        Transportista._unsafe_objects.filter(empresa=empresa).delete()
+        
+        # 7. Configuraciones
+        Banco._unsafe_objects.filter(empresa=empresa).delete()
+        Almacen._unsafe_objects.filter(empresa=empresa).delete()
+        Caja._unsafe_objects.filter(empresa=empresa).delete()
+        MaquinaFiscal._unsafe_objects.filter(empresa=empresa).delete()
+        Secuencia._unsafe_objects.filter(empresa=empresa).delete()
+        TipoNegociable._unsafe_objects.filter(empresa=empresa).delete()
+        
+        # 8. Notificaciones y Opciones
+        Notificaciones._unsafe_objects.filter(empresa=empresa).delete()
+        Opciones._unsafe_objects.filter(empresa=empresa).delete()
+        
+        # 9. Eliminar usuarios asociados (solo si no son superusuarios y solo pertenecen a esta empresa)
+        usuarios_empresa = empresa.usuarios.all()
+        for usuario in usuarios_empresa:
+            if not usuario.is_superuser and usuario.empresas.count() == 1:
+                # Eliminar cualquier dato del usuario primero
+                try:
+                    usuario.delete()
+                except Exception as e:
+                    # Si falla, intentar eliminar relaciones protegidas manualmente
+                    from inventario.models import Caja
+                    Caja._unsafe_objects.filter(creado_por=usuario).delete()
+                    usuario.delete()
+        
+        # 10. Finalmente eliminar la empresa
+        empresa.delete()
 
     def get_form(self, request, obj=None, **kwargs):  # type: ignore[override]
         form = super().get_form(request, obj, **kwargs)
