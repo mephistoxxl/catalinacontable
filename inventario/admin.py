@@ -167,13 +167,66 @@ class TenantModelAdmin(admin.ModelAdmin):
 
 
 class EmpresaAdminForm(forms.ModelForm):
-    username = forms.CharField(max_length=150)
+    username = forms.CharField(
+        max_length=150,
+        required=False,
+        help_text="Se generará automáticamente desde el RUC (personas naturales usan su cédula sin el 001)"
+    )
     email = forms.EmailField()
     password = forms.CharField(required=False, widget=forms.PasswordInput)
 
     class Meta:
         model = Empresa
         fields = "__all__"
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Si hay RUC en el formulario, prellenar el username automáticamente
+        if 'ruc' in self.data:
+            ruc = self.data.get('ruc', '')
+            if ruc and len(ruc) == 13:
+                # Si es persona natural (termina en 001), extraer cédula
+                if ruc.endswith('001'):
+                    self.fields['username'].initial = ruc[:10]  # Primeros 10 dígitos = cédula
+                    self.fields['username'].help_text = f"Cédula extraída del RUC: {ruc[:10]}"
+                else:
+                    # Para empresas, usar el RUC completo
+                    self.fields['username'].initial = ruc
+                    self.fields['username'].help_text = f"RUC completo: {ruc}"
+    
+    def clean_username(self):
+        """Valida que el username sea único"""
+        username = self.cleaned_data.get('username')
+        
+        # Si viene vacío, generar automáticamente desde RUC
+        if not username:
+            ruc = self.cleaned_data.get('ruc', '')
+            if ruc and len(ruc) == 13:
+                if ruc.endswith('001'):
+                    username = ruc[:10]  # Cédula
+                else:
+                    username = ruc  # RUC completo
+        
+        # Validar que no exista
+        User = get_user_model()
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError(
+                f'Ya existe un usuario con username {username}'
+            )
+        
+        return username
+    
+    def clean_email(self):
+        """Valida que el email sea único"""
+        email = self.cleaned_data.get('email')
+        if email:
+            User = get_user_model()
+            if User.objects.filter(email=email).exists():
+                raise forms.ValidationError(
+                    f'Ya existe un usuario con el email {email}'
+                )
+        return email
 
 
 class EmpresaAdmin(admin.ModelAdmin):
@@ -331,9 +384,22 @@ class EmpresaAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
         if creating:
             User = get_user_model()
+            
+            # Obtener username (ya validado y generado en clean_username)
             username = form.cleaned_data.get("username")
+            
+            # Si viene vacío, generar automáticamente desde RUC
+            if not username:
+                ruc = obj.ruc
+                if ruc and len(ruc) == 13:
+                    if ruc.endswith('001'):
+                        username = ruc[:10]  # Persona natural: cédula sin 001
+                    else:
+                        username = ruc  # Empresa: RUC completo
+            
             email = form.cleaned_data.get("email")
             raw_password = form.cleaned_data.get("password")
+            
             usuario = User.objects.create_user(
                 username=username,
                 email=email,
@@ -345,14 +411,36 @@ class EmpresaAdmin(admin.ModelAdmin):
             usuario.is_staff = True  # Puede acceder al admin tenant
             usuario.is_superuser = False  # No es superusuario global
             usuario.save(update_fields=["nivel", "is_staff", "is_superuser"])
+            
+            # Vincular usuario con empresa
             UsuarioEmpresa.objects.create(usuario=usuario, empresa=obj)
+            
+            # Crear Opciones automáticamente
+            from inventario.models import Opciones
+            if not Opciones.objects.filter(empresa=obj).exists():
+                Opciones.objects.create(
+                    empresa=obj,
+                    identificacion=obj.ruc,
+                    razon_social=obj.razon_social,
+                    tipo_ambiente=obj.tipo_ambiente,
+                    direccion_establecimiento='[POR CONFIGURAR]',
+                    correo=email,
+                    telefono='0000000000',
+                )
+            
             self._send_password_setup_email(request, usuario, email)
-            messages.info(
+            
+            # Mensaje informativo según tipo de RUC
+            if obj.ruc.endswith('001'):
+                mensaje_login = f"El usuario podrá iniciar sesión con su cédula: {username}"
+            else:
+                mensaje_login = f"El usuario podrá iniciar sesión con su RUC: {username}"
+            
+            messages.success(
                 request,
-                (
-                    f"Usuario {username} creado. Se envió un enlace seguro a {email} "
-                    "para que establezca su contraseña."
-                ),
+                f"Empresa '{obj.razon_social}' creada exitosamente.\n"
+                f"Usuario {username} creado. {mensaje_login}\n"
+                f"Se envió un enlace a {email} para establecer la contraseña."
             )
 
     def _send_password_setup_email(self, request, usuario, email):
