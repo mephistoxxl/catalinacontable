@@ -406,6 +406,22 @@ class Opciones(models.Model):
         default='DOLAR',
         help_text='Moneda oficial (DOLAR para Ecuador)'
     )
+    
+    # PERSONALIZACIÓN
+    nombre_negocio = models.CharField(
+        max_length=25, 
+        null=True, 
+        blank=True,
+        default='Mi Negocio',
+        help_text='Nombre corto para mostrar en reportes'
+    )
+    
+    mensaje_factura = models.TextField(
+        null=True, 
+        blank=True,
+        default='Gracias por su compra',
+        help_text='Mensaje que aparece en las facturas'
+    )
 
     # CONFIGURACIÓN TÉCNICA SRI (VALORES FIJOS - NO EDITABLES POR USUARIO)
     AMBIENTE_CHOICES = [
