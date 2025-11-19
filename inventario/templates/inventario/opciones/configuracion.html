@@ -126,7 +126,10 @@
                                     {{ form.direccion_establecimiento.errors }}
                                     {{ form.direccion_establecimiento|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
                                 </div>
-                                
+                            </div>
+                            
+                            <div class="space-y-2">
+                                <!-- Columna 2 -->
                                 <div class="space-y-1">
                                     <label for="{{ form.correo.id_for_label }}" class="block text-sm font-medium text-gray-700">
                                         {{ form.correo.label }} <span class="text-red-500">*</span>
@@ -142,10 +145,7 @@
                                     {{ form.telefono.errors }}
                                     {{ form.telefono|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
                                 </div>
-                            </div>
-                            
-                            <div class="space-y-2">
-                                <!-- Columna 2 -->
+                                
                                 <div class="space-y-1">
                                     <label for="{{ form.obligado.id_for_label }}" class="block text-sm font-medium text-gray-700">
                                         {{ form.obligado.label }}
@@ -164,22 +164,6 @@
                                 
                                 {# Moneda oculto: mantener en POST sin mostrar #}
                                 {{ form.moneda.as_hidden }}
-                                
-                                <div class="space-y-1">
-                                    <label for="{{ form.mensaje_factura.id_for_label }}" class="block text-sm font-medium text-gray-700">
-                                        {{ form.mensaje_factura.label }}
-                                    </label>
-                                    {{ form.mensaje_factura.errors }}
-                                    {{ form.mensaje_factura|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
-                                </div>
-                                
-                                <div class="space-y-1">
-                                    <label for="{{ form.nombre_negocio.id_for_label }}" class="block text-sm font-medium text-gray-700">
-                                        {{ form.nombre_negocio.label }}
-                                    </label>
-                                    {{ form.nombre_negocio.errors }}
-                                    {{ form.nombre_negocio|add_class:"w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" }}
-                                </div>
                             </div>
                         </div>
                         </div>
@@ -531,18 +515,6 @@ async function consultarRUC(ruc) {
         if (obligadoSelect && data.obligado_contabilidad) {
             const obligado = data.obligado_contabilidad.toUpperCase();
             obligadoSelect.value = obligado === 'SI' ? 'SI' : 'NO';
-        }
-        
-        // Agregar información en observaciones/mensaje si está disponible
-        let mensajeField = document.getElementById('id_mensaje_factura');
-        if (!mensajeField) {
-            mensajeField = document.querySelector('textarea[name="mensaje_factura"]');
-        }
-        if (mensajeField && data.actividad_economica) {
-            let observaciones = [];
-            if (data.estado) observaciones.push(`Estado: ${data.estado}`);
-            if (data.actividad_economica) observaciones.push(`Actividad: ${data.actividad_economica}`);
-            mensajeField.value = observaciones.join(' | ');
         }
         
         showMessage('Datos del RUC cargados exitosamente', 'success');

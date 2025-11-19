@@ -4924,9 +4924,7 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
             'correo': conf.correo,
             'telefono': conf.telefono,
             'moneda': conf.moneda,
-            'nombre_negocio': conf.nombre_negocio,
             'direccion_establecimiento': conf.direccion_establecimiento,
-            'mensaje_factura': conf.mensaje_factura,
             'obligado': conf.obligado,
             'tipo_regimen': conf.tipo_regimen,
             'es_contribuyente_especial': conf.es_contribuyente_especial,
@@ -4969,8 +4967,6 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
             conf.obligado = form.cleaned_data.get('obligado')
             conf.tipo_regimen = form.cleaned_data.get('tipo_regimen')
             conf.moneda = form.cleaned_data.get('moneda')
-            conf.mensaje_factura = form.cleaned_data.get('mensaje_factura')
-            conf.nombre_negocio = form.cleaned_data.get('nombre_negocio')
             conf.es_contribuyente_especial = form.cleaned_data.get('es_contribuyente_especial')
             conf.numero_contribuyente_especial = form.cleaned_data.get('numero_contribuyente_especial') or None
             conf.es_agente_retencion = form.cleaned_data.get('es_agente_retencion')
