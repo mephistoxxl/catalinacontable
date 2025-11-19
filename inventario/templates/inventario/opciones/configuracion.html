@@ -235,11 +235,10 @@
                                     <div class="bg-white border border-gray-200 rounded-lg p-3 text-center shadow-sm">
                                         {% if configuracion.imagen %}
                                             <img src="{{ configuracion.imagen.url }}" alt="Logo actual" class="max-h-32 mx-auto rounded-lg shadow-sm border border-gray-100">
+                                            <p class="text-xs text-gray-500 mt-2">{{ configuracion.imagen.name|default:"logo.png" }}</p>
                                         {% else %}
-                                            {% load static %}
-                                            <img src="{% static 'inventario/assets/logo/logo2.png' %}" alt="Logo por defecto" class="max-h-32 mx-auto rounded-lg shadow-sm border border-gray-100">
+                                            <p class="text-sm text-gray-400 mt-4">Sin logo</p>
                                         {% endif %}
-                                        <p class="text-xs text-gray-500 mt-2">{% if configuracion.imagen %}{{ configuracion.imagen.name|default:"logo.png" }}{% else %}Logo por defecto{% endif %}</p>
                                     </div>
                                 </div>
                                 
