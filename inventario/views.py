@@ -176,11 +176,7 @@ def necesita_configuracion(empresa):
         if not opciones.tipo_regimen or not opciones.tipo_regimen.strip():
             campos_faltantes.append('Régimen tributario')
         
-        # 9. Mensaje en facturas
-        if not opciones.mensaje_factura or not opciones.mensaje_factura.strip():
-            campos_faltantes.append('Mensaje en facturas')
-        
-        # 10. Firma electrónica
+        # 9. Firma electrónica
         if not opciones.firma_electronica:
             campos_faltantes.append('Firma electrónica')
         
