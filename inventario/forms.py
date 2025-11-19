@@ -1351,25 +1351,6 @@ class OpcionesFormulario(forms.Form):
         widget=forms.HiddenInput(),
     )
     
-    mensaje_factura = forms.CharField(
-        label='Mensaje en facturas',
-        max_length=200,
-        widget=forms.Textarea(attrs={
-            'id': 'mensaje_factura',
-            'class': 'form-control',
-            'rows': 2
-        }),
-    )
-    
-    nombre_negocio = forms.CharField(
-        label='Nombre del negocio',
-        max_length=25,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'id': 'nombre_negocio'
-        }),
-    )
-    
     # NUEVOS CAMPOS SRI
     es_contribuyente_especial = forms.BooleanField(
         label='¿Es contribuyente especial?',
@@ -2037,7 +2018,6 @@ class FirmaElectronicaForm(forms.ModelForm):
             'password_firma',
             'obligado',
             'correo',
-            'mensaje_factura',
             'firma_electronica',
         ]
         widgets = {
