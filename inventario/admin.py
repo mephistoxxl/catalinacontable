@@ -179,6 +179,142 @@ class EmpresaAdminForm(forms.ModelForm):
 class EmpresaAdmin(admin.ModelAdmin):
     form = EmpresaAdminForm
     readonly_fields = ("creada_en", "creada_por")
+    list_display = ("razon_social", "ruc", "tipo_ambiente", "creada_en", "total_facturas", "total_usuarios")
+    list_filter = ("tipo_ambiente", "creada_en")
+    search_fields = ("razon_social", "ruc")
+    ordering = ("-creada_en",)
+    
+    def total_facturas(self, obj):
+        """Muestra el total de facturas de la empresa"""
+        return obj.facturas.count()
+    total_facturas.short_description = "Facturas"
+    
+    def total_usuarios(self, obj):
+        """Muestra el total de usuarios de la empresa"""
+        return obj.usuarios.count()
+    total_usuarios.short_description = "Usuarios"
+    
+    def get_deleted_objects(self, objs, request):
+        """
+        Personaliza el mensaje de eliminación para mostrar un resumen claro
+        de todo lo que se eliminará con la empresa
+        """
+        from django.contrib.admin.utils import NestedObjects
+        from django.utils.encoding import force_str
+        
+        collector = NestedObjects(using='default')
+        collector.collect(objs)
+        
+        def format_callback(obj):
+            opts = obj._meta
+            no_edit_link = f"{force_str(opts.verbose_name)}: {force_str(obj)}"
+            return no_edit_link
+        
+        to_delete = collector.nested(format_callback)
+        
+        # Contar objetos por tipo
+        protected = []
+        model_count = {}
+        
+        for model, instances in collector.model_objs.items():
+            count = len(instances)
+            model_count[model._meta.verbose_name_plural] = count
+        
+        # Crear resumen personalizado
+        perms_needed = set()
+        
+        return to_delete, model_count, perms_needed, protected
+
+    def delete_queryset(self, request, queryset):
+        """Elimina múltiples empresas"""
+        for empresa in queryset:
+            # Usar el manager _unsafe_objects para eliminar sin restricciones de tenant
+            from inventario.models import (
+                Factura, Cliente, Producto, Banco, Facturador, 
+                Almacen, Servicio, Proforma, Opciones
+            )
+            
+            # Eliminar todas las facturas (esto eliminará en cascada detalles, impuestos, etc)
+            Factura._unsafe_objects.filter(empresa=empresa).delete()
+            
+            # Eliminar clientes
+            Cliente._unsafe_objects.filter(empresa=empresa).delete()
+            
+            # Eliminar productos
+            Producto._unsafe_objects.filter(empresa=empresa).delete()
+            
+            # Eliminar bancos
+            Banco._unsafe_objects.filter(empresa=empresa).delete()
+            
+            # Eliminar facturadores
+            Facturador._unsafe_objects.filter(empresa=empresa).delete()
+            
+            # Eliminar almacenes
+            Almacen._unsafe_objects.filter(empresa=empresa).delete()
+            
+            # Eliminar servicios
+            Servicio._unsafe_objects.filter(empresa=empresa).delete()
+            
+            # Eliminar proformas
+            Proforma._unsafe_objects.filter(empresa=empresa).delete()
+            
+            # Eliminar opciones
+            Opciones._unsafe_objects.filter(empresa=empresa).delete()
+            
+            # Finalmente eliminar la empresa
+            empresa.delete()
+        
+        messages.success(request, f"Se eliminaron {queryset.count()} empresas y todos sus datos relacionados.")
+
+    def delete_model(self, request, obj):
+        """Elimina una empresa individual con todos sus datos"""
+        from inventario.models import (
+            Factura, Cliente, Producto, Banco, Facturador,
+            Almacen, Servicio, Proforma, Opciones
+        )
+        
+        empresa_nombre = obj.razon_social
+        
+        # Contar elementos antes de eliminar
+        facturas_count = Factura._unsafe_objects.filter(empresa=obj).count()
+        clientes_count = Cliente._unsafe_objects.filter(empresa=obj).count()
+        productos_count = Producto._unsafe_objects.filter(empresa=obj).count()
+        
+        # Eliminar todas las facturas (esto eliminará en cascada detalles, impuestos, etc)
+        Factura._unsafe_objects.filter(empresa=obj).delete()
+        
+        # Eliminar clientes
+        Cliente._unsafe_objects.filter(empresa=obj).delete()
+        
+        # Eliminar productos
+        Producto._unsafe_objects.filter(empresa=obj).delete()
+        
+        # Eliminar bancos
+        Banco._unsafe_objects.filter(empresa=obj).delete()
+        
+        # Eliminar facturadores
+        Facturador._unsafe_objects.filter(empresa=obj).delete()
+        
+        # Eliminar almacenes
+        Almacen._unsafe_objects.filter(empresa=obj).delete()
+        
+        # Eliminar servicios
+        Servicio._unsafe_objects.filter(empresa=obj).delete()
+        
+        # Eliminar proformas
+        Proforma._unsafe_objects.filter(empresa=obj).delete()
+        
+        # Eliminar opciones
+        Opciones._unsafe_objects.filter(empresa=obj).delete()
+        
+        # Finalmente eliminar la empresa
+        obj.delete()
+        
+        messages.success(
+            request,
+            f'Empresa "{empresa_nombre}" eliminada exitosamente junto con '
+            f'{facturas_count} facturas, {clientes_count} clientes, {productos_count} productos y todos sus datos relacionados.'
+        )
 
     def get_form(self, request, obj=None, **kwargs):  # type: ignore[override]
         form = super().get_form(request, obj, **kwargs)
@@ -318,6 +454,25 @@ class UsuarioAdmin(UserAdmin):
 tenant_admin_site.register(Usuario, UsuarioAdmin)
 class RootUserAdmin(UserAdmin):
     """User admin for the root site protecting the root user."""
+    
+    list_display = ("username", "email", "first_name", "last_name", "is_staff", "is_superuser", "nivel_str", "empresas_asociadas")
+    list_filter = ("is_staff", "is_superuser", "nivel", "empresas")
+    search_fields = ("username", "email", "first_name", "last_name")
+    ordering = ("-date_joined",)
+    
+    def nivel_str(self, obj):
+        """Muestra el nivel del usuario de forma legible"""
+        niveles = {0: "Usuario", 1: "Admin", 2: "Root"}
+        return niveles.get(obj.nivel, "Desconocido")
+    nivel_str.short_description = "Nivel"
+    
+    def empresas_asociadas(self, obj):
+        """Muestra las empresas asociadas al usuario"""
+        empresas = obj.empresas.all()
+        if empresas:
+            return ", ".join([e.razon_social[:30] for e in empresas])
+        return "Ninguna"
+    empresas_asociadas.short_description = "Empresas"
 
     def _is_root(self, obj):
         return obj and (
@@ -327,11 +482,13 @@ class RootUserAdmin(UserAdmin):
 
     def has_delete_permission(self, request, obj=None):  # type: ignore[override]
         if self._is_root(obj):
+            messages.warning(request, "El usuario root está protegido y no puede ser eliminado.")
             return False
         return super().has_delete_permission(request, obj)
 
     def has_change_permission(self, request, obj=None):  # type: ignore[override]
         if self._is_root(obj):
+            messages.warning(request, "El usuario root está protegido y no puede ser modificado.")
             return False
         return super().has_change_permission(request, obj)
 
