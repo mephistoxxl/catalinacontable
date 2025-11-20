@@ -196,18 +196,32 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
     try:
         from email.mime.image import MIMEImage
 
+        # Intentar desde archivos estáticos locales primero
         logo_path = finders.find('inventario/assets/logo/logo-catalina.png')
 
-        if logo_path:
+        if logo_path and os.path.exists(logo_path):
+            # Filesystem local
             with open(logo_path, 'rb') as logo_file:
                 logo_data = logo_file.read()
-                logo_img = MIMEImage(logo_data)
-                logo_img.add_header('Content-ID', '<logo-catalina>')
-                logo_img.add_header('Content-Disposition', 'inline', filename='logo.png')
-                email.attach(logo_img)
-                logger.info(f"✅ Logo embebido adjuntado correctamente desde: {logo_path}")
         else:
-            logger.warning("⚠️ No se pudo encontrar el logo estático para adjuntar")
+            # Intentar desde S3/storage
+            try:
+                storage_logo_path = 'static/inventario/assets/logo/logo-catalina.png'
+                with default_storage.open(storage_logo_path, 'rb') as logo_file:
+                    logo_data = logo_file.read()
+                logger.info(f"✅ Logo cargado desde storage: {storage_logo_path}")
+            except Exception as e:
+                logger.warning(f"⚠️ No se pudo cargar logo desde storage: {e}")
+                logo_data = None
+        
+        if logo_data:
+            logo_img = MIMEImage(logo_data)
+            logo_img.add_header('Content-ID', '<logo-catalina>')
+            logo_img.add_header('Content-Disposition', 'inline', filename='logo.png')
+            email.attach(logo_img)
+            logger.info(f"✅ Logo embebido adjuntado correctamente")
+        else:
+            logger.warning("⚠️ No se pudo encontrar el logo para adjuntar")
     except Exception as e:
         logger.warning(f"Error general adjuntando logo embebido: {e}")
     
