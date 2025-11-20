@@ -100,7 +100,7 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
           <tr>
             <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding:40px 20px; text-align:center;">
               <div style="background: white; padding: 15px; border-radius: 8px; display: inline-block; margin-bottom: 20px;">
-                <img src="cid:logo-catalina" alt="Catalina Facturador" style="max-width: 180px; height: auto; display: block;" />
+                <img src="https://catalina-public-assets.s3.us-east-2.amazonaws.com/Logo+PNG+-+Catalina.png" alt="Catalina Facturador" style="max-width: 180px; height: auto; display: block;" />
               </div>
               <h1 style="margin:0; font-size:28px; font-weight:700; color:#ffffff; letter-spacing:1px;">{nombre_emisor}</h1>
               <p style="margin:8px 0 0; font-size:14px; color:#ffffff; font-weight:300; letter-spacing:0.5px;">Factura Electrónica Autorizada</p>
@@ -191,48 +191,7 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
         cc=cc_list,
     )
     email.attach_alternative(body_html, "text/html")
-    email.mixed_subtype = 'related'  # Necesario para imágenes embebidas
-    
-    # Adjuntar logo embebido para que se vea en el email
-    try:
-        from email.mime.image import MIMEImage
-        
-        logo_data = None
-        
-        # Intentar desde S3 público (catalina-public-assets)
-        try:
-            import boto3
-            s3_client = boto3.client('s3', region_name='us-east-2')
-            response = s3_client.get_object(Bucket='catalina-public-assets', Key='Logo PNG - Catalina.png')
-            logo_data = response['Body'].read()
-            logger.info(f"✅ Logo cargado desde bucket público: catalina-public-assets ({len(logo_data)} bytes)")
-        except Exception as e:
-            # Fallback: intentar desde archivos estáticos locales
-            logger.warning(f"⚠️ No se pudo cargar desde S3, intentando local: {e}")
-            try:
-                logo_path = finders.find('inventario/assets/logo/logo2.png')
-                if logo_path and os.path.exists(logo_path):
-                    with open(logo_path, 'rb') as logo_file:
-                        logo_data = logo_file.read()
-                else:
-                    storage_logo_path = 'logos/Logo PNG - Catalina.png'
-                with default_storage.open(storage_logo_path, 'rb') as logo_file:
-                    logo_data = logo_file.read()
-                logger.info(f"✅ Logo cargado desde storage: {storage_logo_path}")
-            except Exception as e:
-                logger.warning(f"⚠️ No se pudo cargar logo desde storage: {e}")
-                logo_data = None
-        
-        if logo_data:
-            logo_img = MIMEImage(logo_data)
-            logo_img.add_header('Content-ID', '<logo-catalina>')
-            logo_img.add_header('Content-Disposition', 'inline', filename='logo.png')
-            email.attach(logo_img)
-            logger.info(f"✅ Logo embebido adjuntado correctamente")
-        else:
-            logger.warning("⚠️ No se pudo encontrar el logo para adjuntar")
-    except Exception as e:
-        logger.warning(f"Error general adjuntando logo embebido: {e}")
+    # Ya no necesitamos mixed_subtype='related' ni adjuntar logo porque usamos URL pública directa
     
     # Leer y adjuntar archivos (compatible con S3 y filesystem local)
     try:
