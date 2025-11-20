@@ -434,6 +434,10 @@ class EmpresaAdmin(admin.ModelAdmin):
                     telefono='0000000000',
                 )
             
+            # Enviar correo con credenciales de bienvenida
+            from inventario.email_service import enviar_credenciales_nueva_empresa
+            enviar_credenciales_nueva_empresa(obj, usuario, raw_password)
+            
             self._send_password_setup_email(request, usuario, email)
             
             # Mensaje informativo según tipo de RUC

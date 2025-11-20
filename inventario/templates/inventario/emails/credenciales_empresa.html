@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credenciales de Acceso</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            padding: 30px;
+            text-align: center;
+        }
+        .logo {
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+        .brand-dots {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .dot-orange { background-color: #e67e22; }
+        .dot-green { background-color: #27ae60; }
+        .dot-blue { background-color: #3498db; }
+        .dot-purple { background-color: #9b59b6; }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        .welcome {
+            font-size: 24px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        .credentials-section {
+            margin: 30px 0;
+        }
+        .section-title {
+            font-size: 16px;
+            color: #34495e;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        .credential-box {
+            background-color: #ecf0f1;
+            border-left: 4px solid #3498db;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .credential-label {
+            display: flex;
+            align-items: center;
+            color: #7f8c8d;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .credential-label svg {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+        }
+        .credential-value {
+            color: #2c3e50;
+            font-size: 18px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+        .benefits-section {
+            margin: 40px 0;
+        }
+        .benefits-title {
+            font-size: 16px;
+            color: #34495e;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        .benefits-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            text-align: center;
+        }
+        .benefit-item {
+            padding: 15px;
+        }
+        .benefit-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        .benefit-title {
+            font-size: 14px;
+            color: #2c3e50;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .benefit-desc {
+            font-size: 11px;
+            color: #7f8c8d;
+            line-height: 1.4;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            padding: 15px 40px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 600;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .footer {
+            background-color: #2c3e50;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .social-links {
+            margin: 15px 0;
+        }
+        .social-icon {
+            color: white;
+            margin: 0 10px;
+            text-decoration: none;
+            font-size: 20px;
+        }
+        .copyright {
+            font-size: 11px;
+            color: #95a5a6;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">CATALINA FACTURADOR</div>
+            <div class="brand-dots">
+                <span class="dot dot-orange"></span>
+                <span class="dot dot-green"></span>
+                <span class="dot dot-blue"></span>
+                <span class="dot dot-purple"></span>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <h1 class="welcome">¡Bienvenido {{ empresa_nombre }}!</h1>
+            <p class="subtitle">
+                Gracias por adquirir nuestro sistema. ¡Ahora tienes y aumenta la productividad desde el primer día.
+            </p>
+
+            <!-- Credenciales -->
+            <div class="credentials-section">
+                <h2 class="section-title">Credenciales de Acceso</h2>
+                
+                <div class="credential-box">
+                    <div class="credential-label">
+                        <svg fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
+                        </svg>
+                        USUARIO
+                    </div>
+                    <div class="credential-value">{{ usuario }}</div>
+                </div>
+
+                <div class="credential-box">
+                    <div class="credential-label">
+                        <svg fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2z"/>
+                        </svg>
+                        CONTRASEÑA
+                    </div>
+                    <div class="credential-value">{{ password }}</div>
+                </div>
+            </div>
+
+            <!-- Beneficios -->
+            <div class="benefits-section">
+                <h2 class="benefits-title">Beneficios Incluidos</h2>
+                <div class="benefits-grid">
+                    <div class="benefit-item">
+                        <div class="benefit-icon">🔐</div>
+                        <div class="benefit-title">Automatización</div>
+                        <div class="benefit-desc">Emisión de tus facturas de minutos</div>
+                    </div>
+                    <div class="benefit-item">
+                        <div class="benefit-icon">🎓</div>
+                        <div class="benefit-title">Academy Perseo</div>
+                        <div class="benefit-desc">Cursos y recursos de aprendizaje</div>
+                    </div>
+                    <div class="benefit-item">
+                        <div class="benefit-icon">💬</div>
+                        <div class="benefit-title">Soporte Técnico</div>
+                        <div class="benefit-desc">Atención a todos tus inconvenientes especializado</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA Button -->
+            <center>
+                <a href="{{ url_login }}/inventario/login/" class="cta-button">
+                    Ingresar al Sistema
+                </a>
+            </center>
+
+            <p style="text-align: center; color: #7f8c8d; font-size: 12px; margin-top: 30px;">
+                <strong>Archivos adjuntos:</strong><br>
+                Términos y condiciones, contratos y procedimiento de mejora
+                cliente todos los archivos. <a href="#" style="color: #3498db;">sistema</a>
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p style="margin-bottom: 10px;">Síguenos en redes sociales</p>
+            <div class="social-links">
+                <a href="#" class="social-icon">📘</a>
+                <a href="#" class="social-icon">🐦</a>
+                <a href="#" class="social-icon">📷</a>
+            </div>
+            <p class="copyright">© 2025 Catalina Facturador. Todos los derechos reservados</p>
+            <p class="copyright">Quito - Ecuador</p>
+        </div>
+    </div>
+</body>
+</html>

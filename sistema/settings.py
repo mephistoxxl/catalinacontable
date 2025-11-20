@@ -594,6 +594,9 @@ else:
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@catalinasoft-ec.com')
 SERVER_EMAIL = os.environ.get('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
 
+# URL del sitio para correos electrónicos
+SITE_URL = os.environ.get('SITE_URL', 'https://www.catalinasoft-ec.com')
+
 # Configuración global de Django REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
