@@ -4016,6 +4016,10 @@ class Transportista(models.Model):
         related_name='transportistas',
     )
     
+    # Managers
+    objects = TenantManager()
+    _unsafe_objects = models.Manager()
+    
     # Datos de identificación
     ruc_cedula = models.CharField(
         max_length=13,
@@ -4085,6 +4089,10 @@ class GuiaRemision(models.Model):
     establecimiento = models.CharField(max_length=3, default='001')
     punto_emision = models.CharField(max_length=3, default='001')
     secuencial = models.CharField(max_length=9)
+    
+    # Managers
+    objects = TenantManager()
+    _unsafe_objects = models.Manager()
     
     # Datos básicos
     transportista_ruc = models.CharField(max_length=13, help_text="Cédula o RUC del transportista")
@@ -4252,6 +4260,10 @@ class DetalleGuiaRemision(models.Model):
         help_text="Orden del producto en la guía"
     )
     
+    # Managers
+    objects = TenantManager()
+    _unsafe_objects = models.Manager()
+    
     # Datos del producto
     codigo_producto = models.CharField(
         max_length=50,
@@ -4312,6 +4324,10 @@ class DestinatarioGuia(models.Model):
         on_delete=models.CASCADE,
         related_name='destinatarios'
     )
+    
+    # Managers (sin TenantManager porque no tiene campo empresa directo)
+    objects = models.Manager()
+    _unsafe_objects = models.Manager()
     
     # Identificación del destinatario
     identificacion_destinatario = models.CharField(

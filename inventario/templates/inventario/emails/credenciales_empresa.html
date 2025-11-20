@@ -24,32 +24,19 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         .header {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            background: white;
             padding: 30px;
             text-align: center;
+            border-bottom: 3px solid #4caf50;
+        }
+        .logo-img {
+            max-width: 180px;
+            height: auto;
+            margin-bottom: 15px;
         }
         .logo {
-            color: white;
-            font-size: 28px;
-            font-weight: bold;
-            letter-spacing: 2px;
-            margin-bottom: 10px;
+            display: none;
         }
-        .brand-dots {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            margin-top: 10px;
-        }
-        .dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-        }
-        .dot-orange { background-color: #e67e22; }
-        .dot-green { background-color: #27ae60; }
-        .dot-blue { background-color: #3498db; }
-        .dot-purple { background-color: #9b59b6; }
         
         .content {
             padding: 40px 30px;
@@ -77,7 +64,7 @@
         }
         .credential-box {
             background-color: #ecf0f1;
-            border-left: 4px solid #3498db;
+            border-left: 4px solid #4caf50;
             padding: 20px;
             margin-bottom: 15px;
             border-radius: 4px;
@@ -137,7 +124,7 @@
         }
         .cta-button {
             display: inline-block;
-            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
             color: white;
             padding: 15px 40px;
             text-decoration: none;
@@ -147,7 +134,7 @@
             text-align: center;
         }
         .footer {
-            background-color: #2c3e50;
+            background-color: #2d5016;
             color: white;
             padding: 30px;
             text-align: center;
@@ -172,13 +159,8 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
+            <img src="https://www.catalinasoft-ec.com/static/inventario/assets/logo/logo-catalina.png" alt="Catalina Facturador" class="logo-img">
             <div class="logo">CATALINA FACTURADOR</div>
-            <div class="brand-dots">
-                <span class="dot dot-orange"></span>
-                <span class="dot dot-green"></span>
-                <span class="dot dot-blue"></span>
-                <span class="dot dot-purple"></span>
-            </div>
         </div>
 
         <!-- Content -->
@@ -218,14 +200,14 @@
                 <h2 class="benefits-title">Beneficios Incluidos</h2>
                 <div class="benefits-grid">
                     <div class="benefit-item">
-                        <div class="benefit-icon">🔐</div>
-                        <div class="benefit-title">Automatización</div>
-                        <div class="benefit-desc">Emisión de tus facturas de minutos</div>
+                        <div class="benefit-icon">⚡</div>
+                        <div class="benefit-title">Facturación Rápida</div>
+                        <div class="benefit-desc">Emisión de facturas en minutos</div>
                     </div>
                     <div class="benefit-item">
-                        <div class="benefit-icon">🎓</div>
-                        <div class="benefit-title">Academy Perseo</div>
-                        <div class="benefit-desc">Cursos y recursos de aprendizaje</div>
+                        <div class="benefit-icon">📊</div>
+                        <div class="benefit-title">Reportes en Tiempo Real</div>
+                        <div class="benefit-desc">Control total de tu negocio</div>
                     </div>
                     <div class="benefit-item">
                         <div class="benefit-icon">💬</div>
@@ -237,7 +219,7 @@
 
             <!-- CTA Button -->
             <center>
-                <a href="{{ url_login }}/inventario/login/" class="cta-button">
+                <a href="https://www.catalinasoft-ec.com/" class="cta-button">
                     Ingresar al Sistema
                 </a>
             </center>
@@ -258,7 +240,7 @@
                 <a href="#" class="social-icon">📷</a>
             </div>
             <p class="copyright">© 2025 Catalina Facturador. Todos los derechos reservados</p>
-            <p class="copyright">Quito - Ecuador</p>
+            <p class="copyright">Santo Domingo - Ecuador</p>
         </div>
     </div>
 </body>

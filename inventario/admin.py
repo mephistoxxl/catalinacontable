@@ -331,10 +331,8 @@ class EmpresaAdmin(admin.ModelAdmin):
         # 2. Proformas y detalles (CASCADE)
         Proforma._unsafe_objects.filter(empresa=empresa).delete()
         
-        # 3. Guías de remisión y todo relacionado (CASCADE)
+        # 3. Guías de remisión (CASCADE eliminará DestinatarioGuia automáticamente)
         GuiaRemision._unsafe_objects.filter(empresa=empresa).delete()
-        DestinatarioGuia._unsafe_objects.filter(empresa=empresa).delete()
-        ConfiguracionGuiaRemision._unsafe_objects.filter(empresa=empresa).delete()
         
         # 4. Pedidos y detalles (CASCADE)
         Pedido._unsafe_objects.filter(empresa=empresa).delete()
@@ -434,9 +432,9 @@ class EmpresaAdmin(admin.ModelAdmin):
                     telefono='0000000000',
                 )
             
-            # Enviar correo con credenciales de bienvenida
+            # Enviar correo con credenciales de bienvenida (pasar email explícitamente)
             from inventario.email_service import enviar_credenciales_nueva_empresa
-            enviar_credenciales_nueva_empresa(obj, usuario, raw_password)
+            enviar_credenciales_nueva_empresa(obj, usuario, raw_password, email_destino=email)
             
             self._send_password_setup_email(request, usuario, email)
             

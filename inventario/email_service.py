@@ -10,7 +10,7 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
-def enviar_credenciales_nueva_empresa(empresa, usuario, password_temporal):
+def enviar_credenciales_nueva_empresa(empresa, usuario, password_temporal, email_destino=None):
     """
     Envía un correo electrónico con las credenciales de acceso
     a una nueva empresa creada desde el admin.
@@ -19,11 +19,19 @@ def enviar_credenciales_nueva_empresa(empresa, usuario, password_temporal):
         empresa: Instancia del modelo Empresa
         usuario: Instancia del modelo Usuario
         password_temporal: Contraseña temporal generada (string plano)
+        email_destino: Email del destinatario (opcional, si no se pasa usa opciones)
     
     Returns:
         bool: True si el envío fue exitoso, False en caso contrario
     """
     try:
+        print(f"\n{'='*80}")
+        print(f"📧 ENVIANDO CORREO DE CREDENCIALES")
+        print(f"Empresa: {empresa.razon_social}")
+        print(f"Usuario: {usuario.username}")
+        print(f"Email destino: {email_destino}")
+        print(f"{'='*80}\n")
+        
         # Datos para el template
         context = {
             'empresa_nombre': empresa.razon_social,
@@ -35,13 +43,20 @@ def enviar_credenciales_nueva_empresa(empresa, usuario, password_temporal):
         
         # Renderizar template HTML
         html_content = render_to_string('inventario/emails/credenciales_empresa.html', context)
+        print(f"✅ Template HTML renderizado correctamente")
         
         # Crear email
         subject = f'¡Bienvenido {empresa.razon_social}!'
         from_email = settings.DEFAULT_FROM_EMAIL
-        to_email = empresa.opciones.first().correo if empresa.opciones.exists() else None
+        
+        # Usar email_destino si se pasó, sino buscar en opciones
+        if email_destino:
+            to_email = email_destino
+        else:
+            to_email = empresa.opciones.first().correo if empresa.opciones.exists() else None
         
         if not to_email:
+            print(f"❌ No se pudo enviar correo a empresa {empresa.ruc}: sin correo configurado")
             logger.warning(f"No se pudo enviar correo a empresa {empresa.ruc}: sin correo configurado")
             return False
         
@@ -53,11 +68,19 @@ def enviar_credenciales_nueva_empresa(empresa, usuario, password_temporal):
         )
         email.attach_alternative(html_content, "text/html")
         
+        print(f"📨 Enviando correo a: {to_email}")
+        print(f"De: {from_email}")
+        print(f"Asunto: {subject}")
+        
         # Enviar
         email.send(fail_silently=False)
+        print(f"✅ Correo de credenciales enviado exitosamente!")
         logger.info(f"✅ Correo de credenciales enviado a {to_email} para empresa {empresa.ruc}")
         return True
         
     except Exception as e:
+        print(f"❌ ERROR enviando correo: {str(e)}")
+        import traceback
+        traceback.print_exc()
         logger.error(f"❌ Error enviando correo de credenciales a empresa {empresa.ruc}: {str(e)}")
         return False
