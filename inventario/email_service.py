@@ -67,6 +67,28 @@ def enviar_credenciales_nueva_empresa(empresa, usuario, password_temporal, email
             to=[to_email]
         )
         email.attach_alternative(html_content, "text/html")
+        email.mixed_subtype = 'related'  # Para imágenes embebidas
+        
+        # Adjuntar logo embebido
+        try:
+            from email.mime.image import MIMEImage
+            import urllib.request
+            
+            logo_url = 'https://catalina-public-assets.s3.us-east-2.amazonaws.com/Logo+PNG+-+Catalina.png'
+            print(f"🔍 Descargando logo desde: {logo_url}")
+            
+            with urllib.request.urlopen(logo_url, timeout=10) as response:
+                logo_data = response.read()
+                print(f"✅ Logo descargado: {len(logo_data)} bytes")
+                
+                logo_img = MIMEImage(logo_data)
+                logo_img.add_header('Content-ID', '<logo-catalina>')
+                logo_img.add_header('Content-Disposition', 'inline', filename='logo.png')
+                email.attach(logo_img)
+                print(f"✅ Logo embebido adjuntado")
+        except Exception as e:
+            print(f"⚠️ Error adjuntando logo: {e}")
+            logger.warning(f"Error adjuntando logo al email de credenciales: {e}")
         
         print(f"📨 Enviando correo a: {to_email}")
         print(f"De: {from_email}")
