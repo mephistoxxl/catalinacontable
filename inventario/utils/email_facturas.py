@@ -191,7 +191,27 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
         cc=cc_list,
     )
     email.attach_alternative(body_html, "text/html")
-    # Ya no necesitamos mixed_subtype='related' ni adjuntar logo porque usamos URL pública directa
+    email.mixed_subtype = 'related'  # Necesario para imágenes embebidas
+    
+    # Adjuntar logo embebido desde S3 público
+    try:
+        from email.mime.image import MIMEImage
+        import urllib.request
+        
+        logo_url = 'https://catalina-public-assets.s3.us-east-2.amazonaws.com/Logo+PNG+-+Catalina.png'
+        logger.info(f"🔍 Descargando logo desde: {logo_url}")
+        
+        with urllib.request.urlopen(logo_url, timeout=10) as response:
+            logo_data = response.read()
+            logger.info(f"✅ Logo descargado: {len(logo_data)} bytes")
+            
+            logo_img = MIMEImage(logo_data)
+            logo_img.add_header('Content-ID', '<logo-catalina>')
+            logo_img.add_header('Content-Disposition', 'inline', filename='logo.png')
+            email.attach(logo_img)
+            logger.info(f"✅ Logo embebido adjuntado correctamente")
+    except Exception as e:
+        logger.error(f"❌ Error adjuntando logo embebido: {e}")
     
     # Leer y adjuntar archivos (compatible con S3 y filesystem local)
     try:
