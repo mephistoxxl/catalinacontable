@@ -99,7 +99,9 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
           <!-- Header VERDE con logo -->
           <tr>
             <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding:40px 20px; text-align:center;">
-              <img src="https://catalina-media-prod.s3.us-east-2.amazonaws.com/static/inventario/assets/logo/logo-catalina.png" alt="{nombre_emisor}" style="max-width: 150px; height: auto; margin-bottom: 15px; background:white; padding:10px; border-radius:8px;" />
+              <div style="background: white; padding: 15px; border-radius: 8px; display: inline-block; margin-bottom: 20px;">
+                <img src="cid:logo-catalina" alt="Catalina Facturador" style="max-width: 180px; height: auto; display: block;" />
+              </div>
               <h1 style="margin:0; font-size:28px; font-weight:700; color:#ffffff; letter-spacing:1px;">{nombre_emisor}</h1>
               <p style="margin:8px 0 0; font-size:14px; color:#ffffff; font-weight:300; letter-spacing:0.5px;">Factura Electrónica Autorizada</p>
             </td>
