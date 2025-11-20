@@ -199,13 +199,13 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
         
         logo_data = None
         
-        # Intentar desde S3/storage directamente (logo ya está en S3)
+        # Intentar desde S3 público (catalina-public-assets)
         try:
-            storage_logo_path = 'logos/Logo PNG - Catalina.png'
-            logger.info(f"🔍 Intentando cargar logo desde S3: {storage_logo_path}")
-            with default_storage.open(storage_logo_path, 'rb') as logo_file:
-                logo_data = logo_file.read()
-            logger.info(f"✅ Logo cargado desde S3: {storage_logo_path} ({len(logo_data)} bytes)")
+            import boto3
+            s3_client = boto3.client('s3', region_name='us-east-2')
+            response = s3_client.get_object(Bucket='catalina-public-assets', Key='Logo PNG - Catalina.png')
+            logo_data = response['Body'].read()
+            logger.info(f"✅ Logo cargado desde bucket público: catalina-public-assets ({len(logo_data)} bytes)")
         except Exception as e:
             # Fallback: intentar desde archivos estáticos locales
             logger.warning(f"⚠️ No se pudo cargar desde S3, intentando local: {e}")
