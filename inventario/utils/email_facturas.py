@@ -2,7 +2,7 @@ import os
 import logging
 from datetime import datetime
 from django.conf import settings
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.core.files.storage import default_storage
 from django.contrib.staticfiles import finders
 from django.template.loader import render_to_string
@@ -183,14 +183,15 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
 </html>
         """
 
-    email = EmailMessage(
+    email = EmailMultiAlternatives(
         subject=subject,
-        body=body_html,
+        body='',  # Texto plano vacío
         from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@example.com'),
         to=[correo_cliente],
         cc=cc_list,
     )
-    email.content_subtype = 'html'
+    email.attach_alternative(body_html, "text/html")
+    email.mixed_subtype = 'related'  # Necesario para imágenes embebidas
     
     # Adjuntar logo embebido para que se vea en el email
     try:
