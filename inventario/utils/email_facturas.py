@@ -195,13 +195,16 @@ def send_factura_autorizada_email(factura, xml_path: str, ride_path: str, copia_
     # Adjuntar logo embebido para que se vea en el email
     try:
         from email.mime.image import MIMEImage
-
+        
+        logo_data = None
+        
         # Intentar desde S3/storage directamente (logo ya está en S3)
         try:
             storage_logo_path = 'logos/Logo PNG - Catalina.png'
+            logger.info(f"🔍 Intentando cargar logo desde S3: {storage_logo_path}")
             with default_storage.open(storage_logo_path, 'rb') as logo_file:
                 logo_data = logo_file.read()
-            logger.info(f"✅ Logo cargado desde S3: {storage_logo_path}")
+            logger.info(f"✅ Logo cargado desde S3: {storage_logo_path} ({len(logo_data)} bytes)")
         except Exception as e:
             # Fallback: intentar desde archivos estáticos locales
             logger.warning(f"⚠️ No se pudo cargar desde S3, intentando local: {e}")
