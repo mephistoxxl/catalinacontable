@@ -76,7 +76,7 @@
                 <div class="text-xs text-gray-500">{{ guia.clave_acceso|default:"Sin autorizar" }}</div>
               </td>
               <td class="px-4 py-3 text-sm text-gray-900">
-                {{ guia.fecha_emision|date:"d/m/Y" }}
+                {{ guia.fecha_inicio_traslado|date:"d/m/Y" }}
               </td>
               <td class="px-4 py-3 text-sm">
                 <div class="font-medium text-gray-900">{{ guia.destinatario_nombre|truncatechars:30 }}</div>

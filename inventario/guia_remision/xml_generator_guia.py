@@ -334,15 +334,20 @@ class XMLGeneratorGuiaRemision:
             str: Clave de acceso de 49 dígitos
         """
         from random import randint
+        from datetime import datetime
         
         # 1. Fecha (8 dígitos) - ddmmaaaa
-        fecha = self.guia.fecha_inicio_traslado.strftime('%d%m%Y')
+        fecha_obj = self.guia.fecha_inicio_traslado
+        if isinstance(fecha_obj, str):
+            # Convertir string a date
+            fecha_obj = datetime.strptime(fecha_obj, '%Y-%m-%d').date()
+        fecha = fecha_obj.strftime('%d%m%Y')
         
         # 2. Tipo de comprobante (2 dígitos) - 06 = Guía de Remisión
         tipo_comprobante = "06"
         
         # 3. RUC (13 dígitos)
-        ruc = (self.opciones.ruc if self.opciones else self.empresa.ruc).zfill(13)
+        ruc = (self.opciones.identificacion if self.opciones else self.empresa.ruc).zfill(13)
         
         # 4. Ambiente (1 dígito) - 1=Pruebas, 2=Producción
         ambiente = str(self.opciones.tipo_ambiente if self.opciones else '1')

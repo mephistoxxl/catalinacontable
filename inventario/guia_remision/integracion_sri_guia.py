@@ -67,9 +67,12 @@ class IntegracionGuiaRemisionSRI:
             # 5. Enviar al SRI
             resultado_envio = self.enviar_guia_sri(guia, xml_firmado)
             
-            if resultado_envio.get('success'):
+            # Verificar si el envío fue exitoso (RECIBIDA o DEVUELTA)
+            if resultado_envio.get('estado') in ['RECIBIDA', 'DEVUELTA']:
+                logger.info(f"Guía recibida por SRI, consultando autorización...")
                 # 6. Consultar autorización
                 resultado_autorizacion = self.consultar_autorizacion(guia)
+                logger.info(f"Resultado autorización: {resultado_autorizacion}")
                 
                 if resultado_autorizacion.get('estado') == 'AUTORIZADO':
                     guia.estado = 'autorizada'
@@ -83,8 +86,30 @@ class IntegracionGuiaRemisionSRI:
                         'clave_acceso': guia.clave_acceso,
                         'numero_autorizacion': guia.numero_autorizacion
                     }
+                else:
+                    # No autorizada, extraer mensajes de error
+                    mensajes = resultado_autorizacion.get('mensajes', [])
+                    errores = []
+                    for msg in mensajes:
+                        if isinstance(msg, dict):
+                            errores.append(f"{msg.get('identificador', '')}: {msg.get('mensaje', '')}")
+                        else:
+                            errores.append(str(msg))
+                    
+                    mensaje_error = '; '.join(errores) if errores else resultado_autorizacion.get('mensaje', 'Sin mensaje de error')
+                    
+                    return {
+                        'success': False,
+                        'message': f"Guía no autorizada por el SRI: {mensaje_error}",
+                        'detalle': resultado_autorizacion
+                    }
             
-            return resultado_envio
+            # Si el envío falló, devolver el error
+            return {
+                'success': False,
+                'message': f"Error al enviar al SRI: {resultado_envio.get('estado')}",
+                'detalle': resultado_envio
+            }
             
         except GuiaRemision.DoesNotExist:
             logger.error(f"Guía de remisión {guia_id} no encontrada")
@@ -135,11 +160,22 @@ class IntegracionGuiaRemisionSRI:
             if not self.opciones.firma_electronica:
                 raise ValueError("No hay firma electrónica configurada")
             
-            archivo_p12 = self.opciones.firma_electronica.path
-            password = self.opciones.clave_firma
+            # Leer el contenido del archivo P12 (compatible con S3)
+            logger.info(f"Intentando abrir firma desde: {self.opciones.firma_electronica.name}")
+            try:
+                with self.opciones.firma_electronica.open('rb') as f:
+                    p12_content = f.read()
+                logger.info(f"Firma leída exitosamente, {len(p12_content)} bytes")
+            except Exception as e:
+                logger.error(f"Error leyendo firma electrónica: {e}")
+                logger.error(f"Storage: {self.opciones.firma_electronica.storage}")
+                logger.error(f"Nombre archivo: {self.opciones.firma_electronica.name}")
+                raise ValueError(f"No se pudo leer el certificado de firma: {str(e)}")
             
-            # Firmar
-            firmador = FirmadorGuiaRemision(archivo_p12, password)
+            password = self.opciones.password_firma
+            
+            # Firmar usando el contenido en memoria
+            firmador = FirmadorGuiaRemision(p12_content, password)
             xml_firmado = firmador.firmar_xml(xml_string)
             
             logger.info("XML de guía de remisión firmado exitosamente")
@@ -158,24 +194,28 @@ class IntegracionGuiaRemisionSRI:
             xml_firmado (str): XML firmado
             
         Returns:
-            dict: Resultado del envío
+            dict: Resultado del envío (con 'estado')
         """
         try:
-            # Crear cliente SRI
-            ambiente = self.opciones.ambiente_sri
+            # Crear cliente SRI con el ambiente de Opciones
+            ambiente = self.opciones.tipo_ambiente
             cliente = SRIClient(ambiente=ambiente)
             
-            # Enviar comprobante
-            resultado = cliente.enviar_comprobante(xml_firmado)
+            # Enviar comprobante con la clave de acceso
+            resultado = cliente.enviar_comprobante(xml_firmado, guia.clave_acceso)
             
-            logger.info(f"Guía {guia.numero_completo} enviada al SRI")
+            logger.info(f"Guía {guia.numero_completo} enviada al SRI - Estado: {resultado.get('estado')}")
             return resultado
             
         except Exception as e:
             logger.error(f"Error enviando guía al SRI: {e}")
             return {
-                'success': False,
-                'message': f'Error enviando al SRI: {str(e)}'
+                'estado': 'ERROR',
+                'mensajes': [{
+                    'identificador': 'CLIENT_ERROR',
+                    'mensaje': str(e),
+                    'tipo': 'ERROR'
+                }]
             }
     
     def consultar_autorizacion(self, guia):
@@ -195,8 +235,8 @@ class IntegracionGuiaRemisionSRI:
                     'mensaje': 'La guía no tiene clave de acceso'
                 }
             
-            # Crear cliente SRI
-            ambiente = self.opciones.ambiente_sri
+            # Crear cliente SRI con el ambiente de Opciones
+            ambiente = self.opciones.tipo_ambiente
             cliente = SRIClient(ambiente=ambiente)
             
             # Consultar autorización
@@ -221,10 +261,10 @@ class IntegracionGuiaRemisionSRI:
             xml_content (str): Contenido del XML
         """
         try:
-            # Crear directorio si no existe
-            directorio = f'guias_remision/{self.empresa.id}/'
+            # Crear ruta relativa compatible con S3
+            directorio = f'guias_remision/{self.empresa.id}'
             nombre_archivo = f'guia_{guia.numero_completo.replace("-", "_")}.xml'
-            ruta_completa = os.path.join(directorio, nombre_archivo)
+            ruta_completa = f'{directorio}/{nombre_archivo}'
             
             # Guardar archivo
             content_file = ContentFile(xml_content.encode('utf-8'))

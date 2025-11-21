@@ -172,6 +172,7 @@ urlpatterns = [
     path('obtener_datos_factura/<int:factura_id>/', views.obtener_datos_factura, name='obtener_datos_factura'),
     path('guias-remision/<int:guia_id>/', views.ver_guia_remision, name='ver_guia_remision'),
     path('guias-remision/<int:guia_id>/editar/', views.editar_guia_remision, name='editar_guia_remision'),
+    path('guias-remision/<int:guia_id>/autorizar/', views.autorizar_guia_remision, name='autorizar_guia_remision'),
     path('guias-remision/<int:guia_id>/anular/', views.anular_guia_remision, name='anular_guia_remision'),
     path('guias-remision/<int:guia_id>/pdf/', views.descargar_guia_pdf, name='descargar_guia_pdf'),
     path('api/buscar-transportista/', views.buscar_transportista, name='buscar_transportista'),

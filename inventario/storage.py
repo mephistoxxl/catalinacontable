@@ -14,7 +14,10 @@ class EncryptedFirmaStorage(Storage):
     """
 
     def __init__(self, base_storage: Storage | None = None, location: str | None = None):
-        self._use_remote = getattr(settings, "USE_REMOTE_MEDIA_STORAGE", False)
+        # TEMPORAL: Forzar almacenamiento local para firmas en desarrollo
+        # TODO: Configurar permisos correctos en S3 para producción
+        self._use_remote = False  # Deshabilitado temporalmente
+        # self._use_remote = getattr(settings, "USE_REMOTE_MEDIA_STORAGE", False)
 
         if base_storage is not None:
             self._storage = base_storage

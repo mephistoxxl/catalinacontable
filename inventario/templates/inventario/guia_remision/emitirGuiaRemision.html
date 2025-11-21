@@ -77,8 +77,13 @@
     gap: 4px;
     justify-content: space-between;
     margin-top: 6px;
-    padding-top: 4px;
+    padding: 8px 12px;
     border-top: 1px solid #e5e7eb;
+    background: white;
+    position: sticky;
+    bottom: 0;
+    z-index: 100;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
   }
 
   .btn {
@@ -516,43 +521,77 @@ function cargarDatosFactura() {
         // Crear UN destinatario automáticamente con los datos del cliente
         agregarDestinatario();
         
-        // Llenar los datos del cliente en el primer destinatario
-        const primerDestinatario = tbody.querySelector('tr[data-destinatario-id="1"]');
-        if (primerDestinatario) {
-          primerDestinatario.querySelector('input[name="destinatarios[1][ruc]"]').value = clienteId;
-          primerDestinatario.querySelector('input[name="destinatarios[1][nombre]"]').value = clienteNombre;
-          primerDestinatario.querySelector('input[name="destinatarios[1][direccion]"]').value = clienteDireccion;
-          primerDestinatario.querySelector('select[name="destinatarios[1][motivo]"]').value = '01'; // Venta
-          
-          // Llenar documento sustento (factura)
-          primerDestinatario.querySelector('input[name="destinatarios[1][cod_doc_sustento]"]').value = '01'; // Factura
-          primerDestinatario.querySelector('input[name="destinatarios[1][num_doc_sustento]"]').value = numero;
-          primerDestinatario.querySelector('input[name="destinatarios[1][num_aut_doc_sustento]"]').value = clave;
-          primerDestinatario.querySelector('input[name="destinatarios[1][fecha_emision_doc_sustento]"]').value = fecha;
-          
-          // Agregar productos de la factura
-          if (data.productos && data.productos.length > 0) {
-            const tablaProductos = primerDestinatario.querySelector(`#tabla-productos-1 tbody`);
-            tablaProductos.innerHTML = ''; // Limpiar
+        // Esperar a que el DOM se actualice antes de llenar datos
+        setTimeout(() => {
+          // Llenar los datos del cliente en el primer destinatario
+          const primerDestinatario = tbody.querySelector('tr[data-destinatario-id="1"]');
+          if (primerDestinatario) {
+            primerDestinatario.querySelector('input[name="destinatarios[1][ruc]"]').value = clienteId;
+            primerDestinatario.querySelector('input[name="destinatarios[1][nombre]"]').value = clienteNombre;
+            primerDestinatario.querySelector('input[name="destinatarios[1][direccion]"]').value = clienteDireccion;
+            primerDestinatario.querySelector('select[name="destinatarios[1][motivo]"]').value = '01'; // Venta
             
-            data.productos.forEach((prod, idx) => {
-              const rowProd = document.createElement('tr');
-              rowProd.innerHTML = `
-                <td><input type="text" name="destinatarios[1][productos][${idx}][codigo]" value="${prod.codigo}" class="form-control" style="font-size: 10px;" required></td>
-                <td><input type="text" name="destinatarios[1][productos][${idx}][descripcion]" value="${prod.descripcion}" class="form-control" style="font-size: 10px;" required></td>
-                <td><input type="number" name="destinatarios[1][productos][${idx}][cantidad]" value="${prod.cantidad}" step="0.01" class="form-control" style="font-size: 10px;" required></td>
-                <td>
-                  <button type="button" class="btn btn-danger" onclick="eliminarProducto(this)" style="padding: 2px 4px; height: 20px; font-size: 9px;">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </td>
-              `;
-              tablaProductos.appendChild(rowProd);
-            });
+            // Llenar documento sustento (factura)
+            primerDestinatario.querySelector('input[name="destinatarios[1][cod_doc_sustento]"]').value = '01'; // Factura
+            primerDestinatario.querySelector('input[name="destinatarios[1][num_doc_sustento]"]').value = numero;
+            primerDestinatario.querySelector('input[name="destinatarios[1][num_aut_doc_sustento]"]').value = clave;
+            primerDestinatario.querySelector('input[name="destinatarios[1][fecha_emision_doc_sustento]"]').value = fecha;
+            
+            // Agregar productos de la factura
+            if (data.productos && data.productos.length > 0) {
+              console.log('📦 Cargando productos:', data.productos);
+              const tablaProductos = document.querySelector('#tabla-productos-1');
+              console.log('📋 Tabla encontrada:', tablaProductos);
+              if (!tablaProductos) {
+                console.error('No se encontró la tabla de productos para el destinatario');
+                alert('⚠️ Datos cargados pero hubo un problema con la tabla de productos. Por favor, agrégalos manualmente.');
+                return;
+              }
+              tablaProductos.innerHTML = ''; // Limpiar productos existentes
+            
+              data.productos.forEach((prod, idx) => {
+                const productoIdx = idx + 1; // Índice empieza en 1
+                console.log(`  → Producto ${productoIdx}:`, prod);
+                const rowProd = document.createElement('tr');
+                rowProd.innerHTML = `
+                  <td style="border: 1px solid #d1d5db; padding: 2px;">
+                    <input type="text" 
+                           name="destinatarios[1][productos][${productoIdx}][codigo]" 
+                           value="${prod.codigo}" 
+                           class="form-control" 
+                           style="font-size: 9px;" 
+                           required>
+                  </td>
+                  <td style="border: 1px solid #d1d5db; padding: 2px;">
+                    <input type="text" 
+                           name="destinatarios[1][productos][${productoIdx}][descripcion]" 
+                           value="${prod.descripcion}" 
+                           class="form-control" 
+                           style="font-size: 9px;" 
+                           required>
+                  </td>
+                  <td style="border: 1px solid #d1d5db; padding: 2px;">
+                    <input type="number" 
+                           name="destinatarios[1][productos][${productoIdx}][cantidad]" 
+                           value="${prod.cantidad}" 
+                           step="0.01" 
+                           class="form-control" 
+                           style="font-size: 9px;" 
+                           required>
+                  </td>
+                  <td style="border: 1px solid #d1d5db; padding: 2px; text-align: center;">
+                    <button type="button" class="btn btn-danger" onclick="eliminarProducto(this)" style="padding: 2px 4px; height: 20px; font-size: 9px;">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </td>
+                `;
+                tablaProductos.appendChild(rowProd);
+              });
             
             alert(`✅ Datos cargados desde factura ${numero}:\n- Cliente: ${clienteNombre}\n- ${data.productos.length} producto(s) cargado(s)`);
           }
         }
+        }, 100); // Esperar 100ms para que el DOM se actualice
       } else {
         alert('Error al cargar datos de factura: ' + data.message);
       }

@@ -28,7 +28,7 @@ class FirmadorGuiaRemision:
         Inicializa el firmador con el certificado P12
         
         Args:
-            archivo_p12: Ruta al archivo .p12
+            archivo_p12: Ruta al archivo .p12 O contenido en bytes
             password_p12: Contraseña del archivo .p12
         """
         self.archivo_p12 = archivo_p12
@@ -41,8 +41,12 @@ class FirmadorGuiaRemision:
     def _cargar_certificado(self):
         """Carga el certificado y clave privada desde el archivo P12"""
         try:
-            with open(self.archivo_p12, 'rb') as f:
-                p12_data = f.read()
+            # Soportar tanto ruta de archivo como contenido en bytes
+            if isinstance(self.archivo_p12, bytes):
+                p12_data = self.archivo_p12
+            else:
+                with open(self.archivo_p12, 'rb') as f:
+                    p12_data = f.read()
             
             from cryptography.hazmat.primitives.serialization import pkcs12
             

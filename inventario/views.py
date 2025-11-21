@@ -7353,12 +7353,12 @@ def listar_guias_remision(request):
     if fecha:
         try:
             fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
-            guias = guias.filter(fecha_emision=fecha_obj)
+            guias = guias.filter(fecha_inicio_traslado=fecha_obj)
         except ValueError:
             pass
     
     # Ordenar por fecha y secuencial
-    guias = guias.order_by('-fecha_emision', '-secuencial')
+    guias = guias.order_by('-fecha_inicio_traslado', '-secuencial')
     
     # Paginación
     paginator = Paginator(guias, 20)
@@ -7527,13 +7527,20 @@ def emitir_guia_remision(request):
                 from inventario.guia_remision.xml_generator_guia import XMLGeneratorGuiaRemision
                 try:
                     opciones = Opciones.objects.filter(empresa=empresa).first()
+                    if not opciones:
+                        raise ValueError("No se encontraron opciones para la empresa")
+                    
                     xml_gen = XMLGeneratorGuiaRemision(guia, empresa, opciones)
                     guia.clave_acceso = xml_gen.generar_clave_acceso()
                     guia.save()
+                    logger.info(f"✅ Clave de acceso generada: {guia.clave_acceso} ({len(guia.clave_acceso)} dígitos)")
                 except Exception as e:
-                    logger.warning(f"No se pudo generar clave de acceso: {e}")
+                    logger.error(f"❌ ERROR generando clave de acceso: {e}")
+                    import traceback
+                    logger.error(traceback.format_exc())
                     guia.clave_acceso = f"TEMP{guia.id:015d}"
                     guia.save()
+                    messages.warning(request, f"⚠️ Clave temporal asignada. Error: {e}")
                 
                 messages.success(request, f'Guia de remision {guia.numero_completo} creada exitosamente.')
                 return redirect('inventario:ver_guia_remision', guia_id=guia.id)
@@ -7816,6 +7823,43 @@ def descargar_guia_pdf(request, guia_id):
         logger.error(f"Error al generar PDF de guía {guia_id}: {str(e)}")
         messages.error(request, f'Error al generar PDF: {str(e)}')
         return redirect('inventario:ver_guia_remision', guia_id=guia.id)
+
+@login_required
+def autorizar_guia_remision(request, guia_id):
+    """Vista para firmar y enviar una guía de remisión al SRI"""
+    empresa_id = request.session.get('empresa_activa')
+    empresa = None
+    if empresa_id:
+        empresa = request.user.empresas.filter(id=empresa_id).first()
+    if not empresa:
+        messages.error(request, 'Seleccione una empresa válida.')
+        return redirect('inventario:seleccionar_empresa')
+    
+    guia = get_object_or_404(GuiaRemision, id=guia_id, empresa=empresa)
+    
+    if guia.estado != 'borrador':
+        messages.error(request, 'Solo se pueden autorizar guías en estado borrador.')
+        return redirect('inventario:ver_guia_remision', guia_id=guia.id)
+    
+    try:
+        # Usar el integrador completo que ya existe
+        from inventario.guia_remision.integracion_sri_guia import IntegracionGuiaRemisionSRI
+        
+        integrador = IntegracionGuiaRemisionSRI(empresa)
+        resultado = integrador.procesar_guia_remision(guia.id)
+        
+        if resultado['success']:
+            messages.success(request, f'✅ Guía de remisión {guia.numero_completo} autorizada exitosamente por el SRI.')
+        else:
+            messages.error(request, f'❌ Error: {resultado["message"]}')
+            
+    except Exception as e:
+        logger.error(f"Error al autorizar guía {guia_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        messages.error(request, f'Error inesperado: {str(e)}')
+    
+    return redirect('inventario:ver_guia_remision', guia_id=guia.id)
 
 @login_required
 @csrf_exempt
