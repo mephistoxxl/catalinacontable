@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.db import transaction
 
 from ..sri.sri_client import SRIClient
-from ..sri.firmador_xades_sri import FirmadorXAdES
+from ..sri.firmador_xades_sri_simple import FirmadorXAdESSRIEcuador
 from .xml_generator_liquidacion import LiquidacionXMLGenerator
 from .models import LiquidacionCompra, LiquidacionLogCambioEstado
 
@@ -43,7 +43,6 @@ class IntegracionSRILiquidacion:
         # Inicializar componentes
         self.cliente_sri = SRIClient(ambiente=ambiente_sri)
         self.generador_xml = LiquidacionXMLGenerator()
-        self.firmador = FirmadorXAdES()
         
         logger.info(f"Integración SRI Liquidación inicializada - Empresa: {empresa.ruc} - Ambiente: {ambiente_sri}")
 
@@ -164,33 +163,41 @@ class IntegracionSRILiquidacion:
             Dict con resultado de la firma
         """
         try:
-            # Obtener ruta del archivo .p12
-            if not self.opciones.ruta_firma or not self.opciones.clave_firma:
+            # Validar configuración de firma
+            if not self.opciones.firma_electronica:
                 return {
                     'exito': False,
-                    'mensaje': 'No se ha configurado la firma electrónica para esta empresa'
+                    'mensaje': 'No hay firma electrónica configurada'
                 }
             
-            # Firmar XML usando el firmador existente
-            xml_firmado = self.firmador.firmar_xml(
-                xml_content=xml_content,
-                ruta_p12=self.opciones.ruta_firma,
-                password=self.opciones.clave_firma
-            )
+            logger.info(f"🔏 Firmando liquidación de compra con firmador SRI Ecuador")
             
-            if not xml_firmado:
+            # Leer el contenido del archivo P12
+            try:
+                with self.opciones.firma_electronica.open('rb') as f:
+                    p12_content = f.read()
+                logger.info(f"✅ Firma electrónica leída: {len(p12_content)} bytes")
+            except Exception as e:
+                logger.error(f"❌ Error leyendo firma electrónica: {e}")
                 return {
                     'exito': False,
-                    'mensaje': 'Error al generar la firma electrónica'
+                    'mensaje': f'No se pudo leer el certificado de firma: {str(e)}'
                 }
             
+            password = self.opciones.password_firma
+            
+            # Usar firmador XAdES-BES simplificado (el mismo que guías de remisión)
+            firmador = FirmadorXAdESSRIEcuador(p12_content, password)
+            xml_firmado = firmador.firmar_xml(xml_content)
+            
+            logger.info("✅ XML de liquidación firmado exitosamente con XAdES-BES SRI Ecuador")
             return {
                 'exito': True,
                 'xml_firmado': xml_firmado
             }
             
         except Exception as e:
-            logger.error(f"Error al firmar XML: {e}", exc_info=True)
+            logger.error(f"❌ Error firmando XML de liquidación: {e}", exc_info=True)
             return {
                 'exito': False,
                 'mensaje': f'Error al firmar XML: {str(e)}'
