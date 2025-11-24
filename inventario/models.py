@@ -4156,7 +4156,7 @@ class GuiaRemision(models.Model):
     
     # Campos SRI (para autorización futura)
     clave_acceso = models.CharField(max_length=49, null=True, blank=True, unique=True)
-    numero_autorizacion = models.CharField(max_length=37, null=True, blank=True)
+    numero_autorizacion = models.CharField(max_length=49, null=True, blank=True)
     fecha_autorizacion = models.DateTimeField(null=True, blank=True)
     xml_autorizado = models.TextField(null=True, blank=True)
     
