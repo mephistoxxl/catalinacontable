@@ -1970,6 +1970,32 @@ class Proveedor(models.Model):
     @staticmethod
     def formatearCedula(cedula):
         return format(int(cedula), ',d')
+    
+    def clean(self):
+        """Validaciones personalizadas del modelo Proveedor."""
+        from django.core.exceptions import ValidationError
+        
+        super().clean()
+        
+        # ADVERTENCIA CRÍTICA: Uso restringido en Liquidaciones de Compra
+        # Según normativa del SRI (Ficha Técnica v2.31/v2.32 - Anexo 17),
+        # NO se permite usar proveedores con tipo "Consumidor Final" (07)
+        # en liquidaciones de compra electrónicas (codDoc 03).
+        # 
+        # Esta validación es informativa. Las validaciones estrictas se aplican
+        # en el formulario y modelo de LiquidacionCompra.
+        if self.tipoIdentificacion == '07':
+            # Nota: No bloqueamos la creación del proveedor, solo advertimos
+            # que no podrá ser usado en liquidaciones de compra
+            pass  # La validación real está en LiquidacionCompraForm
+        
+        # Validación adicional: Identificación especial de consumidor final
+        if self.identificacion_proveedor == '9999999999999' and self.tipoIdentificacion != '07':
+            raise ValidationError({
+                'identificacion_proveedor': 
+                    'La identificación 9999999999999 está reservada para Consumidor Final. '
+                    'Si desea usar esta identificación, seleccione tipo "Consumidor Final" (07).'
+            })
     # ---------------------------------------------------------------------------------------
 
     class Meta:

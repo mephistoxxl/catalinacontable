@@ -405,6 +405,11 @@ class LiquidacionCompraForm(forms.ModelForm):
 
 
 class LiquidacionDetalleForm(forms.ModelForm):
+    # Sobrescribir producto y servicio como IntegerField para evitar validación de ModelChoiceField
+    # El JavaScript envía IDs pero no queremos validar contra queryset aquí
+    producto = forms.IntegerField(required=False, widget=forms.HiddenInput())
+    servicio = forms.IntegerField(required=False, widget=forms.HiddenInput())
+    
     class Meta:
         model = LiquidacionDetalle
         fields = [
@@ -424,8 +429,6 @@ class LiquidacionDetalleForm(forms.ModelForm):
             "total_con_impuestos",
         ]
         widgets = {
-            "producto": forms.Select(attrs={"class": "form-control"}),
-            "servicio": forms.Select(attrs={"class": "form-control"}),
             "descripcion": forms.TextInput(attrs={"class": "form-control"}),
             "unidad_medida": forms.TextInput(attrs={"class": "form-control"}),
             "cantidad": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
@@ -440,10 +443,38 @@ class LiquidacionDetalleForm(forms.ModelForm):
             "total_con_impuestos": forms.HiddenInput(),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Los campos producto y servicio ya están definidos como IntegerField arriba
+
     def clean(self):
         cleaned = super().clean()
-        producto = cleaned.get("producto")
-        servicio = cleaned.get("servicio")
+        
+        # Convertir IDs de producto/servicio a instancias reales
+        from ..models import Producto, Servicio
+        
+        producto_id = cleaned.get("producto")
+        servicio_id = cleaned.get("servicio")
+        
+        producto = None
+        servicio = None
+        
+        if producto_id:
+            try:
+                producto = Producto.objects.get(pk=producto_id)
+                cleaned["producto"] = producto
+            except Producto.DoesNotExist:
+                # Si el producto no existe, lo dejamos como None
+                cleaned["producto"] = None
+                
+        if servicio_id:
+            try:
+                servicio = Servicio.objects.get(pk=servicio_id)
+                cleaned["servicio"] = servicio
+            except Servicio.DoesNotExist:
+                # Si el servicio no existe, lo dejamos como None
+                cleaned["servicio"] = None
+        
         descripcion = cleaned.get("descripcion")
         if not descripcion:
             if producto:

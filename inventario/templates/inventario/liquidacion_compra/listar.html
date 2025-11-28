@@ -2,72 +2,233 @@
 {% load i18n %}
 
 {% block content %}
-<div class="container mx-auto px-6 py-6">
-  <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-semibold">{% trans "Liquidaciones de Compra" %}</h1>
-    <a style="text-decoration: none !important;" class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm" href="{% url 'inventario:liquidaciones_compra_crear' %}">
-      <i class="fa fa-plus mr-2" style="color: white;"></i>
-      <span style="color: white;">{% trans "Nueva Liquidación" %}</span>
-    </a>
+<style>
+  .page-header {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    padding: 1.5rem 2rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+
+  .page-title {
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .btn-nueva {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    background: #10b981;
+    color: white !important;
+    text-decoration: none !important;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .btn-nueva:hover {
+    background: #059669;
+    transform: translateY(-1px);
+  }
+
+  .table-container {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .modern-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .modern-table thead {
+    background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+    border-bottom: 2px solid #e2e8f0;
+  }
+
+  .modern-table thead th {
+    padding: 1rem 1.25rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #475569;
+  }
+
+  .modern-table tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: all 0.15s ease;
+  }
+
+  .modern-table tbody tr:hover {
+    background-color: #f8fafc;
+  }
+
+  .modern-table tbody td {
+    padding: 1rem 1.25rem;
+    font-size: 0.875rem;
+    color: #1f2937;
+  }
+
+  .badge-estado {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+
+  .badge-borrador {
+    background-color: #fef3c7;
+    color: #92400e;
+  }
+
+  .badge-autorizado {
+    background-color: #d1fae5;
+    color: #065f46;
+  }
+
+  .badge-error {
+    background-color: #fee2e2;
+    color: #991b1b;
+  }
+
+  .text-right {
+    text-align: right;
+  }
+
+  .text-muted {
+    color: #64748b;
+  }
+
+  .font-mono {
+    font-family: ui-monospace, monospace;
+    font-size: 0.8125rem;
+  }
+</style>
+
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
+  <div class="container mx-auto" style="max-width: 1400px;">
+    <div class="page-header">
+      <div class="flex items-center justify-between flex-wrap gap-4">
+        <h1 class="page-title">
+          <i class="fa fa-file-text-o"></i>
+          {% trans "Liquidaciones de Compra" %}
+        </h1>
+        <a href="{% url 'inventario:liquidaciones_compra_crear' %}" class="btn-nueva">
+          <i class="fa fa-plus"></i>
+          <span>{% trans "Nueva Liquidación" %}</span>
+        </a>
+      </div>
+    </div>
+
+    {% if liquidaciones %}
+    <div class="table-container">
+      <div style="overflow-x: auto;">
+        <table class="modern-table">
+          <thead>
+            <tr>
+              <th>{% trans "Fecha" %}</th>
+              <th>{% trans "Serie" %}</th>
+              <th>{% trans "Secuencia" %}</th>
+              <th>{% trans "Proveedor" %}</th>
+              <th class="text-right">{% trans "Importe Total" %}</th>
+              <th>{% trans "Estado" %}</th>
+              <th class="text-right">{% trans "Acciones" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for liquidacion in liquidaciones %}
+            <tr>
+              <td>
+                <span class="text-muted">
+                  <i class="fa fa-calendar-o" style="margin-right: 0.25rem;"></i>
+                  {{ liquidacion.fecha_emision|date:"d/m/Y" }}
+                </span>
+              </td>
+              <td>
+                <span class="font-mono">
+                  {{ liquidacion.establecimiento|stringformat:"03d" }}-{{ liquidacion.punto_emision|stringformat:"03d"
+                  }}
+                </span>
+              </td>
+              <td>
+                <span class="font-mono">{{ liquidacion.secuencia|stringformat:"09d" }}</span>
+              </td>
+              <td>
+                <div style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  <strong>{{ liquidacion.proveedor.razon_social_proveedor }}</strong>
+                </div>
+                <div class="text-muted" style="font-size: 0.75rem;">
+                  {{ liquidacion.proveedor.identificacion_proveedor }}
+                </div>
+              </td>
+              <td class="text-right">
+                <strong style="color: #059669; font-size: 0.9375rem;">
+                  ${{ liquidacion.importe_total|floatformat:2 }}
+                </strong>
+              </td>
+              <td>
+                {% if liquidacion.estado == 'BORRADOR' %}
+                <span class="badge-estado badge-borrador">
+                  <i class="fa fa-pencil" style="margin-right: 0.25rem;"></i>
+                  Borrador
+                </span>
+                {% elif liquidacion.estado == 'AUTORIZADO' %}
+                <span class="badge-estado badge-autorizado">
+                  <i class="fa fa-check-circle" style="margin-right: 0.25rem;"></i>
+                  Autorizado
+                </span>
+                {% else %}
+                <span class="badge-estado badge-error">
+                  <i class="fa fa-exclamation-triangle" style="margin-right: 0.25rem;"></i>
+                  {{ liquidacion.get_estado_display }}
+                </span>
+                {% endif %}
+              </td>
+              <td class="text-right">
+                <div style="display: inline-flex; gap: 0.5rem;">
+                  <a href="{% url 'inventario:liquidaciones_compra_ver' liquidacion.id %}"
+                    title="{% trans 'Ver detalles' %}"
+                    style="display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; background: #3b82f6; color: white; border-radius: 6px; text-decoration: none;">
+                    <i class="fa fa-eye"></i>
+                  </a>
+                  <a href="#" title="{% trans 'Descargar PDF' %}"
+                    style="display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; background: #ef4444; color: white; border-radius: 6px; text-decoration: none;">
+                    <i class="fa fa-file-pdf-o"></i>
+                  </a>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 4rem; background: white; border-radius: 12px;">
+      <i class="fa fa-file-text-o" style="font-size: 4rem; color: #cbd5e1;"></i>
+      <h3 style="margin-top: 1rem; font-size: 1.25rem; color: #475569;">{% trans "No hay liquidaciones de compra" %}
+      </h3>
+      <p style="color: #64748b;">{% trans "Haz clic en 'Nueva Liquidación' para comenzar." %}</p>
+    </div>
+    {% endif %}
   </div>
-
-  {% if liquidaciones %}
-  <div class="table-responsive shadow bg-white rounded">
-    <table class="table table-striped mb-0">
-      <thead class="thead-light">
-        <tr>
-          <th>{% trans "Fecha" %}</th>
-          <th>{% trans "Serie" %}</th>
-          <th>{% trans "Secuencia" %}</th>
-          <th>{% trans "Proveedor" %}</th>
-          <th class="text-right">{% trans "Importe Total" %}</th>
-          <th>{% trans "Estado" %}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for liquidacion in liquidaciones %}
-        <tr>
-          <td>{{ liquidacion.fecha_emision|date:"d/m/Y" }}</td>
-          <td>{{ liquidacion.serie_formateada }}</td>
-          <td>{{ liquidacion.secuencia_formateada }}</td>
-          <td>{{ liquidacion.proveedor.razon_social_proveedor }}</td>
-          <td class="text-right">{{ liquidacion.importe_total|floatformat:2 }}</td>
-          <td>{{ liquidacion.get_estado_display }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="alert alert-info">
-    {% trans "Todavía no existen liquidaciones de compra." %}
-  </div>
-  {% endif %}
-
-  {% if is_paginated %}
-  <nav class="mt-4" aria-label="Paginación">
-    <ul class="pagination">
-      {% if page_obj.has_previous %}
-      <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">&laquo;</a></li>
-      {% else %}
-      <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
-      {% endif %}
-
-      {% for num in paginator.page_range %}
-      {% if page_obj.number == num %}
-      <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-      {% else %}
-      <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
-      {% endif %}
-      {% endfor %}
-
-      {% if page_obj.has_next %}
-      <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">&raquo;</a></li>
-      {% else %}
-      <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
-      {% endif %}
-    </ul>
-  </nav>
-  {% endif %}
 </div>
 {% endblock %}

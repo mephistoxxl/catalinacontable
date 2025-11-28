@@ -218,3 +218,128 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
             secuencia_info=secuencia_info,
         )
         return render(request, self.template_name, context)
+
+
+class LiquidacionCompraDetailView(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
+    """Vista para ver los detalles de una liquidación de compra."""
+    template_name = "inventario/liquidacion_compra/ver.html"
+    
+    def get(self, request, pk, *args, **kwargs):
+        from django.shortcuts import get_object_or_404
+        
+        empresa = get_empresa_activa(request)
+        liquidacion = get_object_or_404(
+            LiquidacionCompra.objects.select_related('proveedor', 'empresa', 'usuario_creacion')
+                                      .prefetch_related('detalles', 'formas_pago', 'campos_adicionales'),
+            pk=pk,
+            empresa=empresa
+        )
+        
+        # Obtener ambiente de empresa.opciones
+        ambiente = '1'  # Default: Pruebas
+        if hasattr(empresa, 'opciones'):
+            opciones = empresa.opciones.first()
+            if opciones and opciones.tipo_ambiente:
+                ambiente = opciones.tipo_ambiente
+        
+        context = {
+            'liquidacion': liquidacion,
+            'titulo': _('Detalles de Liquidación de Compra'),
+            'ambiente': ambiente,
+        }
+        return render(request, self.template_name, context)
+
+
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import get_object_or_404
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+@login_required
+def autorizar_liquidacion_compra(request, pk):
+    """Vista para firmar y enviar una liquidación de compra al SRI"""
+    empresa = get_empresa_activa(request)
+    if not empresa:
+        messages.error(request, 'Seleccione una empresa válida.')
+        return redirect('inventario:seleccionar_empresa')
+    
+    liquidacion = get_object_or_404(LiquidacionCompra, pk=pk, empresa=empresa)
+    
+    if liquidacion.estado_sri and liquidacion.estado_sri not in ['BORRADOR', '']:
+        messages.error(request, 'Solo se pueden autorizar liquidaciones en estado borrador.')
+        return redirect('inventario:liquidaciones_compra_ver', pk=liquidacion.pk)
+    
+    try:
+        # Usar integrador SRI para liquidaciones
+        from .integracion_sri_liquidacion import IntegracionSRILiquidacion
+        
+        integrador = IntegracionSRILiquidacion(empresa)
+        resultado = integrador.procesar_liquidacion_completa(liquidacion)
+        
+        if resultado.get('exito'):
+            messages.success(request, f'✅ Liquidación de compra {liquidacion.numero_completo} autorizada exitosamente por el SRI.')
+        else:
+            mensajes = resultado.get('mensajes', [])
+            if mensajes:
+                for msg in mensajes:
+                    if isinstance(msg, dict):
+                        messages.error(request, f"❌ Error: [{msg.get('identificador')}] {msg.get('mensaje')}")
+                    else:
+                        messages.error(request, f'❌ Error: {msg}')
+            else:
+                messages.error(request, f'❌ Error: {resultado.get("estado", "Error desconocido")}')
+        
+    except Exception as e:
+        logger.error(f"Error al autorizar liquidación {pk}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        messages.error(request, f'Error inesperado: {str(e)}')
+    
+    return redirect('inventario:liquidaciones_compra_ver', pk=liquidacion.pk)
+
+
+@login_required
+def consultar_estado_liquidacion_compra(request, pk):
+    """Vista para consultar el estado de una liquidación de compra en el SRI"""
+    empresa = get_empresa_activa(request)
+    if not empresa:
+        messages.error(request, 'Seleccione una empresa válida.')
+        return redirect('inventario:seleccionar_empresa')
+    
+    liquidacion = get_object_or_404(LiquidacionCompra, pk=pk, empresa=empresa)
+    
+    if not liquidacion.clave_acceso:
+        messages.error(request, 'Esta liquidación no tiene clave de acceso. No se puede consultar el estado en el SRI.')
+        return redirect('inventario:liquidaciones_compra_ver', pk=liquidacion.pk)
+    
+    try:
+        # Usar integrador SRI para consultar estado
+        from .integracion_sri_liquidacion import IntegracionSRILiquidacion
+        
+        integrador = IntegracionSRILiquidacion(empresa)
+        resultado = integrador.consultar_estado_actual(liquidacion)
+        
+        if resultado.get('exito'):
+            messages.success(request, f'✅ Liquidación consultada: {resultado.get("estado")}')
+            if resultado.get('numero_autorizacion'):
+                messages.info(request, f'Número de autorización: {resultado.get("numero_autorizacion")}')
+        else:
+            mensajes = resultado.get('mensajes', [])
+            if mensajes:
+                for msg in mensajes:
+                    if isinstance(msg, dict):
+                        messages.error(request, f"[{msg.get('identificador')}] {msg.get('mensaje')}")
+                    else:
+                        messages.error(request, str(msg))
+            else:
+                messages.warning(request, f'Estado: {resultado.get("estado", "Desconocido")}')
+        
+    except Exception as e:
+        logger.error(f"Error al consultar estado de liquidación {pk}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        messages.error(request, f'Error inesperado: {str(e)}')
+    
+    return redirect('inventario:liquidaciones_compra_ver', pk=liquidacion.pk)

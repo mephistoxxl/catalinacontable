@@ -1194,11 +1194,17 @@
         }
       });
 
-      // También permitir búsqueda con Enter
+      // También permitir búsqueda con Enter (con validación)
       identificacionInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          botonBuscar.click();
+          const identificacion = identificacionInput.value.trim();
+          // Solo buscar si tiene al menos 10 caracteres (cédula mínima)
+          if (identificacion.length >= 10) {
+            botonBuscar.click();
+          } else {
+            mostrarMensajeProveedor('Ingrese al menos 10 dígitos para buscar', 'warning');
+          }
         }
       });
     }
@@ -1875,7 +1881,7 @@
     }
 
     function prepararFormaPagoSimple() {
-      const formaPagoSelect = document.getElementById('forma_pago_simple');
+      const formaPagoSelect = document.getElementById('id_forma_pago_simple');  // ← Django genera: id_forma_pago_simple
       if (!formaPagoSelect) {
         alert('Error: No se encontró el selector de forma de pago');
         return false;

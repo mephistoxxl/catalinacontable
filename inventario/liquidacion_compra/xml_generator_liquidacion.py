@@ -102,22 +102,32 @@ class LiquidacionXMLGenerator:
         info_tributaria = ET.SubElement(root, 'infoTributaria')
         
         empresa = liquidacion.empresa
+        opciones = empresa.opciones.first() if hasattr(empresa, 'opciones') else None
         
         # ambiente: 1=pruebas, 2=producción - OBLIGATORIO
-        ET.SubElement(info_tributaria, 'ambiente').text = str(empresa.ambiente)
+        ambiente = '1'  # Default: pruebas
+        if opciones and opciones.tipo_ambiente in ('1', '2'):
+            ambiente = opciones.tipo_ambiente
+        ET.SubElement(info_tributaria, 'ambiente').text = ambiente
         
-        # tipoEmision: 1=normal - OBLIGATORIO
-        ET.SubElement(info_tributaria, 'tipoEmision').text = '1'
+        # tipoEmision: 1=normal, 2=contingencia - OBLIGATORIO
+        tipo_emision = '1'  # Default: normal
+        if opciones and opciones.tipo_emision in ('1', '2'):
+            tipo_emision = opciones.tipo_emision
+        ET.SubElement(info_tributaria, 'tipoEmision').text = tipo_emision
         
         # razonSocial del emisor - OBLIGATORIO
-        ET.SubElement(info_tributaria, 'razonSocial').text = empresa.razon_social[:300]
+        razon_social = opciones.razon_social if opciones and opciones.razon_social else empresa.razon_social
+        ET.SubElement(info_tributaria, 'razonSocial').text = razon_social[:300]
         
         # nombreComercial - OPCIONAL
-        if empresa.nombre_comercial:
-            ET.SubElement(info_tributaria, 'nombreComercial').text = empresa.nombre_comercial[:300]
+        nombre_comercial = opciones.nombre_comercial if opciones and opciones.nombre_comercial else None
+        if nombre_comercial:
+            ET.SubElement(info_tributaria, 'nombreComercial').text = nombre_comercial[:300]
         
         # RUC del emisor - OBLIGATORIO (formato: 10 dígitos + 001)
-        ET.SubElement(info_tributaria, 'ruc').text = empresa.ruc
+        ruc = opciones.identificacion if opciones and opciones.identificacion else empresa.ruc
+        ET.SubElement(info_tributaria, 'ruc').text = ruc
         
         # claveAcceso de 49 dígitos - OBLIGATORIO
         ET.SubElement(info_tributaria, 'claveAcceso').text = liquidacion.clave_acceso
@@ -135,19 +145,16 @@ class LiquidacionXMLGenerator:
         ET.SubElement(info_tributaria, 'secuencial').text = f"{liquidacion.secuencia:09d}"
         
         # Dirección matriz del emisor - OBLIGATORIO
-        ET.SubElement(info_tributaria, 'dirMatriz').text = empresa.direccion_matriz[:300]
+        dir_matriz = opciones.direccion_establecimiento if opciones and opciones.direccion_establecimiento else 'SIN DIRECCION'
+        ET.SubElement(info_tributaria, 'dirMatriz').text = dir_matriz[:300]
         
         # Agente de retención - OPCIONAL (máximo 8 dígitos)
-        if hasattr(empresa, 'agente_retencion') and empresa.agente_retencion:
-            ET.SubElement(info_tributaria, 'agenteRetencion').text = str(empresa.agente_retencion)[:8]
+        if opciones and opciones.agente_retencion and opciones.agente_retencion != '...':
+            ET.SubElement(info_tributaria, 'agenteRetencion').text = str(opciones.agente_retencion)[:8]
         
-        # Contribuyente RIMPE - OPCIONAL
-        if hasattr(empresa, 'contribuyente_rimpe') and empresa.contribuyente_rimpe:
-            ET.SubElement(info_tributaria, 'contribuyenteRimpe').text = 'CONTRIBUYENTE RÉGIMEN RIMPE'
-
-        # Contribuyente RIMPE - OPCIONAL
-        if hasattr(empresa, 'contribuyente_rimpe') and empresa.contribuyente_rimpe:
-            ET.SubElement(info_tributaria, 'contribuyenteRimpe').text = 'CONTRIBUYENTE RÉGIMEN RIMPE'
+        # Contribuyente RIMPE - OPCIONAL (muy raro, omitir si no existe)
+        # if opciones and hasattr(opciones, 'contribuyente_rimpe') and opciones.contribuyente_rimpe:
+        #     ET.SubElement(info_tributaria, 'contribuyenteRimpe').text = 'CONTRIBUYENTE RÉGIMEN RIMPE'
 
         # 2. InfoLiquidacionCompra - OBLIGATORIO
         info_liquidacion = ET.SubElement(root, 'infoLiquidacionCompra')
@@ -156,30 +163,35 @@ class LiquidacionXMLGenerator:
         ET.SubElement(info_liquidacion, 'fechaEmision').text = liquidacion.fecha_emision.strftime('%d/%m/%Y')
         
         # dirEstablecimiento - OPCIONAL
-        if hasattr(empresa, 'direccion_establecimiento') and empresa.direccion_establecimiento:
-            ET.SubElement(info_liquidacion, 'dirEstablecimiento').text = empresa.direccion_establecimiento[:300]
+        if opciones and opciones.direccion_establecimiento:
+            ET.SubElement(info_liquidacion, 'dirEstablecimiento').text = opciones.direccion_establecimiento[:300]
         
         # contribuyenteEspecial - OPCIONAL (3-13 caracteres alfanuméricos)
-        if hasattr(empresa, 'numero_contribuyente_especial') and empresa.numero_contribuyente_especial:
-            ET.SubElement(info_liquidacion, 'contribuyenteEspecial').text = str(empresa.numero_contribuyente_especial)[:13]
+        if opciones and opciones.numero_contribuyente_especial:
+            ET.SubElement(info_liquidacion, 'contribuyenteEspecial').text = str(opciones.numero_contribuyente_especial)[:13]
         
         # obligadoContabilidad - OPCIONAL pero recomendado
-        obligado_conta = 'SI' if empresa.obligado_llevar_contabilidad else 'NO'
+        obligado_conta = 'SI' if (opciones and opciones.obligado == 'SI') else 'NO'
         ET.SubElement(info_liquidacion, 'obligadoContabilidad').text = obligado_conta
         
         # DATOS DEL PROVEEDOR (quien presta el servicio/vende) - OBLIGATORIOS
+        proveedor = liquidacion.proveedor
+        
         # tipoIdentificacionProveedor: 04=RUC, 05=Cédula, 06=Pasaporte, 07=Consumidor final, 08=Identificación exterior
-        ET.SubElement(info_liquidacion, 'tipoIdentificacionProveedor').text = liquidacion.proveedor.tipoIdentificacion
+        tipo_id = proveedor.tipoIdentificacion if proveedor.tipoIdentificacion else '05'
+        ET.SubElement(info_liquidacion, 'tipoIdentificacionProveedor').text = tipo_id
         
         # razonSocialProveedor - OBLIGATORIO (1-300 caracteres)
-        ET.SubElement(info_liquidacion, 'razonSocialProveedor').text = liquidacion.proveedor.razon_social_proveedor[:300]
+        razon_social = proveedor.razon_social_proveedor or proveedor.nombre_comercial_proveedor or 'PROVEEDOR'
+        ET.SubElement(info_liquidacion, 'razonSocialProveedor').text = razon_social[:300]
         
         # identificacionProveedor - OBLIGATORIO (1-20 caracteres)
-        ET.SubElement(info_liquidacion, 'identificacionProveedor').text = liquidacion.proveedor.identificacion_proveedor[:20]
+        identificacion = proveedor.identificacion_proveedor if proveedor.identificacion_proveedor else '9999999999999'
+        ET.SubElement(info_liquidacion, 'identificacionProveedor').text = identificacion[:20]
         
         # direccionProveedor - OPCIONAL
-        if liquidacion.proveedor.direccion:
-            ET.SubElement(info_liquidacion, 'direccionProveedor').text = liquidacion.proveedor.direccion[:300]
+        if proveedor.direccion:
+            ET.SubElement(info_liquidacion, 'direccionProveedor').text = proveedor.direccion[:300]
         
         # TOTALES - OBLIGATORIOS
         # totalSinImpuestos (14 dígitos, 2 decimales)
@@ -260,10 +272,6 @@ class LiquidacionXMLGenerator:
                 if forma_pago.unidad_tiempo:
                     ET.SubElement(pago, 'unidadTiempo').text = forma_pago.unidad_tiempo[:10]
 
-                # unidadTiempo - OPCIONAL (días, meses, etc.)
-                if forma_pago.unidad_tiempo:
-                    ET.SubElement(pago, 'unidadTiempo').text = forma_pago.unidad_tiempo[:10]
-
         # 3. Detalles - OBLIGATORIO (al menos 1 detalle)
         detalles = ET.SubElement(root, 'detalles')
         for detalle in liquidacion.detalles.all():
@@ -302,7 +310,7 @@ class LiquidacionXMLGenerator:
             ET.SubElement(detalle_elem, 'descuento').text = self._format_decimal(detalle.descuento)
             
             # precioTotalSinImpuesto - OBLIGATORIO
-            ET.SubElement(detalle_elem, 'precioTotalSinImpuesto').text = self._format_decimal(detalle.total_sin_impuestos)
+            ET.SubElement(detalle_elem, 'precioTotalSinImpuesto').text = self._format_decimal(detalle.precio_total_sin_impuesto)
             
             # detallesAdicionales - OPCIONAL (máximo 3 detalles adicionales)
             if hasattr(detalle, 'detalles_adicionales') and detalle.detalles_adicionales:

@@ -182,6 +182,11 @@ class LiquidacionCompra(models.Model):
     @property
     def secuencia_formateada(self) -> str:
         return f"{int(self.secuencia):09d}"
+    
+    @property
+    def numero_completo(self) -> str:
+        """Retorna el número completo de la liquidación en formato 001-001-000000001"""
+        return f"{self.serie_formateada}-{self.secuencia_formateada}"
 
     # -----------------------------
     # Reglas de negocio críticas
