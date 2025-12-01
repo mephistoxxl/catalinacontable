@@ -4596,3 +4596,6 @@ class PasswordResetToken(models.Model):
     def __str__(self):
         return f"Token para {self.usuario.username} - {'Usado' if self.used else 'Activo'}"
 
+
+# Importar modelos de planes
+from .models_planes import Plan, EmpresaPlan, HistorialPlan

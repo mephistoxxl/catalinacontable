@@ -608,3 +608,7 @@ for model in apps.get_app_config("inventario").get_models():
             root_admin_site.register(model)
         except admin.sites.AlreadyRegistered:
             pass
+
+
+# Registrar administración de planes
+from .admin_planes import PlanAdmin, EmpresaPlanAdmin, HistorialPlanAdmin

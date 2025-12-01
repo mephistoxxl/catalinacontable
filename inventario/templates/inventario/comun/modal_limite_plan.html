@@ -1,0 +1,176 @@
+{% comment %}
+Modal para mostrar advertencia de límite de plan
+Incluir en las páginas donde se autorizan documentos
+{% endcomment %}
+
+<div id="modal-limite-plan" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <!-- Icono de advertencia -->
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100">
+                <i class="fas fa-exclamation-triangle text-yellow-600 text-2xl"></i>
+            </div>
+            
+            <!-- Contenido -->
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-limite-titulo">
+                    Límite de Plan Alcanzado
+                </h3>
+                <div class="mt-2 px-7 py-3">
+                    <p class="text-sm text-gray-500" id="modal-limite-mensaje">
+                        Ha alcanzado el límite de documentos de su plan.
+                    </p>
+                    
+                    <!-- Estadísticas -->
+                    <div class="mt-4 bg-gray-50 rounded-lg p-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs text-gray-600">Documentos Usados:</span>
+                            <span class="text-sm font-bold text-gray-900" id="modal-docs-usados">0</span>
+                        </div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs text-gray-600">Límite del Plan:</span>
+                            <span class="text-sm font-bold text-gray-900" id="modal-docs-limite">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-gray-600">Documentos Restantes:</span>
+                            <span class="text-sm font-bold" id="modal-docs-restantes">0</span>
+                        </div>
+                        
+                        <!-- Barra de progreso -->
+                        <div class="mt-3">
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div id="modal-progreso-barra" class="bg-yellow-600 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                            <p class="text-xs text-center mt-1 text-gray-600">
+                                <span id="modal-porcentaje">0</span>% utilizado
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Advertencia adicional -->
+                    <div class="mt-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 text-left">
+                        <p class="text-xs text-yellow-700">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            <span id="modal-advertencia-extra"></span>
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Botones -->
+                <div class="items-center px-4 py-3">
+                    <button id="modal-limite-btn-cerrar" class="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                        Cerrar
+                    </button>
+                    <button id="modal-limite-btn-continuar" class="hidden mt-2 px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        Continuar de Todos Modos
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// JavaScript para controlar el modal de límite de plan
+(function() {
+    const modal = document.getElementById('modal-limite-plan');
+    const btnCerrar = document.getElementById('modal-limite-btn-cerrar');
+    const btnContinuar = document.getElementById('modal-limite-btn-continuar');
+    
+    // Función para verificar el límite del plan antes de autorizar
+    window.verificarLimitePlan = async function() {
+        try {
+            const response = await fetch('/inventario/api/verificar-limite-plan/');
+            const data = await response.json();
+            
+            if (!data.tiene_plan) {
+                // Sin plan configurado - permitir (modo legacy)
+                return { puede_continuar: true };
+            }
+            
+            if (data.alcanzado_limite) {
+                // Límite alcanzado - mostrar modal bloqueante
+                mostrarModalLimite(data, false);
+                return { puede_continuar: false, motivo: 'limite_alcanzado' };
+            }
+            
+            if (data.alcanzado_80) {
+                // Advertencia al 80% - mostrar modal informativo
+                mostrarModalLimite(data, true);
+                return { puede_continuar: true, advertencia: true };
+            }
+            
+            // Todo OK
+            return { puede_continuar: true };
+            
+        } catch (error) {
+            console.error('Error verificando límite del plan:', error);
+            // En caso de error, permitir continuar
+            return { puede_continuar: true };
+        }
+    };
+    
+    function mostrarModalLimite(data, permitir_continuar) {
+        // Actualizar contenido del modal
+        document.getElementById('modal-docs-usados').textContent = data.documentos_usados;
+        document.getElementById('modal-docs-limite').textContent = data.limite_documentos;
+        document.getElementById('modal-docs-restantes').textContent = data.documentos_restantes;
+        document.getElementById('modal-porcentaje').textContent = data.porcentaje_usado.toFixed(1);
+        
+        // Actualizar barra de progreso
+        const barra = document.getElementById('modal-progreso-barra');
+        const porcentaje = Math.min(data.porcentaje_usado, 100);
+        barra.style.width = porcentaje + '%';
+        
+        // Cambiar color según el porcentaje
+        if (porcentaje >= 100) {
+            barra.classList.remove('bg-yellow-600', 'bg-orange-500');
+            barra.classList.add('bg-red-600');
+        } else if (porcentaje >= 90) {
+            barra.classList.remove('bg-yellow-600', 'bg-red-600');
+            barra.classList.add('bg-orange-500');
+        } else {
+            barra.classList.remove('bg-red-600', 'bg-orange-500');
+            barra.classList.add('bg-yellow-600');
+        }
+        
+        // Configurar mensajes
+        if (permitir_continuar) {
+            document.getElementById('modal-limite-titulo').textContent = '⚠️ Advertencia: Acercándose al Límite';
+            document.getElementById('modal-limite-mensaje').textContent = 
+                `Ha utilizado ${data.porcentaje_usado.toFixed(1)}% de su plan ${data.plan_nombre}. Le quedan ${data.documentos_restantes} documentos disponibles.`;
+            document.getElementById('modal-advertencia-extra').textContent = 
+                'Considere actualizar su plan para evitar interrupciones en el servicio.';
+            btnContinuar.classList.remove('hidden');
+        } else {
+            document.getElementById('modal-limite-titulo').textContent = '🚫 Límite de Plan Alcanzado';
+            document.getElementById('modal-limite-mensaje').textContent = 
+                `Ha alcanzado el límite de ${data.limite_documentos} documentos de su plan ${data.plan_nombre}.`;
+            document.getElementById('modal-advertencia-extra').textContent = 
+                'Por favor contacte con soporte para actualizar su plan y continuar autorizando documentos.';
+            btnContinuar.classList.add('hidden');
+        }
+        
+        // Mostrar modal
+        modal.classList.remove('hidden');
+    }
+    
+    // Cerrar modal
+    btnCerrar.addEventListener('click', function() {
+        modal.classList.add('hidden');
+    });
+    
+    // Continuar (solo si está permitido)
+    btnContinuar.addEventListener('click', function() {
+        modal.classList.add('hidden');
+        // Aquí se puede ejecutar la acción de autorización si es necesario
+    });
+    
+    // Cerrar con ESC
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+            modal.classList.add('hidden');
+        }
+    });
+})();
+</script>
