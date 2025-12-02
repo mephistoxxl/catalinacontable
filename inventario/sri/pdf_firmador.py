@@ -112,8 +112,8 @@ class PDFFirmador:
                 "sigfield": "Signature1",
                 "auto_sigfield": True,
                 "sigandcertify": True,  # Certificar el documento
-                "signaturebox": (50, 50, 250, 150),  # Posición más visible
-                "signature": f"Firmado digitalmente por {self.opciones.razon_social or 'Sistema'}" if self.opciones else "Firmado digitalmente",
+                "signaturebox": (0, 0, 0, 0),  # Sin visualización de firma
+                "signature": "",  # Sin texto visible
                 "reason": razon,
                 "location": ubicacion,
                 "contact": contacto,
