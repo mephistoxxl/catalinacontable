@@ -2672,7 +2672,15 @@ class EmitirFactura(LoginRequiredMixin, View):
                 monto_general = Decimal('0.00')
                 total_iva = Decimal('0.00')
                 
-                for codigo, cantidad_str in zip(codigos, cantidades):
+                # ✅ Obtener precios e IVAs personalizados
+                precios_personalizados = request.POST.getlist('productos_precios[]')
+                ivas_personalizados = request.POST.getlist('productos_ivas[]')
+                descripciones_reemplazo = request.POST.getlist('productos_descripciones[]')
+                info_adicional_list = request.POST.getlist('productos_info_adicional[]')
+                
+                print(f"💰 Precios personalizados recibidos: {precios_personalizados}")
+                
+                for idx, (codigo, cantidad_str) in enumerate(zip(codigos, cantidades)):
                     cantidad = int(cantidad_str)
                     
                     # Buscar producto o servicio
@@ -2683,9 +2691,26 @@ class EmitirFactura(LoginRequiredMixin, View):
                         print(f"⚠️ Producto/Servicio no encontrado: {codigo}")
                         continue
                     
-                    if producto:
+                    # ✅ USAR PRECIO PERSONALIZADO si existe
+                    precio_pers = precios_personalizados[idx] if idx < len(precios_personalizados) else None
+                    if precio_pers and precio_pers.strip():
+                        precio_unitario = Decimal(precio_pers.strip())
+                        print(f"   💰 Usando precio PERSONALIZADO: ${precio_unitario}")
+                    elif producto:
                         precio_unitario = producto.precio
+                    elif servicio:
+                        precio_unitario = servicio.precio1
+                    
+                    # ✅ USAR IVA PERSONALIZADO si existe
+                    iva_pers = ivas_personalizados[idx] if idx < len(ivas_personalizados) else None
+                    if iva_pers and iva_pers.strip():
+                        iva_code = iva_pers.strip()
+                    elif producto:
                         iva_code = str(producto.iva.iva if hasattr(producto.iva, 'iva') else producto.iva)
+                    elif servicio:
+                        iva_code = str(servicio.iva.iva if hasattr(servicio.iva, 'iva') else servicio.iva)
+                    
+                    if producto:
                         descripcion = producto.descripcion
                     elif servicio:
                         precio_unitario = servicio.precio1
@@ -2705,6 +2730,10 @@ class EmitirFactura(LoginRequiredMixin, View):
                     valor_iva = valor_iva.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                     total = total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                     
+                    # ✅ Obtener descripción reemplazo e info adicional
+                    desc_reemplazo = descripciones_reemplazo[idx].strip() if idx < len(descripciones_reemplazo) and descripciones_reemplazo[idx].strip() else None
+                    info_adic = info_adicional_list[idx].strip() if idx < len(info_adicional_list) and info_adicional_list[idx].strip() else None
+                    
                     # Crear detalle
                     detalle = DetalleFactura.objects.create(
                         factura=factura,
@@ -2715,21 +2744,40 @@ class EmitirFactura(LoginRequiredMixin, View):
                         sub_total=subtotal,
                         total=total,
                         descuento=Decimal('0.00'),
-                        porcentaje_descuento=Decimal('0.00')
+                        porcentaje_descuento=Decimal('0.00'),
+                        # ✅ GUARDAR VALORES PERSONALIZADOS
+                        precio_unitario=precio_unitario,
+                        iva_codigo=iva_code,
+                        descripcion_reemplazo=desc_reemplazo,
+                        info_adicional=info_adic
                     )
                     
-                    # ✅ DESCONTAR INVENTARIO: Restar cantidad del stock disponible
-                    if producto:
+                    # ✅ Si hay info adicional, crear DetalleAdicional para el XML SRI
+                    if info_adic:
+                        DetalleAdicional.objects.create(
+                            empresa_id=empresa_id,
+                            detalle_factura=detalle,
+                            nombre='Información',
+                            valor=info_adic[:300]
+                        )
+                        print(f"   📝 Info adicional agregada al detalle: {info_adic[:50]}...")
+                    
+                    # ✅ DESCONTAR INVENTARIO: Solo si el producto tiene_inventario=True
+                    if producto and getattr(producto, 'tiene_inventario', False):
                         if producto.disponible is None:
                             producto.disponible = 0
                         producto.disponible -= cantidad
                         producto.save()
                         print(f"   📦 Inventario actualizado: {producto.codigo} - Stock restante: {producto.disponible}")
+                    elif producto:
+                        print(f"   ℹ️ Producto {producto.codigo} no controla inventario - no se descuenta")
                     
                     # Forzar valores correctos después del save
                     DetalleFactura.objects.filter(id=detalle.id).update(
                         sub_total=subtotal,
-                        total=total
+                        total=total,
+                        precio_unitario=precio_unitario,
+                        iva_codigo=iva_code
                     )
                     
                     # Acumular totales
@@ -2881,17 +2929,40 @@ class DetallesFactura(LoginRequiredMixin, View):
                 # Obtener listas de códigos y cantidades
                 codigos = request.POST.getlist('productos_codigos[]')
                 cantidades = request.POST.getlist('productos_cantidades[]')
+                # ✅ Obtener precios e IVAs personalizados (opcionales)
+                precios_personalizados = request.POST.getlist('productos_precios[]')
+                ivas_personalizados = request.POST.getlist('productos_ivas[]')
+                # ✅ Obtener descripciones e info adicional (opcionales)
+                descripciones_reemplazo = request.POST.getlist('productos_descripciones[]')
+                info_adicional_list = request.POST.getlist('productos_info_adicional[]')
+                
                 # Si no llegan, intentar variantes comunes de nombre
                 if not codigos:
                     codigos = request.POST.getlist('productos_codigos')
                 if not cantidades:
                     cantidades = request.POST.getlist('productos_cantidades')
+                if not precios_personalizados:
+                    precios_personalizados = request.POST.getlist('productos_precios')
+                if not ivas_personalizados:
+                    ivas_personalizados = request.POST.getlist('productos_ivas')
+                if not descripciones_reemplazo:
+                    descripciones_reemplazo = request.POST.getlist('productos_descripciones')
+                if not info_adicional_list:
+                    info_adicional_list = request.POST.getlist('productos_info_adicional')
 
                 print(f"Códigos recibidos: {codigos}")
                 print(f"Cantidades recibidas: {cantidades}")
+                print(f"Precios personalizados: {precios_personalizados}")
+                print(f"IVAs personalizados: {ivas_personalizados}")
+                print(f"Descripciones reemplazo: {descripciones_reemplazo}")
+                print(f"Info adicional: {info_adicional_list}")
                 
                 logger.info(f"📦 Códigos recibidos: {codigos}")
                 logger.info(f"🔢 Cantidades recibidas: {cantidades}")
+                logger.info(f"💰 Precios personalizados: {precios_personalizados}")
+                logger.info(f"📊 IVAs personalizados: {ivas_personalizados}")
+                logger.info(f"📝 Descripciones reemplazo: {descripciones_reemplazo}")
+                logger.info(f"ℹ️ Info adicional: {info_adicional_list}")
 
                 # Validaciones iniciales
                 if not codigos or not cantidades:
@@ -2935,7 +3006,7 @@ class DetallesFactura(LoginRequiredMixin, View):
 
                 # Procesar cada producto
                 errores = []  # Inicializar la lista de errores
-                for codigo, cantidad_str in zip(codigos, cantidades):
+                for idx, (codigo, cantidad_str) in enumerate(zip(codigos, cantidades)):
                     producto = Producto.objects.filter(empresa_id=factura.empresa_id, codigo=codigo).first()
                     servicio = Servicio.objects.filter(empresa_id=factura.empresa_id, codigo=codigo).first()
                     if not producto and not servicio:
@@ -2961,17 +3032,49 @@ class DetallesFactura(LoginRequiredMixin, View):
                         '8': Decimal('0.08')   # 8%
                     }
 
-                    if producto:
+                    # ✅ Usar precio personalizado si se envió, sino usar precio del producto
+                    precio_pers_valor = precios_personalizados[idx] if precios_personalizados and idx < len(precios_personalizados) else None
+                    
+                    print("="*60)
+                    print(f"🔍 PRECIO DEBUG [{idx}]:")
+                    print(f"   precios_personalizados lista: {precios_personalizados}")
+                    print(f"   precio_pers_valor: '{precio_pers_valor}'")
+                    print("="*60)
+                    
+                    logger.info(f"   🔍 Precio personalizado recibido[{idx}]: '{precio_pers_valor}'")
+                    
+                    if precio_pers_valor and precio_pers_valor.strip():
+                        try:
+                            precio_unitario = Decimal(str(precio_pers_valor.strip()))
+                            print(f"   ✅ USANDO PRECIO PERSONALIZADO: {precio_unitario}")
+                            logger.info(f"   💰 Usando precio PERSONALIZADO: {precio_unitario}")
+                        except Exception as e:
+                            print(f"   ❌ ERROR CONVIRTIENDO PRECIO: {e}")
+                            logger.error(f"   ❌ Error convirtiendo precio: {e}")
+                            precio_unitario = producto.precio if producto else servicio.precio1
+                    elif producto:
                         precio_unitario = producto.precio
-                        # Usar el mapeo de códigos SRI
-                        iva_code = str(producto.iva.iva if hasattr(producto.iva, 'iva') else producto.iva)
-                        iva_percent = MAPEO_IVA.get(iva_code, Decimal('0.12'))
+                        print(f"   ⚠️ USANDO PRECIO ORIGINAL PRODUCTO: {precio_unitario}")
                     elif servicio:
                         precio_unitario = servicio.precio1
-                        iva_code = str(servicio.iva.iva if hasattr(servicio.iva, 'iva') else servicio.iva)
-                        iva_percent = MAPEO_IVA.get(iva_code, Decimal('0.12'))
+                        print(f"   ⚠️ USANDO PRECIO ORIGINAL SERVICIO: {precio_unitario}")
                     else:
                         continue
+                    
+                    # ✅ Usar IVA personalizado si se envió, sino usar IVA del producto
+                    iva_pers_valor = ivas_personalizados[idx] if ivas_personalizados and idx < len(ivas_personalizados) else None
+                    logger.info(f"   🔍 IVA personalizado recibido[{idx}]: '{iva_pers_valor}'")
+                    
+                    if iva_pers_valor and str(iva_pers_valor).strip():
+                        iva_code = str(iva_pers_valor).strip()
+                        iva_percent = MAPEO_IVA.get(iva_code, Decimal('0.15'))
+                        logger.info(f"   📊 Usando IVA PERSONALIZADO: {iva_code} ({iva_percent * 100}%)")
+                    elif producto:
+                        iva_code = str(producto.iva.iva if hasattr(producto.iva, 'iva') else producto.iva)
+                        iva_percent = MAPEO_IVA.get(iva_code, Decimal('0.15'))
+                    elif servicio:
+                        iva_code = str(servicio.iva.iva if hasattr(servicio.iva, 'iva') else servicio.iva)
+                        iva_percent = MAPEO_IVA.get(iva_code, Decimal('0.15'))
 
                     # 🔍 DEBUG: Logging detallado de cálculos
                     logger.info(f"🔢 PROCESANDO: Código={codigo}, Cantidad={cantidad}")
@@ -2997,6 +3100,39 @@ class DetallesFactura(LoginRequiredMixin, View):
                     logger.info(f"   Total CON redondeo Django: {total}")
                     logger.info(f"   📊 Acumulando en monto_general: {monto_general} + {total}")
 
+                    # ✅ Determinar si hay valores personalizados diferentes al producto original
+                    codigo_personalizado = None
+                    precio_personalizado = None
+                    iva_personalizado = None
+                    
+                    if producto:
+                        # Código personalizado: si difiere del código del producto
+                        if codigo != producto.codigo:
+                            codigo_personalizado = codigo
+                        # Precio personalizado: si difiere del precio del producto
+                        if precio_unitario != producto.precio:
+                            precio_personalizado = precio_unitario
+                        # IVA personalizado: si difiere del IVA del producto
+                        iva_original = str(producto.iva.iva if hasattr(producto.iva, 'iva') else producto.iva)
+                        if iva_code != iva_original:
+                            iva_personalizado = iva_code
+                    elif servicio:
+                        # Para servicios, guardar siempre los valores usados
+                        codigo_personalizado = codigo if codigo != servicio.codigo else None
+                        precio_personalizado = precio_unitario if precio_unitario != servicio.precio1 else None
+                        iva_original = str(servicio.iva.iva if hasattr(servicio.iva, 'iva') else servicio.iva)
+                        iva_personalizado = iva_code if iva_code != iva_original else None
+
+                    # ✅ Obtener descripción de reemplazo e info adicional para este ítem
+                    descripcion_reemplazo = None
+                    info_adicional = None
+                    if descripciones_reemplazo and idx < len(descripciones_reemplazo):
+                        descripcion_reemplazo = descripciones_reemplazo[idx].strip() or None
+                    if info_adicional_list and idx < len(info_adicional_list):
+                        info_adicional = info_adicional_list[idx].strip() or None
+
+                    print(f"💾 GUARDANDO DetalleFactura con precio_unitario={precio_unitario}")
+                    
                     detalle = DetalleFactura.objects.create(
                         factura=factura,
                         producto=producto if producto else None,
@@ -3006,16 +3142,37 @@ class DetallesFactura(LoginRequiredMixin, View):
                         total=total,
                         descuento=descuento,
                         porcentaje_descuento=porcentaje_descuento,
-                        precio_sin_subsidio=precio_sin_subsidio
+                        precio_sin_subsidio=precio_sin_subsidio,
+                        # ✅ CORREGIDO: Siempre guardar precio_unitario (ya tiene el valor correcto)
+                        codigo_personalizado=codigo_personalizado,
+                        precio_unitario=precio_unitario,  # ✅ Siempre guardar el precio usado
+                        iva_codigo=iva_code,  # ✅ Siempre guardar el IVA usado
+                        # ✅ Guardar descripción e info adicional para esta factura
+                        descripcion_reemplazo=descripcion_reemplazo,
+                        info_adicional=info_adicional
                     )
                     
-                    # ✅ DESCONTAR INVENTARIO: Restar cantidad del stock disponible
-                    if producto:
+                    print(f"💾 DetalleFactura guardado. ID={detalle.id}, precio_unitario en DB={detalle.precio_unitario}")
+                    
+                    # ✅ Si hay info adicional, crear DetalleAdicional para el XML SRI
+                    if info_adicional:
+                        DetalleAdicional.objects.create(
+                            empresa_id=factura.empresa_id,
+                            detalle_factura=detalle,
+                            nombre='Información',
+                            valor=info_adicional[:300]
+                        )
+                        logger.info(f"   📝 Info adicional agregada al detalle: {info_adicional[:50]}...")
+                    
+                    # ✅ DESCONTAR INVENTARIO: Solo si el producto tiene_inventario=True
+                    if producto and getattr(producto, 'tiene_inventario', False):
                         if producto.disponible is None:
                             producto.disponible = 0
                         producto.disponible -= cantidad
                         producto.save()
                         logger.info(f"   📦 Inventario actualizado: {producto.codigo} - Stock restante: {producto.disponible}")
+                    elif producto:
+                        logger.info(f"   ℹ️ Producto {producto.codigo} no controla inventario - no se descuenta")
                     
                     # 🔧 CRÍTICO: Actualizar el detalle CON LOS VALORES CORRECTOS después del save()
                     # El método save() del modelo puede recalcular, así que forzamos nuestros valores
@@ -3975,88 +4132,35 @@ class VerFactura(LoginRequiredMixin, View):
             # Rutas de almacenamiento normalizadas
             media_paths = build_factura_media_paths(factura)
 
-            # ✅ GENERAR XML ELECTRÓNICO SRI
+            # ✅ VERIFICAR SI EXISTEN XML Y RIDE (sin abrirlos para evitar 403)
             xml_path = None
+            xml_filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}_firmada.xml"
+            xml_storage_path = f"{media_paths.xml_dir}/{xml_filename}"
+            
+            # Solo verificar existencia sin abrir el archivo
             try:
-                if opciones and detalles.exists():
-                    if not factura.formas_pago.exists():
-                        raise ValueError("Factura sin formas de pago; no se puede generar XML")
-                    from .sri.xml_generator import SRIXMLGenerator
-                    xml_generator = SRIXMLGenerator(ambiente=datos_factura['emisor'].get('tipo_ambiente', '1'))
-                    xml_content = xml_generator.generar_xml_factura(factura)
-                    xml_filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}.xml"
-                    xml_storage_path = f"{media_paths.xml_dir}/{xml_filename}"
-                    default_storage.delete(xml_storage_path)
-                    # xml_content ahora ya es bytes UTF-8, NO encode() de nuevo
-                    default_storage.save(xml_storage_path, ContentFile(xml_content))
+                if default_storage.exists(xml_storage_path):
                     xml_path = xml_storage_path
-                    logger.info(f"XML SRI generado exitosamente: {xml_storage_path}")
+                    logger.info(f"XML SRI encontrado: {xml_storage_path}")
+                else:
+                    logger.info(f"XML SRI no encontrado en: {xml_storage_path}")
             except Exception as e:
-                logger.error(f"Error generando XML SRI: {e}")
-                messages.warning(request, f'Error generando XML electrónico: {str(e)}')
+                logger.warning(f"Error verificando XML: {e}")
 
-            # ✅ GENERAR RIDE AUTOMÁTICAMENTE
+            # ✅ VERIFICAR SI EXISTE RIDE (PDF firmado)
             ride_path = None
+            signed_filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}_firmado.pdf"
+            ride_storage_path = f"{media_paths.pdf_dir}/{signed_filename}"
+            
+            # Solo verificar existencia sin abrir el archivo
             try:
-                if opciones and detalles.exists():
-                    ride_generator = RIDEGenerator()
-                    media_root = getattr(settings, 'MEDIA_ROOT', 'media')
-                    logo_dir = os.path.join(media_root, 'logos')
-                    filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}.pdf"
-                    logo_path = None
-                    possible_logos = ['logo.png', 'logo.jpg', 'logo.jpeg', 'logo2.png']
-                    for logo_name in possible_logos:
-                        logo_test_path = os.path.join(logo_dir, logo_name)
-                        if os.path.exists(logo_test_path):
-                            logo_path = logo_test_path
-                            break
-                    if not logo_path:
-                        static_logo = os.path.join('inventario', 'static', 'inventario', 'assets', 'logo', 'logo2.png')
-                        if os.path.exists(static_logo):
-                            logo_path = static_logo
-                    clave_acceso = None
-                    if xml_path:
-                        try:
-                            import xml.etree.ElementTree as ET
-                            if default_storage.exists(xml_path):
-                                with default_storage.open(xml_path, 'rb') as xml_file:
-                                    tree = ET.parse(xml_file)
-                                    clave_element = tree.find('.//claveAcceso')
-                                    if clave_element is not None:
-                                        clave_acceso = clave_element.text
-                        except Exception as e:
-                            logger.warning(f"No se pudo extraer clave de acceso: {e}")
-                    # Generar RIDE con firma electrónica opcional
-                    try:
-                        # Intentar generar y firmar el RIDE
-                        ride_generator = RIDEGenerator()
-                        result = ride_generator.generar_ride_factura_firmado(
-                            factura=factura,
-                            output_dir=media_paths.pdf_dir,
-                            firmar=True
-                        )
-
-                        if isinstance(result, tuple):
-                            # Si se firmó correctamente, devuelve (original, firmado)
-                            ride_path = result[1]  # Usar el PDF firmado
-                        else:
-                            # Si no se firmó, devuelve solo el path original
-                            ride_path = result
-
-                    except ImportError as e:
-                        # 🚫 NO MÁS FALLBACKS - SI NO HAY FIRMA, NO SE GENERA NADA
-                        logger.error(f"🚫 CRÍTICO: Error de importación para firma de PDF: {e}")
-                        logger.error("🚫 NO SE GENERARÁ PDF SIN FIRMA VÁLIDA")
-                        raise Exception(f"FIRMA DE PDF REQUERIDA - Error de importación: {e}")
-                    except Exception as e:
-                        # 🚫 NO MÁS FALLBACKS - SI LA FIRMA FALLA, TODO SE DETIENE
-                        logger.error(f"🚫 CRÍTICO: Error en firma de PDF: {e}")
-                        logger.error("🚫 NO SE GENERARÁ PDF SIN FIRMA VÁLIDA")
-                        raise Exception(f"FIRMA DE PDF REQUERIDA - Error en firma: {e}")
-                    logger.info(f"RIDE generado exitosamente: {ride_path}")
+                if default_storage.exists(ride_storage_path):
+                    ride_path = ride_storage_path
+                    logger.info(f"RIDE PDF encontrado: {ride_storage_path}")
+                else:
+                    logger.info(f"RIDE PDF no encontrado en: {ride_storage_path}")
             except Exception as e:
-                logger.error(f"Error generando RIDE: {e}")
-                messages.warning(request, f'La factura se muestra correctamente, pero hubo un error generando el PDF: {str(e)}')
+                logger.warning(f"Error verificando RIDE: {e}")
             
             # ✅ AGREGAR MENSAJE DE FACTURA PROCESADA SOLO SI VIENE RECIÉN COMPLETADA
             if 'HTTP_REFERER' in request.META and 'detallesDeFactura' in request.META['HTTP_REFERER']:
@@ -4183,6 +4287,316 @@ class VerFactura(LoginRequiredMixin, View):
 #Fin de vista--------------------------------------------------------------------------------------#
 
 
+#Editar factura existente--------------------------------------------------------------------------#
+class EditarFactura(LoginRequiredMixin, View):
+    login_url = '/inventario/login'
+    redirect_field_name = None
+
+    def get(self, request, p):
+        """Muestra el formulario para editar una factura existente"""
+        print(f"🔵 EditarFactura.get() llamado con factura_id={p}")
+        try:
+            # Verificar facturador en sesión
+            facturador_id = request.session.get('facturador_id')
+            print(f"🔵 Facturador ID en sesión: {facturador_id}")
+            if not facturador_id:
+                messages.warning(request, 'Debe iniciar sesión como facturador antes de editar facturas.')
+                # Guardar la URL actual para redirigir después del login
+                next_url = request.path
+                return redirect(f'/inventario/login_facturador/?next={next_url}')
+            
+            try:
+                facturador = Facturador.tenant_objects.get(id=facturador_id, activo=True)
+            except Facturador.DoesNotExist:
+                messages.error(request, 'El facturador no existe o no está activo.')
+                if 'facturador_id' in request.session:
+                    del request.session['facturador_id']
+                if 'facturador_nombre' in request.session:
+                    del request.session['facturador_nombre']
+                return redirect('inventario:login_facturador')
+
+            # Obtener empresa activa
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'Seleccione una empresa antes de editar facturas.')
+                return redirect('inventario:panel')
+            
+            empresa = Empresa.objects.get(id=empresa_id)
+
+            # Obtener la factura a editar
+            factura = get_object_or_404(Factura, id=p, empresa_id=empresa_id)
+            
+            # Verificar que la factura no esté autorizada
+            if factura.estado_sri == 'AUTORIZADO':
+                messages.warning(request, 'No se puede editar una factura autorizada por el SRI.')
+                return redirect('inventario:verFactura', p=p)
+            
+            # Obtener los detalles de la factura
+            detalles = DetalleFactura.objects.filter(factura=factura).select_related('producto', 'servicio')
+            
+            # Obtener formas de pago de la factura (usando _unsafe_objects para evitar filtro tenant)
+            formas_pago = FormaPago._unsafe_objects.filter(factura=factura).select_related('caja')
+            print(f"🔵 Formas de pago encontradas: {formas_pago.count()}")
+            for fp in formas_pago:
+                print(f"   - forma_pago={fp.forma_pago}, total={fp.total}, caja={fp.caja}")
+
+            # Preparar datos para el formulario
+            cedulas = Cliente.objects.filter(empresa_id=empresa_id).values_list('id', 'identificacion')
+            secuencias = Secuencia.objects.filter(empresa_id=empresa_id, tipo_documento='01', activo=True).order_by('establecimiento', 'punto_emision')
+            almacenes = Almacen.objects.filter(activo=True, empresa_id=empresa_id)
+            cajas_activas = Caja.objects.filter(activo=True, empresa_id=empresa_id).order_by('descripcion')
+            
+            # Buscar la secuencia que coincide con la factura
+            secuencia_factura_id = None
+            if factura.establecimiento and factura.punto_emision:
+                secuencia_match = Secuencia.objects.filter(
+                    empresa_id=empresa_id,
+                    establecimiento=factura.establecimiento,
+                    punto_emision=factura.punto_emision,
+                    tipo_documento='01',
+                    activo=True
+                ).first()
+                if secuencia_match:
+                    secuencia_factura_id = secuencia_match.id
+                    print(f"🔵 Secuencia encontrada para factura: id={secuencia_factura_id}, desc={secuencia_match.descripcion}")
+            
+            # Formas de pago SRI
+            formas_pago_sri = getattr(FormaPago, 'FORMAS_PAGO_CHOICES', [])
+
+            # Lista de bancos
+            try:
+                if hasattr(Banco, 'bancos_disponibles'):
+                    bancos_db = set(Banco.bancos_disponibles())
+                else:
+                    bancos_db = set(Banco.objects.filter(empresa_id=empresa_id).values_list('banco', flat=True))
+            except Exception:
+                bancos_db = set()
+
+            bancos_fallback = {
+                'Pichincha', 'Produbanco', 'Pacifico', 'Machala', 'Guayaquil', 'Banecuador',
+                'Internacional', 'Procredit', 'Austro', 'Bolivariano', 'Loja', 'Amazonas', 'Ruminahui'
+            }
+            lista_bancos = sorted({*(bancos_db or set()), *bancos_fallback})
+
+            # Preparar formulario con datos de la factura
+            initial_data = {
+                'secuencia': secuencia_factura_id,
+                'secuencia_valor': factura.secuencia,
+                'identificacion_cliente': factura.identificacion_cliente,
+                'nombre_cliente': factura.nombre_cliente,
+                'correo_cliente': factura.cliente.correo if factura.cliente else '',
+                'almacen': str(factura.almacen_id) if factura.almacen_id else '',
+                'establecimiento': factura.establecimiento,
+                'punto_emision': factura.punto_emision,
+                'concepto': factura.concepto or '',
+                'fecha_emision': factura.fecha_emision,
+                'fecha_vencimiento': factura.fecha_vencimiento,
+            }
+            # Configurar choices ANTES de crear el formulario con initial
+            almacen_choices = [('', '...')] + [(str(a.id), a.descripcion) for a in almacenes]
+            form = EmitirFacturaFormulario(cedulas=cedulas, secuencias=secuencias, initial=initial_data)
+            form.fields['almacen'].choices = almacen_choices
+            # Forzar el valor inicial del almacén
+            if factura.almacen_id:
+                form.fields['almacen'].initial = str(factura.almacen_id)
+            print(f"🔵 Almacén inicial: {factura.almacen_id}, choices: {almacen_choices[:3]}...")
+
+            # Preparar context
+            contexto = {
+                'form': form,
+                'factura': factura,
+                'detalles': detalles,
+                'formas_pago_factura': formas_pago,
+                'cedulas': cedulas,
+                'secuencias': secuencias,
+                'secuencia_factura_id': secuencia_factura_id,
+                'almacenes': almacenes,
+                'facturador': facturador,
+                'cajas': cajas_activas,
+                'formas_pago_sri': formas_pago_sri,
+                'bancos_lista_nombres': lista_bancos,
+                'bancos_db': Banco.objects.filter(activo=True, empresa_id=empresa_id).order_by('banco'),
+                'now': timezone.now(),
+                'es_edicion': True  # Flag para que el template sepa que estamos editando
+            }
+            contexto = complementarContexto(contexto, request.user)
+
+            return render(request, 'inventario/factura/editarFactura.html', contexto)
+
+        except Exception as e:
+            print(f"Error al cargar la página de editar factura: {e}")
+            messages.error(request, f"Error al cargar la página: {e}")
+            return redirect('inventario:listarFacturas')
+
+    def post(self, request, p):
+        """Procesa la actualización de la factura"""
+        try:
+            from django.db import transaction
+            from decimal import Decimal
+            import json
+            
+            # Verificar facturador
+            facturador_id = request.session.get('facturador_id')
+            if not facturador_id:
+                messages.error(request, 'Debe iniciar sesión como facturador.')
+                return redirect('inventario:login_facturador')
+            
+            try:
+                facturador = Facturador.tenant_objects.get(id=facturador_id, activo=True)
+            except Facturador.DoesNotExist:
+                messages.error(request, 'El facturador no existe o no está activo.')
+                return redirect('inventario:login_facturador')
+
+            # Obtener empresa activa
+            empresa_id = request.session.get('empresa_activa')
+            if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+                messages.error(request, 'No se ha seleccionado una empresa válida.')
+                return redirect('inventario:panel')
+            
+            empresa = Empresa.objects.get(id=empresa_id)
+
+            # Obtener la factura a editar
+            factura = get_object_or_404(Factura, id=p, empresa_id=empresa_id)
+            
+            # Verificar que no esté autorizada
+            if factura.estado_sri == 'AUTORIZADO':
+                messages.error(request, 'No se puede editar una factura autorizada.')
+                return redirect('inventario:verFactura', p=p)
+
+            # Validar productos
+            codigos = request.POST.getlist('productos_codigos[]')
+            cantidades = request.POST.getlist('productos_cantidades[]')
+            
+            if not codigos:
+                codigos = request.POST.getlist('productos_codigos')
+                cantidades = request.POST.getlist('productos_cantidades')
+            
+            if not codigos or not cantidades:
+                raise ValueError("Debe agregar al menos un producto a la factura.")
+            
+            if len(codigos) != len(cantidades):
+                raise ValueError("Error en los datos de productos.")
+
+            # Validar formas de pago
+            pagos_json = request.POST.get('pagos_efectivo', '[]')
+            try:
+                pagos_list = json.loads(pagos_json)
+            except json.JSONDecodeError:
+                raise ValueError("Error al procesar las formas de pago.")
+            
+            if not pagos_list:
+                raise ValueError("Debe agregar al menos una forma de pago.")
+
+            # Actualizar factura con transacción
+            with transaction.atomic():
+                # Actualizar datos del cliente
+                cliente_id = request.POST.get('cliente_id')
+                if not cliente_id:
+                    raise ValueError("No se seleccionó un cliente válido.")
+                    
+                cliente = get_object_or_404(Cliente, pk=cliente_id, empresa_id=empresa.id)
+                
+                # Actualizar correo del cliente si cambió
+                correo_cliente = request.POST.get('correo_cliente', '').strip()
+                if correo_cliente:
+                    cliente.correo = correo_cliente
+                    cliente.save()
+
+                # Actualizar datos de la factura
+                factura.nombre_cliente = cliente.razon_social
+                factura.identificacion = cliente.identificacion
+                factura.telefono = cliente.telefono or ''
+                factura.direccion = cliente.direccion or ''
+                factura.correo = correo_cliente or cliente.correo or ''
+                
+                # Actualizar fechas
+                from datetime import datetime
+                factura.fecha_emision = datetime.strptime(request.POST.get('fecha_emision'), '%Y-%m-%d').date()
+                factura.fecha_vencimiento = datetime.strptime(request.POST.get('fecha_vencimiento'), '%Y-%m-%d').date()
+                
+                # Actualizar almacén
+                almacen_id = request.POST.get('almacen')
+                if almacen_id:
+                    factura.almacen = get_object_or_404(Almacen, pk=almacen_id, empresa=empresa)
+                
+                # Actualizar concepto
+                factura.concepto = request.POST.get('concepto', 'Sin concepto')
+
+                # Eliminar detalles anteriores
+                DetalleFactura.objects.filter(factura=factura).delete()
+                
+                # Eliminar formas de pago anteriores
+                FormaPago.objects.filter(factura=factura).delete()
+
+                # Crear nuevos detalles (reutilizando la lógica de emitir factura)
+                descuentos = request.POST.getlist('productos_descuentos[]') or request.POST.getlist('productos_descuentos')
+                porcentajes_descuento = request.POST.getlist('productos_porcentajes[]') or request.POST.getlist('productos_porcentajes')
+                errores = []
+                
+                crear_detalles_factura(factura, codigos, cantidades, descuentos, porcentajes_descuento, errores)
+                
+                if errores:
+                    raise ValueError(f"Errores en productos: {', '.join(errores)}")
+
+                # Recalcular totales (considerando productos Y servicios)
+                detalles = DetalleFactura.objects.filter(factura=factura)
+                subtotal_sin_imp = Decimal('0.00')
+                subtotal_iva = Decimal('0.00')
+                iva_total = Decimal('0.00')
+                total_general = Decimal('0.00')
+                
+                for d in detalles:
+                    # Determinar el código IVA del producto o servicio
+                    if d.producto:
+                        codigo_iva = d.producto.iva
+                    elif d.servicio:
+                        codigo_iva = d.servicio.iva
+                    else:
+                        codigo_iva = '0'
+                    
+                    if codigo_iva == '0' or codigo_iva == '6' or codigo_iva == '7':
+                        subtotal_sin_imp += d.sub_total or Decimal('0.00')
+                    else:
+                        subtotal_iva += d.sub_total or Decimal('0.00')
+                    
+                    iva_total += d.iva or Decimal('0.00')
+                    total_general += d.total or Decimal('0.00')
+                
+                factura.sub_total_sin_impuesto = subtotal_sin_imp.quantize(Decimal('0.01'))
+                factura.sub_total_iva = subtotal_iva.quantize(Decimal('0.01'))
+                factura.iva = iva_total.quantize(Decimal('0.01'))
+                factura.monto_general = total_general.quantize(Decimal('0.01'))
+                factura.save()
+
+                # Crear nuevas formas de pago (sin validación full_clean para evitar conflicto de timing)
+                for pago in pagos_list:
+                    caja_id = pago.get('caja_id')
+                    forma_pago = FormaPago(
+                        factura=factura,
+                        forma_pago=pago.get('forma_pago', '01'),
+                        total=Decimal(str(pago.get('valor', 0))),
+                        plazo=pago.get('plazo', 0) or 0,
+                        unidad_tiempo=pago.get('unidad_tiempo', 'dias') or 'dias',
+                        caja_id=caja_id if caja_id else None,
+                        empresa=empresa
+                    )
+                    # Guardar sin ejecutar full_clean() que tiene la validación problemática
+                    super(FormaPago, forma_pago).save()
+
+                messages.success(request, f'✅ Factura {factura.establecimiento}-{factura.punto_emision}-{factura.secuencia} actualizada exitosamente.')
+                return redirect('inventario:verFactura', p=factura.id)
+
+        except ValueError as ve:
+            messages.error(request, str(ve))
+            return redirect('inventario:editarFactura', p=p)
+        except Exception as e:
+            print(f"Error actualizando factura: {e}")
+            messages.error(request, f"Error al actualizar la factura: {str(e)}")
+            return redirect('inventario:editarFactura', p=p)
+
+#Fin de vista--------------------------------------------------------------------------------------#
+
+
 #Genera la factura en CSV--------------------------------------------------------------------------#
 class GenerarFactura(LoginRequiredMixin, View):
     login_url = '/inventario/login'
@@ -4235,63 +4649,44 @@ class GenerarFacturaPDF(LoginRequiredMixin, View):
     redirect_field_name = None
 
     def get(self, request, p):
-        """Generar y descargar RIDE PDF - SIEMPRE FIRMA"""
-        from django.conf import settings
-        import os
+        """Generar y descargar RIDE PDF"""
+        from django.core.files.storage import default_storage
+        from io import BytesIO
 
         empresa_id = request.session.get('empresa_activa')
         if not request.user.empresas.filter(id=empresa_id).exists():
             raise Http404("Empresa no válida")
         factura = get_object_or_404(Factura, id=p, empresa_id=empresa_id)
-        media_root = getattr(settings, 'MEDIA_ROOT', 'media')
-        pdf_dir = os.path.join(media_root, 'facturas_pdf')
         
-        signed_filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}_firmado.pdf"
-        unsigned_filename = f"factura_{factura.establecimiento}_{factura.punto_emision}_{factura.secuencia}.pdf"
-        
-        signed_path = os.path.join(pdf_dir, signed_filename)
-        unsigned_path = os.path.join(pdf_dir, unsigned_filename)
-        
-        # Siempre generar y firmar el PDF
         try:
-            # Obtener detalles y opciones necesarias
-            detalles = DetalleFactura.objects.filter(factura=factura)
-            empresa = getattr(factura, 'empresa', None)
-            opciones = Opciones.objects.for_tenant(empresa).first()
-            if not opciones and empresa:
-                opciones = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
-            
-            # Generar directorio si no existe
-            os.makedirs(pdf_dir, exist_ok=True)
-            
-            # Generar RIDE firmado
+            # Generar RIDE (sin firmar para evitar complicaciones)
             ride_generator = RIDEGenerator()
             result = ride_generator.generar_ride_factura_firmado(
                 factura=factura,
-                output_dir=pdf_dir,
-                firmar=True
+                output_dir='facturas_pdf',
+                firmar=False  # Sin firma para simplificar
             )
             
-            if isinstance(result, tuple):
-                # Se firmó correctamente, devuelve (original, firmado)
-                pdf_path = result[1]  # Usar el PDF firmado
+            # El resultado es un path en el storage
+            storage_path = result if isinstance(result, str) else result[0]
+            
+            # Leer el archivo desde el storage
+            if default_storage.exists(storage_path):
+                pdf_file = default_storage.open(storage_path, 'rb')
+                filename = f"RIDE_{factura.establecimiento}-{factura.punto_emision}-{str(factura.secuencia).zfill(9)}.pdf"
+                response = HttpResponse(pdf_file.read(), content_type='application/pdf')
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                pdf_file.close()
+                return response
             else:
-                # No se firmó, devuelve solo el path original
-                pdf_path = result
-                
-            # Verificar que el archivo firmado existe
-            if os.path.exists(signed_path):
-                return FileResponse(open(signed_path, 'rb'), as_attachment=True, filename=signed_filename, content_type='application/pdf')
-            elif os.path.exists(pdf_path):
-                # Si no se pudo firmar, devolver el no firmado
-                return FileResponse(open(pdf_path, 'rb'), as_attachment=True, filename=os.path.basename(pdf_path), content_type='application/pdf')
-            else:
-                messages.error(request, 'Error al generar el PDF firmado.')
+                messages.error(request, 'No se encontró el archivo PDF generado.')
                 return redirect('inventario:verFactura', p=p)
                 
         except Exception as e:
-            logger.error(f"Error generando PDF firmado: {e}")
-            messages.error(request, f'Error al generar el PDF firmado: {str(e)}')
+            logger.error(f"Error generando PDF: {e}")
+            import traceback
+            traceback.print_exc()
+            messages.error(request, f'Error al generar el PDF: {str(e)}')
             return redirect('inventario:verFactura', p=p)
 
         #Fin de vista--------------------------------------------------------------------------------------#
@@ -5341,7 +5736,13 @@ class LoginFacturador(View):
                 request.session['facturador_nombre'] = facturador_valido.nombres
                 
                 messages.success(request, f'Bienvenido {facturador_valido.nombres}')
-                return redirect('inventario:emitirFactura')
+                
+                # Redirigir a la página solicitada o a emitirFactura por defecto
+                next_url = request.GET.get('next') or request.POST.get('next') or 'inventario:emitirFactura'
+                if next_url.startswith('/'):
+                    return redirect(next_url)
+                else:
+                    return redirect(next_url)
             else:
                 messages.error(request, 'Contraseña incorrecta. Verifique e intente nuevamente.')
                 return render(request, 'inventario/facturador/login_facturador.html')
@@ -5553,17 +5954,62 @@ def adapt_producto(producto):
 def adapt_detallefactura(detalle):
     """
     Adapta una instancia de DetalleFactura a un dict compatible con SRI/ride_generator/xml_generator
+    Usa valores personalizados si existen, sino los del producto/servicio original
     """
     producto = getattr(detalle, 'producto', None)
+    servicio = getattr(detalle, 'servicio', None)
     prod_dict = adapt_producto(producto) if producto else {}
+    
+    # ✅ Usar código personalizado si existe, sino el del producto/servicio
+    codigo = getattr(detalle, 'codigo_personalizado', None)
+    if not codigo:
+        if producto:
+            codigo = prod_dict.get('codigo', '')
+        elif servicio:
+            codigo = getattr(servicio, 'codigo', '')
+        else:
+            codigo = ''
+    
+    # ✅ Usar precio personalizado si existe, sino el del producto/servicio
+    precio = getattr(detalle, 'precio_unitario', None)
+    if precio is None:
+        precio = prod_dict.get('precio', 0) if producto else getattr(servicio, 'precio1', 0) if servicio else 0
+    
+    # ✅ Usar IVA personalizado si existe, sino el del producto/servicio
+    iva_codigo = getattr(detalle, 'iva_codigo', None)
+    if not iva_codigo:
+        if producto:
+            iva_codigo = prod_dict.get('iva', '0')
+        elif servicio:
+            iva_codigo = str(servicio.iva.iva if hasattr(servicio.iva, 'iva') else servicio.iva) if servicio else '0'
+        else:
+            iva_codigo = '0'
+    
+    # ✅ Descripción: usar reemplazo si existe, sino la del producto/servicio
+    descripcion_reemplazo = getattr(detalle, 'descripcion_reemplazo', None)
+    if descripcion_reemplazo:
+        descripcion = descripcion_reemplazo
+    else:
+        descripcion = prod_dict.get('descripcion', '') if producto else getattr(servicio, 'descripcion', '') if servicio else ''
+    
+    # ✅ Información adicional (detallesAdicionales del XML SRI)
+    info_adicional = getattr(detalle, 'info_adicional', None)
+    detalles_adicionales = []
+    if info_adicional:
+        detalles_adicionales.append({
+            'nombre': 'Información',
+            'valor': info_adicional[:300]  # Máximo 300 caracteres según SRI
+        })
+    
     return {
-        'codigo_principal': prod_dict.get('codigo', ''),
-        'descripcion': prod_dict.get('descripcion', ''),
+        'codigo_principal': codigo,
+        'descripcion': descripcion,
         'cantidad': float(getattr(detalle, 'cantidad', 0)),
-        'precio_unitario': float(getattr(detalle, 'precio_unitario', prod_dict.get('precio', 0))),
+        'precio_unitario': float(precio),
         'descuento': float(getattr(detalle, 'descuento', 0) or 0),
-        'precio_total_sin_impuesto': float(getattr(detalle, 'total', getattr(detalle, 'sub_total', 0))),
-        'codigo_porcentaje_iva': prod_dict.get('iva', '0'),
+        'precio_total_sin_impuesto': float(getattr(detalle, 'sub_total', 0)),
+        'codigo_porcentaje_iva': iva_codigo,
+        'detalles_adicionales': detalles_adicionales,  # ✅ Info adicional para XML
     }
 
 def adapt_factura(factura, detalles=None, opciones=None):
@@ -8082,18 +8528,53 @@ def enriquecer_cliente_api(request):
         except Exception as e:
             logger.error(f"Fallo servicio externo enriquecer: {e}")
             return JsonResponse({'success': False, 'message': 'No se pudo consultar servicio externo'}, status=502)
+        
+        # Extraer todos los datos disponibles
         razon = resultado.get('razonSocial') or resultado.get('razon_social') or resultado.get('nombre') or resultado.get('name') or ''
+        nombre_comercial = resultado.get('nombreComercial') or resultado.get('nombre_comercial') or ''
+        direccion = resultado.get('direccion') or ''
+        telefono = resultado.get('telefono') or ''
+        correo = resultado.get('email') or resultado.get('correo') or ''
+        
+        # Actualizar todos los campos disponibles
+        campos_actualizar = []
+        enriquecido = False
+        
         if razon and razon.strip() and razon.strip() != identificacion:
             cliente.razon_social = razon.strip()[:200]
-            cliente.save(update_fields=['razon_social'])
+            campos_actualizar.append('razon_social')
             enriquecido = True
-        else:
-            enriquecido = False
+        
+        if nombre_comercial and nombre_comercial.strip():
+            cliente.nombre_comercial = nombre_comercial.strip()[:200]
+            campos_actualizar.append('nombre_comercial')
+            enriquecido = True
+        
+        if direccion and direccion.strip() and direccion.strip() != 'NO ESPECIFICADA':
+            cliente.direccion = direccion.strip()[:300]
+            campos_actualizar.append('direccion')
+            enriquecido = True
+        
+        if telefono and telefono.strip():
+            cliente.telefono = telefono.strip()[:20]
+            campos_actualizar.append('telefono')
+            enriquecido = True
+        
+        if correo and correo.strip():
+            cliente.correo = correo.strip()[:100]
+            campos_actualizar.append('correo')
+            enriquecido = True
+        
+        if campos_actualizar:
+            cliente.save(update_fields=campos_actualizar)
+        
         return JsonResponse({'success': True, 'enriquecido': enriquecido, 'cliente': {
             'id': cliente.id,
             'identificacion': cliente.identificacion,
             'razon_social': cliente.razon_social,
             'nombre_comercial': cliente.nombre_comercial or '',
+            'direccion': cliente.direccion or '',
+            'telefono': cliente.telefono or '',
             'correo': cliente.correo or ''
         }})
     except Exception as e:

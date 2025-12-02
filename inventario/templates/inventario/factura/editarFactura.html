@@ -5,138 +5,6 @@
 /* Compact header/icon helpers */
 .form-header-icon { font-size: 16px !important; }
 .label-icon { font-size: 12px !important; width: 14px !important; text-align: center !important; }
-
-/* ✅ MODAL DE INFORMACIÓN ADICIONAL */
-.modal-info-producto {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    z-index: 9999;
-    justify-content: center;
-    align-items: center;
-}
-.modal-info-producto.active {
-    display: flex;
-}
-.modal-info-content {
-    background: white;
-    border-radius: 8px;
-    padding: 20px;
-    width: 90%;
-    max-width: 450px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-}
-.modal-info-content h3 {
-    margin: 0 0 15px 0;
-    font-size: 14px;
-    color: #333;
-    border-bottom: 1px solid #e5e7eb;
-    padding-bottom: 10px;
-}
-.modal-info-content label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    font-weight: 600;
-    color: #555;
-    margin-bottom: 5px;
-}
-.modal-info-content label span {
-    color: #999;
-    font-weight: normal;
-}
-.modal-info-content input,
-.modal-info-content textarea {
-    width: 100%;
-    padding: 8px 10px;
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    font-size: 13px;
-    margin-bottom: 15px;
-}
-.modal-info-content textarea {
-    height: 70px;
-    resize: vertical;
-}
-.modal-info-buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 10px;
-}
-.modal-info-buttons button {
-    padding: 8px 16px;
-    border-radius: 4px;
-    font-size: 12px;
-    cursor: pointer;
-}
-.btn-guardar-info {
-    background: #d4a500;
-    color: white;
-    border: none;
-}
-.btn-guardar-info:hover {
-    background: #b8920a;
-}
-.btn-cancelar-info {
-    background: #6b7280;
-    color: white;
-    border: none;
-}
-.btn-cancelar-info:hover {
-    background: #4b5563;
-}
-/* Indicador de info adicional */
-.tiene-info-adicional {
-    color: #d4a500 !important;
-}
-
-/* ✅ ESTILOS PARA CAMPOS EDITABLES EN TABLA */
-.codigo-display,
-.precio-display,
-.iva-display {
-    cursor: pointer !important;
-    padding: 2px 4px !important;
-    border-radius: 3px !important;
-}
-.codigo-display:hover,
-.precio-display:hover,
-.iva-display:hover {
-    background: #e5e7eb !important;
-    color: #2563eb !important;
-}
-.codigo-editable,
-.precio-editable,
-.iva-editable {
-    border: 1px solid #3b82f6 !important;
-    background: #ffffff !important;
-    outline: none !important;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
-    height: 24px !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
-}
-.precio-editable::-webkit-outer-spin-button,
-.precio-editable::-webkit-inner-spin-button {
-    -webkit-appearance: none !important;
-    margin: 0 !important;
-}
-.precio-editable {
-    -moz-appearance: textfield !important;
-    width: 80px !important;
-    text-align: right !important;
-}
-.codigo-editable {
-    width: 100px !important;
-}
-.iva-editable {
-    width: 60px !important;
-}
-
 /* ✅ ESTILOS COMPACTOS MEJORADOS PARA INPUTS */
 input[type="text"], 
 input[type="email"], 
@@ -344,13 +212,13 @@ input[type="number"][readonly] {
         <div class="bg-gray-50 p-3" style="min-height: auto; padding-top: 8px; padding-bottom: 12px;">
     <div class="max-w-5xl mx-auto">
         <!-- Header Section - Equilibrado -->
-        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 mb-1 rounded-lg mt-0">
+        <div class="bg-gradient-to-r from-yellow-600 to-yellow-700 px-3 py-2 mb-1 rounded-lg mt-0">
             <div class="flex items-center justify-between">
                 <div class="flex items-center">
-                    <i class="fas fa-file-invoice text-white form-header-icon mr-2"></i>
+                    <i class="fas fa-edit text-white form-header-icon mr-2"></i>
                     <div>
-                        <h2 class="text-base font-semibold text-white">Emitir Factura</h2>
-                        <p class="text-gray-300 text-[11px] hidden sm:block">Complete los datos para generar la factura</p>
+                        <h2 class="text-base font-semibold text-white">Editar Factura #{{ factura.establecimiento }}-{{ factura.punto_emision }}-{{ factura.secuencia }}</h2>
+                        <p class="text-gray-300 text-[11px] hidden sm:block">Modifique los datos de la factura</p>
                     </div>
                 </div>
                 {% if facturador %}
@@ -379,7 +247,7 @@ input[type="number"][readonly] {
     <!-- Main Content - Compacto -->
         <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
             <div class="p-2">
-                <form method="POST" action="{% url 'inventario:emitirFactura' %}" class="space-y-2">
+                <form method="POST" action="{% url 'inventario:editarFactura' factura.id %}" class="space-y-2">
                     {% csrf_token %}
                     
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-2">
@@ -440,10 +308,15 @@ input[type="number"][readonly] {
                         <div class="space-y-1">
                             <!-- Almacén -->
                             <div>
-                                <label for="almacen" class="block text-xs font-medium text-gray-800 mb-1">
-                    <i class="fas fa-warehouse text-green-600 mr-1 label-icon"></i>{{ form.almacen.label }}
+                                <label for="id_almacen" class="block text-xs font-medium text-gray-800 mb-1">
+                    <i class="fas fa-warehouse text-green-600 mr-1 label-icon"></i>Almacén
                                 </label>
-                                {{ form.almacen }}
+                                <select name="almacen" id="id_almacen" class="form-control w-full">
+                                    <option value="">...</option>
+                                    {% for almacen in almacenes %}
+                                    <option value="{{ almacen.id }}" {% if es_edicion and factura.almacen_id == almacen.id %}selected{% endif %}>{{ almacen.descripcion }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
 
                             <!-- Establecimiento -->
@@ -897,16 +770,342 @@ input[type="number"][readonly] {
 </style>
 
 <script>
+console.log('🚀 SCRIPT INICIADO - editarFactura.html');
+
 // ========== VARIABLES GLOBALES ==========
 let productosAgregados = [];
 let contadorProductos = 0;
-// ✅ Variables de formas de pago (movidas aquí para disponibilidad global)
-let pagosEfectivo = [];
-let totalPagado = 0;
+
+console.log('✅ Variables globales definidas');
 
 // ========== INICIALIZACIÓN ==========
 document.addEventListener('DOMContentLoaded', function() {
-    // Configurar fechas por defecto
+    console.log('🔍 DOMContentLoaded ejecutado');
+    console.log('🔍 es_edicion:', {% if es_edicion %}true{% else %}false{% endif %});
+    console.log('🔍 factura existe:', {% if factura %}true{% else %}false{% endif %});
+    {% if factura %}
+    console.log('🔍 factura.identificacion:', '{{ factura.identificacion }}');
+    console.log('🔍 factura.nombre_cliente:', '{{ factura.nombre_cliente }}');
+    console.log('🔍 detalles.length:', {{ detalles|length }});
+    {% endif %}
+    
+    {% if es_edicion and factura %}
+    console.log('📝 MODO EDICIÓN: Precargando datos de la factura #{{ factura.id }}');
+    
+    // ===== PRECARGAR SECUENCIA (buscar por establecimiento y punto_emision) =====
+    const secuenciaSelect = document.getElementById('id_secuencia');
+    const facturaEstablecimiento = '{{ factura.establecimiento|default:"" }}';
+    const facturaPuntoEmision = '{{ factura.punto_emision|default:"" }}';
+    
+    if (secuenciaSelect && facturaEstablecimiento && facturaPuntoEmision) {
+        // Buscar la opción que corresponda - recorrer las opciones y verificar
+        let secuenciaEncontrada = false;
+        for (let i = 0; i < secuenciaSelect.options.length; i++) {
+            const option = secuenciaSelect.options[i];
+            // Las opciones tienen formato "DESCRIPCION - EST-PUNTO" o similar
+            // Por ahora, si hay un secuencia_id en contexto, lo usamos
+            {% if secuencia_factura_id %}
+            if (option.value === '{{ secuencia_factura_id }}') {
+                secuenciaSelect.selectedIndex = i;
+                secuenciaEncontrada = true;
+                console.log('✅ Secuencia cargada por ID:', option.value);
+                break;
+            }
+            {% endif %}
+        }
+        if (!secuenciaEncontrada) {
+            // Seleccionar la primera opción válida (no vacía)
+            for (let i = 0; i < secuenciaSelect.options.length; i++) {
+                if (secuenciaSelect.options[i].value) {
+                    secuenciaSelect.selectedIndex = i;
+                    console.log('✅ Secuencia cargada (primera disponible):', secuenciaSelect.options[i].value);
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Cargar campos de texto de factura directamente
+    const establecimientoInput = document.getElementById('id_establecimiento');
+    const puntoEmisionInput = document.getElementById('id_punto_emision');
+    const secuenciaValorInput = document.getElementById('id_secuencia_valor');
+    
+    if (establecimientoInput) {
+        establecimientoInput.value = '{{ factura.establecimiento|default:"" }}';
+        console.log('✅ Establecimiento cargado:', establecimientoInput.value);
+    }
+    if (puntoEmisionInput) {
+        puntoEmisionInput.value = '{{ factura.punto_emision|default:"" }}';
+        console.log('✅ Punto emisión cargado:', puntoEmisionInput.value);
+    }
+    if (secuenciaValorInput) {
+        secuenciaValorInput.value = '{{ factura.secuencia|default:"" }}';
+        console.log('✅ Número secuencia cargado:', secuenciaValorInput.value);
+    }
+    
+    // ===== PRECARGAR DATOS DEL CLIENTE =====
+    const identificacionInput = document.getElementById('id_identificacion_cliente');
+    const clienteIdInput = document.getElementById('cliente_id');
+    const nombreClienteInput = document.getElementById('id_nombre_cliente');
+    const correoClienteInput = document.getElementById('id_correo_cliente');
+    
+    console.log('🔍 Datos cliente disponibles:');
+    console.log('  - identificacion_cliente:', '{{ factura.identificacion_cliente|default:"N/A" }}');
+    console.log('  - nombre_cliente:', '{{ factura.nombre_cliente|default:"N/A" }}');
+    console.log('  - cliente.correo:', '{{ factura.cliente.correo|default:"N/A" }}');
+    
+    // CI/RUC - usar identificacion_cliente de la factura
+    {% if factura.identificacion_cliente %}
+    if (identificacionInput) {
+        identificacionInput.value = '{{ factura.identificacion_cliente|escapejs }}';
+        console.log('✅ CI/RUC cargado:', identificacionInput.value);
+    }
+    {% endif %}
+    
+    // ID del cliente
+    {% if factura.cliente %}
+    if (clienteIdInput) clienteIdInput.value = '{{ factura.cliente.id }}';
+    {% endif %}
+    
+    // Nombre del cliente
+    {% if factura.nombre_cliente %}
+    if (nombreClienteInput) {
+        nombreClienteInput.value = '{{ factura.nombre_cliente|escapejs }}';
+        console.log('✅ Nombre cliente cargado:', nombreClienteInput.value);
+    }
+    {% endif %}
+    
+    // Correo del cliente (desde el objeto cliente)
+    {% if factura.cliente.correo %}
+    if (correoClienteInput) {
+        correoClienteInput.value = '{{ factura.cliente.correo|escapejs }}';
+        console.log('✅ Correo cargado:', correoClienteInput.value);
+    }
+    {% endif %}
+    
+    // ===== PRECARGAR FECHAS =====
+    const fechaEmision = document.getElementById('id_fecha_emision');
+    const fechaVencimiento = document.getElementById('id_fecha_vencimiento');
+    
+    if (fechaEmision) fechaEmision.value = '{{ factura.fecha_emision|date:"Y-m-d" }}';
+    if (fechaVencimiento) fechaVencimiento.value = '{{ factura.fecha_vencimiento|date:"Y-m-d" }}';
+    console.log('✅ Fechas cargadas');
+    
+    // ===== PRECARGAR ALMACÉN =====
+    const almacenSelect = document.getElementById('id_almacen');
+    console.log('🔍 Buscando almacén select:', almacenSelect);
+    console.log('🔍 Almacén ID de factura:', '{{ factura.almacen_id|default:"NULL" }}');
+    
+    {% if factura.almacen_id %}
+    if (almacenSelect) {
+        const almacenValue = '{{ factura.almacen_id }}';
+        console.log('🔄 Intentando seleccionar almacén:', almacenValue);
+        console.log('🔄 Opciones disponibles:', Array.from(almacenSelect.options).map(o => o.value + '=' + o.text));
+        almacenSelect.value = almacenValue;
+        console.log('✅ Almacén seleccionado:', almacenSelect.value);
+        // Si no se seleccionó, intentar forzar
+        if (almacenSelect.value !== almacenValue) {
+            for (let i = 0; i < almacenSelect.options.length; i++) {
+                if (almacenSelect.options[i].value === almacenValue) {
+                    almacenSelect.selectedIndex = i;
+                    console.log('✅ Almacén forzado por índice:', i);
+                    break;
+                }
+            }
+        }
+    }
+    {% elif factura.almacen %}
+    if (almacenSelect) {
+        almacenSelect.value = '{{ factura.almacen.id }}';
+        console.log('✅ Almacén cargado por objeto:', '{{ factura.almacen.id }}');
+    }
+    {% endif %}
+    
+    // ===== PRECARGAR CONCEPTO =====
+    const conceptoInput = document.getElementById('id_concepto');
+    if (conceptoInput) {
+        conceptoInput.value = '{{ factura.concepto|default:""|escapejs }}';
+        console.log('✅ Concepto cargado');
+    }
+    
+    // ===== PRECARGAR PRODUCTOS =====
+    {% if detalles %}
+    console.log('📦 Precargando {{ detalles|length }} productos...');
+    
+    // Limpiar filas vacías
+    const tablaProductos = document.getElementById('tabla-productos');
+    if (tablaProductos) {
+        const tbody = tablaProductos.getElementsByTagName('tbody')[0];
+        const filasVacias = tbody.querySelectorAll('.fila-vacia');
+        filasVacias.forEach(fila => fila.remove());
+    }
+    
+    // Cargar cada producto
+    const detallesData = [
+        {% for detalle in detalles %}
+        {
+            {% if detalle.producto %}
+            codigo: '{{ detalle.producto.codigo|default:""|escapejs }}',
+            nombre: '{{ detalle.producto.descripcion|default:""|escapejs }}',
+            precio: parseFloat('{{ detalle.producto.precio|default:0 }}') || 0,
+            ivaPercent: parseFloat('{{ detalle.producto.iva|default:0.15 }}') || 0.15,
+            {% elif detalle.servicio %}
+            codigo: '{{ detalle.servicio.codigo|default:""|escapejs }}',
+            nombre: '{{ detalle.servicio.descripcion|default:""|escapejs }}',
+            precio: parseFloat('{{ detalle.servicio.precio1|default:0 }}') || 0,
+            ivaPercent: 0.15,
+            {% else %}
+            codigo: '[Sin código]',
+            nombre: '[Sin descripción]',
+            precio: parseFloat('{{ detalle.sub_total|default:0 }}') / parseFloat('{{ detalle.cantidad|default:1 }}') || 0,
+            ivaPercent: 0.15,
+            {% endif %}
+            cantidad: parseFloat('{{ detalle.cantidad|default:1 }}') || 1
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    console.log('📦 Detalles a cargar:', detallesData);
+    
+    detallesData.forEach(function(detalle, index) {
+        setTimeout(function() {
+            const precio = isNaN(detalle.precio) ? 0 : detalle.precio;
+            const ivaPercent = isNaN(detalle.ivaPercent) ? 0 : detalle.ivaPercent;
+            const cantidad = isNaN(detalle.cantidad) ? 1 : detalle.cantidad;
+            
+            const precioConIva = precio * (1 + ivaPercent);
+            const subtotal = cantidad * precio;
+            const totalConIva = cantidad * precioConIva;
+            
+            const producto = {
+                id: contadorProductos++,
+                codigo: detalle.codigo || '[Sin código]',
+                nombre: detalle.nombre || '[Sin descripción]',
+                cantidad: cantidad,
+                precio: precio,
+                precioConIva: Math.round(precioConIva * 100) / 100,
+                subtotal: Math.round(subtotal * 100) / 100,
+                totalConIva: Math.round(totalConIva * 100) / 100,
+                ivaPercent: ivaPercent
+            };
+            
+            console.log('📦 Cargando producto ' + (index + 1) + ':', producto);
+            
+            productosAgregados.push(producto);
+            agregarFilaTabla(producto);
+            actualizarCamposOcultos();
+            actualizarTotal();
+            
+            console.log('✅ Producto ' + (index + 1) + '/' + detallesData.length + ' cargado');
+        }, index * 50);
+    });
+    {% endif %}
+    
+    // ===== PRECARGAR FORMAS DE PAGO =====
+    {% if formas_pago_factura %}
+    console.log('💰 Precargando {{ formas_pago_factura|length }} formas de pago...');
+    window.addEventListener('load', function() {
+        setTimeout(function() {
+            pagosEfectivo = [];
+            
+            {% for pago in formas_pago_factura %}
+            console.log('📝 Agregando pago: {{ pago.forma_pago }} = ${{ pago.total }}');
+            pagosEfectivo.push({
+                tipo: 'efectivo',
+                forma_pago: '{{ pago.forma_pago }}',
+                monto: parseFloat('{{ pago.total }}') || 0,
+                valor: parseFloat('{{ pago.total }}') || 0,
+                plazo: parseInt('{{ pago.plazo|default:0 }}') || 0,
+                unidad_tiempo: '{{ pago.unidad_tiempo|default:"dias" }}',
+                banco: '',
+                banco_descripcion: '',
+                numero_cheque: '',
+                fecha_cheque: '',
+                caja_id: '{{ pago.caja_id|default:"" }}',
+                caja_descripcion: '{{ pago.caja.descripcion|default:"Sin caja"|escapejs }}',
+                sri_pago: '{{ pago.forma_pago }}',
+                sri_pago_descripcion: '{{ pago.get_forma_pago_display|default:"Efectivo" }}'
+            });
+            {% endfor %}
+            
+            console.log('📦 Pagos cargados:', pagosEfectivo);
+            
+            // Actualizar tabla de pagos
+            if (typeof actualizarTablaPagosEfectivo === 'function') {
+                actualizarTablaPagosEfectivo();
+            }
+            
+            // Activar visualmente la sección de efectivo
+            if (typeof cambiarFormaPago === 'function') {
+                cambiarFormaPago('efectivo');
+            }
+            
+            // Mostrar la tabla de pagos
+            const tablaContainer = document.getElementById('tabla-efectivo-container');
+            if (tablaContainer) {
+                tablaContainer.classList.remove('hidden');
+            }
+            
+            // Marcar el botón Efectivo como activo
+            const btnEfectivo = document.querySelector('[data-forma="efectivo"]');
+            if (btnEfectivo) {
+                btnEfectivo.classList.add('ring-2', 'ring-green-500', 'bg-green-50');
+            }
+            
+            console.log('✅ Formas de pago cargadas:', pagosEfectivo.length);
+        }, 500);
+    });
+    {% else %}
+    // No hay formas de pago guardadas - crear pago en Efectivo con el total automáticamente
+    window.addEventListener('load', function() {
+        setTimeout(function() {
+            console.log('🔄 Creando pago Efectivo por defecto con total de factura...');
+            
+            // Calcular el total de la factura
+            const totalFactura = parseFloat('{{ factura.monto_general|default:0 }}') || 0;
+            console.log('💰 Total factura:', totalFactura);
+            
+            if (totalFactura > 0) {
+                // Agregar el pago a la lista
+                if (typeof pagosEfectivo === 'undefined') {
+                    window.pagosEfectivo = [];
+                }
+                pagosEfectivo.push({
+                    forma_pago: '01',  // Efectivo SRI
+                    valor: totalFactura,
+                    plazo: 0,
+                    unidad_tiempo: 'dias',
+                    banco: '',
+                    numero_cheque: '',
+                    fecha_cheque: ''
+                });
+                
+                // Actualizar la tabla de pagos
+                if (typeof actualizarTablaPagosEfectivo === 'function') {
+                    actualizarTablaPagosEfectivo();
+                }
+                
+                // Activar visualmente la sección de efectivo
+                if (typeof cambiarFormaPago === 'function') {
+                    cambiarFormaPago('efectivo');
+                }
+                
+                // Marcar el botón como activo
+                const btnEfectivo = document.querySelector('[data-forma="efectivo"]');
+                if (btnEfectivo) {
+                    btnEfectivo.classList.add('ring-2', 'ring-green-500', 'bg-green-50');
+                }
+                
+                console.log('✅ Pago Efectivo $' + totalFactura.toFixed(2) + ' agregado automáticamente');
+            }
+        }, 800);
+    });
+    {% endif %}
+    
+    console.log('✅ PRECARGA COMPLETADA');
+    
+    {% else %}
+    // Modo crear nueva factura - configurar fechas por defecto
     const hoy = new Date().toISOString().split('T')[0];
     const fechaEmision = document.getElementById('id_fecha_emision');
     const fechaVencimiento = document.getElementById('id_fecha_vencimiento');
@@ -917,25 +1116,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if (fechaVencimiento && !fechaVencimiento.value) {
         fechaVencimiento.value = hoy;
     }
+    {% endif %}
     
     // ✅ AGREGAR: Validación al enviar el formulario
     const formulario = document.querySelector('form');
     if (formulario) {
         formulario.addEventListener('submit', function(e) {
-            // 🔍 DEBUG: Mostrar qué se va a enviar
-            console.log('📤 ENVIANDO FORMULARIO...');
-            console.log('📦 productosAgregados:', JSON.stringify(productosAgregados, null, 2));
-            
-            // Mostrar campos ocultos
-            const container = document.getElementById('productos-hidden');
-            if (container) {
-                const inputs = container.querySelectorAll('input');
-                console.log('📋 Campos ocultos a enviar:');
-                inputs.forEach(inp => {
-                    console.log(`   ${inp.name} = ${inp.value}`);
-                });
-            }
-            
             if (!validarFormulario()) {
                 e.preventDefault();
                 return false;
@@ -1165,7 +1351,6 @@ function buscarProducto() {
                 document.getElementById('producto').value = `${producto.nombre} (${tipo})`;
                 document.getElementById('producto').dataset.precio = producto.precio;
                 document.getElementById('producto').dataset.ivaPercent = producto.iva_percent || '0.12';
-                document.getElementById('producto').dataset.ivaCodigo = producto.iva || '2';
                 document.getElementById('producto').dataset.precioCiva = producto.precio_con_iva;
                 document.getElementById('producto').dataset.codigo = producto.codigo;
             } else {
@@ -1308,7 +1493,6 @@ function agregarProducto() {
 
     let subtotal = (cantidad * precio);
     let ivaPercent = parseFloat(document.getElementById('producto').dataset.ivaPercent || '0.12');
-    let ivaCodigo = document.getElementById('producto').dataset.ivaCodigo || '2';
     
     // Calcular precio con IVA
     let precioConIva = precio * (1 + ivaPercent);
@@ -1328,8 +1512,7 @@ function agregarProducto() {
         precioConIva: precioConIva,
         subtotal: subtotal,
         totalConIva: totalConIva,
-        ivaPercent: ivaPercent,
-        ivaCodigo: ivaCodigo
+        ivaPercent: ivaPercent
     };
 
     productosAgregados.push(productoData);
@@ -1366,62 +1549,30 @@ function agregarFilaTabla(producto) {
     const ivaValor = (producto.precioConIva - producto.precio).toFixed(2);
     const ivaPorcentaje = (producto.ivaPercent * 100).toFixed(0);
     
-    // Opciones de IVA disponibles
-    const opcionesIVA = [
-        { valor: '0', texto: '0%', porcentaje: 0 },
-        { valor: '2', texto: '12%', porcentaje: 0.12 },
-        { valor: '4', texto: '15%', porcentaje: 0.15 },
-        { valor: '5', texto: '5%', porcentaje: 0.05 }
-    ];
-    
-    let selectIVAOptions = opcionesIVA.map(opt => 
-        `<option value="${opt.valor}" ${Math.abs(producto.ivaPercent - opt.porcentaje) < 0.01 ? 'selected' : ''}>${opt.texto}</option>`
-    ).join('');
-    
     nuevaFila.innerHTML = `
-        <td class="px-2 py-1">
-            <span class="codigo-display text-xs cursor-pointer hover:text-blue-600" onclick="this.style.display='none'; this.nextElementSibling.style.display='inline-block'; this.nextElementSibling.focus();">${producto.codigo}</span>
-            <input type="text" value="${producto.codigo}" class="codigo-editable hidden w-20 text-xs px-1 py-0.5" data-original="${producto.codigo}" onblur="this.style.display='none'; this.previousElementSibling.style.display='inline'; this.previousElementSibling.textContent=this.value;" />
-        </td>
-        <td class="text-xs px-2 py-1 celda-nombre">${producto.descripcionReemplazo ? `<span class="text-yellow-600" title="Descripción original: ${producto.nombre}">${producto.descripcionReemplazo}</span>` : producto.nombre}</td>
-        <td class="text-center px-2 py-1">
+        <td class="text-xs">${producto.codigo}</td>
+        <td class="text-xs">${producto.nombre}</td>
+        <td class="text-center">
             <div class="inline-flex items-center gap-1">
                 <button type="button" class="px-2 py-1 text-xs border rounded qty-btn" data-action="minus">-</button>
                 <input type="number" min="1" step="1" value="${producto.cantidad}" class="w-16 text-center text-xs border rounded cantidad-input" />
                 <button type="button" class="px-2 py-1 text-xs border rounded qty-btn" data-action="plus">+</button>
             </div>
         </td>
-        <td class="text-right px-2 py-1">
-            <div class="space-y-1">
-                <div class="flex items-center justify-end gap-1">
-                    <span class="text-xs text-gray-500">Base:</span>
-                    <span class="precio-display text-xs cursor-pointer hover:text-blue-600" onclick="this.style.display='none'; this.nextElementSibling.style.display='inline-block'; this.nextElementSibling.focus();">$${producto.precio.toFixed(2)}</span>
-                    <input type="number" step="0.01" min="0" value="${producto.precio.toFixed(2)}" class="precio-editable hidden w-20 text-xs text-right px-1 py-0.5" data-producto-id="${producto.id}" />
-                </div>
-                <div class="flex items-center justify-end gap-1">
-                    <span class="text-xs text-gray-500">IVA:</span>
-                    <span class="iva-display text-xs cursor-pointer hover:text-blue-600" onclick="this.style.display='none'; this.nextElementSibling.style.display='inline-block'; this.nextElementSibling.focus();">${producto.ivaPercent * 100}%</span>
-                    <select class="iva-editable hidden text-xs px-1 py-0.5" data-producto-id="${producto.id}">
-                        ${selectIVAOptions}
-                    </select>
-                </div>
-                <div class="font-bold text-xs precio-total-display">Total: $${producto.precioConIva.toFixed(2)}</div>
-            </div>
+        <td class="text-right text-xs">
+            <div>Base: $${producto.precio.toFixed(2)}</div>
+            <div class="text-gray-500">IVA ${ivaPorcentaje}%: $${ivaValor}</div>
+            <div class="font-bold">Total: $${producto.precioConIva.toFixed(2)}</div>
         </td>
-        <td class="subtotal text-right text-xs px-2 py-1">
+        <td class="subtotal text-right text-xs">
             <div>Base: $${producto.subtotal.toFixed(2)}</div>
             <div class="text-gray-500">IVA: $${(producto.totalConIva - producto.subtotal).toFixed(2)}</div>
             <div class="font-bold">Total: $${producto.totalConIva.toFixed(2)}</div>
         </td>
-        <td class="text-center px-2 py-1">
-            <div class="flex items-center justify-center gap-1">
-                <button type="button" class="btn-info-producto px-2 py-1 text-xs text-white bg-yellow-500 hover:bg-yellow-600 rounded ${producto.descripcionReemplazo || producto.infoAdicional ? 'tiene-info-adicional' : ''}" onclick="abrirModalInfo(${producto.id})" title="${producto.descripcionReemplazo || producto.infoAdicional ? 'Tiene información adicional' : 'Agregar información'}">
-                    <i class="fa fa-info-circle"></i>
-                </button>
-                <button type="button" class="px-2 py-1 text-xs text-white bg-red-600 hover:bg-red-700 rounded" onclick="eliminarProducto(${producto.id})">
-                    <i class="fa fa-trash"></i>
-                </button>
-            </div>
+        <td class="text-center">
+            <button type="button" class="px-2 py-1 text-xs text-white bg-red-600 hover:bg-red-700 rounded" onclick="eliminarProducto(${producto.id})">
+                <i class="fa fa-trash"></i>
+            </button>
         </td>
     `;
     
@@ -1444,150 +1595,6 @@ function agregarFilaTabla(producto) {
         inputCantidad.value = current;
         actualizarCantidad(producto.id, current);
     }));
-    
-    // ✅ Hook eventos de precio editable
-    const inputPrecio = nuevaFila.querySelector('.precio-editable');
-    if (inputPrecio) {
-        inputPrecio.addEventListener('change', () => {
-            const nuevoPrecio = parseFloat(inputPrecio.value) || 0;
-            console.log(`🔄 Precio CHANGE event: ${nuevoPrecio}`);
-            actualizarPrecioProducto(producto.id, nuevoPrecio);
-        });
-        inputPrecio.addEventListener('blur', () => {
-            const nuevoPrecio = parseFloat(inputPrecio.value) || 0;
-            console.log(`🔄 Precio BLUR event: ${nuevoPrecio}`);
-            // Ocultar input y mostrar span
-            inputPrecio.style.display = 'none';
-            const spanDisplay = inputPrecio.previousElementSibling;
-            if (spanDisplay) {
-                spanDisplay.style.display = 'inline';
-                spanDisplay.textContent = '$' + nuevoPrecio.toFixed(2);
-            }
-            actualizarPrecioProducto(producto.id, nuevoPrecio);
-        });
-    }
-    
-    // ✅ Hook eventos de IVA editable
-    const selectIVA = nuevaFila.querySelector('.iva-editable');
-    if (selectIVA) {
-        selectIVA.addEventListener('change', () => {
-            const nuevoIVACodigo = selectIVA.value;
-            console.log(`🔄 IVA CHANGE event: ${nuevoIVACodigo}`);
-            actualizarIVAProducto(producto.id, nuevoIVACodigo);
-        });
-        selectIVA.addEventListener('blur', () => {
-            const nuevoIVACodigo = selectIVA.value;
-            console.log(`🔄 IVA BLUR event: ${nuevoIVACodigo}`);
-            // Ocultar select y mostrar span
-            selectIVA.style.display = 'none';
-            const spanDisplay = selectIVA.previousElementSibling;
-            if (spanDisplay) {
-                spanDisplay.style.display = 'inline';
-                spanDisplay.textContent = selectIVA.options[selectIVA.selectedIndex].text;
-            }
-            actualizarIVAProducto(producto.id, nuevoIVACodigo);
-        });
-    }
-    
-    // ✅ Hook eventos de código editable
-    const inputCodigo = nuevaFila.querySelector('.codigo-editable');
-    if (inputCodigo) {
-        inputCodigo.addEventListener('change', () => {
-            const nuevoCodigo = inputCodigo.value.trim();
-            actualizarCodigoProducto(producto.id, nuevoCodigo);
-        });
-        inputCodigo.addEventListener('blur', () => {
-            const nuevoCodigo = inputCodigo.value.trim();
-            actualizarCodigoProducto(producto.id, nuevoCodigo);
-        });
-    }
-}
-
-// ✅ Función para actualizar precio del producto (solo para esta factura)
-function actualizarPrecioProducto(productoId, nuevoPrecio) {
-    console.log(`💰 actualizarPrecioProducto llamada: ID=${productoId}, nuevoPrecio=${nuevoPrecio}`);
-    
-    const idx = productosAgregados.findIndex(p => p.id === productoId);
-    if (idx === -1) {
-        console.log(`❌ Producto con ID ${productoId} NO encontrado en productosAgregados`);
-        return;
-    }
-    
-    const p = productosAgregados[idx];
-    console.log(`✅ Producto encontrado. Precio anterior: ${p.precio}, nuevo: ${nuevoPrecio}`);
-    
-    p.precio = nuevoPrecio;
-    p.precioConIva = Math.round((nuevoPrecio * (1 + p.ivaPercent)) * 100) / 100;
-    p.subtotal = p.precio * p.cantidad;
-    p.totalConIva = Math.round((p.precioConIva * p.cantidad) * 100) / 100;
-    
-    console.log(`📊 Después de actualización: precio=${p.precio}, precioConIva=${p.precioConIva}, ivaCodigo=${p.ivaCodigo}`);
-    
-    actualizarFilaUI(productoId, p);
-    actualizarCamposOcultos();
-    actualizarTotal();
-}
-
-// ✅ Función para actualizar IVA del producto (solo para esta factura)
-function actualizarIVAProducto(productoId, nuevoIVACodigo) {
-    console.log(`📊 actualizarIVAProducto llamada: ID=${productoId}, nuevoIVACodigo=${nuevoIVACodigo}`);
-    
-    const idx = productosAgregados.findIndex(p => p.id === productoId);
-    if (idx === -1) {
-        console.log(`❌ Producto con ID ${productoId} NO encontrado en productosAgregados`);
-        return;
-    }
-    
-    const p = productosAgregados[idx];
-    console.log(`✅ Producto encontrado. IVA anterior: ${p.ivaCodigo}, nuevo: ${nuevoIVACodigo}`);
-    
-    // Mapeo de códigos de IVA a porcentajes
-    const ivaMap = { '0': 0, '2': 0.12, '4': 0.15, '5': 0.05, '6': 0, '7': 0, '8': 0.08 };
-    p.ivaPercent = ivaMap[nuevoIVACodigo] || 0;
-    p.ivaCodigo = nuevoIVACodigo;
-    p.precioConIva = Math.round((p.precio * (1 + p.ivaPercent)) * 100) / 100;
-    p.subtotal = p.precio * p.cantidad;
-    p.totalConIva = Math.round((p.precioConIva * p.cantidad) * 100) / 100;
-    
-    console.log(`📊 Después de actualización IVA: ivaCodigo=${p.ivaCodigo}, ivaPercent=${p.ivaPercent}, precioConIva=${p.precioConIva}`);
-    
-    actualizarFilaUI(productoId, p);
-    actualizarCamposOcultos();
-    actualizarTotal();
-}
-
-// ✅ Función para actualizar código del producto (solo para esta factura)
-function actualizarCodigoProducto(productoId, nuevoCodigo) {
-    const idx = productosAgregados.findIndex(p => p.id === productoId);
-    if (idx === -1) return;
-    
-    const p = productosAgregados[idx];
-    p.codigoPersonalizado = nuevoCodigo;
-    
-    actualizarCamposOcultos();
-}
-
-// ✅ Función auxiliar para actualizar la UI de una fila
-function actualizarFilaUI(productoId, p) {
-    const fila = document.querySelector(`tr[data-producto-id="${productoId}"]`);
-    if (!fila) return;
-    
-    // Actualizar precio total display
-    const precioTotalDisplay = fila.querySelector('.precio-total-display');
-    if (precioTotalDisplay) {
-        precioTotalDisplay.textContent = `Total: $${p.precioConIva.toFixed(2)}`;
-    }
-    
-    // Actualizar subtotal
-    const tdSubtotal = fila.querySelector('td.subtotal');
-    if (tdSubtotal) {
-        const ivaValorTotal = (p.totalConIva - p.subtotal).toFixed(2);
-        tdSubtotal.innerHTML = `
-            <div>Base: $${p.subtotal.toFixed(2)}</div>
-            <div class="text-gray-500">IVA: $${ivaValorTotal}</div>
-            <div class="font-bold">Total: $${p.totalConIva.toFixed(2)}</div>
-        `;
-    }
 }
 
 function actualizarCantidad(productoId, nuevaCantidad) {
@@ -1674,22 +1681,12 @@ function actualizarCamposOcultos() {
     if (!container) return;
 
     container.innerHTML = '';
-    
-    console.log('🔄 actualizarCamposOcultos() - Estado actual de productos:', productosAgregados);
 
-    productosAgregados.forEach((producto, index) => {
-        console.log(`📦 Producto[${index}]:`, {
-            codigo: producto.codigoPersonalizado || producto.codigo,
-            precio: producto.precio,
-            ivaCodigo: producto.ivaCodigo,
-            cantidad: producto.cantidad
-        });
-        
-        // Código (puede ser personalizado)
+    productosAgregados.forEach((producto) => {
         let inputCodigo = document.createElement('input');
         inputCodigo.type = 'hidden';
         inputCodigo.name = 'productos_codigos[]';
-        inputCodigo.value = producto.codigoPersonalizado || producto.codigo;
+        inputCodigo.value = producto.codigo;
         container.appendChild(inputCodigo);
 
         let inputCantidad = document.createElement('input');
@@ -1703,34 +1700,6 @@ function actualizarCamposOcultos() {
         inputNombre.name = 'productos_nombres[]';
         inputNombre.value = producto.nombre;
         container.appendChild(inputNombre);
-        
-        // ✅ Precio personalizado (para esta factura)
-        let inputPrecio = document.createElement('input');
-        inputPrecio.type = 'hidden';
-        inputPrecio.name = 'productos_precios[]';
-        inputPrecio.value = producto.precio.toFixed(2);
-        container.appendChild(inputPrecio);
-        
-        // ✅ Código IVA personalizado (para esta factura)
-        let inputIVA = document.createElement('input');
-        inputIVA.type = 'hidden';
-        inputIVA.name = 'productos_ivas[]';
-        inputIVA.value = producto.ivaCodigo || '';
-        container.appendChild(inputIVA);
-        
-        // ✅ Descripción de reemplazo (para esta factura)
-        let inputDescReemplazo = document.createElement('input');
-        inputDescReemplazo.type = 'hidden';
-        inputDescReemplazo.name = 'productos_descripciones[]';
-        inputDescReemplazo.value = producto.descripcionReemplazo || '';
-        container.appendChild(inputDescReemplazo);
-        
-        // ✅ Información adicional (para esta factura - detalles adicionales SRI)
-        let inputInfoAdicional = document.createElement('input');
-        inputInfoAdicional.type = 'hidden';
-        inputInfoAdicional.name = 'productos_info_adicional[]';
-        inputInfoAdicional.value = producto.infoAdicional || '';
-        container.appendChild(inputInfoAdicional);
     });
 }
 
@@ -1756,25 +1725,35 @@ function actualizarTotal() {
         }
     }
     
-    // ✅ LIMPIAR pagos existentes cuando cambia el total (para evitar inconsistencias)
-    if (typeof pagosEfectivo !== 'undefined' && pagosEfectivo.length > 0) {
-        console.log('🔄 Total cambió, limpiando pagos anteriores:', pagosEfectivo);
-        pagosEfectivo = [];
-        totalPagado = 0;
-        if (typeof actualizarTablaPagosEfectivo === 'function') {
-            actualizarTablaPagosEfectivo();
+    // ✅ Si hay formas de pago precargadas y el total cambió, actualizar automáticamente
+    if (pagosEfectivo.length > 0) {
+        const totalPagosActual = pagosEfectivo.reduce((sum, p) => sum + (p.monto || 0), 0);
+        // Si el total cambió significativamente (más de $0.01 de diferencia)
+        if (Math.abs(totalPagosActual - totalRedondeado) > 0.01) {
+            console.log('🔄 Total cambió de $' + totalPagosActual.toFixed(2) + ' a $' + totalRedondeado.toFixed(2));
+            // Actualizar el monto del primer pago al nuevo total
+            if (pagosEfectivo.length === 1) {
+                pagosEfectivo[0].monto = totalRedondeado;
+                pagosEfectivo[0].valor = totalRedondeado;
+                console.log('✅ Pago actualizado a $' + totalRedondeado.toFixed(2));
+            }
         }
-        // También limpiar el campo hidden
-        const pagosInput = document.getElementById('pagos_efectivo_input');
-        if (pagosInput) {
-            pagosInput.value = '[]';
-            console.log('🧹 Campo pagos_efectivo_input limpiado');
+        // Siempre actualizar la tabla de pagos si hay pagos
+        actualizarTablaPagosEfectivo();
+        // Mostrar la tabla
+        const tablaContainer = document.getElementById('tabla-efectivo-container');
+        if (tablaContainer) {
+            tablaContainer.classList.remove('hidden');
         }
     }
     
     // Actualizar el monto de efectivo si está visible
     actualizarTotalPagado();
 }
+
+// ========== VARIABLES GLOBALES FORMAS DE PAGO ==========
+let pagosEfectivo = [];
+let totalPagado = 0;
 
 // ========== FUNCIONES DE FORMAS DE PAGO ==========
 function cambiarFormaPago(forma) {
@@ -2101,9 +2080,22 @@ function actualizarTotalPagado() {
     const montoPendiente = Math.max(0, totalFacturaRedondeado - totalPagado);
     
     const montoEfectivo = document.getElementById('monto-efectivo');
+    const montoContainer = document.getElementById('monto-container');
     const formaEfectivo = document.getElementById('forma-efectivo');
-    if (montoEfectivo && formaEfectivo && !formaEfectivo.classList.contains('hidden')) {
-        montoEfectivo.value = montoPendiente.toFixed(2);
+    
+    // Solo mostrar formulario si hay monto pendiente
+    if (montoPendiente > 0.01) {
+        if (montoContainer) {
+            montoContainer.classList.remove('hidden');
+        }
+        if (montoEfectivo) {
+            montoEfectivo.value = montoPendiente.toFixed(2);
+        }
+    } else {
+        // Ya está todo pagado, ocultar formulario
+        if (montoContainer) {
+            montoContainer.classList.add('hidden');
+        }
     }
     
     console.log('💰 Resumen de pagos:');
@@ -2136,21 +2128,17 @@ function validarFormulario() {
     formulario.querySelectorAll('input[name="productos_codigos[]"]').forEach(el => el.remove());
     formulario.querySelectorAll('input[name="productos_cantidades[]"]').forEach(el => el.remove());
     formulario.querySelectorAll('input[name="productos_nombres[]"]').forEach(el => el.remove());
-    formulario.querySelectorAll('input[name="productos_precios[]"]').forEach(el => el.remove());
-    formulario.querySelectorAll('input[name="productos_ivas[]"]').forEach(el => el.remove());
-    formulario.querySelectorAll('input[name="productos_descripciones[]"]').forEach(el => el.remove());
-    formulario.querySelectorAll('input[name="productos_info_adicional[]"]').forEach(el => el.remove());
 
     console.log('🧹 Campos anteriores eliminados');
     
     // Crear campos directamente en el formulario
     productosAgregados.forEach((producto, index) => {
-        console.log(`🔧 Creando campos para: ${producto.codigo} x ${producto.cantidad} @ $${producto.precio}`);
+        console.log(`🔧 Creando campos para: ${producto.codigo} x ${producto.cantidad}`);
         
         const inputCodigo = document.createElement('input');
         inputCodigo.type = 'hidden';
         inputCodigo.name = 'productos_codigos[]';
-        inputCodigo.value = producto.codigoPersonalizado || producto.codigo;
+        inputCodigo.value = producto.codigo;
         formulario.appendChild(inputCodigo);
         
         const inputCantidad = document.createElement('input');
@@ -2164,34 +2152,6 @@ function validarFormulario() {
         inputNombre.name = 'productos_nombres[]';
         inputNombre.value = producto.nombre;
         formulario.appendChild(inputNombre);
-        
-        // ✅ PRECIO PERSONALIZADO
-        const inputPrecio = document.createElement('input');
-        inputPrecio.type = 'hidden';
-        inputPrecio.name = 'productos_precios[]';
-        inputPrecio.value = producto.precio.toFixed(2);
-        formulario.appendChild(inputPrecio);
-        
-        // ✅ IVA PERSONALIZADO
-        const inputIVA = document.createElement('input');
-        inputIVA.type = 'hidden';
-        inputIVA.name = 'productos_ivas[]';
-        inputIVA.value = producto.ivaCodigo || '';
-        formulario.appendChild(inputIVA);
-        
-        // ✅ DESCRIPCIÓN REEMPLAZO
-        const inputDescReemplazo = document.createElement('input');
-        inputDescReemplazo.type = 'hidden';
-        inputDescReemplazo.name = 'productos_descripciones[]';
-        inputDescReemplazo.value = producto.descripcionReemplazo || '';
-        formulario.appendChild(inputDescReemplazo);
-        
-        // ✅ INFO ADICIONAL
-        const inputInfoAdicional = document.createElement('input');
-        inputInfoAdicional.type = 'hidden';
-        inputInfoAdicional.name = 'productos_info_adicional[]';
-        inputInfoAdicional.value = producto.infoAdicional || '';
-        formulario.appendChild(inputInfoAdicional);
     });
     
     // Verificar campos creados
@@ -2257,137 +2217,4 @@ function validarFormulario() {
 }
 
 </script>
-
-<!-- ✅ MODAL DE INFORMACIÓN ADICIONAL DEL PRODUCTO -->
-<div id="modalInfoProducto" class="modal-info-producto">
-    <div class="modal-info-content">
-        <h3>
-            <i class="fa fa-info-circle text-yellow-500 mr-2"></i>
-            <span id="modalInfoTitulo">Información del Producto</span>
-        </h3>
-        
-        <input type="hidden" id="modalInfoProductoId" value="">
-        
-        <label>
-            Remplazar Descripción:
-            <span><span id="contadorDescripcion">0</span>/300</span>
-        </label>
-        <input type="text" id="modalDescripcionReemplazo" maxlength="300" placeholder="Dejar vacío para usar descripción original">
-        
-        <label>
-            Agregar Información Ítem:
-            <span><span id="contadorInfoAdicional">0</span>/300</span>
-        </label>
-        <textarea id="modalInfoAdicional" maxlength="300" placeholder="Información adicional que aparecerá en detalles adicionales del RIDE"></textarea>
-        
-        <div class="modal-info-buttons">
-            <button type="button" class="btn-guardar-info" onclick="guardarInfoProducto()">
-                <i class="fa fa-save mr-1"></i> Guardar
-            </button>
-            <button type="button" class="btn-cancelar-info" onclick="cerrarModalInfo()">
-                <i class="fa fa-times mr-1"></i> Cancelar
-            </button>
-        </div>
-    </div>
-</div>
-
-<script>
-// ✅ FUNCIONES DEL MODAL DE INFORMACIÓN ADICIONAL
-function abrirModalInfo(productoId) {
-    const producto = productosAgregados.find(p => p.id === productoId);
-    if (!producto) return;
-    
-    document.getElementById('modalInfoProductoId').value = productoId;
-    document.getElementById('modalInfoTitulo').textContent = producto.nombre;
-    document.getElementById('modalDescripcionReemplazo').value = producto.descripcionReemplazo || '';
-    document.getElementById('modalInfoAdicional').value = producto.infoAdicional || '';
-    
-    // Actualizar contadores
-    actualizarContadorModal('modalDescripcionReemplazo', 'contadorDescripcion');
-    actualizarContadorModal('modalInfoAdicional', 'contadorInfoAdicional');
-    
-    document.getElementById('modalInfoProducto').classList.add('active');
-}
-
-function cerrarModalInfo() {
-    document.getElementById('modalInfoProducto').classList.remove('active');
-}
-
-function guardarInfoProducto() {
-    const productoId = parseInt(document.getElementById('modalInfoProductoId').value);
-    const descripcionReemplazo = document.getElementById('modalDescripcionReemplazo').value.trim();
-    const infoAdicional = document.getElementById('modalInfoAdicional').value.trim();
-    
-    const idx = productosAgregados.findIndex(p => p.id === productoId);
-    if (idx === -1) return;
-    
-    // Guardar en el objeto del producto
-    productosAgregados[idx].descripcionReemplazo = descripcionReemplazo;
-    productosAgregados[idx].infoAdicional = infoAdicional;
-    
-    // Actualizar el botón de info para indicar que tiene datos
-    const fila = document.querySelector(`tr[data-id="${productoId}"]`);
-    if (fila) {
-        const btnInfo = fila.querySelector('.btn-info-producto');
-        if (btnInfo) {
-            if (descripcionReemplazo || infoAdicional) {
-                btnInfo.classList.add('tiene-info-adicional');
-                btnInfo.title = 'Tiene información adicional';
-            } else {
-                btnInfo.classList.remove('tiene-info-adicional');
-                btnInfo.title = 'Agregar información';
-            }
-        }
-        
-        // Si hay descripción de reemplazo, mostrarla en la celda de nombre
-        const celdaNombre = fila.querySelector('.celda-nombre');
-        if (celdaNombre) {
-            if (descripcionReemplazo) {
-                celdaNombre.innerHTML = `<span class="text-yellow-600" title="Descripción original: ${productosAgregados[idx].nombre}">${descripcionReemplazo}</span>`;
-            } else {
-                celdaNombre.textContent = productosAgregados[idx].nombre;
-            }
-        }
-    }
-    
-    // Actualizar campos ocultos
-    actualizarCamposOcultos();
-    
-    cerrarModalInfo();
-}
-
-function actualizarContadorModal(inputId, contadorId) {
-    const input = document.getElementById(inputId);
-    const contador = document.getElementById(contadorId);
-    contador.textContent = input.value.length;
-}
-
-// Event listeners para contadores
-document.addEventListener('DOMContentLoaded', function() {
-    const descInput = document.getElementById('modalDescripcionReemplazo');
-    const infoInput = document.getElementById('modalInfoAdicional');
-    
-    if (descInput) {
-        descInput.addEventListener('input', () => actualizarContadorModal('modalDescripcionReemplazo', 'contadorDescripcion'));
-    }
-    if (infoInput) {
-        infoInput.addEventListener('input', () => actualizarContadorModal('modalInfoAdicional', 'contadorInfoAdicional'));
-    }
-    
-    // Cerrar modal con Escape
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            cerrarModalInfo();
-        }
-    });
-    
-    // Cerrar modal al hacer clic fuera
-    document.getElementById('modalInfoProducto').addEventListener('click', function(e) {
-        if (e.target === this) {
-            cerrarModalInfo();
-        }
-    });
-});
-</script>
-
 {% endblock %}

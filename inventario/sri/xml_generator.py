@@ -597,9 +597,12 @@ class SRIXMLGenerator:
             if codigo_auxiliar:
                 ET.SubElement(detalle_element, 'codigoAuxiliar').text = codigo_auxiliar
             
-            # Descripción
-            if hasattr(detalle, 'descripcion_xml'):
+            # Descripción - ✅ Usar descripcion_reemplazo si existe
+            if hasattr(detalle, 'descripcion_xml') and detalle.descripcion_xml:
                 descripcion = detalle.descripcion_xml
+            elif hasattr(detalle, 'descripcion_reemplazo') and detalle.descripcion_reemplazo:
+                # ✅ Usar descripción de reemplazo de DetalleFactura
+                descripcion = detalle.descripcion_reemplazo
             else:
                 if detalle.producto:
                     descripcion = detalle.producto.descripcion
@@ -630,8 +633,12 @@ class SRIXMLGenerator:
             # Cantidad y precios
             ET.SubElement(detalle_element, 'cantidad').text = self._formatear_decimal(detalle.cantidad)
             
+            # ✅ CORREGIDO: Usar precio_unitario del DetalleFactura si existe (precio personalizado)
             if hasattr(detalle, 'precio_unitario_xml'):
                 precio_unitario = detalle.precio_unitario_xml
+            elif hasattr(detalle, 'precio_unitario') and detalle.precio_unitario is not None:
+                # ✅ Usar precio personalizado guardado en DetalleFactura
+                precio_unitario = detalle.precio_unitario
             else:
                 if detalle.producto:
                     precio_unitario = detalle.producto.precio

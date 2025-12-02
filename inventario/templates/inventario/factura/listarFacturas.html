@@ -61,7 +61,34 @@
                 <div class="relative">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 space-y-2 sm:space-y-0 gap-3">
                         <h3 class="text-sm font-semibold text-gray-800">Facturas Registradas</h3>
-                        <div class="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
+                        <div class="flex items-center gap-2 flex-wrap flex-1 sm:flex-initial justify-end">
+                            <!-- Filtros de fecha -->
+                            <div class="flex items-center gap-1">
+                                <label class="text-xs text-gray-600">Desde:</label>
+                                <input 
+                                    type="date" 
+                                    id="fecha-desde" 
+                                    class="px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    onchange="filtrarPorFechas()"
+                                />
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <label class="text-xs text-gray-600">Hasta:</label>
+                                <input 
+                                    type="date" 
+                                    id="fecha-hasta" 
+                                    class="px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    onchange="filtrarPorFechas()"
+                                />
+                            </div>
+                            <button 
+                                onclick="limpiarFiltrosFecha()" 
+                                class="px-2 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors"
+                                title="Limpiar filtros de fecha"
+                            >
+                                <i class="fa fa-times"></i>
+                            </button>
+                            <!-- Buscador de texto -->
                             <div class="relative">
                                 <input 
                                     type="text" 
@@ -211,20 +238,19 @@
                                                     <i class="fa fa-minus-circle mr-2 text-red-500 action-icon"></i>
                                                     <span>Nota de Crédito</span>
                                                 </a>
-                                                <div class="border-t border-gray-100"></div>
-                                                <a href="/inventario/sri/xml/{{ fila.id }}" class="flex items-center w-full text-left px-3 py-1.5 text-xs text-purple-700 hover:bg-purple-50 hover:text-purple-900">
-                                                    <i class="fa fa-file-code-o mr-2 text-purple-500 action-icon"></i>
-                                                    <span>XML</span>
-                                                </a>
                                                 {% endif %}
                                                 <div class="border-t border-gray-100"></div>
                                                 <a href="/inventario/generarFactura/{{ fila.id }}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                                                     <i class="fa fa-file-text-o mr-2 text-gray-500 action-icon"></i>
                                                     <span>CSV</span>
                                                 </a>
-                                                <a href="/inventario/generarFacturaPDF/{{ fila.id }}" class="flex items-center px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 hover:text-red-700">
+                                                <a href="{% url 'inventario:generarFacturaPDF' fila.id %}" class="flex items-center px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 hover:text-red-700" target="_blank">
                                                     <i class="fa fa-file-pdf-o mr-2 text-red-500 action-icon"></i>
                                                     <span>PDF</span>
+                                                </a>
+                                                <a href="/inventario/sri/xml/{{ fila.id }}" class="flex items-center px-3 py-1.5 text-xs text-purple-700 hover:bg-purple-50 hover:text-purple-900" target="_blank">
+                                                    <i class="fa fa-file-code-o mr-2 text-purple-500 action-icon"></i>
+                                                    <span>XML</span>
                                                 </a>
                                             </div>
                                         </div>
@@ -327,18 +353,58 @@
 
     // ✅ FUNCIÓN DE BÚSQUEDA
     function buscarFactura() {
+        aplicarTodosLosFiltros();
+    }
+
+    // ✅ FUNCIÓN PARA FILTRAR POR FECHAS
+    function filtrarPorFechas() {
+        aplicarTodosLosFiltros();
+    }
+
+    // ✅ FUNCIÓN PARA LIMPIAR FILTROS DE FECHA
+    function limpiarFiltrosFecha() {
+        document.getElementById('fecha-desde').value = '';
+        document.getElementById('fecha-hasta').value = '';
+        aplicarTodosLosFiltros();
+    }
+
+    // ✅ FUNCIÓN PRINCIPAL QUE APLICA TODOS LOS FILTROS
+    function aplicarTodosLosFiltros() {
         const textoBusqueda = document.getElementById('buscar-factura').value.toLowerCase().trim();
+        const fechaDesde = document.getElementById('fecha-desde').value;
+        const fechaHasta = document.getElementById('fecha-hasta').value;
         
-        if (!textoBusqueda) {
-            // Si no hay búsqueda, mostrar todas las filas
-            filasFiltradas = [...filasOriginales];
-        } else {
-            // Filtrar filas basándose en el texto de búsqueda
-            filasFiltradas = filasOriginales.filter(fila => {
+        filasFiltradas = filasOriginales.filter(fila => {
+            // Filtro de texto
+            let cumpleTexto = true;
+            if (textoBusqueda) {
                 const textoFila = fila.textContent.toLowerCase();
-                return textoFila.includes(textoBusqueda);
-            });
-        }
+                cumpleTexto = textoFila.includes(textoBusqueda);
+            }
+            
+            // Filtro de fechas - la fecha está en la 3ra columna (índice 2)
+            let cumpleFecha = true;
+            if (fechaDesde || fechaHasta) {
+                const celdaFecha = fila.querySelectorAll('td')[2]; // 3ra columna
+                if (celdaFecha) {
+                    const textoFecha = celdaFecha.textContent.trim(); // Formato: dd/mm/yyyy
+                    const partes = textoFecha.split('/');
+                    if (partes.length === 3) {
+                        // Convertir dd/mm/yyyy a yyyy-mm-dd para comparación
+                        const fechaFila = `${partes[2]}-${partes[1]}-${partes[0]}`;
+                        
+                        if (fechaDesde && fechaFila < fechaDesde) {
+                            cumpleFecha = false;
+                        }
+                        if (fechaHasta && fechaFila > fechaHasta) {
+                            cumpleFecha = false;
+                        }
+                    }
+                }
+            }
+            
+            return cumpleTexto && cumpleFecha;
+        });
         
         // Actualizar contador visible
         const totalVisible = document.getElementById('total-visible');

@@ -95,9 +95,10 @@ class ProductoFormulario(forms.ModelForm):
 
     class Meta:
         model = Producto
-        fields = ['codigo', 'codigo_barras', 'descripcion', 'precio', 'precio2', 'categoria', 'disponible', 'iva', 'costo_actual', 'imagen']
+        fields = ['codigo', 'codigo_barras', 'descripcion', 'precio', 'precio2', 'categoria', 'tiene_inventario', 'disponible', 'iva', 'costo_actual', 'imagen']
         labels = {
             'descripcion': 'Descripción',
+            'tiene_inventario': '¿Tiene inventario?',
             'disponible': 'Disponible',
             'iva': 'I.V.A:',
             'costo_actual': 'Costo actual:',
@@ -108,6 +109,7 @@ class ProductoFormulario(forms.ModelForm):
             'codigo_barras': forms.TextInput(attrs={'placeholder': 'Código de barras del producto', 'id': 'codigo_barras', 'class': 'form-control'}),
             'descripcion': forms.TextInput(attrs={'placeholder': 'Descripción', 'id': 'descripcion', 'class': 'form-control'}),
             'categoria': forms.Select(attrs={'class': 'form-control', 'id': 'categoria'}),
+            'tiene_inventario': forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'tiene_inventario'}),
             'disponible': forms.NumberInput(attrs={'placeholder': 'Cantidad disponible', 'id': 'disponible', 'class': 'form-control', 'step': '1', 'min': '0'}),
             'costo_actual': forms.NumberInput(attrs={'placeholder': 'Costo actual', 'id': 'costo_actual', 'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'imagen': forms.FileInput(attrs={'class': 'form-control', 'id': 'imagen', 'accept': 'image/*'}),
@@ -595,7 +597,7 @@ class EmitirFacturaFormulario(forms.Form):
         required=False,
         widget=forms.Select(attrs={
             'class': 'form-control',
-            'id': 'almacen'
+            'id': 'id_almacen'
         })
     )
 
@@ -1539,10 +1541,10 @@ class FacturadorForm(forms.ModelForm):
             'placeholder': 'Ingrese la contraseña'
         }),
         label='Contraseña',
-        min_length=8,
+        min_length=3,
         required=False,  # No obligatorio al editar
         error_messages={
-            'min_length': 'La contraseña debe tener al menos 8 caracteres.',
+            'min_length': 'La contraseña debe tener al menos 3 caracteres.',
         }
     )
     verificar_password = forms.CharField(

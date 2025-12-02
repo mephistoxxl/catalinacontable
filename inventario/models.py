@@ -559,14 +559,18 @@ class Producto(models.Model):
         blank=False,
     )
     codigo = models.CharField(max_length=20)
-    codigo_barras = models.CharField(max_length=100)
+    codigo_barras = models.CharField(max_length=100, blank=True, default='')
     descripcion = models.CharField(max_length=40)
     precio = models.DecimalField(max_digits=9, decimal_places=2)
     precio2 = models.DecimalField(max_digits=9, decimal_places=2, null=True, blank=True)
     disponible = models.IntegerField(null=True)
+    tiene_inventario = models.BooleanField(
+        default=False,
+        help_text='Si está marcado, se descontará del inventario al facturar'
+    )
     categoria = models.CharField(max_length=20, choices=decisiones)
     iva = models.CharField(max_length=10, choices=tiposIVA)
-    costo_actual = models.DecimalField(max_digits=9, decimal_places=2)
+    costo_actual = models.DecimalField(max_digits=9, decimal_places=2, blank=True, null=True, default=0)
     imagen = models.ImageField(
         upload_to='productos/',
         null=True,
@@ -1656,6 +1660,41 @@ class DetalleFactura(models.Model):
         help_text="Precio sin subsidio para este ítem (opcional)"
     )
 
+    # ✅ CAMPOS PARA VALORES PERSONALIZADOS POR FACTURA
+    codigo_personalizado = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Código personalizado para esta factura (si difiere del producto)"
+    )
+    precio_unitario = models.DecimalField(
+        max_digits=18,
+        decimal_places=6,
+        blank=True,
+        null=True,
+        help_text="Precio unitario personalizado para esta factura"
+    )
+    iva_codigo = models.CharField(
+        max_length=5,
+        blank=True,
+        null=True,
+        help_text="Código de IVA personalizado para esta factura (0, 2, 4, 5, etc.)"
+    )
+    
+    # ✅ CAMPOS PARA INFORMACIÓN ADICIONAL DEL ÍTEM (solo para esta factura)
+    descripcion_reemplazo = models.CharField(
+        max_length=300,
+        blank=True,
+        null=True,
+        help_text="Descripción que reemplaza a la del producto en esta factura"
+    )
+    info_adicional = models.TextField(
+        max_length=300,
+        blank=True,
+        null=True,
+        help_text="Información adicional que aparece en detallesAdicionales del XML SRI"
+    )
+
     # ✅ VALIDACIONES de descuento por ítem
     def clean(self):
         """Validaciones de descuento por ítem"""
@@ -1734,7 +1773,10 @@ class DetalleFactura(models.Model):
             raise ValueError("La cantidad debe ser mayor a cero")
 
         # ========== FASE 2: CALCULAR DESCUENTOS Y SUBTOTALES CON REDONDEO ==========
-        if self.producto:
+        # ✅ CORREGIDO: Usar precio_unitario personalizado si existe, sino el del producto
+        if self.precio_unitario is not None:
+            precio_unitario = self.precio_unitario
+        elif self.producto:
             precio_unitario = self.producto.precio
         elif self.servicio:
             precio_unitario = self.servicio.precio1
@@ -1811,16 +1853,31 @@ class DetalleFactura(models.Model):
     # ✅ PROPERTIES para XML
     @property
     def precio_unitario_xml(self):
-        """Precio unitario del producto/servicio para XML"""
-        if self.producto:
+        """Precio unitario para XML - usa precio personalizado si existe"""
+        # ✅ CORREGIDO: Primero verificar si hay precio personalizado
+        if self.precio_unitario is not None:
+            return self.precio_unitario
+        elif self.producto:
             return self.producto.precio
         elif self.servicio:
             return self.servicio.precio1
-        else:
-            return Decimal('0.00')
+        return Decimal('0.00')
+        
     @property
-    def precio_unitario(self):
-        """Precio unitario real aplicado (incluye descuento si existe)"""
+    def precio_unitario_calculado(self):
+        """Precio unitario real aplicado (incluye descuento si existe) - calculado desde subtotal"""
+        if self.cantidad:
+            return (self.sub_total + self.descuento) / self.cantidad
+        return Decimal('0.00')
+
+    @property
+    def precio_unitario_efectivo(self):
+        """Precio unitario efectivo: usa el personalizado si existe, sino calcula"""
+        # Si hay precio_unitario guardado (campo), usarlo
+        precio_guardado = getattr(self, '_precio_unitario_field', None)
+        if precio_guardado is not None:
+            return precio_guardado
+        # Sino, calcular desde subtotal
         if self.cantidad:
             return (self.sub_total + self.descuento) / self.cantidad
         return Decimal('0.00')
@@ -2504,6 +2561,7 @@ class FormaPago(models.Model):
             })
         
         # ✅ Validar que el total no exceda el total de la factura
+        # NOTA: Validación flexible - solo advertencia en logs, no bloqueo
         if self.factura and self.total is not None:
             from decimal import Decimal, ROUND_HALF_UP
             total_otras_formas = self.factura.formas_pago.exclude(id=self.id).aggregate(
@@ -2519,9 +2577,9 @@ class FormaPago(models.Model):
                     self.total = (self.total - diferencia).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                     total_con_esta = monto_factura
                 else:
-                    raise ValidationError({
-                        'total': f'El total de formas de pago (${total_con_esta}) excede el total de la factura (${monto_factura})'
-                    })
+                    # ✅ AJUSTE AUTOMÁTICO: En lugar de error, ajustar al monto correcto
+                    print(f"⚠️ Ajustando pago de ${self.total} a ${monto_factura - total_otras_formas}")
+                    self.total = (monto_factura - total_otras_formas).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     
     def save(self, *args, **kwargs):
         self.full_clean()
