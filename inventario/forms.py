@@ -2045,11 +2045,17 @@ class FirmaElectronicaForm(forms.ModelForm):
         """Preserva la firma existente si no se sube una nueva"""
         firma = self.cleaned_data.get('firma_electronica')
         
-        # Si no se subió una nueva firma pero existe una en la instancia actual, preservarla
-        if not firma and self.instance and getattr(self.instance, 'firma_electronica', None):
+        # Si se subió una nueva firma, usarla
+        if firma and hasattr(firma, 'name'):
+            return firma
+        
+        # Si no se subió nueva firma, preservar la existente
+        if self.instance and self.instance.pk and self.instance.firma_electronica:
             return self.instance.firma_electronica
         
-        return firma
+        # Si firma es False explícitamente (checkbox clear), pero queremos preservar
+        # Solo retornar None si realmente no hay firma existente
+        return self.instance.firma_electronica if (self.instance and self.instance.pk) else firma
 
 from django import forms
 from .models import Servicio
