@@ -1899,8 +1899,11 @@ class DetalleFactura(models.Model):
 
     @property
     def descripcion_xml(self):
-        """Descripción del producto/servicio para XML"""
-        if self.producto:
+        """Descripción del producto/servicio para XML - usa descripcion_reemplazo si existe"""
+        # ✅ CORREGIDO: Usar descripcion_reemplazo si existe
+        if self.descripcion_reemplazo:
+            return self.descripcion_reemplazo
+        elif self.producto:
             return self.producto.descripcion
         elif self.servicio:
             return self.servicio.descripcion
