@@ -4045,7 +4045,23 @@ class ProformaDetalle(models.Model):
         ordering = ['id']
 
 # Función para crear detalles de factura a partir de códigos y cantidades
-def crear_detalles_factura(factura, codigos, cantidades, descuentos, porcentajes_descuento, errores):
+def crear_detalles_factura(factura, codigos, cantidades, descuentos=None, porcentajes_descuento=None, errores=None,
+                          precios=None, ivas=None, descripciones=None, info_adicionales=None):
+    """
+    Crea los detalles de una factura a partir de los datos proporcionados.
+    
+    Args:
+        factura: Instancia de Factura
+        codigos: Lista de códigos de productos/servicios
+        cantidades: Lista de cantidades
+        descuentos: Lista de descuentos (opcional)
+        porcentajes_descuento: Lista de porcentajes de descuento (opcional)
+        errores: Lista donde se agregarán los errores encontrados
+        precios: Lista de precios personalizados (opcional)
+        ivas: Lista de códigos IVA personalizados (opcional)
+        descripciones: Lista de descripciones de reemplazo (opcional)
+        info_adicionales: Lista de información adicional (opcional)
+    """
     from decimal import Decimal
 
     MAPEO_IVA_PORCENTAJES = {
@@ -4053,11 +4069,39 @@ def crear_detalles_factura(factura, codigos, cantidades, descuentos, porcentajes
         '3': 0.14, '4': 0.15, '6': 0.00, '7': 0.00, '8': 0.08
     }
 
+    if errores is None:
+        errores = []
+    
+    # Asegurar listas del mismo tamaño
+    n = len(codigos)
+    descuentos = descuentos or ['0'] * n
+    porcentajes_descuento = porcentajes_descuento or ['0'] * n
+    precios = precios or [None] * n
+    ivas = ivas or [None] * n
+    descripciones = descripciones or [''] * n
+    info_adicionales = info_adicionales or [''] * n
+    
+    # Extender listas si son más cortas
+    while len(descuentos) < n: descuentos.append('0')
+    while len(porcentajes_descuento) < n: porcentajes_descuento.append('0')
+    while len(precios) < n: precios.append(None)
+    while len(ivas) < n: ivas.append(None)
+    while len(descripciones) < n: descripciones.append('')
+    while len(info_adicionales) < n: info_adicionales.append('')
+
     # Asegurar que la factura tenga un ID antes de crear detalles
     if not factura.pk:
         factura.save()
 
-    for codigo, cantidad_str, descuento_str, porcentaje_str in zip(codigos, cantidades, descuentos, porcentajes_descuento):
+    for i, codigo in enumerate(codigos):
+        cantidad_str = cantidades[i] if i < len(cantidades) else '1'
+        descuento_str = descuentos[i] if i < len(descuentos) else '0'
+        porcentaje_str = porcentajes_descuento[i] if i < len(porcentajes_descuento) else '0'
+        precio_str = precios[i] if i < len(precios) else None
+        iva_codigo = ivas[i] if i < len(ivas) else None
+        descripcion_reemplazo = descripciones[i] if i < len(descripciones) else ''
+        info_adicional = info_adicionales[i] if i < len(info_adicionales) else ''
+        
         producto = Producto.objects.filter(empresa_id=factura.empresa_id, codigo=codigo).first()
         servicio = Servicio.objects.filter(empresa_id=factura.empresa_id, codigo=codigo).first()
         if not producto and not servicio:
@@ -4066,21 +4110,34 @@ def crear_detalles_factura(factura, codigos, cantidades, descuentos, porcentajes
 
         cantidad = int(cantidad_str)
         try:
-            descuento = Decimal(descuento_str)
+            descuento = Decimal(descuento_str) if descuento_str else Decimal('0.00')
         except:
             descuento = Decimal('0.00')
         try:
-            porcentaje_descuento = Decimal(porcentaje_str)
+            porcentaje_descuento = Decimal(porcentaje_str) if porcentaje_str else Decimal('0.00')
         except:
             porcentaje_descuento = Decimal('0.00')
+        
+        # Precio personalizado (si no viene, se usará None y el model property lo manejará)
+        precio_unitario = None
+        if precio_str and precio_str.strip():
+            try:
+                precio_unitario = Decimal(precio_str)
+            except:
+                precio_unitario = None
 
         DetalleFactura.objects.create(
             factura=factura,
+            empresa_id=factura.empresa_id,
             producto=producto if producto else None,
             servicio=servicio if servicio else None,
             cantidad=cantidad,
             descuento=descuento,
             porcentaje_descuento=porcentaje_descuento,
+            precio_unitario=precio_unitario,
+            iva_codigo=iva_codigo if iva_codigo and iva_codigo.strip() else None,
+            descripcion_reemplazo=descripcion_reemplazo if descripcion_reemplazo else None,
+            info_adicional=info_adicional if info_adicional else None,
         )
 
     factura.save()

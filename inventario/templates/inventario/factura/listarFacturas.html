@@ -349,6 +349,10 @@
         filasOriginales = Array.from(document.querySelectorAll('.factura-row'));
         filasFiltradas = [...filasOriginales];
         inicializarPaginacion();
+        
+        // ✅ Establecer fecha de hoy solo en "Hasta"
+        const hoy = new Date().toISOString().split('T')[0];
+        document.getElementById('fecha-hasta').value = hoy;
     });
 
     // ✅ FUNCIÓN DE BÚSQUEDA

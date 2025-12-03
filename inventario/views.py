@@ -4529,11 +4529,25 @@ class EditarFactura(LoginRequiredMixin, View):
                 FormaPago.objects.filter(factura=factura).delete()
 
                 # Crear nuevos detalles (reutilizando la lógica de emitir factura)
-                descuentos = request.POST.getlist('productos_descuentos[]') or request.POST.getlist('productos_descuentos')
-                porcentajes_descuento = request.POST.getlist('productos_porcentajes[]') or request.POST.getlist('productos_porcentajes')
+                descuentos = request.POST.getlist('productos_descuentos[]') or request.POST.getlist('productos_descuentos') or []
+                porcentajes_descuento = request.POST.getlist('productos_porcentajes[]') or request.POST.getlist('productos_porcentajes') or []
+                precios = request.POST.getlist('productos_precios[]') or request.POST.getlist('productos_precios') or []
+                ivas = request.POST.getlist('productos_ivas[]') or request.POST.getlist('productos_ivas') or []
+                descripciones = request.POST.getlist('productos_descripciones[]') or request.POST.getlist('productos_descripciones') or []
+                info_adicionales = request.POST.getlist('productos_info_adicional[]') or request.POST.getlist('productos_info_adicional') or []
+                
                 errores = []
                 
-                crear_detalles_factura(factura, codigos, cantidades, descuentos, porcentajes_descuento, errores)
+                crear_detalles_factura(
+                    factura, codigos, cantidades, 
+                    descuentos=descuentos, 
+                    porcentajes_descuento=porcentajes_descuento, 
+                    errores=errores,
+                    precios=precios,
+                    ivas=ivas,
+                    descripciones=descripciones,
+                    info_adicionales=info_adicionales
+                )
                 
                 if errores:
                     raise ValueError(f"Errores en productos: {', '.join(errores)}")
@@ -4547,20 +4561,26 @@ class EditarFactura(LoginRequiredMixin, View):
                 
                 for d in detalles:
                     # Determinar el código IVA del producto o servicio
-                    if d.producto:
+                    if d.iva_codigo:
+                        codigo_iva = d.iva_codigo
+                    elif d.producto:
                         codigo_iva = d.producto.iva
                     elif d.servicio:
                         codigo_iva = d.servicio.iva
                     else:
                         codigo_iva = '0'
                     
-                    if codigo_iva == '0' or codigo_iva == '6' or codigo_iva == '7':
-                        subtotal_sin_imp += d.sub_total or Decimal('0.00')
-                    else:
-                        subtotal_iva += d.sub_total or Decimal('0.00')
+                    sub = d.sub_total or Decimal('0.00')
+                    tot = d.total or Decimal('0.00')
+                    iva_detalle = tot - sub  # IVA = total - subtotal
                     
-                    iva_total += d.iva or Decimal('0.00')
-                    total_general += d.total or Decimal('0.00')
+                    if codigo_iva == '0' or codigo_iva == '6' or codigo_iva == '7':
+                        subtotal_sin_imp += sub
+                    else:
+                        subtotal_iva += sub
+                    
+                    iva_total += iva_detalle
+                    total_general += tot
                 
                 factura.sub_total_sin_impuesto = subtotal_sin_imp.quantize(Decimal('0.01'))
                 factura.sub_total_iva = subtotal_iva.quantize(Decimal('0.01'))

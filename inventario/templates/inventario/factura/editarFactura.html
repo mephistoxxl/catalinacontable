@@ -5,6 +5,100 @@
 /* Compact header/icon helpers */
 .form-header-icon { font-size: 16px !important; }
 .label-icon { font-size: 12px !important; width: 14px !important; text-align: center !important; }
+
+/* ✅ MODAL DE INFORMACIÓN ADICIONAL */
+.modal-info-producto {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+}
+.modal-info-producto.active {
+    display: flex;
+}
+.modal-info-content {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    width: 90%;
+    max-width: 450px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+.modal-info-content h3 {
+    margin: 0 0 15px 0;
+    font-size: 14px;
+    color: #333;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 10px;
+}
+.modal-info-content label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 5px;
+}
+.modal-info-content label span {
+    color: #999;
+    font-weight: normal;
+}
+.modal-info-content input,
+.modal-info-content textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 13px;
+    margin-bottom: 15px;
+}
+.modal-info-content textarea {
+    height: 70px;
+    resize: vertical;
+}
+.modal-info-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+}
+.modal-info-buttons button {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.btn-guardar-info {
+    background: #d4a500;
+    color: white;
+    border: none;
+}
+.btn-guardar-info:hover {
+    background: #b8920a;
+}
+.btn-cancelar-info {
+    background: #e5e7eb;
+    color: #333;
+    border: none;
+}
+.btn-cancelar-info:hover {
+    background: #d1d5db;
+}
+.tiene-info-adicional {
+    background: #f59e0b !important;
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
 /* ✅ ESTILOS COMPACTOS MEJORADOS PARA INPUTS */
 input[type="text"], 
 input[type="email"], 
@@ -947,19 +1041,24 @@ document.addEventListener('DOMContentLoaded', function() {
             {% if detalle.producto %}
             codigo: '{{ detalle.producto.codigo|default:""|escapejs }}',
             nombre: '{{ detalle.producto.descripcion|default:""|escapejs }}',
-            precio: parseFloat('{{ detalle.producto.precio|default:0 }}') || 0,
-            ivaPercent: parseFloat('{{ detalle.producto.iva|default:0.15 }}') || 0.15,
+            precioOriginal: parseFloat('{{ detalle.producto.precio|default:0 }}') || 0,
+            ivaPercentOriginal: parseFloat('{{ detalle.producto.iva|default:0.15 }}') || 0.15,
             {% elif detalle.servicio %}
             codigo: '{{ detalle.servicio.codigo|default:""|escapejs }}',
             nombre: '{{ detalle.servicio.descripcion|default:""|escapejs }}',
-            precio: parseFloat('{{ detalle.servicio.precio1|default:0 }}') || 0,
-            ivaPercent: 0.15,
+            precioOriginal: parseFloat('{{ detalle.servicio.precio1|default:0 }}') || 0,
+            ivaPercentOriginal: 0.15,
             {% else %}
             codigo: '[Sin código]',
             nombre: '[Sin descripción]',
-            precio: parseFloat('{{ detalle.sub_total|default:0 }}') / parseFloat('{{ detalle.cantidad|default:1 }}') || 0,
-            ivaPercent: 0.15,
+            precioOriginal: parseFloat('{{ detalle.sub_total|default:0 }}') / parseFloat('{{ detalle.cantidad|default:1 }}') || 0,
+            ivaPercentOriginal: 0.15,
             {% endif %}
+            // ✅ Datos personalizados del detalle de factura
+            precioPersonalizado: '{{ detalle.precio_unitario|default:"" }}' !== '' ? parseFloat('{{ detalle.precio_unitario|default:0 }}') : null,
+            ivaCodigo: '{{ detalle.iva_codigo|default:"" }}',
+            descripcionReemplazo: '{{ detalle.descripcion_reemplazo|default:""|escapejs }}',
+            infoAdicional: '{{ detalle.info_adicional|default:""|escapejs }}',
             cantidad: parseFloat('{{ detalle.cantidad|default:1 }}') || 1
         }{% if not forloop.last %},{% endif %}
         {% endfor %}
@@ -969,8 +1068,24 @@ document.addEventListener('DOMContentLoaded', function() {
     
     detallesData.forEach(function(detalle, index) {
         setTimeout(function() {
-            const precio = isNaN(detalle.precio) ? 0 : detalle.precio;
-            const ivaPercent = isNaN(detalle.ivaPercent) ? 0 : detalle.ivaPercent;
+            // Usar precio personalizado si existe, sino el original
+            const precio = detalle.precioPersonalizado !== null ? detalle.precioPersonalizado : (isNaN(detalle.precioOriginal) ? 0 : detalle.precioOriginal);
+            
+            // Determinar IVA desde código o usar original
+            let ivaPercent = detalle.ivaPercentOriginal;
+            let ivaCodigo = detalle.ivaCodigo || '';
+            if (ivaCodigo) {
+                const ivaMap = { '0': 0, '2': 0.12, '4': 0.15, '5': 0.05, '6': 0, '7': 0, '8': 0.08 };
+                ivaPercent = ivaMap[ivaCodigo] !== undefined ? ivaMap[ivaCodigo] : ivaPercent;
+            } else {
+                // Inferir código de IVA del porcentaje
+                if (Math.abs(ivaPercent - 0.15) < 0.01) ivaCodigo = '4';
+                else if (Math.abs(ivaPercent - 0.12) < 0.01) ivaCodigo = '2';
+                else if (Math.abs(ivaPercent - 0.05) < 0.01) ivaCodigo = '5';
+                else if (ivaPercent === 0) ivaCodigo = '0';
+                else ivaCodigo = '4';
+            }
+            
             const cantidad = isNaN(detalle.cantidad) ? 1 : detalle.cantidad;
             
             const precioConIva = precio * (1 + ivaPercent);
@@ -986,7 +1101,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 precioConIva: Math.round(precioConIva * 100) / 100,
                 subtotal: Math.round(subtotal * 100) / 100,
                 totalConIva: Math.round(totalConIva * 100) / 100,
-                ivaPercent: ivaPercent
+                ivaPercent: ivaPercent,
+                ivaCodigo: ivaCodigo,
+                descripcionReemplazo: detalle.descripcionReemplazo || '',
+                infoAdicional: detalle.infoAdicional || ''
             };
             
             console.log('📦 Cargando producto ' + (index + 1) + ':', producto);
@@ -1493,6 +1611,7 @@ function agregarProducto() {
 
     let subtotal = (cantidad * precio);
     let ivaPercent = parseFloat(document.getElementById('producto').dataset.ivaPercent || '0.12');
+    let ivaCodigo = document.getElementById('producto').dataset.ivaCodigo || '2';
     
     // Calcular precio con IVA
     let precioConIva = precio * (1 + ivaPercent);
@@ -1512,7 +1631,10 @@ function agregarProducto() {
         precioConIva: precioConIva,
         subtotal: subtotal,
         totalConIva: totalConIva,
-        ivaPercent: ivaPercent
+        ivaPercent: ivaPercent,
+        ivaCodigo: ivaCodigo,
+        descripcionReemplazo: '',
+        infoAdicional: ''
     };
 
     productosAgregados.push(productoData);
@@ -1549,30 +1671,62 @@ function agregarFilaTabla(producto) {
     const ivaValor = (producto.precioConIva - producto.precio).toFixed(2);
     const ivaPorcentaje = (producto.ivaPercent * 100).toFixed(0);
     
+    // Opciones de IVA disponibles
+    const opcionesIVA = [
+        { valor: '0', texto: '0%', porcentaje: 0 },
+        { valor: '2', texto: '12%', porcentaje: 0.12 },
+        { valor: '4', texto: '15%', porcentaje: 0.15 },
+        { valor: '5', texto: '5%', porcentaje: 0.05 }
+    ];
+    
+    let selectIVAOptions = opcionesIVA.map(opt => 
+        `<option value="${opt.valor}" ${Math.abs(producto.ivaPercent - opt.porcentaje) < 0.01 ? 'selected' : ''}>${opt.texto}</option>`
+    ).join('');
+    
     nuevaFila.innerHTML = `
-        <td class="text-xs">${producto.codigo}</td>
-        <td class="text-xs">${producto.nombre}</td>
-        <td class="text-center">
+        <td class="px-2 py-1">
+            <span class="codigo-display text-xs cursor-pointer hover:text-blue-600" onclick="this.style.display='none'; this.nextElementSibling.style.display='inline-block'; this.nextElementSibling.focus();">${producto.codigo}</span>
+            <input type="text" value="${producto.codigo}" class="codigo-editable hidden w-20 text-xs px-1 py-0.5" data-original="${producto.codigo}" onblur="this.style.display='none'; this.previousElementSibling.style.display='inline'; this.previousElementSibling.textContent=this.value;" />
+        </td>
+        <td class="text-xs px-2 py-1 celda-nombre">${producto.descripcionReemplazo ? `<span class="text-yellow-600" title="Descripción original: ${producto.nombre}">${producto.descripcionReemplazo}</span>` : producto.nombre}</td>
+        <td class="text-center px-2 py-1">
             <div class="inline-flex items-center gap-1">
                 <button type="button" class="px-2 py-1 text-xs border rounded qty-btn" data-action="minus">-</button>
                 <input type="number" min="1" step="1" value="${producto.cantidad}" class="w-16 text-center text-xs border rounded cantidad-input" />
                 <button type="button" class="px-2 py-1 text-xs border rounded qty-btn" data-action="plus">+</button>
             </div>
         </td>
-        <td class="text-right text-xs">
-            <div>Base: $${producto.precio.toFixed(2)}</div>
-            <div class="text-gray-500">IVA ${ivaPorcentaje}%: $${ivaValor}</div>
-            <div class="font-bold">Total: $${producto.precioConIva.toFixed(2)}</div>
+        <td class="text-right px-2 py-1">
+            <div class="space-y-1">
+                <div class="flex items-center justify-end gap-1">
+                    <span class="text-xs text-gray-500">Base:</span>
+                    <span class="precio-display text-xs cursor-pointer hover:text-blue-600" onclick="this.style.display='none'; this.nextElementSibling.style.display='inline-block'; this.nextElementSibling.focus();">$${producto.precio.toFixed(2)}</span>
+                    <input type="number" step="0.01" min="0" value="${producto.precio.toFixed(2)}" class="precio-editable hidden w-20 text-xs text-right px-1 py-0.5" data-producto-id="${producto.id}" />
+                </div>
+                <div class="flex items-center justify-end gap-1">
+                    <span class="text-xs text-gray-500">IVA:</span>
+                    <span class="iva-display text-xs cursor-pointer hover:text-blue-600" onclick="this.style.display='none'; this.nextElementSibling.style.display='inline-block'; this.nextElementSibling.focus();">${producto.ivaPercent * 100}%</span>
+                    <select class="iva-editable hidden text-xs px-1 py-0.5" data-producto-id="${producto.id}">
+                        ${selectIVAOptions}
+                    </select>
+                </div>
+                <div class="font-bold text-xs precio-total-display">Total: $${producto.precioConIva.toFixed(2)}</div>
+            </div>
         </td>
-        <td class="subtotal text-right text-xs">
+        <td class="subtotal text-right text-xs px-2 py-1">
             <div>Base: $${producto.subtotal.toFixed(2)}</div>
             <div class="text-gray-500">IVA: $${(producto.totalConIva - producto.subtotal).toFixed(2)}</div>
             <div class="font-bold">Total: $${producto.totalConIva.toFixed(2)}</div>
         </td>
-        <td class="text-center">
-            <button type="button" class="px-2 py-1 text-xs text-white bg-red-600 hover:bg-red-700 rounded" onclick="eliminarProducto(${producto.id})">
-                <i class="fa fa-trash"></i>
-            </button>
+        <td class="text-center px-2 py-1">
+            <div class="flex items-center justify-center gap-1">
+                <button type="button" class="btn-info-producto px-2 py-1 text-xs text-white bg-yellow-500 hover:bg-yellow-600 rounded ${producto.descripcionReemplazo || producto.infoAdicional ? 'tiene-info-adicional' : ''}" onclick="abrirModalInfo(${producto.id})" title="${producto.descripcionReemplazo || producto.infoAdicional ? 'Tiene información adicional' : 'Agregar información'}">
+                    <i class="fa fa-info-circle"></i>
+                </button>
+                <button type="button" class="px-2 py-1 text-xs text-white bg-red-600 hover:bg-red-700 rounded" onclick="eliminarProducto(${producto.id})">
+                    <i class="fa fa-trash"></i>
+                </button>
+            </div>
         </td>
     `;
     
@@ -1595,6 +1749,54 @@ function agregarFilaTabla(producto) {
         inputCantidad.value = current;
         actualizarCantidad(producto.id, current);
     }));
+    
+    // ✅ Hook eventos de precio editable
+    const inputPrecio = nuevaFila.querySelector('.precio-editable');
+    if (inputPrecio) {
+        inputPrecio.addEventListener('change', () => {
+            const nuevoPrecio = parseFloat(inputPrecio.value) || 0;
+            actualizarPrecioProducto(producto.id, nuevoPrecio);
+        });
+        inputPrecio.addEventListener('blur', () => {
+            const nuevoPrecio = parseFloat(inputPrecio.value) || 0;
+            inputPrecio.style.display = 'none';
+            const spanDisplay = inputPrecio.previousElementSibling;
+            if (spanDisplay) {
+                spanDisplay.style.display = 'inline';
+                spanDisplay.textContent = '$' + nuevoPrecio.toFixed(2);
+            }
+            actualizarPrecioProducto(producto.id, nuevoPrecio);
+        });
+    }
+    
+    // ✅ Hook eventos de IVA editable
+    const selectIVA = nuevaFila.querySelector('.iva-editable');
+    if (selectIVA) {
+        selectIVA.addEventListener('change', () => {
+            const nuevoIVACodigo = selectIVA.value;
+            actualizarIVAProducto(producto.id, nuevoIVACodigo);
+        });
+        selectIVA.addEventListener('blur', () => {
+            selectIVA.style.display = 'none';
+            const spanDisplay = selectIVA.previousElementSibling;
+            if (spanDisplay) {
+                spanDisplay.style.display = 'inline';
+                const idx = productosAgregados.findIndex(p => p.id === producto.id);
+                if (idx !== -1) {
+                    spanDisplay.textContent = (productosAgregados[idx].ivaPercent * 100) + '%';
+                }
+            }
+        });
+    }
+    
+    // ✅ Hook eventos de código editable
+    const inputCodigo = nuevaFila.querySelector('.codigo-editable');
+    if (inputCodigo) {
+        inputCodigo.addEventListener('blur', () => {
+            const nuevoCodigo = inputCodigo.value.trim();
+            actualizarCodigoProducto(producto.id, nuevoCodigo);
+        });
+    }
 }
 
 function actualizarCantidad(productoId, nuevaCantidad) {
@@ -1607,20 +1809,80 @@ function actualizarCantidad(productoId, nuevaCantidad) {
     p.totalConIva = Math.round((p.precioConIva * cantidad) * 100) / 100;
     
     // Actualizar UI de la fila
-    const fila = document.querySelector(`tr[data-producto-id="${productoId}"]`);
-    if (fila) {
-        const tdSubtotal = fila.querySelector('td.subtotal');
-        if (tdSubtotal) {
-            tdSubtotal.innerHTML = `
-                <div>Base: $${p.subtotal.toFixed(2)}</div>
-                <div class="text-gray-500">IVA: $${(p.totalConIva - p.subtotal).toFixed(2)}</div>
-                <div class="font-bold">Total: $${p.totalConIva.toFixed(2)}</div>
-            `;
-        }
-    }
+    actualizarFilaUI(productoId, p);
     
     actualizarCamposOcultos();
     actualizarTotal();
+}
+
+// ✅ Función para actualizar precio del producto (solo para esta factura)
+function actualizarPrecioProducto(productoId, nuevoPrecio) {
+    const idx = productosAgregados.findIndex(p => p.id === productoId);
+    if (idx === -1) return;
+    
+    const p = productosAgregados[idx];
+    p.precio = nuevoPrecio;
+    p.precioConIva = Math.round((nuevoPrecio * (1 + p.ivaPercent)) * 100) / 100;
+    p.subtotal = p.precio * p.cantidad;
+    p.totalConIva = Math.round((p.precioConIva * p.cantidad) * 100) / 100;
+    
+    actualizarFilaUI(productoId, p);
+    actualizarCamposOcultos();
+    actualizarTotal();
+}
+
+// ✅ Función para actualizar IVA del producto (solo para esta factura)
+function actualizarIVAProducto(productoId, nuevoIVACodigo) {
+    const idx = productosAgregados.findIndex(p => p.id === productoId);
+    if (idx === -1) return;
+    
+    const p = productosAgregados[idx];
+    
+    // Mapeo de códigos de IVA a porcentajes
+    const ivaMap = { '0': 0, '2': 0.12, '4': 0.15, '5': 0.05, '6': 0, '7': 0, '8': 0.08 };
+    p.ivaPercent = ivaMap[nuevoIVACodigo] || 0;
+    p.ivaCodigo = nuevoIVACodigo;
+    p.precioConIva = Math.round((p.precio * (1 + p.ivaPercent)) * 100) / 100;
+    p.subtotal = p.precio * p.cantidad;
+    p.totalConIva = Math.round((p.precioConIva * p.cantidad) * 100) / 100;
+    
+    actualizarFilaUI(productoId, p);
+    actualizarCamposOcultos();
+    actualizarTotal();
+}
+
+// ✅ Función para actualizar código del producto (solo para esta factura)
+function actualizarCodigoProducto(productoId, nuevoCodigo) {
+    const idx = productosAgregados.findIndex(p => p.id === productoId);
+    if (idx === -1) return;
+    
+    const p = productosAgregados[idx];
+    p.codigoPersonalizado = nuevoCodigo;
+    
+    actualizarCamposOcultos();
+}
+
+// ✅ Función auxiliar para actualizar la UI de una fila
+function actualizarFilaUI(productoId, p) {
+    const fila = document.querySelector(`tr[data-producto-id="${productoId}"]`);
+    if (!fila) return;
+    
+    // Actualizar precio total display
+    const precioTotalDisplay = fila.querySelector('.precio-total-display');
+    if (precioTotalDisplay) {
+        precioTotalDisplay.textContent = `Total: $${p.precioConIva.toFixed(2)}`;
+    }
+    
+    // Actualizar subtotal
+    const tdSubtotal = fila.querySelector('td.subtotal');
+    if (tdSubtotal) {
+        const ivaValorTotal = (p.totalConIva - p.subtotal).toFixed(2);
+        tdSubtotal.innerHTML = `
+            <div>Base: $${p.subtotal.toFixed(2)}</div>
+            <div class="text-gray-500">IVA: $${ivaValorTotal}</div>
+            <div class="font-bold">Total: $${p.totalConIva.toFixed(2)}</div>
+        `;
+    }
 }
 
 function eliminarProducto(productoId) {
@@ -1683,10 +1945,11 @@ function actualizarCamposOcultos() {
     container.innerHTML = '';
 
     productosAgregados.forEach((producto) => {
+        // Código (puede ser personalizado)
         let inputCodigo = document.createElement('input');
         inputCodigo.type = 'hidden';
         inputCodigo.name = 'productos_codigos[]';
-        inputCodigo.value = producto.codigo;
+        inputCodigo.value = producto.codigoPersonalizado || producto.codigo;
         container.appendChild(inputCodigo);
 
         let inputCantidad = document.createElement('input');
@@ -1700,6 +1963,34 @@ function actualizarCamposOcultos() {
         inputNombre.name = 'productos_nombres[]';
         inputNombre.value = producto.nombre;
         container.appendChild(inputNombre);
+        
+        // ✅ Precio personalizado (para esta factura)
+        let inputPrecio = document.createElement('input');
+        inputPrecio.type = 'hidden';
+        inputPrecio.name = 'productos_precios[]';
+        inputPrecio.value = producto.precio.toFixed(2);
+        container.appendChild(inputPrecio);
+        
+        // ✅ Código IVA personalizado (para esta factura)
+        let inputIVA = document.createElement('input');
+        inputIVA.type = 'hidden';
+        inputIVA.name = 'productos_ivas[]';
+        inputIVA.value = producto.ivaCodigo || '';
+        container.appendChild(inputIVA);
+        
+        // ✅ Descripción de reemplazo (para esta factura)
+        let inputDescReemplazo = document.createElement('input');
+        inputDescReemplazo.type = 'hidden';
+        inputDescReemplazo.name = 'productos_descripciones[]';
+        inputDescReemplazo.value = producto.descripcionReemplazo || '';
+        container.appendChild(inputDescReemplazo);
+        
+        // ✅ Información adicional (para esta factura - detalles adicionales SRI)
+        let inputInfoAdicional = document.createElement('input');
+        inputInfoAdicional.type = 'hidden';
+        inputInfoAdicional.name = 'productos_info_adicional[]';
+        inputInfoAdicional.value = producto.infoAdicional || '';
+        container.appendChild(inputInfoAdicional);
     });
 }
 
@@ -2216,5 +2507,132 @@ function validarFormulario() {
     return true;
 }
 
+</script>
+
+<!-- ✅ MODAL DE INFORMACIÓN ADICIONAL DEL PRODUCTO -->
+<div id="modalInfoProducto" class="modal-info-producto">
+    <div class="modal-info-content">
+        <h3>
+            <i class="fa fa-info-circle text-yellow-500 mr-2"></i>
+            <span id="modalInfoTitulo">Información del Producto</span>
+        </h3>
+        
+        <input type="hidden" id="modalInfoProductoId" value="">
+        
+        <label>
+            Remplazar Descripción:
+            <span><span id="contadorDescripcion">0</span>/300</span>
+        </label>
+        <input type="text" id="modalDescripcionReemplazo" maxlength="300" placeholder="Dejar vacío para usar descripción original">
+        
+        <label>
+            Agregar Información Ítem:
+            <span><span id="contadorInfoAdicional">0</span>/300</span>
+        </label>
+        <textarea id="modalInfoAdicional" maxlength="300" placeholder="Información adicional que aparecerá en detalles adicionales del RIDE"></textarea>
+        
+        <div class="modal-info-buttons">
+            <button type="button" class="btn-guardar-info" onclick="guardarInfoProducto()">
+                <i class="fa fa-save mr-1"></i> Guardar
+            </button>
+            <button type="button" class="btn-cancelar-info" onclick="cerrarModalInfo()">
+                <i class="fa fa-times mr-1"></i> Cancelar
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ✅ FUNCIONES DEL MODAL DE INFORMACIÓN ADICIONAL
+function abrirModalInfo(productoId) {
+    const producto = productosAgregados.find(p => p.id === productoId);
+    if (!producto) return;
+    
+    document.getElementById('modalInfoProductoId').value = productoId;
+    document.getElementById('modalInfoTitulo').textContent = producto.nombre;
+    document.getElementById('modalDescripcionReemplazo').value = producto.descripcionReemplazo || '';
+    document.getElementById('modalInfoAdicional').value = producto.infoAdicional || '';
+    
+    // Actualizar contadores
+    actualizarContadorModal('modalDescripcionReemplazo', 'contadorDescripcion');
+    actualizarContadorModal('modalInfoAdicional', 'contadorInfoAdicional');
+    
+    document.getElementById('modalInfoProducto').classList.add('active');
+}
+
+function cerrarModalInfo() {
+    document.getElementById('modalInfoProducto').classList.remove('active');
+}
+
+function guardarInfoProducto() {
+    const productoId = parseInt(document.getElementById('modalInfoProductoId').value);
+    const descripcionReemplazo = document.getElementById('modalDescripcionReemplazo').value.trim();
+    const infoAdicional = document.getElementById('modalInfoAdicional').value.trim();
+    
+    const idx = productosAgregados.findIndex(p => p.id === productoId);
+    if (idx === -1) return;
+    
+    // Guardar en el objeto del producto
+    productosAgregados[idx].descripcionReemplazo = descripcionReemplazo;
+    productosAgregados[idx].infoAdicional = infoAdicional;
+    
+    // Actualizar el botón de info para indicar que tiene datos
+    const fila = document.querySelector(`tr[data-producto-id="${productoId}"]`);
+    if (fila) {
+        const btnInfo = fila.querySelector('.btn-info-producto');
+        if (btnInfo) {
+            if (descripcionReemplazo || infoAdicional) {
+                btnInfo.classList.add('tiene-info-adicional');
+                btnInfo.title = 'Tiene información adicional';
+            } else {
+                btnInfo.classList.remove('tiene-info-adicional');
+                btnInfo.title = 'Agregar información';
+            }
+        }
+        
+        // Si hay descripción de reemplazo, mostrarla en la celda de nombre
+        const celdaNombre = fila.querySelector('.celda-nombre');
+        if (celdaNombre) {
+            if (descripcionReemplazo) {
+                celdaNombre.innerHTML = `<span class="text-yellow-600" title="Descripción original: ${productosAgregados[idx].nombre}">${descripcionReemplazo}</span>`;
+            } else {
+                celdaNombre.textContent = productosAgregados[idx].nombre;
+            }
+        }
+    }
+    
+    // Actualizar campos ocultos
+    actualizarCamposOcultos();
+    
+    cerrarModalInfo();
+}
+
+function actualizarContadorModal(inputId, contadorId) {
+    const input = document.getElementById(inputId);
+    const contador = document.getElementById(contadorId);
+    if (input && contador) {
+        contador.textContent = input.value.length;
+        input.addEventListener('input', () => {
+            contador.textContent = input.value.length;
+        });
+    }
+}
+
+// Inicializar contadores cuando el modal se abre
+document.addEventListener('DOMContentLoaded', function() {
+    const inputDesc = document.getElementById('modalDescripcionReemplazo');
+    const inputInfo = document.getElementById('modalInfoAdicional');
+    
+    if (inputDesc) {
+        inputDesc.addEventListener('input', function() {
+            document.getElementById('contadorDescripcion').textContent = this.value.length;
+        });
+    }
+    if (inputInfo) {
+        inputInfo.addEventListener('input', function() {
+            document.getElementById('contadorInfoAdicional').textContent = this.value.length;
+        });
+    }
+});
 </script>
 {% endblock %}
