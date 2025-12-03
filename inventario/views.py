@@ -8422,6 +8422,7 @@ def crear_cliente_api(request):
       razon_social (si falta usa identificacion)
       correo (opcional)
       direccion (opcional, por defecto 'NO ESPECIFICADA')
+      telefono (opcional)
     Reglas:
       - Detecta tipoIdentificacion por longitud (13=RUC->'04',10=cedula->'05',otros->'08')
       - Si ya existe retorna ese cliente (idempotente)
@@ -8459,6 +8460,7 @@ def crear_cliente_api(request):
         razon_social = _val('razon_social') or identificacion
         correo = _val('correo')
         direccion = _val('direccion') or 'NO ESPECIFICADA'
+        telefono = _val('telefono')
         # Log breve para debug (se puede bajar a debug luego)
         logger.debug(f"[crear_cliente_api] payload normalizado id={identificacion} razon={razon_social}")
         # Heurística tipo identificacion
@@ -8481,7 +8483,7 @@ def crear_cliente_api(request):
                 razon_social=razon_social,
                 nombre_comercial='',
                 direccion=direccion,
-                telefono='',
+                telefono=telefono or '',
                 correo=correo or '',
                 observaciones='',
                 convencional='',

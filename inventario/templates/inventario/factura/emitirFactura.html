@@ -1097,12 +1097,18 @@ function crearClienteAutomatico(identificacion){
     // Paso 1: intentar obtener datos externos (si hay endpoint de consulta)
     let tipo = '';
     if(identificacion.length === 13) tipo = '04'; else if(identificacion.length === 10) tipo = '05';
-    const construirYCrear = (razon) => {
-        const razon_final = (razon && razon.trim()) ? razon.trim() : identificacion;
+    const construirYCrear = (datosCliente) => {
+        const razon_final = (datosCliente.razon_social && datosCliente.razon_social.trim()) ? datosCliente.razon_social.trim() : identificacion;
         fetch('/inventario/api/clientes/crear', {
             method: 'POST',
             headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({identificacion: identificacion, razon_social: razon_final})
+            body: JSON.stringify({
+                identificacion: identificacion,
+                razon_social: razon_final,
+                direccion: datosCliente.direccion || '',
+                correo: datosCliente.correo || '',
+                telefono: datosCliente.telefono || ''
+            })
         })
             .then(r=>r.json())
             .then(resp=>{
@@ -1120,21 +1126,26 @@ function crearClienteAutomatico(identificacion){
             });
     };
     if(!tipo){
-        return construirYCrear('');
+        return construirYCrear({});
     }
     fetch(`/inventario/consultar-identificacion/?identificacion=${encodeURIComponent(identificacion)}&tipo=${tipo}`)
         .then(r=>r.json())
         .then(data=>{
             if(!data.error){
-                // intentar diferentes campos que podría devolver el servicio
-                const razon = data.razonSocial || data.razon_social || data.nombre || data.name || '';
-                construirYCrear(razon);
+                // Extraer todos los datos disponibles del servicio externo
+                const datosCliente = {
+                    razon_social: data.razonSocial || data.razon_social || data.nombre || data.name || '',
+                    direccion: data.direccion || '',
+                    correo: data.email || data.correo || '',
+                    telefono: data.telefono || ''
+                };
+                construirYCrear(datosCliente);
             } else {
-                construirYCrear('');
+                construirYCrear({});
             }
         })
         .catch(()=>{
-            construirYCrear('');
+            construirYCrear({});
         });
 }
 
