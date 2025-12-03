@@ -6775,7 +6775,12 @@ class FirmaElectronicaView(LoginRequiredMixin, View):
                 return redirect('inventario:firma_electronica')
                 
             except ValidationError as e:
-                messages.error(request, f'Error de validación: {e.message}')
+                # ValidationError puede tener messages (lista) o message (string)
+                if hasattr(e, 'messages'):
+                    for msg in e.messages:
+                        messages.error(request, f'Error de validación: {msg}')
+                else:
+                    messages.error(request, f'Error de validación: {str(e)}')
             except Exception as e:
                 messages.error(request, f'Error al guardar la firma electrónica: {str(e)}')
                 # En caso de error, mantener el formulario con los datos ingresados
