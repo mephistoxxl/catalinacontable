@@ -456,8 +456,11 @@ class RIDEGenerator:
                     elif detalle.servicio:
                         cod_principal = detalle.servicio.codigo
 
-                cantidad = f"{getattr(detalle, 'cantidad', 1):.2f}"
-                unidad = getattr(detalle, 'unidad_medida', 'UND')
+                # ✅ PROTECCIÓN: Asegurar que valores numéricos no sean None
+                cantidad_raw = getattr(detalle, 'cantidad', 1)
+                cantidad_val = float(cantidad_raw) if cantidad_raw is not None else 1.0
+                cantidad = f"{cantidad_val:.2f}"
+                unidad = getattr(detalle, 'unidad_medida', 'UND') or 'UND'
 
                 descripcion = getattr(detalle, 'descripcion', None)
                 if not descripcion:
@@ -468,12 +471,23 @@ class RIDEGenerator:
                     else:
                         descripcion = str(detalle)
 
-                precio_unitario = f"${getattr(detalle, 'precio_unitario', getattr(detalle, 'precio', 0.0)):.2f}"
-                descuento = f"${getattr(detalle, 'descuento', 0.0):.2f}"
+                # ✅ PROTECCIÓN: Obtener precio_unitario con fallbacks seguros
+                precio_unitario_raw = getattr(detalle, 'precio_unitario', None)
+                if precio_unitario_raw is None:
+                    precio_unitario_raw = getattr(detalle, 'precio', None)
+                if precio_unitario_raw is None:
+                    if detalle.producto:
+                        precio_unitario_raw = detalle.producto.precio
+                    elif detalle.servicio:
+                        precio_unitario_raw = detalle.servicio.precio1
+                precio_unitario_val = float(precio_unitario_raw) if precio_unitario_raw is not None else 0.0
+                
+                descuento_raw = getattr(detalle, 'descuento', 0)
+                descuento_val = float(descuento_raw) if descuento_raw is not None else 0.0
+                
+                precio_unitario = f"${precio_unitario_val:.2f}"
+                descuento = f"${descuento_val:.2f}"
                 # Calculate subtotal without IVA: (precio_unitario * cantidad) - descuento
-                precio_unitario_val = float(getattr(detalle, 'precio_unitario', getattr(detalle, 'precio', 0.0)))
-                cantidad_val = float(getattr(detalle, 'cantidad', 1))
-                descuento_val = float(getattr(detalle, 'descuento', 0.0))
                 subtotal = (precio_unitario_val * cantidad_val) - descuento_val
                 precio_total = f"${subtotal:.2f}"
                 fila = [
@@ -544,24 +558,33 @@ class RIDEGenerator:
             ivas = {}
 
             for ti in factura.totales_impuestos.all():
+                # ✅ PROTECCIÓN: Asegurar valores no sean None
+                tarifa = float(ti.tarifa) if ti.tarifa is not None else 0.0
+                base_imponible = float(ti.base_imponible) if ti.base_imponible is not None else 0.0
+                valor = float(ti.valor) if ti.valor is not None else 0.0
+                
                 if ti.codigo == '2':  # IVA
-                    key = f"SUBTOTAL {float(ti.tarifa):.1f}%"
-                    subtotales[key] = subtotales.get(key, 0) + float(ti.base_imponible)
-                    iva_key = f"IVA {float(ti.tarifa):.1f}%"
-                    ivas[iva_key] = ivas.get(iva_key, 0) + float(ti.valor)
+                    key = f"SUBTOTAL {tarifa:.1f}%"
+                    subtotales[key] = subtotales.get(key, 0) + base_imponible
+                    iva_key = f"IVA {tarifa:.1f}%"
+                    ivas[iva_key] = ivas.get(iva_key, 0) + valor
                 elif ti.codigo == '3':  # ICE
                     key = "ICE"
-                    subtotales[key] = subtotales.get(key, 0) + float(ti.base_imponible)
+                    subtotales[key] = subtotales.get(key, 0) + base_imponible
 
             # Subtotales especiales (solo si existen y son > 0)
-            if getattr(factura, 'subtotal_0', 0.0) > 0:
-                subtotales['SUBTOTAL 0%'] = getattr(factura, 'subtotal_0', 0.0)
-            if getattr(factura, 'subtotal_no_objeto_iva', 0.0) > 0:
-                subtotales['SUBTOTAL No objeto de IVA'] = getattr(factura, 'subtotal_no_objeto_iva', 0.0)
-            if getattr(factura, 'subtotal_exento_iva', 0.0) > 0:
-                subtotales['SUBTOTAL EXENTO DE IVA'] = getattr(factura, 'subtotal_exento_iva', 0.0)
-            if getattr(factura, 'subtotal_sin_impuestos', 0.0) > 0:
-                subtotales['SUBTOTAL SIN IMPUESTOS'] = getattr(factura, 'subtotal_sin_impuestos', 0.0)
+            subtotal_0 = getattr(factura, 'subtotal_0', None)
+            if subtotal_0 is not None and float(subtotal_0) > 0:
+                subtotales['SUBTOTAL 0%'] = float(subtotal_0)
+            subtotal_no_obj = getattr(factura, 'subtotal_no_objeto_iva', None)
+            if subtotal_no_obj is not None and float(subtotal_no_obj) > 0:
+                subtotales['SUBTOTAL No objeto de IVA'] = float(subtotal_no_obj)
+            subtotal_exento = getattr(factura, 'subtotal_exento_iva', None)
+            if subtotal_exento is not None and float(subtotal_exento) > 0:
+                subtotales['SUBTOTAL EXENTO DE IVA'] = float(subtotal_exento)
+            subtotal_sin_imp = getattr(factura, 'subtotal_sin_impuestos', None)
+            if subtotal_sin_imp is not None and float(subtotal_sin_imp) > 0:
+                subtotales['SUBTOTAL SIN IMPUESTOS'] = float(subtotal_sin_imp)
 
             # Agrega todos los subtotales encontrados (solo los que existen)
             for label, value in subtotales.items():
@@ -570,12 +593,13 @@ class RIDEGenerator:
                     totales_values.append(f"{value:.2f}")
 
             # Descuento (solo si existe)
-            if getattr(factura, 'descuento', 0.0) > 0:
+            descuento_factura = getattr(factura, 'descuento', None)
+            if descuento_factura is not None and float(descuento_factura) > 0:
                 totales_labels.append('DESCUENTO')
-                totales_values.append(f"{getattr(factura, 'descuento', 0.0):.2f}")
+                totales_values.append(f"{float(descuento_factura):.2f}")
 
             # ICE (solo si existe)
-            ice_total = sum(float(ti.valor) for ti in factura.totales_impuestos.all() if ti.codigo == '3')
+            ice_total = sum(float(ti.valor) if ti.valor is not None else 0.0 for ti in factura.totales_impuestos.all() if ti.codigo == '3')
             if ice_total > 0:
                 totales_labels.append('ICE')
                 totales_values.append(f"{ice_total:.2f}")
@@ -587,8 +611,10 @@ class RIDEGenerator:
                     totales_values.append(f"{value:.2f}")
 
             # Valor total (siempre)
+            total_factura = getattr(factura, 'total', None)
+            total_val = float(total_factura) if total_factura is not None else 0.0
             totales_labels.append('VALOR TOTAL')
-            totales_values.append(f"{getattr(factura, 'total', 0.0):.2f}")
+            totales_values.append(f"{total_val:.2f}")
 
             totales_text = '<br/>'.join(totales_labels)
             valores_text = '<br/>'.join(totales_values)
@@ -635,7 +661,9 @@ class RIDEGenerator:
                 for forma_pago in formas_pago:
                     # Mapear códigos SRI a descripción legible
                     forma_descripcion = self._obtener_descripcion_forma_pago(forma_pago.forma_pago)
-                    valor = f"${forma_pago.total:.2f}"
+                    # ✅ PROTECCIÓN: Asegurar que total no sea None
+                    forma_total = float(forma_pago.total) if forma_pago.total is not None else 0.0
+                    valor = f"${forma_total:.2f}"
                     plazo = str(getattr(forma_pago, 'plazo', '0')) if getattr(forma_pago, 'plazo', None) is not None else '0'
                     tiempo_dias = str(getattr(forma_pago, 'unidad_tiempo', 'días')) if getattr(forma_pago, 'unidad_tiempo', None) is not None else 'días'
                     
@@ -649,9 +677,11 @@ class RIDEGenerator:
             else:
                 # ✅ Usar valor por defecto: SIN UTILIZACIÓN DEL SISTEMA FINANCIERO
                 print("⚠️ RIDE: No se encontraron formas de pago, usando valor por defecto")
+                # ✅ PROTECCIÓN: Asegurar que total no sea None
+                factura_total = float(factura.total) if factura.total is not None else 0.0
                 pago_data.append([
                     Paragraph('SIN UTILIZACIÓN DEL SISTEMA FINANCIERO', self.styles['Campo']),
-                    Paragraph(f"${factura.total:.2f}", self.styles['Campo']),
+                    Paragraph(f"${factura_total:.2f}", self.styles['Campo']),
                     Paragraph('0', self.styles['Campo']),
                     Paragraph('días', self.styles['Campo'])
                 ])
