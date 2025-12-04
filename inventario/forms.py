@@ -110,7 +110,7 @@ class ProductoFormulario(forms.ModelForm):
             'descripcion': forms.TextInput(attrs={'placeholder': 'Descripción', 'id': 'descripcion', 'class': 'form-control'}),
             'categoria': forms.Select(attrs={'class': 'form-control', 'id': 'categoria'}),
             'tiene_inventario': forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'tiene_inventario'}),
-            'disponible': forms.NumberInput(attrs={'placeholder': 'Cantidad disponible', 'id': 'disponible', 'class': 'form-control', 'step': '1', 'min': '0'}),
+            'disponible': forms.NumberInput(attrs={'placeholder': 'Cantidad disponible', 'id': 'disponible', 'class': 'form-control', 'step': '1', 'min': '0', 'required': False}),
             'costo_actual': forms.NumberInput(attrs={'placeholder': 'Costo actual', 'id': 'costo_actual', 'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'imagen': forms.FileInput(attrs={'class': 'form-control', 'id': 'imagen', 'accept': 'image/*'}),
         }

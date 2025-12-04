@@ -362,13 +362,19 @@
         
         function toggleInventarioFields() {
             inventarioFields.forEach(field => {
+                const input = field.querySelector('input');
                 if (tieneInventarioCheckbox.checked) {
                     field.classList.remove('hidden');
+                    // Restaurar required si es necesario
+                    if (input) input.removeAttribute('disabled');
                 } else {
                     field.classList.add('hidden');
-                    // Limpiar valores cuando se oculta
-                    const input = field.querySelector('input');
-                    if (input) input.value = '';
+                    // Limpiar valores y quitar required cuando se oculta
+                    if (input) {
+                        input.value = '';
+                        input.removeAttribute('required');
+                        input.setAttribute('disabled', 'disabled');
+                    }
                 }
             });
         }

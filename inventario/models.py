@@ -563,7 +563,7 @@ class Producto(models.Model):
     descripcion = models.CharField(max_length=40)
     precio = models.DecimalField(max_digits=9, decimal_places=2)
     precio2 = models.DecimalField(max_digits=9, decimal_places=2, null=True, blank=True)
-    disponible = models.IntegerField(null=True)
+    disponible = models.IntegerField(null=True, blank=True)
     tiene_inventario = models.BooleanField(
         default=False,
         help_text='Si está marcado, se descontará del inventario al facturar'
