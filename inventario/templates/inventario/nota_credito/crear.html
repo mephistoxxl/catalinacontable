@@ -1,0 +1,592 @@
+{% extends "inventario/comun/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<style>
+  .page-header {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    padding: 1.5rem 2rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+
+  .page-title {
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1.5rem;
+  }
+
+  .card-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+    border-radius: 12px 12px 0 0;
+  }
+
+  .card-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .card-body {
+    padding: 1.5rem;
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition: all 0.15s ease;
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+  }
+
+  .form-control:disabled, .form-control[readonly] {
+    background-color: #f8fafc;
+    color: #64748b;
+  }
+
+  .info-box {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border: 1px solid #93c5fd;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .info-box h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.875rem;
+    color: #1e40af;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .info-box p {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: #1e3a8a;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+
+  @media (max-width: 768px) {
+    .grid-2, .grid-3 {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .table-detalles {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+  }
+
+  .table-detalles thead {
+    background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+  }
+
+  .table-detalles th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #475569;
+    border-bottom: 2px solid #e2e8f0;
+  }
+
+  .table-detalles td {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .table-detalles tbody tr:hover {
+    background-color: #f8fafc;
+  }
+
+  .text-right {
+    text-align: right;
+  }
+
+  .checkbox-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .checkbox-container input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    cursor: pointer;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary:hover {
+    background: #b91c1c;
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: #64748b;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+
+  .btn-secondary:hover {
+    background: #475569;
+    color: white;
+  }
+
+  .totales-box {
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    border: 1px solid #f87171;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+  }
+
+  .totales-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(248, 113, 113, 0.3);
+  }
+
+  .totales-row:last-child {
+    border-bottom: none;
+    font-weight: 700;
+    font-size: 1.125rem;
+  }
+
+  .totales-row span:first-child {
+    color: #7f1d1d;
+  }
+
+  .totales-row span:last-child {
+    color: #dc2626;
+  }
+
+  .alert-warning {
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    border-radius: 8px;
+    padding: 1rem;
+    color: #92400e;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .alert-warning i {
+    color: #d97706;
+    font-size: 1.25rem;
+    margin-top: 0.125rem;
+  }
+
+  .input-qty {
+    width: 80px;
+    text-align: center;
+  }
+</style>
+
+<div class="min-h-screen bg-gradient-to-br from-red-50 via-pink-50 to-rose-50 p-4">
+  <div class="container mx-auto" style="max-width: 1200px;">
+    <div class="page-header">
+      <h1 class="page-title">
+        <i class="fa fa-minus-circle"></i>
+        {% trans "Crear Nota de Crédito" %}
+      </h1>
+    </div>
+
+    <!-- Info de la factura original -->
+    <div class="info-box">
+      <h4>
+        <i class="fa fa-file-text-o"></i>
+        {% trans "Factura de Referencia" %}
+      </h4>
+      <p>
+        <strong>Número:</strong> {{ factura.numero_completo }} | 
+        <strong>Fecha:</strong> {{ factura.fecha|date:"d/m/Y" }} | 
+        <strong>Cliente:</strong> {{ factura.cliente.razon_social }} | 
+        <strong>Total:</strong> ${{ factura.total|floatformat:2 }} |
+        <strong>Saldo disponible:</strong> ${{ factura.saldo_nota_credito|floatformat:2 }}
+      </p>
+    </div>
+
+    {% if factura.saldo_nota_credito <= 0 %}
+    <div class="alert-warning">
+      <i class="fa fa-exclamation-triangle"></i>
+      <div>
+        <strong>{% trans "No se puede crear nota de crédito" %}</strong>
+        <p style="margin: 0.25rem 0 0 0;">{% trans "Esta factura ya tiene notas de crédito por el valor total." %}</p>
+      </div>
+    </div>
+    {% else %}
+
+    <form method="post" id="formNotaCredito">
+      {% csrf_token %}
+
+      <!-- Datos de la Nota de Crédito -->
+      <div class="card">
+        <div class="card-header">
+          <h3>
+            <i class="fa fa-info-circle"></i>
+            {% trans "Datos de la Nota de Crédito" %}
+          </h3>
+        </div>
+        <div class="card-body">
+          <div class="grid-3">
+            <div class="form-group">
+              <label>{% trans "Establecimiento" %}</label>
+              <input type="text" class="form-control" value="{{ form.establecimiento.value|default:opciones.establecimiento|stringformat:'03d' }}" readonly>
+              <input type="hidden" name="establecimiento" value="{{ form.establecimiento.value|default:opciones.establecimiento }}">
+            </div>
+            <div class="form-group">
+              <label>{% trans "Punto de Emisión" %}</label>
+              <input type="text" class="form-control" value="{{ form.punto_emision.value|default:opciones.punto_emision|stringformat:'03d' }}" readonly>
+              <input type="hidden" name="punto_emision" value="{{ form.punto_emision.value|default:opciones.punto_emision }}">
+            </div>
+            <div class="form-group">
+              <label>{% trans "Secuencial" %}</label>
+              <input type="text" class="form-control" value="{{ siguiente_secuencial|stringformat:'09d' }}" readonly>
+              <input type="hidden" name="secuencial" value="{{ siguiente_secuencial }}">
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="form-group">
+              <label for="motivo">{% trans "Motivo" %} *</label>
+              <select name="motivo" id="motivo" class="form-control" required>
+                <option value="">{% trans "Seleccione un motivo" %}</option>
+                <option value="DEVOLUCION">{% trans "Devolución de productos" %}</option>
+                <option value="DESCUENTO">{% trans "Descuento posterior" %}</option>
+                <option value="ERROR_FACTURACION">{% trans "Error en facturación" %}</option>
+                <option value="ANULACION">{% trans "Anulación total" %}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="fecha_emision">{% trans "Fecha de Emisión" %}</label>
+              <input type="date" name="fecha_emision" id="fecha_emision" class="form-control" value="{{ today|date:'Y-m-d' }}">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="observaciones">{% trans "Observaciones" %}</label>
+            <textarea name="observaciones" id="observaciones" class="form-control" rows="2" placeholder="{% trans 'Motivo detallado de la nota de crédito...' %}"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Selección de Items -->
+      <div class="card">
+        <div class="card-header">
+          <h3>
+            <i class="fa fa-list"></i>
+            {% trans "Seleccionar Items a Devolver/Modificar" %}
+          </h3>
+        </div>
+        <div class="card-body">
+          <div class="alert-warning" style="margin-bottom: 1rem;">
+            <i class="fa fa-info-circle"></i>
+            <div>
+              <strong>{% trans "Instrucciones:" %}</strong>
+              <p style="margin: 0.25rem 0 0 0;">{% trans "Seleccione los items y modifique las cantidades/valores según corresponda. Solo se incluirán los items marcados." %}</p>
+            </div>
+          </div>
+
+          <table class="table-detalles">
+            <thead>
+              <tr>
+                <th style="width: 40px;">
+                  <input type="checkbox" id="selectAll" title="{% trans 'Seleccionar todos' %}">
+                </th>
+                <th>{% trans "Código" %}</th>
+                <th>{% trans "Descripción" %}</th>
+                <th class="text-right">{% trans "Cant. Original" %}</th>
+                <th class="text-right">{% trans "Cant. NC" %}</th>
+                <th class="text-right">{% trans "P. Unitario" %}</th>
+                <th class="text-right">{% trans "Subtotal" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for detalle in factura.detalles.all %}
+              <tr data-detalle-id="{{ detalle.id }}">
+                <td>
+                  <div class="checkbox-container">
+                    <input type="checkbox" name="detalle_{{ detalle.id }}_incluir" class="item-checkbox" value="1" data-precio="{{ detalle.precio }}" data-cantidad="{{ detalle.cantidad }}">
+                  </div>
+                </td>
+                <td>
+                  <span style="font-family: monospace; font-size: 0.8125rem;">{{ detalle.producto.codigo_principal|default:"-" }}</span>
+                </td>
+                <td>
+                  <strong>{{ detalle.producto.descripcion }}</strong>
+                  <input type="hidden" name="detalle_{{ detalle.id }}_producto_id" value="{{ detalle.producto.id }}">
+                  <input type="hidden" name="detalle_{{ detalle.id }}_descripcion" value="{{ detalle.descripcion_xml }}">
+                </td>
+                <td class="text-right">
+                  {{ detalle.cantidad|floatformat:2 }}
+                </td>
+                <td class="text-right">
+                  <input type="number" name="detalle_{{ detalle.id }}_cantidad" class="form-control input-qty cantidad-input" step="0.01" min="0.01" max="{{ detalle.cantidad }}" value="{{ detalle.cantidad }}" disabled>
+                </td>
+                <td class="text-right">
+                  ${{ detalle.precio|floatformat:2 }}
+                  <input type="hidden" name="detalle_{{ detalle.id }}_precio" value="{{ detalle.precio }}">
+                </td>
+                <td class="text-right subtotal-cell">
+                  <span class="subtotal-value">$0.00</span>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
+                  {% trans "No hay detalles en la factura" %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <!-- Totales -->
+          <div class="totales-box">
+            <div class="totales-row">
+              <span>{% trans "Subtotal 0%:" %}</span>
+              <span id="subtotal0">$0.00</span>
+            </div>
+            <div class="totales-row">
+              <span>{% trans "Subtotal IVA 15%:" %}</span>
+              <span id="subtotalIva">$0.00</span>
+            </div>
+            <div class="totales-row">
+              <span>{% trans "IVA 15%:" %}</span>
+              <span id="valorIva">$0.00</span>
+            </div>
+            <div class="totales-row">
+              <span>{% trans "TOTAL NOTA DE CRÉDITO:" %}</span>
+              <span id="totalNC">$0.00</span>
+            </div>
+          </div>
+
+          <!-- Hidden fields for totals -->
+          <input type="hidden" name="total_sin_impuestos" id="totalSinImpuestosInput" value="0">
+          <input type="hidden" name="subtotal_cero" id="subtotalCeroInput" value="0">
+          <input type="hidden" name="subtotal_iva" id="subtotalIvaInput" value="0">
+          <input type="hidden" name="valor_iva" id="valorIvaInput" value="0">
+          <input type="hidden" name="valor_modificacion" id="valorModificacionInput" value="0">
+        </div>
+      </div>
+
+      <!-- Botones de acción -->
+      <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+        <a href="{% url 'inventario:verFactura' factura.id %}" class="btn-secondary">
+          <i class="fa fa-arrow-left"></i>
+          {% trans "Cancelar" %}
+        </a>
+        <button type="submit" class="btn-primary" id="btnGuardar">
+          <i class="fa fa-save"></i>
+          {% trans "Guardar Nota de Crédito" %}
+        </button>
+        <button type="submit" name="autorizar" value="1" class="btn-primary" style="background: #059669;" id="btnAutorizar">
+          <i class="fa fa-paper-plane"></i>
+          {% trans "Guardar y Autorizar" %}
+        </button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const IVA_RATE = 0.15;
+  const saldoDisponible = {{ factura.saldo_nota_credito|default:0 }};
+
+  // Select all checkbox
+  const selectAll = document.getElementById('selectAll');
+  const itemCheckboxes = document.querySelectorAll('.item-checkbox');
+  const cantidadInputs = document.querySelectorAll('.cantidad-input');
+
+  selectAll.addEventListener('change', function() {
+    itemCheckboxes.forEach(cb => {
+      cb.checked = this.checked;
+      const row = cb.closest('tr');
+      const cantInput = row.querySelector('.cantidad-input');
+      cantInput.disabled = !this.checked;
+    });
+    calcularTotales();
+  });
+
+  // Individual checkboxes
+  itemCheckboxes.forEach(cb => {
+    cb.addEventListener('change', function() {
+      const row = this.closest('tr');
+      const cantInput = row.querySelector('.cantidad-input');
+      cantInput.disabled = !this.checked;
+      if (!this.checked) {
+        const subtotalCell = row.querySelector('.subtotal-value');
+        subtotalCell.textContent = '$0.00';
+      }
+      calcularTotales();
+    });
+  });
+
+  // Quantity inputs
+  cantidadInputs.forEach(input => {
+    input.addEventListener('input', calcularTotales);
+  });
+
+  function calcularTotales() {
+    let subtotal0 = 0;
+    let subtotalIva = 0;
+
+    itemCheckboxes.forEach(cb => {
+      if (cb.checked) {
+        const row = cb.closest('tr');
+        const cantInput = row.querySelector('.cantidad-input');
+        const precio = parseFloat(cb.dataset.precio) || 0;
+        const cantidad = parseFloat(cantInput.value) || 0;
+        const subtotal = precio * cantidad;
+
+        const subtotalCell = row.querySelector('.subtotal-value');
+        subtotalCell.textContent = '$' + subtotal.toFixed(2);
+
+        // Asumimos IVA 15% para todos (ajustar según lógica real)
+        subtotalIva += subtotal;
+      }
+    });
+
+    const valorIva = subtotalIva * IVA_RATE;
+    const total = subtotal0 + subtotalIva + valorIva;
+
+    // Update display
+    document.getElementById('subtotal0').textContent = '$' + subtotal0.toFixed(2);
+    document.getElementById('subtotalIva').textContent = '$' + subtotalIva.toFixed(2);
+    document.getElementById('valorIva').textContent = '$' + valorIva.toFixed(2);
+    document.getElementById('totalNC').textContent = '$' + total.toFixed(2);
+
+    // Update hidden inputs
+    document.getElementById('totalSinImpuestosInput').value = (subtotal0 + subtotalIva).toFixed(2);
+    document.getElementById('subtotalCeroInput').value = subtotal0.toFixed(2);
+    document.getElementById('subtotalIvaInput').value = subtotalIva.toFixed(2);
+    document.getElementById('valorIvaInput').value = valorIva.toFixed(2);
+    document.getElementById('valorModificacionInput').value = total.toFixed(2);
+
+    // Validate against saldo disponible
+    const btnGuardar = document.getElementById('btnGuardar');
+    const btnAutorizar = document.getElementById('btnAutorizar');
+    
+    if (total > saldoDisponible) {
+      btnGuardar.disabled = true;
+      btnAutorizar.disabled = true;
+      btnGuardar.style.opacity = '0.5';
+      btnAutorizar.style.opacity = '0.5';
+    } else {
+      btnGuardar.disabled = false;
+      btnAutorizar.disabled = false;
+      btnGuardar.style.opacity = '1';
+      btnAutorizar.style.opacity = '1';
+    }
+  }
+
+  // Form validation
+  document.getElementById('formNotaCredito').addEventListener('submit', function(e) {
+    const checkedItems = document.querySelectorAll('.item-checkbox:checked');
+    if (checkedItems.length === 0) {
+      e.preventDefault();
+      alert('{% trans "Debe seleccionar al menos un item para la nota de crédito." %}');
+      return false;
+    }
+
+    const total = parseFloat(document.getElementById('valorModificacionInput').value);
+    if (total <= 0) {
+      e.preventDefault();
+      alert('{% trans "El valor de la nota de crédito debe ser mayor a cero." %}');
+      return false;
+    }
+
+    if (total > saldoDisponible) {
+      e.preventDefault();
+      alert('{% trans "El valor de la nota de crédito excede el saldo disponible de la factura." %}');
+      return false;
+    }
+  });
+});
+</script>
+{% endblock %}

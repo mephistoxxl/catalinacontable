@@ -2,6 +2,7 @@ from django.urls import path, include, reverse_lazy
 from . import views
 from .views import FirmaElectronicaView, ConfiguracionGeneral
 from .liquidacion_compra import views as liquidacion_views
+from .nota_credito import views as nota_credito_views
 # TEMPORAL: Deshabilitado password reset por error en producción
 # from .views_password_reset import SolicitarResetPassword, ResetPassword
 from django.conf import settings
@@ -119,6 +120,13 @@ urlpatterns = [
     path('liquidaciones-compra/ver/<int:pk>/', liquidacion_views.LiquidacionCompraDetailView.as_view(), name='liquidaciones_compra_ver'),
     path('liquidaciones-compra/autorizar/<int:pk>/', liquidacion_views.autorizar_liquidacion_compra, name='autorizar_liquidacion_compra'),
     path('liquidaciones-compra/consultar-estado/<int:pk>/', liquidacion_views.consultar_estado_liquidacion_compra, name='consultar_estado_liquidacion_compra'),
+
+    # Notas de Crédito (codDoc 04)
+    path('notas-credito/', nota_credito_views.ListarNotasCredito.as_view(), name='notas_credito_listar'),
+    path('notas-credito/crear/<int:factura_id>/', nota_credito_views.CrearNotaCredito.as_view(), name='notas_credito_crear'),
+    path('notas-credito/ver/<int:pk>/', nota_credito_views.VerNotaCredito.as_view(), name='notas_credito_ver'),
+    path('notas-credito/autorizar/<int:pk>/', nota_credito_views.AutorizarNotaCredito.as_view(), name='notas_credito_autorizar'),
+    path('notas-credito/pdf/<int:pk>/', nota_credito_views.DescargarPDF.as_view(), name='notas_credito_pdf'),
 
     # Bancos
     path('bancos/', views.ListarBancos.as_view(), name='listar_bancos'),

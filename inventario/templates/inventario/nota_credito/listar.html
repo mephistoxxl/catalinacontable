@@ -1,0 +1,329 @@
+{% extends "inventario/comun/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<style>
+  .page-header {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    padding: 1.5rem 2rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+
+  .page-title {
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .table-container {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .modern-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .modern-table thead {
+    background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+    border-bottom: 2px solid #e2e8f0;
+  }
+
+  .modern-table thead th {
+    padding: 1rem 1.25rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #475569;
+  }
+
+  .modern-table tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: all 0.15s ease;
+  }
+
+  .modern-table tbody tr:hover {
+    background-color: #f8fafc;
+  }
+
+  .modern-table tbody td {
+    padding: 1rem 1.25rem;
+    font-size: 0.875rem;
+    color: #1f2937;
+  }
+
+  .badge-estado {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+
+  .badge-pendiente {
+    background-color: #fef3c7;
+    color: #92400e;
+  }
+
+  .badge-enviado {
+    background-color: #dbeafe;
+    color: #1e40af;
+  }
+
+  .badge-autorizado {
+    background-color: #d1fae5;
+    color: #065f46;
+  }
+
+  .badge-rechazado {
+    background-color: #fee2e2;
+    color: #991b1b;
+  }
+
+  .text-right {
+    text-align: right;
+  }
+
+  .text-muted {
+    color: #64748b;
+  }
+
+  .font-mono {
+    font-family: ui-monospace, monospace;
+    font-size: 0.8125rem;
+  }
+
+  .btn-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.15s ease;
+  }
+
+  .btn-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .btn-view {
+    background: #3b82f6;
+    color: white;
+  }
+
+  .btn-pdf {
+    background: #ef4444;
+    color: white;
+  }
+
+  .btn-authorize {
+    background: #10b981;
+    color: white;
+  }
+
+  .search-box {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 0.5rem 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 0.875rem;
+  }
+
+  .search-input:focus {
+    outline: none;
+    border-color: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+  }
+</style>
+
+<div class="min-h-screen bg-gradient-to-br from-red-50 via-pink-50 to-rose-50 p-4">
+  <div class="container mx-auto" style="max-width: 1400px;">
+    <div class="page-header">
+      <div class="flex items-center justify-between flex-wrap gap-4">
+        <h1 class="page-title">
+          <i class="fa fa-minus-circle"></i>
+          {% trans "Notas de Crédito" %}
+        </h1>
+      </div>
+    </div>
+
+    <!-- Filtros de búsqueda -->
+    <div class="search-box">
+      <form method="get" class="flex gap-4 flex-wrap">
+        <div class="flex-1" style="min-width: 200px;">
+          <input type="text" name="q" value="{{ request.GET.q }}" placeholder="{% trans 'Buscar por cliente o número...' %}" class="search-input">
+        </div>
+        <div>
+          <select name="estado" class="search-input" style="width: auto;">
+            <option value="">{% trans "Todos los estados" %}</option>
+            <option value="PENDIENTE" {% if request.GET.estado == 'PENDIENTE' %}selected{% endif %}>{% trans "Pendiente" %}</option>
+            <option value="AUTORIZADO" {% if request.GET.estado == 'AUTORIZADO' %}selected{% endif %}>{% trans "Autorizado" %}</option>
+            <option value="RECHAZADO" {% if request.GET.estado == 'RECHAZADO' %}selected{% endif %}>{% trans "Rechazado" %}</option>
+          </select>
+        </div>
+        <button type="submit" class="btn-action btn-view">
+          <i class="fa fa-search"></i>
+        </button>
+      </form>
+    </div>
+
+    {% if notas_credito %}
+    <div class="table-container">
+      <div style="overflow-x: auto;">
+        <table class="modern-table">
+          <thead>
+            <tr>
+              <th>{% trans "Fecha" %}</th>
+              <th>{% trans "Número" %}</th>
+              <th>{% trans "Factura Ref." %}</th>
+              <th>{% trans "Cliente" %}</th>
+              <th>{% trans "Motivo" %}</th>
+              <th class="text-right">{% trans "Valor" %}</th>
+              <th>{% trans "Estado" %}</th>
+              <th class="text-right">{% trans "Acciones" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for nc in notas_credito %}
+            <tr>
+              <td>
+                <span class="text-muted">
+                  <i class="fa fa-calendar-o" style="margin-right: 0.25rem;"></i>
+                  {{ nc.fecha_emision|date:"d/m/Y" }}
+                </span>
+              </td>
+              <td>
+                <span class="font-mono">{{ nc.numero_completo }}</span>
+              </td>
+              <td>
+                <a href="{% url 'inventario:verFactura' nc.factura_modificada.id %}" 
+                   style="color: #3b82f6; text-decoration: none;">
+                  <span class="font-mono">{{ nc.factura_modificada.numero_completo }}</span>
+                </a>
+              </td>
+              <td>
+                <div style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  <strong>{{ nc.factura_modificada.cliente.razon_social }}</strong>
+                </div>
+                <div class="text-muted" style="font-size: 0.75rem;">
+                  {{ nc.factura_modificada.cliente.cedula }}
+                </div>
+              </td>
+              <td>
+                <span class="text-muted">{{ nc.get_tipo_motivo_display }}</span>
+              </td>
+              <td class="text-right">
+                <strong style="color: #dc2626; font-size: 0.9375rem;">
+                  ${{ nc.valor_modificacion|floatformat:2 }}
+                </strong>
+              </td>
+              <td>
+                {% if nc.estado_sri == 'PENDIENTE' %}
+                <span class="badge-estado badge-pendiente">
+                  <i class="fa fa-clock-o" style="margin-right: 0.25rem;"></i>
+                  Pendiente
+                </span>
+                {% elif nc.estado_sri == 'ENVIADO' %}
+                <span class="badge-estado badge-enviado">
+                  <i class="fa fa-paper-plane" style="margin-right: 0.25rem;"></i>
+                  Enviado
+                </span>
+                {% elif nc.estado_sri == 'AUTORIZADO' %}
+                <span class="badge-estado badge-autorizado">
+                  <i class="fa fa-check-circle" style="margin-right: 0.25rem;"></i>
+                  Autorizado
+                </span>
+                {% elif nc.estado_sri == 'RECHAZADO' %}
+                <span class="badge-estado badge-rechazado">
+                  <i class="fa fa-times-circle" style="margin-right: 0.25rem;"></i>
+                  Rechazado
+                </span>
+                {% else %}
+                <span class="badge-estado badge-pendiente">
+                  {{ nc.estado_sri }}
+                </span>
+                {% endif %}
+              </td>
+              <td class="text-right">
+                <div style="display: inline-flex; gap: 0.5rem;">
+                  <a href="{% url 'inventario:notas_credito_ver' nc.id %}" title="{% trans 'Ver detalles' %}" class="btn-action btn-view">
+                    <i class="fa fa-eye"></i>
+                  </a>
+                  {% if nc.estado_sri == 'AUTORIZADO' %}
+                  <a href="{% url 'inventario:notas_credito_pdf' nc.id %}" title="{% trans 'Descargar PDF' %}" class="btn-action btn-pdf">
+                    <i class="fa fa-file-pdf-o"></i>
+                  </a>
+                  {% elif nc.estado_sri == 'PENDIENTE' %}
+                  <a href="{% url 'inventario:notas_credito_autorizar' nc.id %}" title="{% trans 'Autorizar' %}" class="btn-action btn-authorize">
+                    <i class="fa fa-paper-plane"></i>
+                  </a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Paginación -->
+    {% if page_obj.has_other_pages %}
+    <div style="display: flex; justify-content: center; margin-top: 1.5rem; gap: 0.5rem;">
+      {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}" class="btn-action btn-view">
+        <i class="fa fa-chevron-left"></i>
+      </a>
+      {% endif %}
+      
+      <span style="padding: 0.5rem 1rem; background: white; border-radius: 6px; font-size: 0.875rem;">
+        Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+      </span>
+      
+      {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}" class="btn-action btn-view">
+        <i class="fa fa-chevron-right"></i>
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div style="text-align: center; padding: 4rem; background: white; border-radius: 12px;">
+      <i class="fa fa-minus-circle" style="font-size: 4rem; color: #fca5a5;"></i>
+      <h3 style="margin-top: 1rem; font-size: 1.25rem; color: #475569;">{% trans "No hay notas de crédito" %}</h3>
+      <p style="color: #64748b;">{% trans "Las notas de crédito se crean desde el detalle de una factura autorizada." %}</p>
+      <a href="{% url 'inventario:listarFacturas' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 1rem; padding: 0.625rem 1.25rem; background: #3b82f6; color: white; text-decoration: none; border-radius: 8px; font-weight: 500;">
+        <i class="fa fa-list"></i>
+        {% trans "Ir a Facturas" %}
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

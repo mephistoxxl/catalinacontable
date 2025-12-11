@@ -1613,6 +1613,55 @@ class Factura(models.Model):
 
         return total_ventas / meses if meses > 0 else 0
 
+    @property
+    def numero_completo(self):
+        """Alias para 'numero' - número de factura formato 001-001-000000001"""
+        return self.numero
+
+    @property
+    def saldo_nota_credito(self):
+        """
+        Calcula el saldo disponible para notas de crédito.
+        Es el total de la factura menos el total de notas de crédito autorizadas.
+        """
+        from decimal import Decimal
+        total_nc = Decimal('0.00')
+        
+        # Importar el modelo NotaCredito aquí para evitar import circular
+        try:
+            from inventario.nota_credito.models import NotaCredito
+            notas_credito = NotaCredito.objects.filter(
+                factura_modificada=self,
+                estado_sri__in=['AUTORIZADO', 'PENDIENTE', 'ENVIADO']
+            )
+            for nc in notas_credito:
+                total_nc += nc.valor_modificacion or Decimal('0.00')
+        except Exception:
+            pass  # Si no existe el módulo aún, retornar total completo
+        
+        return self.monto_general - total_nc
+
+    @property
+    def total_notas_credito(self):
+        """
+        Calcula el total de notas de crédito emitidas contra esta factura.
+        """
+        from decimal import Decimal
+        total_nc = Decimal('0.00')
+        
+        try:
+            from inventario.nota_credito.models import NotaCredito
+            notas_credito = NotaCredito.objects.filter(
+                factura_modificada=self,
+                estado_sri__in=['AUTORIZADO', 'PENDIENTE', 'ENVIADO']
+            )
+            for nc in notas_credito:
+                total_nc += nc.valor_modificacion or Decimal('0.00')
+        except Exception:
+            pass
+        
+        return total_nc
+
 
 class DetalleFactura(models.Model):
     empresa = models.ForeignKey(
