@@ -320,8 +320,18 @@ class Opciones(models.Model):
             except Exception as e:
                 logger.error(f"Error inesperado extrayendo fecha de caducidad: {e}")
                 raise ValidationError({'__all__': 'No se pudo extraer la fecha de caducidad. Verifique el archivo y la contraseña.'})
-    # Opcional: método para obtener la ruta segura del archivo
+    
+    # ✅ Método para leer el contenido de la firma (funciona con S3 y local)
+    def get_firma_bytes(self):
+        """Lee y retorna los bytes descifrados de la firma electrónica."""
+        if self.firma_electronica:
+            with self.firma_electronica.open('rb') as f:
+                return f.read()
+        return None
+    
+    # ⚠️ DEPRECATED: No usar con S3 - usar get_firma_bytes() en su lugar
     def get_firma_path(self):
+        """DEPRECATED: Solo funciona con almacenamiento local, no con S3."""
         if self.firma_electronica:
             return self.firma_electronica.path
         return None
