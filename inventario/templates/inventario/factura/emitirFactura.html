@@ -75,12 +75,12 @@
     cursor: pointer;
 }
 .btn-guardar-info {
-    background: #d4a500;
+    background: #10b981;
     color: white;
     border: none;
 }
 .btn-guardar-info:hover {
-    background: #b8920a;
+    background: #059669;
 }
 .btn-cancelar-info {
     background: #6b7280;
@@ -422,7 +422,14 @@ input[type="number"][readonly] {
                                 <label for="nombre_cliente" class="block text-xs font-medium text-gray-800 mb-1">
                     <i class="fas fa-user text-blue-600 mr-1 label-icon"></i>Nombre del Cliente
                                 </label>
-                                {{ form.nombre_cliente }}
+                                <div class="flex space-x-2">
+                                    <div class="flex-1">
+                                        {{ form.nombre_cliente }}
+                                    </div>
+                                    <button type="button" id="btnInfoCliente" onclick="abrirModalCliente()" class="inline-flex items-center px-2 py-1 border border-green-500 text-xs font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-1 focus:ring-green-500 transition-all duration-150" style="display: none;" title="Ver/Editar información del cliente">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </div>
                             </div>
 
                             <!-- Correo del Cliente -->
@@ -1023,6 +1030,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ========== FUNCIONES DE CLIENTES ==========
+// ✅ Variable global para datos adicionales del cliente
+let clienteActualData = null;
+
 // Función de búsqueda de cliente
 function buscarCliente() {
     const cedula = document.getElementById('id_identificacion_cliente').value.trim();
@@ -1056,6 +1066,7 @@ function completarClienteDesdeObjeto(obj){
     const nombreCliente = document.getElementById('id_nombre_cliente');
     const clienteId = document.getElementById('cliente_id');
     const correoCliente = document.getElementById('id_correo_cliente');
+    const btnInfoCliente = document.getElementById('btnInfoCliente');
     if(!obj){ limpiarCamposCliente(); return; }
     const razon = obj.razon_social || obj.nombre_compuesto || obj.identificacion || '';
     const nomCom = obj.nombre_comercial || '';
@@ -1063,6 +1074,16 @@ function completarClienteDesdeObjeto(obj){
     if (nombreCliente) nombreCliente.value = nombreCompleto;
     if (clienteId) clienteId.value = obj.id || '';
     if (correoCliente && obj.correo !== undefined) correoCliente.value = obj.correo || '';
+    
+    // ✅ Guardar datos adicionales del cliente y mostrar botón de editar
+    if (obj.id) {
+        clienteActualData = {
+            direccion: obj.direccion || '',
+            telefono: obj.telefono || ''
+        };
+        if (btnInfoCliente) btnInfoCliente.style.display = 'flex';
+    }
+    
     // Intentar enriquecer si razon social == identificacion
     if(obj.id && razon && obj.identificacion && razon === obj.identificacion){
         fetch(`/inventario/api/clientes/enriquecer?id=${obj.id}`)
@@ -1074,6 +1095,11 @@ function completarClienteDesdeObjeto(obj){
                     const nomCom2 = c.nombre_comercial || '';
                     const nombreCompleto2 = nomCom2 ? `${razon2} ${nomCom2}`.trim() : razon2;
                     if (nombreCliente) nombreCliente.value = nombreCompleto2;
+                    // ✅ Actualizar datos adicionales si se enriqueció
+                    clienteActualData = {
+                        direccion: c.direccion || clienteActualData?.direccion || '',
+                        telefono: c.telefono || clienteActualData?.telefono || ''
+                    };
                 }
             })
             .catch(()=>{});
@@ -1084,9 +1110,13 @@ function limpiarCamposCliente(){
     const nombreCliente = document.getElementById('id_nombre_cliente');
     const clienteId = document.getElementById('cliente_id');
     const correoCliente = document.getElementById('id_correo_cliente');
+    const btnInfoCliente = document.getElementById('btnInfoCliente');
     if (nombreCliente) nombreCliente.value = '';
     if (clienteId) clienteId.value = '';
     if (correoCliente) correoCliente.value = '';
+    // ✅ Ocultar botón de editar y limpiar datos
+    if (btnInfoCliente) btnInfoCliente.style.display = 'none';
+    clienteActualData = null;
 }
 
 function crearClienteAutomatico(identificacion){
@@ -2389,6 +2419,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
             cerrarModalInfo();
+            cerrarModalCliente();
         }
     });
     
@@ -2398,7 +2429,148 @@ document.addEventListener('DOMContentLoaded', function() {
             cerrarModalInfo();
         }
     });
+    
+    // Cerrar modal cliente al hacer clic fuera
+    const modalCliente = document.getElementById('modalInfoCliente');
+    if (modalCliente) {
+        modalCliente.addEventListener('click', function(e) {
+            if (e.target === this) {
+                cerrarModalCliente();
+            }
+        });
+    }
 });
+</script>
+
+<!-- ✅ MODAL PARA EDITAR INFORMACIÓN DEL CLIENTE -->
+<div id="modalInfoCliente" class="modal-info-producto">
+    <div class="modal-info-content" style="max-width: 500px;">
+        <h3><i class="fas fa-user-edit text-green-600 mr-2"></i>Información del Cliente</h3>
+        
+        <input type="hidden" id="modalClienteId">
+        
+        <label>
+            CI/RUC
+            <span>(no editable)</span>
+        </label>
+        <input type="text" id="modalClienteIdentificacion" readonly style="background-color: #f3f4f6; color: #6b7280;">
+        
+        <label>Razón Social / Nombre</label>
+        <input type="text" id="modalClienteRazonSocial" maxlength="200" placeholder="Nombre completo del cliente">
+        
+        <label>Dirección</label>
+        <input type="text" id="modalClienteDireccion" maxlength="200" placeholder="Dirección del cliente">
+        
+        <label>Teléfono</label>
+        <input type="text" id="modalClienteTelefono" maxlength="20" placeholder="Teléfono de contacto">
+        
+        <label>Correo Electrónico</label>
+        <input type="email" id="modalClienteCorreo" maxlength="100" placeholder="correo@ejemplo.com">
+        
+        <div class="modal-info-buttons">
+            <button type="button" class="btn-cancelar-info" onclick="cerrarModalCliente()">
+                <i class="fas fa-times mr-1"></i>Cancelar
+            </button>
+            <button type="button" class="btn-guardar-info" onclick="guardarClienteModal()">
+                <i class="fas fa-save mr-1"></i>Guardar Cambios
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ✅ FUNCIONES PARA MODAL DE CLIENTE (clienteActualData ya declarada arriba)
+
+function abrirModalCliente() {
+    const clienteId = document.getElementById('cliente_id')?.value;
+    if (!clienteId) {
+        alert('Primero busque un cliente');
+        return;
+    }
+    
+    // Llenar modal con datos actuales
+    document.getElementById('modalClienteId').value = clienteId;
+    document.getElementById('modalClienteIdentificacion').value = document.getElementById('id_identificacion_cliente')?.value || '';
+    document.getElementById('modalClienteRazonSocial').value = document.getElementById('id_nombre_cliente')?.value || '';
+    document.getElementById('modalClienteCorreo').value = document.getElementById('id_correo_cliente')?.value || '';
+    
+    // Si tenemos datos adicionales guardados del cliente
+    if (clienteActualData) {
+        document.getElementById('modalClienteDireccion').value = clienteActualData.direccion || '';
+        document.getElementById('modalClienteTelefono').value = clienteActualData.telefono || '';
+    } else {
+        document.getElementById('modalClienteDireccion').value = '';
+        document.getElementById('modalClienteTelefono').value = '';
+    }
+    
+    document.getElementById('modalInfoCliente').classList.add('active');
+    document.getElementById('modalClienteRazonSocial').focus();
+}
+
+function cerrarModalCliente() {
+    document.getElementById('modalInfoCliente').classList.remove('active');
+}
+
+async function guardarClienteModal() {
+    const clienteId = document.getElementById('modalClienteId').value;
+    if (!clienteId) {
+        alert('Error: No hay cliente seleccionado');
+        return;
+    }
+    
+    const datos = {
+        id: parseInt(clienteId),
+        razon_social: document.getElementById('modalClienteRazonSocial').value.trim(),
+        direccion: document.getElementById('modalClienteDireccion').value.trim(),
+        telefono: document.getElementById('modalClienteTelefono').value.trim(),
+        correo: document.getElementById('modalClienteCorreo').value.trim()
+    };
+    
+    if (!datos.razon_social) {
+        alert('La razón social es obligatoria');
+        document.getElementById('modalClienteRazonSocial').focus();
+        return;
+    }
+    
+    try {
+        const response = await fetch('{% url "inventario:actualizar_cliente_api" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(datos)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Actualizar campos del formulario principal
+            document.getElementById('id_nombre_cliente').value = result.cliente.razon_social;
+            document.getElementById('id_correo_cliente').value = result.cliente.correo || '';
+            
+            // Guardar datos adicionales
+            clienteActualData = {
+                direccion: result.cliente.direccion,
+                telefono: result.cliente.telefono
+            };
+            
+            cerrarModalCliente();
+            
+            // Mostrar notificación de éxito
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+            toast.innerHTML = '<i class="fas fa-check mr-2"></i>Cliente actualizado correctamente';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        } else {
+            alert('Error: ' + (result.message || 'No se pudo actualizar el cliente'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error de conexión al guardar el cliente');
+    }
+}
 </script>
 
 {% endblock %}

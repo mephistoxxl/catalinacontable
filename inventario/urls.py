@@ -183,6 +183,7 @@ urlpatterns = [
     path('api/buscar-cliente/', views.buscar_cliente_ajax, name='buscar_cliente_ajax'),
     path('api/clientes/buscar', views.buscar_cliente_api, name='buscar_cliente_api'),
     path('api/clientes/crear', views.crear_cliente_api, name='crear_cliente_api'),
+    path('api/clientes/actualizar', views.actualizar_cliente_api, name='actualizar_cliente_api'),
     path('api/clientes/enriquecer', views.enriquecer_cliente_api, name='enriquecer_cliente_api'),
     path('api/verificar-limite-plan/', views.api_verificar_limite, name='api_verificar_limite_plan'),
 

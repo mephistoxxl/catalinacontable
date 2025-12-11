@@ -8516,6 +8516,74 @@ def crear_cliente_api(request):
 
 @login_required
 @csrf_exempt
+def actualizar_cliente_api(request):
+    """Actualiza los datos de un cliente existente.
+    POST JSON:
+      id: ID del cliente (requerido)
+      razon_social, direccion, telefono, correo: campos a actualizar
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=405)
+    
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        return JsonResponse({'success': False, 'message': 'Empresa no válida'}, status=403)
+    
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': 'JSON inválido'}, status=400)
+    
+    cliente_id = data.get('id')
+    if not cliente_id:
+        return JsonResponse({'success': False, 'message': 'ID de cliente requerido'}, status=400)
+    
+    try:
+        cliente = Cliente.objects.filter(empresa_id=empresa_id, id=cliente_id).first()
+        if not cliente:
+            return JsonResponse({'success': False, 'message': 'Cliente no encontrado'}, status=404)
+        
+        # Campos actualizables
+        campos_actualizar = []
+        
+        if 'razon_social' in data and data['razon_social']:
+            cliente.razon_social = data['razon_social'].strip()[:200]
+            campos_actualizar.append('razon_social')
+        
+        if 'direccion' in data:
+            cliente.direccion = (data['direccion'] or '').strip()[:200]
+            campos_actualizar.append('direccion')
+        
+        if 'telefono' in data:
+            cliente.telefono = (data['telefono'] or '').strip()[:20]
+            campos_actualizar.append('telefono')
+        
+        if 'correo' in data:
+            cliente.correo = (data['correo'] or '').strip()[:100]
+            campos_actualizar.append('correo')
+        
+        if campos_actualizar:
+            cliente.save(update_fields=campos_actualizar)
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Cliente actualizado correctamente',
+            'cliente': {
+                'id': cliente.id,
+                'identificacion': cliente.identificacion,
+                'razon_social': cliente.razon_social,
+                'nombre_comercial': cliente.nombre_comercial or '',
+                'direccion': cliente.direccion or '',
+                'telefono': cliente.telefono or '',
+                'correo': cliente.correo or ''
+            }
+        })
+    except Exception as e:
+        logger.exception("Error actualizando cliente")
+        return JsonResponse({'success': False, 'message': 'Error interno'}, status=500)
+
+@login_required
+@csrf_exempt
 def enriquecer_cliente_api(request):
     """Intenta complementar datos de un cliente existente usando el servicio externo
     GET params:
