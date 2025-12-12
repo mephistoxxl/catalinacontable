@@ -42,25 +42,16 @@
             </div>
         {% endif %}
                 
-        <!-- Header Section -->
-    <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 mb-0 rounded-lg mt-0">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-            <i class="fa fa-list-alt text-white form-header-icon"></i>
-                </div>
-                <div class="ml-3">
-            <h2 class="text-base font-semibold text-white">Listar Facturas</h2>
-            <p class="text-gray-300 text-[11px]">Verifique las facturas agregadas</p>
-                </div>
-            </div>
-        </div>
-
         <!-- Main Content -->
-    <div class="bg-white rounded-lg shadow-lg border border-gray-200 relative overflow-hidden mt-2">
+    <div class="bg-white rounded-lg shadow-lg border border-gray-200 relative" style="overflow: visible;">
             <div class="p-3">
-                <div class="relative">
+                <div class="relative" style="overflow: visible;">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 space-y-2 sm:space-y-0 gap-3">
-                        <h3 class="text-sm font-semibold text-gray-800">Facturas Registradas</h3>
+                        <!-- Título -->
+                        <div class="flex items-center gap-2">
+                            <i class="fa fa-list-alt text-green-600"></i>
+                            <h3 class="text-sm font-semibold text-gray-800">Listar Facturas</h3>
+                        </div>
                         <div class="flex items-center gap-2 flex-wrap flex-1 sm:flex-initial justify-end">
                             <!-- Filtros de fecha -->
                             <div class="flex items-center gap-1">
@@ -88,6 +79,60 @@
                             >
                                 <i class="fa fa-times"></i>
                             </button>
+                            <!-- Botón de Filtros con Dropdown -->
+                            <div class="relative">
+                                <button 
+                                    onclick="toggleFiltrosDropdown()"
+                                    class="px-2 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors border border-gray-300 flex items-center gap-1"
+                                    title="Filtros avanzados"
+                                    id="btnFiltros"
+                                >
+                                    <i class="fa fa-filter text-green-600"></i>
+                                    <span id="filtrosActivos" class="hidden bg-green-500 text-white text-[10px] rounded-full px-1">0</span>
+                                </button>
+                                <!-- Dropdown de filtros -->
+                                <div id="filtrosDropdown" class="hidden absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50 p-3">
+                                    <div class="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                                        <i class="fa fa-filter text-green-600"></i> Filtros
+                                    </div>
+                                    <!-- Filtro por Almacén -->
+                                    <div class="mb-3">
+                                        <label class="text-xs text-gray-600 block mb-1">Almacén:</label>
+                                        <select 
+                                            id="filtro-almacen" 
+                                            class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                            onchange="aplicarFiltros()"
+                                        >
+                                            <option value="">Todos los almacenes</option>
+                                            {% for almacen in almacenes %}
+                                            <option value="{{ almacen.id }}">{{ almacen.descripcion }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <!-- Filtro por Estado -->
+                                    <div class="mb-3">
+                                        <label class="text-xs text-gray-600 block mb-1">Estado SRI:</label>
+                                        <select 
+                                            id="filtro-estado" 
+                                            class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                            onchange="aplicarFiltros()"
+                                        >
+                                            <option value="">Todos los estados</option>
+                                            <option value="autorizada">✅ Autorizadas</option>
+                                            <option value="pendiente">⏳ Pendientes</option>
+                                            <option value="local">📦 Locales</option>
+                                            <option value="rechazada">❌ Rechazadas</option>
+                                        </select>
+                                    </div>
+                                    <!-- Botón limpiar filtros -->
+                                    <button 
+                                        onclick="limpiarFiltrosAvanzados()"
+                                        class="w-full px-2 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                                    >
+                                        <i class="fa fa-times mr-1"></i>Limpiar filtros
+                                    </button>
+                                </div>
+                            </div>
                             <!-- Buscador de texto -->
                             <div class="relative">
                                 <input 
@@ -119,7 +164,11 @@
                         </thead>
                         <tbody id="tabla-facturas" class="bg-white divide-y divide-gray-200">
                             {% for fila in tabla %}
-                            <tr class="factura-row hover:bg-gray-50 transition-colors duration-150" style="display: none">
+                            <tr class="factura-row hover:bg-gray-50 transition-colors duration-150" 
+                                style="display: none"
+                                data-almacen-id="{{ fila.almacen.id|default:'' }}"
+                                data-estado="{% if fila.numero_autorizacion and fila.fecha_autorizacion %}autorizada{% elif fila.estado_sri == 'AUTORIZADA' or fila.estado_sri == 'AUTORIZADO' %}autorizada{% elif fila.estado_sri == 'RECHAZADA' or fila.estado_sri == 'NO_AUTORIZADA' or fila.estado_sri == 'NO AUTORIZADO' %}rechazada{% elif fila.estado_sri == 'PENDIENTE' or fila.estado_sri == 'RECIBIDA' %}pendiente{% else %}local{% endif %}"
+                            >
                                 <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.id }}</td>
                                 <td class="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">{{ fila.cliente.identificacion }}</td>
                                 <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.fecha_emision|date:"d/m/Y" }}</td>
@@ -350,9 +399,13 @@
         filasFiltradas = [...filasOriginales];
         inicializarPaginacion();
         
-        // ✅ Establecer fecha de hoy solo en "Hasta"
+        // ✅ Establecer fecha de hoy en "Desde" y "Hasta"
         const hoy = new Date().toISOString().split('T')[0];
+        document.getElementById('fecha-desde').value = hoy;
         document.getElementById('fecha-hasta').value = hoy;
+        
+        // Aplicar filtro de fechas al cargar
+        filtrarPorFechas();
     });
 
     // ✅ FUNCIÓN DE BÚSQUEDA
@@ -363,6 +416,53 @@
     // ✅ FUNCIÓN PARA FILTRAR POR FECHAS
     function filtrarPorFechas() {
         aplicarTodosLosFiltros();
+    }
+
+    // ✅ FUNCIÓN PARA TOGGLE DEL DROPDOWN DE FILTROS
+    function toggleFiltrosDropdown() {
+        const dropdown = document.getElementById('filtrosDropdown');
+        dropdown.classList.toggle('hidden');
+    }
+
+    // Cerrar dropdown al hacer click fuera
+    document.addEventListener('click', function(event) {
+        const dropdown = document.getElementById('filtrosDropdown');
+        const btn = document.getElementById('btnFiltros');
+        if (dropdown && btn && !dropdown.contains(event.target) && !btn.contains(event.target)) {
+            dropdown.classList.add('hidden');
+        }
+    });
+
+    // ✅ FUNCIÓN PARA APLICAR FILTROS (almacén y estado)
+    function aplicarFiltros() {
+        aplicarTodosLosFiltros();
+        actualizarContadorFiltros();
+        // Cerrar el dropdown después de aplicar filtro
+        document.getElementById('filtrosDropdown').classList.add('hidden');
+    }
+
+    // ✅ FUNCIÓN PARA ACTUALIZAR CONTADOR DE FILTROS ACTIVOS
+    function actualizarContadorFiltros() {
+        const filtroAlmacen = document.getElementById('filtro-almacen').value;
+        const filtroEstado = document.getElementById('filtro-estado').value;
+        let count = 0;
+        if (filtroAlmacen) count++;
+        if (filtroEstado) count++;
+        
+        const badge = document.getElementById('filtrosActivos');
+        if (count > 0) {
+            badge.textContent = count;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+
+    // ✅ FUNCIÓN PARA LIMPIAR FILTROS AVANZADOS
+    function limpiarFiltrosAvanzados() {
+        document.getElementById('filtro-almacen').value = '';
+        document.getElementById('filtro-estado').value = '';
+        aplicarFiltros();
     }
 
     // ✅ FUNCIÓN PARA LIMPIAR FILTROS DE FECHA
@@ -377,6 +477,8 @@
         const textoBusqueda = document.getElementById('buscar-factura').value.toLowerCase().trim();
         const fechaDesde = document.getElementById('fecha-desde').value;
         const fechaHasta = document.getElementById('fecha-hasta').value;
+        const filtroAlmacen = document.getElementById('filtro-almacen').value;
+        const filtroEstado = document.getElementById('filtro-estado').value;
         
         filasFiltradas = filasOriginales.filter(fila => {
             // Filtro de texto
@@ -407,7 +509,21 @@
                 }
             }
             
-            return cumpleTexto && cumpleFecha;
+            // Filtro por almacén
+            let cumpleAlmacen = true;
+            if (filtroAlmacen) {
+                const almacenId = fila.dataset.almacenId || '';
+                cumpleAlmacen = almacenId === filtroAlmacen;
+            }
+            
+            // Filtro por estado
+            let cumpleEstado = true;
+            if (filtroEstado) {
+                const estadoFila = fila.dataset.estado || '';
+                cumpleEstado = estadoFila === filtroEstado;
+            }
+            
+            return cumpleTexto && cumpleFecha && cumpleAlmacen && cumpleEstado;
         });
         
         // Actualizar contador visible

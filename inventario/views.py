@@ -3812,15 +3812,21 @@ class ListarFacturas(LoginRequiredMixin, View):
             messages.error(request, 'No se ha seleccionado una empresa válida')
             return HttpResponseRedirect('/inventario/panel')
 
+        # Obtener la empresa activa
+        empresa = Empresa.objects.get(id=empresa_id)
+        
         #Lista de productos de la BDD
         facturas = Factura.objects.filter(empresa_id=empresa_id)
+        
+        # Obtener almacenes para el filtro (usar for_tenant para evitar problemas con TenantManager)
+        almacenes = Almacen.objects.for_tenant(empresa)
         
         # La sincronización automática con el SRI ha sido deshabilitada para mejorar el rendimiento
         # Solo se ejecutará cuando el usuario haga clic en "Autorizar documento" o similar
         # Si necesita verificar estados pendientes, use el botón de sincronización manual
         #Crea el paginador
 
-        contexto = {'tabla': facturas}
+        contexto = {'tabla': facturas, 'almacenes': almacenes}
         contexto = complementarContexto(contexto, request.user)
 
         return render(request, 'inventario/factura/listarFacturas.html', contexto)
@@ -4511,8 +4517,21 @@ class EditarFactura(LoginRequiredMixin, View):
                 
                 # Actualizar fechas
                 from datetime import datetime
-                factura.fecha_emision = datetime.strptime(request.POST.get('fecha_emision'), '%Y-%m-%d').date()
+                fecha_anterior = factura.fecha_emision
+                nueva_fecha = datetime.strptime(request.POST.get('fecha_emision'), '%Y-%m-%d').date()
+                factura.fecha_emision = nueva_fecha
                 factura.fecha_vencimiento = datetime.strptime(request.POST.get('fecha_vencimiento'), '%Y-%m-%d').date()
+                
+                # ✅ REGENERAR CLAVE DE ACCESO SI CAMBIÓ LA FECHA
+                # La clave de acceso contiene la fecha en los primeros 8 dígitos (DDMMAAAA)
+                # Si la fecha cambia, la clave debe regenerarse para que coincida
+                if fecha_anterior != nueva_fecha and factura.clave_acceso:
+                    fecha_clave_anterior = factura.clave_acceso[:8]  # DDMMAAAA
+                    fecha_nueva_str = nueva_fecha.strftime('%d%m%Y')
+                    if fecha_clave_anterior != fecha_nueva_str:
+                        print(f"🔄 Regenerando clave de acceso: fecha cambió de {fecha_anterior} a {nueva_fecha}")
+                        factura.clave_acceso = factura.generar_clave_acceso()  # Generar nueva clave con fecha correcta
+                        print(f"✅ Nueva clave de acceso: {factura.clave_acceso}")
                 
                 # Actualizar almacén
                 almacen_id = request.POST.get('almacen')
