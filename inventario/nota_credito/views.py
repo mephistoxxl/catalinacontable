@@ -72,6 +72,13 @@ class CrearNotaCredito(LoginRequiredMixin, View):
             messages.error(request, 'Debe seleccionar una empresa.')
             return redirect('inventario:panel')
         
+        # ✅ VALIDAR AUTENTICACIÓN DE FACTURADOR
+        facturador_id = request.session.get('facturador_id')
+        if not facturador_id:
+            # Si no hay facturador logueado, redirigir al login con next
+            next_url = f'/inventario/notas-credito/crear/{factura_id}/' if factura_id else '/inventario/notas-credito/crear/'
+            return redirect(f'/inventario/login_facturador/?next={next_url}')
+        
         empresa = get_object_or_404(Empresa, id=empresa_id)
         
         # Obtener la factura - Solo facturas autorizadas pueden tener NC
