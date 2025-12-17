@@ -1335,6 +1335,11 @@ class Factura(models.Model):
         return self.numero
     
     @property
+    def numero_completo(self):
+        """Alias para numero - compatibilidad con notas de crédito"""
+        return self.numero
+    
+    @property
     def subtotal_12(self):
         return sum(float(ti.base_imponible) for ti in self.totales_impuestos.all() if ti.codigo == '2' and float(ti.tarifa) == 12)
 
@@ -1369,6 +1374,44 @@ class Factura(models.Model):
     @property
     def total(self):
         return float(self.monto_general)
+    
+    @property
+    def saldo_nota_credito(self):
+        """
+        Calcula el saldo disponible para notas de crédito.
+        Es el total de la factura menos el total de notas de crédito autorizadas.
+        """
+        from decimal import Decimal
+        
+        # Importar el modelo NotaCredito aquí para evitar import circular
+        try:
+            from inventario.nota_credito.models import NotaCredito
+            notas_credito = NotaCredito.objects.filter(
+                factura_modificada=self,
+                estado_sri__in=['AUTORIZADO', 'AUTORIZADA']
+            )
+            total_nc = sum(nc.valor_modificacion for nc in notas_credito)
+        except Exception:
+            total_nc = Decimal('0.00')
+        
+        return self.monto_general - total_nc
+    
+    @property
+    def total_notas_credito(self):
+        """
+        Calcula el total de notas de crédito emitidas contra esta factura.
+        """
+        from decimal import Decimal
+        
+        try:
+            from inventario.nota_credito.models import NotaCredito
+            notas_credito = NotaCredito.objects.filter(
+                factura_modificada=self,
+                estado_sri__in=['AUTORIZADO', 'AUTORIZADA']
+            )
+            return sum(nc.valor_modificacion for nc in notas_credito)
+        except Exception:
+            return Decimal('0.00')
 
     def sincronizar_formas_pago(self):
         """

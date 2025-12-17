@@ -1,0 +1,101 @@
+{% extends 'inventario/comun/base.html' %}
+{% load static %}
+
+{% block titulo %}{{ titulo }}{% endblock %}
+
+{% block contenido %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-file-invoice"></i> {{ titulo }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5>Factura Original</h5>
+                        <p><strong>Número:</strong> {{ factura.numero_completo }}</p>
+                        <p><strong>Cliente:</strong> {{ factura.nombre_cliente }}</p>
+                        <p><strong>Total Factura:</strong> ${{ factura.monto_general }}</p>
+                        <p><strong>Saldo Disponible:</strong> ${{ factura.saldo_nota_credito }}</p>
+                    </div>
+
+                    <form method="post" id="formNotaCredito">
+                        {% csrf_token %}
+                        <input type="hidden" name="factura_modificada" value="{{ factura.id }}">
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Fecha de Emisión</label>
+                                    <input type="date" name="fecha_emision" class="form-control" 
+                                           value="{{ today|date:'Y-m-d' }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Secuencial</label>
+                                    <input type="text" class="form-control" 
+                                           value="{{ siguiente_secuencial|stringformat:'09d' }}" readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Tipo de Motivo</label>
+                                    <select name="tipo_motivo" class="form-control" required>
+                                        <option value="DEVOLUCION">Devolución de mercadería</option>
+                                        <option value="DESCUENTO">Descuento posterior a la venta</option>
+                                        <option value="ANULACION">Anulación de factura</option>
+                                        <option value="CORRECCION">Corrección de valores</option>
+                                        <option value="OTRO">Otro motivo</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Motivo (Descripción)</label>
+                            <textarea name="motivo" class="form-control" rows="3" 
+                                      maxlength="300" required></textarea>
+                        </div>
+
+                        <h5 class="mt-4">Detalles de la Nota de Crédito</h5>
+                        <div class="alert alert-warning">
+                            <strong>Nota:</strong> Seleccione los productos/servicios de la factura que desea incluir en la nota de crédito.
+                            Por ahora, esta es una versión temporal. Los templates completos se agregarán próximamente.
+                        </div>
+
+                        <input type="hidden" name="productos" id="productos" value='[]'>
+
+                        <div class="form-group mt-4">
+                            <button type="button" class="btn btn-secondary" onclick="history.back()">
+                                <i class="fas fa-arrow-left"></i> Cancelar
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Crear Nota de Crédito
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Script temporal - agregar lógica de selección de productos
+document.getElementById('formNotaCredito').addEventListener('submit', function(e) {
+    const productos = document.getElementById('productos').value;
+    if (productos === '[]') {
+        e.preventDefault();
+        alert('Debe seleccionar al menos un producto para la nota de crédito.');
+        return false;
+    }
+});
+</script>
+{% endblock %}
