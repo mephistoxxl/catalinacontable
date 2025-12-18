@@ -349,8 +349,8 @@ input[type="number"][readonly] {
                 <div class="flex items-center">
                     <i class="fas fa-file-invoice text-white form-header-icon mr-2"></i>
                     <div>
-                        <h2 class="text-base font-semibold text-white">Emitir Factura</h2>
-                        <p class="text-gray-300 text-[11px] hidden sm:block">Complete los datos para generar la factura</p>
+                        <h2 class="text-base font-semibold text-white">Emitir Nota de Crédito</h2>
+                        <p class="text-gray-300 text-[11px] hidden sm:block">Complete los datos para generar la nota de crédito</p>
                     </div>
                 </div>
                 {% if facturador %}
@@ -379,6 +379,15 @@ input[type="number"][readonly] {
     <!-- Main Content - Compacto -->
         <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
             <div class="p-2">
+                <!-- ✅ Mostrar info de secuencia calculada (como liquidación) -->
+                {% if secuencia_info %}
+                <div class="bg-blue-50 border border-blue-200 rounded-md p-2 mb-3 text-xs">
+                    <i class="fas fa-info-circle text-blue-600 mr-1"></i>
+                    <span class="font-medium">Secuencia calculada:</span>
+                    <span class="ml-1">Establecimiento: {{ secuencia_info.establecimiento_str }} · Punto de emisión: {{ secuencia_info.punto_emision_str }} · Secuencial: {{ secuencia_info.valor_str }}</span>
+                </div>
+                {% endif %}
+                
                 <form method="POST" action="{% url 'inventario:emitirFactura' %}" class="space-y-2">
                     {% csrf_token %}
                     
@@ -393,10 +402,10 @@ input[type="number"][readonly] {
                                 {{ form.secuencia }}
                             </div>
                             
-                            <!-- Número de Factura -->
+                            <!-- Número de Nota de Crédito -->
                             <div>
                                 <label for="secuencia_valor" class="block text-xs font-medium text-gray-800 mb-1">
-                    <i class="fas fa-hashtag text-blue-600 mr-1 label-icon"></i>Número de Factura
+                    <i class="fas fa-hashtag text-blue-600 mr-1 label-icon"></i>Número de Nota de Crédito
                                 </label>
                                 {{ form.secuencia_valor }}
                             </div>
@@ -913,6 +922,12 @@ let totalPagado = 0;
 
 // ========== INICIALIZACIÓN ==========
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('✅ DOM Cargado - Nota de Crédito');
+    
+    // ========== NO MÁS JAVASCRIPT DE SECUENCIA ==========
+    // Los campos de secuencia se calculan en el servidor como liquidación
+    // Establecimiento, punto_emision y secuencia_valor vienen pre-llenados
+    
     // Configurar fechas por defecto
     const hoy = new Date().toISOString().split('T')[0];
     const fechaEmision = document.getElementById('id_fecha_emision');
@@ -984,46 +999,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.key === 'Enter') { 
                 e.preventDefault(); 
                 cargarProductosModal(modalBuscarInput.value); 
-            }
-        });
-    }
-});
-
-// ========== MANEJO DE SECUENCIA ==========
-document.addEventListener('DOMContentLoaded', function() {
-    const secuenciaSelect = document.getElementById('id_secuencia');
-    if (secuenciaSelect) {
-        secuenciaSelect.addEventListener('change', function () {
-            const secuenciaId = this.value;
-            if (secuenciaId) {
-                fetch(`/inventario/obtener_datos_secuencia/${secuenciaId}/`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            const establecimiento = document.getElementById('id_establecimiento');
-                            const puntoEmision = document.getElementById('id_punto_emision');
-                            const secuenciaValor = document.getElementById('id_secuencia_valor');
-                            
-                            if (establecimiento) establecimiento.value = data.data.establecimiento || '';
-                            if (puntoEmision) puntoEmision.value = data.data.punto_emision || '';
-                            if (secuenciaValor) secuenciaValor.value = data.data.secuencial || '';
-                        } else {
-                            console.error('Error:', data.error);
-                            alert('Error al obtener datos de la secuencia: ' + data.error);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error al obtener los datos de la secuencia:', error);
-                        alert('Error de conexión al obtener datos de la secuencia');
-                    });
-            } else {
-                const establecimiento = document.getElementById('id_establecimiento');
-                const puntoEmision = document.getElementById('id_punto_emision');
-                const secuenciaValor = document.getElementById('id_secuencia_valor');
-                
-                if (establecimiento) establecimiento.value = '';
-                if (puntoEmision) puntoEmision.value = '';
-                if (secuenciaValor) secuenciaValor.value = '';
             }
         });
     }
@@ -2284,7 +2259,6 @@ function validarFormulario() {
         alert('ERROR: No se puede procesar los pagos. Contacte al administrador.');
         return false;
     }
-    
     // Deshabilitar botón para evitar doble envío
     const btnEnviar = document.getElementById('btnEnviar');
     if (btnEnviar) {
@@ -2296,8 +2270,6 @@ function validarFormulario() {
     
     return true;
 }
-
-</script>
 
 <!-- ✅ MODAL DE INFORMACIÓN ADICIONAL DEL PRODUCTO -->
 <div id="modalInfoProducto" class="modal-info-producto">
@@ -2571,6 +2543,79 @@ async function guardarClienteModal() {
         alert('Error de conexión al guardar el cliente');
     }
 }
+</script>
+
+<!-- Modal de confirmación para mantener detalles -->
+<div id="modalMantenerDetalles" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center;">
+    <div style="background:#fff; width:90%; max-width:400px; border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.3); padding:24px;">
+        <div style="text-align:center; margin-bottom:20px;">
+            <i class="fas fa-question-circle" style="font-size:48px; color:#3b82f6;"></i>
+            <h3 style="margin-top:12px; font-size:18px; font-weight:600; color:#1f2937;">¿Mantener detalles del documento?</h3>
+            <p style="margin-top:8px; color:#6b7280; font-size:14px;">¿Desea conservar los productos y detalles de la factura para esta nota de crédito?</p>
+        </div>
+        <div style="display:flex; gap:12px; justify-content:center;">
+            <button type="button" onclick="responderMantenerDetalles(true)" class="btn-modal-si" style="flex:1; padding:10px 20px; background:#10b981; color:#fff; border:none; border-radius:6px; font-weight:500; cursor:pointer; transition:background 0.2s;">
+                <i class="fas fa-check mr-2"></i>Sí
+            </button>
+            <button type="button" onclick="responderMantenerDetalles(false)" class="btn-modal-no" style="flex:1; padding:10px 20px; background:#ef4444; color:#fff; border:none; border-radius:6px; font-weight:500; cursor:pointer; transition:background 0.2s;">
+                <i class="fas fa-times mr-2"></i>No
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+.btn-modal-si:hover {
+    background: #059669 !important;
+}
+.btn-modal-no:hover {
+    background: #dc2626 !important;
+}
+</style>
+
+<script>
+// Variable para controlar si ya se mostró el modal
+let modalMantenerDetallesMostrado = false;
+let mantenerDetallesRespuesta = null;
+
+function mostrarModalMantenerDetalles() {
+    const modal = document.getElementById('modalMantenerDetalles');
+    if (modal) {
+        modal.style.display = 'flex';
+        modalMantenerDetallesMostrado = true;
+    }
+}
+
+function ocultarModalMantenerDetalles() {
+    const modal = document.getElementById('modalMantenerDetalles');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function responderMantenerDetalles(respuesta) {
+    mantenerDetallesRespuesta = respuesta;
+    ocultarModalMantenerDetalles();
+    
+    if (!respuesta) {
+        // Si dijo NO, limpiar los productos
+        productosAgregados = [];
+        contadorProductos = 0;
+        actualizarTablaProductos();
+        actualizarTotales();
+    }
+    
+    // No hacer nada más, solo cerrar el modal
+    // El usuario continuará trabajando en el formulario normalmente
+}
+
+// Mostrar el modal automáticamente al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    // Mostrar modal al cargar
+    setTimeout(function() {
+        mostrarModalMantenerDetalles();
+    }, 300); // Pequeño delay para que la página cargue completamente
+});
 </script>
 
 {% endblock %}

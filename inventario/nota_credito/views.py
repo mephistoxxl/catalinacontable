@@ -13,8 +13,10 @@ import json
 import logging
 
 from .models import NotaCredito, DetalleNotaCredito, TotalImpuestoNotaCredito
-from inventario.models import Factura, Empresa, Opciones, DetalleFactura
+from inventario.models import Factura, Empresa, Opciones, DetalleFactura, Cliente, Almacen, Secuencia, Facturador
 from inventario.views import complementarContexto
+from inventario.forms import EmitirFacturaFormulario
+from django.db.models import Max
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,55 @@ class ListarNotasCredito(LoginRequiredMixin, View):
 class CrearNotaCredito(LoginRequiredMixin, View):
     """Vista para crear una nueva nota de crédito desde una factura"""
     login_url = '/inventario/login'
+    SECUENCIA_TIPO_DOCUMENTO = "04"  # Nota de Crédito
+    
+    def _calcular_datos_secuencia(self, empresa, secuencia):
+        """Calcula el siguiente secuencial disponible - IGUAL QUE LIQUIDACIÓN"""
+        if not empresa or not secuencia:
+            return None
+
+        max_existente = NotaCredito.objects.filter(
+            empresa=empresa,
+            establecimiento=secuencia.establecimiento,
+            punto_emision=secuencia.punto_emision,
+        ).aggregate(m=Max("secuencial"))["m"] or 0
+
+        base = secuencia.secuencial or 0
+        if max_existente > 0:
+            siguiente = max_existente + 1
+        else:
+            siguiente = max(base, 1)
+        if siguiente > 999_999_999:
+            raise ValueError("El secuencial ha alcanzado el valor máximo permitido (999999999).")
+
+        return {
+            "secuencia": secuencia,
+            "establecimiento": secuencia.establecimiento,
+            "punto_emision": secuencia.punto_emision,
+            "valor": siguiente,
+            "establecimiento_str": f"{secuencia.establecimiento:03d}",
+            "punto_emision_str": f"{secuencia.punto_emision:03d}",
+            "valor_str": f"{siguiente:09d}",
+        }
+
+    def _obtener_siguiente_secuencia(self, empresa, secuencia_id=None):
+        """Obtiene la siguiente secuencia disponible - IGUAL QUE LIQUIDACIÓN"""
+        if not empresa:
+            return None
+
+        qs = Secuencia.objects.filter(
+            empresa=empresa,
+            tipo_documento=self.SECUENCIA_TIPO_DOCUMENTO,
+            activo=True,
+        )
+        if secuencia_id:
+            qs = qs.filter(id=secuencia_id)
+
+        secuencia = qs.order_by("establecimiento", "punto_emision").first()
+        if not secuencia:
+            return None
+
+        return self._calcular_datos_secuencia(empresa, secuencia)
     
     def get(self, request, factura_id=None):
         # Aceptar factura_id desde URL o query string
@@ -98,25 +149,56 @@ class CrearNotaCredito(LoginRequiredMixin, View):
             messages.error(request, 'Esta factura no tiene saldo disponible para notas de crédito.')
             return redirect('inventario:verFactura', p=factura_id)
         
-        # Obtener establecimiento y punto de emisión desde la factura original
-        opciones = Opciones.objects.for_tenant(empresa).first()
-        establecimiento = factura.establecimiento  # Usar mismo establecimiento de la factura
-        punto_emision = factura.punto_emision      # Usar mismo punto de emisión de la factura
+        # ✅ CALCULAR SECUENCIA EN EL SERVIDOR (como liquidación)
+        secuencia_info = self._obtener_siguiente_secuencia(empresa)
         
-        ultimo_secuencial = NotaCredito.objects.filter(
-            empresa=empresa,
-            establecimiento=establecimiento,
-            punto_emision=punto_emision
-        ).order_by('-secuencial').first()
+        # Obtener clientes y almacenes de la empresa
+        cedulas = Cliente.objects.filter(empresa=empresa).values_list('id', 'identificacion')
+        almacenes = Almacen.objects.filter(activo=True, empresa=empresa)
         
-        siguiente_secuencial = int(ultimo_secuencial.secuencial) + 1 if ultimo_secuencial else 1
+        # ✅ Obtener secuencias para el select
+        secuencias = Secuencia.objects.filter(
+            empresa=empresa, 
+            tipo_documento=self.SECUENCIA_TIPO_DOCUMENTO,
+            activo=True
+        ).order_by('establecimiento', 'punto_emision')
         
+        # ✅ Preparar initial data con los valores calculados
         from datetime import date
+        initial = {
+            'fecha_emision': date.today(),
+        }
+        if secuencia_info:
+            initial.update({
+                "establecimiento": secuencia_info["establecimiento_str"],
+                "punto_emision": secuencia_info["punto_emision_str"],
+                "secuencia_valor": secuencia_info["valor_str"],
+                "secuencia": secuencia_info["secuencia"].id,  # ID de la secuencia seleccionada
+            })
+        
+        # Crear formulario con initial data
+        form = EmitirFacturaFormulario(cedulas=cedulas, secuencias=secuencias, initial=initial)
+        
+        # ✅ Hacer campos de secuencia READONLY (como liquidación)
+        for campo in ("establecimiento", "punto_emision", "secuencia_valor"):
+            if campo in form.fields:
+                widget = form.fields[campo].widget
+                clases_actuales = widget.attrs.get("class", "").strip()
+                widget.attrs["class"] = f"{clases_actuales} bg-gray-100".strip()
+                widget.attrs["readonly"] = "readonly"
+                widget.attrs["tabindex"] = "-1"
+        
+        # Actualizar el campo de almacenes dinámicamente
+        form.fields['almacen'].choices = [('', '...')] + [
+            (a.id, a.descripcion) for a in almacenes
+        ]
         
         contexto = {
             'factura': factura,
-            'opciones': opciones,
-            'siguiente_secuencial': siguiente_secuencial,
+            'opciones': Opciones.objects.for_tenant(empresa).first(),
+            'form': form,
+            'secuencias': secuencias,
+            'secuencia_info': secuencia_info,  # ✅ Info de la secuencia calculada
             'today': date.today(),
             'titulo': f'Nueva Nota de Crédito - Factura {factura.numero_completo}'
         }
