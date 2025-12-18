@@ -172,6 +172,10 @@ class CrearNotaCredito(LoginRequiredMixin, View):
             'identificacion_cliente': factura.identificacion_cliente or '',
             'nombre_cliente': factura.nombre_cliente or '',
         }
+
+        # Pre-cargar almacén desde la factura (mismo patrón que EditarFactura)
+        if getattr(factura, 'almacen_id', None):
+            initial['almacen'] = str(factura.almacen_id)
         
         # Obtener correo del cliente si existe
         if factura.cliente and hasattr(factura.cliente, 'email'):
@@ -198,9 +202,13 @@ class CrearNotaCredito(LoginRequiredMixin, View):
                 widget.attrs["tabindex"] = "-1"
         
         # Actualizar el campo de almacenes dinámicamente
-        form.fields['almacen'].choices = [('', '...')] + [
-            (a.id, a.descripcion) for a in almacenes
-        ]
+        # Importante: usar IDs como string para que el "initial" haga match en el HTML.
+        if 'almacen' in form.fields:
+            form.fields['almacen'].choices = [('', '...')] + [
+                (str(a.id), a.descripcion) for a in almacenes
+            ]
+            if getattr(factura, 'almacen_id', None):
+                form.fields['almacen'].initial = str(factura.almacen_id)
         
         # ✅ Pre-cargar productos de la factura como JSON
         productos_factura = []
