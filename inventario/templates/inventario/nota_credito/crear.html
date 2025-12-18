@@ -561,44 +561,57 @@ input[type="number"][readonly] {
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
-                                    <!-- ✅ 4 FILAS PRELLENADAS VACÍAS -->
-                                    <tr class="fila-vacia">
-                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
-                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
-                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
-                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
-                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
-                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
-                                    </tr>
-                                    <tr class="fila-vacia">
-                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
-                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
-                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
-                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
-                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
-                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
-                                    </tr>
-                                    <tr class="fila-vacia">
-                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
-                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
-                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
-                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
-                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
-                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
-                                    </tr>
-                                    <tr class="fila-vacia">
-                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
-                                        <td class="px-3 py-2 text-xs text-gray-400">-</td>
-                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
-                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
-                                        <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
-                                        <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
-                                    </tr>
+                                    {% if productos_factura %}
+                                        {% for p in productos_factura %}
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-3 py-2 text-xs text-gray-700">{{ p.codigo }}</td>
+                                            <td class="px-3 py-2 text-xs text-gray-700">{{ p.descripcion }}</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-700">{{ p.cantidad|floatformat:0 }}</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-700">${{ p.precio_unitario|floatformat:2 }}</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-700 font-medium">${{ p.subtotal|floatformat:2 }}</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <!-- ✅ 4 FILAS PRELLENADAS VACÍAS -->
+                                        <tr class="fila-vacia">
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                        </tr>
+                                        <tr class="fila-vacia">
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                        </tr>
+                                        <tr class="fila-vacia">
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                        </tr>
+                                        <tr class="fila-vacia">
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                        </tr>
+                                    {% endif %}
                                 </tbody>
                                 <tfoot class="bg-gray-50">
                                     <tr>
                                         <td colspan="4" class="px-3 py-2 text-right text-sm font-semibold text-gray-900">Total:</td>
-                                        <td class="px-3 py-2 text-right text-base font-bold text-gray-900" id="total-general">$0.00</td>
+                                        <td class="px-3 py-2 text-right text-base font-bold text-gray-900" id="total-general">${{ total_general|default:0|floatformat:2 }}</td>
                                         <td class="px-3 py-2"></td>
                                     </tr>
                                 </tfoot>
@@ -606,8 +619,10 @@ input[type="number"][readonly] {
                         </div>
                     </div>
 
-                    <!-- Campos ocultos para enviar los datos -->
-                    <div id="productos-hidden"></div>
+                    <!-- Campos ocultos para enviar los datos (fallback server-side) -->
+                    <div id="productos-hidden">
+                        <input type="hidden" id="productos" name="productos" value="{{ productos_factura_json|escape }}">
+                    </div>
 
                     <!-- SECCIÓN DE FORMAS DE PAGO - Compacta -->
                     <div class="bg-white rounded-md border border-gray-200 overflow-hidden mt-3" id="seccion-formas-pago" style="display: none;">
@@ -920,13 +935,99 @@ let contadorProductos = 0;
 let pagosEfectivo = [];
 let totalPagado = 0;
 
+// ========== FUNCIONES DE RENDERIZADO ==========
+function actualizarTablaProductos() {
+    const tbody = document.querySelector('#tabla-productos tbody');
+    if (!tbody) {
+        console.error('❌ No se encontró tbody de tabla de productos');
+        return;
+    }
+    
+    // Limpiar tabla
+    tbody.innerHTML = '';
+    
+    if (productosAgregados.length === 0) {
+        // Mostrar filas vacías
+        for (let i = 0; i < 4; i++) {
+            tbody.innerHTML += `
+                <tr class="fila-vacia">
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                </tr>
+            `;
+        }
+    } else {
+        // Renderizar productos
+        productosAgregados.forEach(prod => {
+            tbody.innerHTML += `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-3 py-2 text-xs text-gray-700">${prod.codigo || '-'}</td>
+                    <td class="px-3 py-2 text-xs text-gray-700">${prod.descripcion || '-'}</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-700">${prod.cantidad || 0}</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-700">$${(prod.precio_unitario || 0).toFixed(2)}</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-700 font-medium">$${(prod.subtotal || 0).toFixed(2)}</td>
+                    <td class="px-3 py-2 text-center">
+                        <button type="button" onclick="eliminarProducto(${prod.id})" class="text-red-600 hover:text-red-800">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+    
+    console.log('✅ Tabla actualizada con', productosAgregados.length, 'productos');
+}
+
+function actualizarTotales() {
+    let subtotal = 0;
+    let totalIva = 0;
+    
+    productosAgregados.forEach(prod => {
+        const sub = parseFloat(prod.subtotal) || 0;
+        subtotal += sub;
+        
+        // Calcular IVA
+        const tarifa = parseFloat(prod.tarifa_iva) || 0;
+        if (tarifa > 0) {
+            totalIva += sub * (tarifa / 100);
+        }
+    });
+    
+    const total = subtotal + totalIva;
+    
+    // Actualizar en la UI
+    const totalElement = document.querySelector('#tabla-productos tfoot td:last-child') || 
+                         document.querySelector('.total-display'); // buscar alternativa
+    
+    if (totalElement) {
+        totalElement.textContent = `$${total.toFixed(2)}`;
+    }
+    
+    console.log('✅ Totales: Subtotal=', subtotal.toFixed(2), 'IVA=', totalIva.toFixed(2), 'Total=', total.toFixed(2));
+}
+
 // ========== INICIALIZACIÓN ==========
 document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ DOM Cargado - Nota de Crédito');
     
+    // ========== DEBUG: Verificar qué viene del servidor ==========
+    console.log('🔍 Verificando productos_factura_json...');
+    {% if productos_factura_json %}
+        console.log('✅ productos_factura_json EXISTS');
+    {% else %}
+        console.log('❌ productos_factura_json NO EXISTE');
+    {% endif %}
+    
     // ========== NO MÁS JAVASCRIPT DE SECUENCIA ==========
     // Los campos de secuencia se calculan en el servidor como liquidación
     // Establecimiento, punto_emision y secuencia_valor vienen pre-llenados
+    
+    // Productos se renderizan server-side y se envían en <input name="productos">.
     
     // Configurar fechas por defecto
     const hoy = new Date().toISOString().split('T')[0];
@@ -2554,11 +2655,11 @@ async function guardarClienteModal() {
             <p style="margin-top:8px; color:#6b7280; font-size:14px;">¿Desea conservar los productos y detalles de la factura para esta nota de crédito?</p>
         </div>
         <div style="display:flex; gap:12px; justify-content:center;">
-            <button type="button" onclick="responderMantenerDetalles(true)" class="btn-modal-si" style="flex:1; padding:10px 20px; background:#10b981; color:#fff; border:none; border-radius:6px; font-weight:500; cursor:pointer; transition:background 0.2s;">
-                <i class="fas fa-check mr-2"></i>Sí
+            <button type="button" onclick="cerrarModal()" class="btn-modal-si" style="flex:1; padding:10px 20px; background:#10b981; color:#fff; border:none; border-radius:6px; font-weight:500; cursor:pointer; transition:background 0.2s;">
+                <i class="fas fa-check mr-2"></i>Mantener
             </button>
-            <button type="button" onclick="responderMantenerDetalles(false)" class="btn-modal-no" style="flex:1; padding:10px 20px; background:#ef4444; color:#fff; border:none; border-radius:6px; font-weight:500; cursor:pointer; transition:background 0.2s;">
-                <i class="fas fa-times mr-2"></i>No
+            <button type="button" onclick="limpiarProductos()" class="btn-modal-no" style="flex:1; padding:10px 20px; background:#ef4444; color:#fff; border:none; border-radius:6px; font-weight:500; cursor:pointer; transition:background 0.2s;">
+                <i class="fas fa-times mr-2"></i>Limpiar
             </button>
         </div>
     </div>
@@ -2574,9 +2675,8 @@ async function guardarClienteModal() {
 </style>
 
 <script>
-// Variable para controlar si ya se mostró el modal
+// Modal simple: solo cerrar o limpiar productos
 let modalMantenerDetallesMostrado = false;
-let mantenerDetallesRespuesta = null;
 
 function mostrarModalMantenerDetalles() {
     const modal = document.getElementById('modalMantenerDetalles');
@@ -2586,35 +2686,42 @@ function mostrarModalMantenerDetalles() {
     }
 }
 
-function ocultarModalMantenerDetalles() {
+function cerrarModal() {
     const modal = document.getElementById('modalMantenerDetalles');
     if (modal) {
         modal.style.display = 'none';
     }
+    console.log('✅ Modal cerrado - productos mantenidos');
 }
 
-function responderMantenerDetalles(respuesta) {
-    mantenerDetallesRespuesta = respuesta;
-    ocultarModalMantenerDetalles();
-    
-    if (!respuesta) {
-        // Si dijo NO, limpiar los productos
-        productosAgregados = [];
-        contadorProductos = 0;
-        actualizarTablaProductos();
-        actualizarTotales();
+function limpiarProductos() {
+    const modal = document.getElementById('modalMantenerDetalles');
+    if (modal) {
+        modal.style.display = 'none';
     }
     
-    // No hacer nada más, solo cerrar el modal
-    // El usuario continuará trabajando en el formulario normalmente
+    // Esperar a que las funciones estén disponibles
+    setTimeout(function() {
+        if (typeof productosAgregados !== 'undefined') {
+            productosAgregados = [];
+            contadorProductos = 0;
+            
+            if (typeof actualizarTablaProductos === 'function') {
+                actualizarTablaProductos();
+            }
+            if (typeof actualizarTotales === 'function') {
+                actualizarTotales();
+            }
+            console.log('✅ Productos limpiados');
+        }
+    }, 100);
 }
 
-// Mostrar el modal automáticamente al cargar la página
+// Mostrar el modal después de que se carguen los productos
 document.addEventListener('DOMContentLoaded', function() {
-    // Mostrar modal al cargar
     setTimeout(function() {
         mostrarModalMantenerDetalles();
-    }, 300); // Pequeño delay para que la página cargue completamente
+    }, 1000); // Esperar a que se carguen los productos primero
 });
 </script>
 

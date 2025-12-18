@@ -167,7 +167,16 @@ class CrearNotaCredito(LoginRequiredMixin, View):
         from datetime import date
         initial = {
             'fecha_emision': date.today(),
+            'fecha_vencimiento': date.today(),
+            # Pre-cargar datos del cliente de la factura
+            'identificacion_cliente': factura.identificacion_cliente or '',
+            'nombre_cliente': factura.nombre_cliente or '',
         }
+        
+        # Obtener correo del cliente si existe
+        if factura.cliente and hasattr(factura.cliente, 'email'):
+            initial['correo_cliente'] = factura.cliente.email or ''
+        
         if secuencia_info:
             initial.update({
                 "establecimiento": secuencia_info["establecimiento_str"],
@@ -193,12 +202,76 @@ class CrearNotaCredito(LoginRequiredMixin, View):
             (a.id, a.descripcion) for a in almacenes
         ]
         
+        # ✅ Pre-cargar productos de la factura como JSON
+        productos_factura = []
+        print(f"🔍 DEBUG: Factura ID: {factura.id}, Detalles: {factura.detallefactura_set.count()}")
+        
+        for detalle in factura.detallefactura_set.all():
+            # Mapeo de códigos IVA a tarifas
+            tarifas_iva = {
+                '0': 0, '2': 12, '3': 14, '4': 15, '5': 5,
+                '6': 0, '7': 0, '8': 0, '10': 13,
+            }
+            
+            if detalle.producto:
+                codigo = detalle.producto.codigo
+                descripcion = detalle.producto.descripcion
+                precio = float(detalle.precio_unitario or detalle.producto.precio or 0)
+                codigo_iva = detalle.iva_codigo or detalle.producto.iva or '2'
+                producto_id = detalle.producto_id
+                servicio_id = None
+            elif detalle.servicio:
+                codigo = detalle.servicio.codigo
+                descripcion = detalle.servicio.descripcion
+                precio = float(detalle.precio_unitario or detalle.servicio.precio1 or 0)
+                codigo_iva = detalle.iva_codigo or detalle.servicio.iva or '2'
+                producto_id = None
+                servicio_id = detalle.servicio_id
+            else:
+                codigo = 'SIN_CODIGO'
+                descripcion = 'Sin descripción'
+                precio = float(detalle.precio_unitario or 0)
+                codigo_iva = '2'
+                producto_id = None
+                servicio_id = None
+            
+            productos_factura.append({
+                'producto_id': producto_id,
+                'servicio_id': servicio_id,
+                'codigo': codigo,
+                'descripcion': descripcion,
+                'cantidad': float(detalle.cantidad),
+                'precio_unitario': precio,
+                'descuento': float(detalle.descuento or 0),
+                'subtotal': float(detalle.sub_total or 0),
+                'codigo_iva': codigo_iva,
+                'tarifa_iva': tarifas_iva.get(str(codigo_iva), 15),
+            })
+        
+        print(f"✅ DEBUG: Productos cargados: {len(productos_factura)}")
+        print(f"📦 DEBUG: Productos JSON: {json.dumps(productos_factura)[:200]}...")  # Primeros 200 caracteres
+
+        # Totales para render server-side (fallback si el JS no corre)
+        from decimal import Decimal
+        subtotal_sum = Decimal('0.00')
+        iva_sum = Decimal('0.00')
+        for p in productos_factura:
+            sub = Decimal(str(p.get('subtotal', 0) or 0))
+            tarifa = Decimal(str(p.get('tarifa_iva', 0) or 0))
+            subtotal_sum += sub
+            if tarifa > 0:
+                iva_sum += sub * (tarifa / Decimal('100'))
+        total_general = subtotal_sum + iva_sum
+        
         contexto = {
             'factura': factura,
             'opciones': Opciones.objects.for_tenant(empresa).first(),
             'form': form,
             'secuencias': secuencias,
             'secuencia_info': secuencia_info,  # ✅ Info de la secuencia calculada
+            'productos_factura': productos_factura,  # ✅ Lista para render server-side
+            'productos_factura_json': json.dumps(productos_factura),  # ✅ Productos como JSON
+            'total_general': float(total_general),
             'today': date.today(),
             'titulo': f'Nueva Nota de Crédito - Factura {factura.numero_completo}'
         }

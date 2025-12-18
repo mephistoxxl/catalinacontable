@@ -8085,6 +8085,11 @@ def obtener_datos_factura(request, factura_id):
         # Obtener factura con sus detalles
         factura = Factura.objects.select_related('cliente').get(id=factura_id, empresa=empresa)
         
+        # Obtener correo del cliente
+        correo_cliente = ''
+        if factura.cliente:
+            correo_cliente = factura.cliente.email if hasattr(factura.cliente, 'email') else ''
+        
         # Obtener productos de la factura
         from inventario.models import DetalleFactura
         detalles = DetalleFactura.objects.filter(factura=factura).select_related('producto', 'servicio')
@@ -8095,32 +8100,65 @@ def obtener_datos_factura(request, factura_id):
             if detalle.producto:
                 codigo = detalle.producto.codigo
                 descripcion = detalle.producto.descripcion
+                precio_unitario = float(detalle.precio_unitario or detalle.producto.precio or 0)
+                codigo_iva = detalle.iva_codigo or detalle.producto.iva or '2'
             elif detalle.servicio:
                 codigo = detalle.servicio.codigo
                 descripcion = detalle.servicio.descripcion
+                precio_unitario = float(detalle.precio_unitario or detalle.servicio.precio1 or 0)
+                codigo_iva = detalle.iva_codigo or detalle.servicio.iva or '2'
             else:
                 codigo = 'SIN_CODIGO'
                 descripcion = 'Sin descripción'
+                precio_unitario = float(detalle.precio_unitario or 0)
+                codigo_iva = detalle.iva_codigo or '2'
+            
+            # Mapeo de códigos IVA a tarifas
+            tarifas_iva = {
+                '0': 0,
+                '2': 12,
+                '3': 14,
+                '4': 15,
+                '5': 5,
+                '6': 0,  # No objeto
+                '7': 0,  # Exento
+                '8': 0,
+                '10': 13,
+            }
+            tarifa_iva = tarifas_iva.get(str(codigo_iva), 15)
             
             productos.append({
+                'producto_id': detalle.producto_id,
+                'servicio_id': detalle.servicio_id,
                 'codigo': codigo,
                 'descripcion': descripcion,
-                'cantidad': float(detalle.cantidad)
+                'cantidad': float(detalle.cantidad),
+                'precio_unitario': precio_unitario,
+                'descuento': float(detalle.descuento or 0),
+                'subtotal': float(detalle.sub_total or 0),
+                'codigo_iva': codigo_iva,
+                'tarifa_iva': tarifa_iva,
             })
         
         return JsonResponse({
             'success': True,
             'factura': {
+                'id': factura.id,
                 'numero': f"{factura.establecimiento}-{factura.punto_emision}-{factura.secuencia}",
                 'clave_acceso': factura.clave_acceso or '',
                 'fecha_emision': factura.fecha_emision.isoformat(),
+                'identificacion': factura.identificacion_cliente or '',
+                'cliente': factura.nombre_cliente or '',
+                'correo': correo_cliente,
+                'total': float(factura.total or 0),
             },
             'cliente': {
-                'identificacion': factura.identificacion_cliente,
-                'nombre': factura.nombre_cliente,
+                'identificacion': factura.identificacion_cliente or '',
+                'nombre': factura.nombre_cliente or '',
                 'direccion': factura.cliente.direccion if factura.cliente else 'Sin dirección',
             },
-            'productos': productos
+            'productos': productos,
+            'detalles': productos,  # Alias para compatibilidad
         })
     except Factura.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'Factura no encontrada'})
