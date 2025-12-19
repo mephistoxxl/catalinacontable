@@ -935,6 +935,37 @@ let contadorProductos = 0;
 let pagosEfectivo = [];
 let totalPagado = 0;
 
+// ========== HELPERS NUMÉRICOS (igual que editar factura: tolera $ y separadores) ==========
+function _toNumberFlexible(value) {
+    if (value == null) return 0;
+    if (typeof value === 'number') return isFinite(value) ? value : 0;
+
+    const raw = String(value).trim();
+    if (!raw) return 0;
+
+    // Mantener dígitos, signo, punto y coma. Quitar $ y otros símbolos.
+    let s = raw.replace(/[^0-9,\-\.]/g, '');
+    if (!s) return 0;
+
+    // Si hay coma como separador decimal (y no hay punto), convertir coma a punto.
+    if (s.includes(',') && !s.includes('.')) {
+        s = s.replace(',', '.');
+    }
+    // Quitar separadores de miles restantes.
+    s = s.replace(/,/g, '');
+
+    const n = Number(s);
+    return isFinite(n) ? n : 0;
+}
+
+function _toIvaPercentFlexible(prod) {
+    // Prioridad: ivaPercent (0.12), tarifa_iva (12), iva (12/0.12)
+    let v = _toNumberFlexible(prod?.ivaPercent ?? prod?.iva_percent ?? prod?.tarifa_iva ?? prod?.iva);
+    if (!isFinite(v) || v < 0) v = 0;
+    if (v > 1) v = v / 100;
+    return v;
+}
+
 // ========== FUNCIONES DE RENDERIZADO ==========
 function actualizarTablaProductos() {
     const tbody = document.querySelector('#tabla-productos tbody');
@@ -1001,7 +1032,8 @@ function actualizarTotales() {
     const total = subtotal + totalIva;
     
     // Actualizar en la UI
-    const totalElement = document.querySelector('#tabla-productos tfoot td:last-child') || 
+    const totalElement = document.getElementById('total-general') ||
+                         document.querySelector('#tabla-productos tfoot td:last-child') || 
                          document.querySelector('.total-display'); // buscar alternativa
     
     if (totalElement) {
@@ -1852,7 +1884,37 @@ function actualizarCamposOcultos() {
 }
 
 function actualizarTotal() {
-    const totalConIva = productosAgregados.reduce((sum, producto) => sum + parseFloat(producto.totalConIva || 0), 0);
+    // En NC puede venir mezcla de formatos (strings con $ / objetos parciales).
+    // Para que quede como editar factura, derivamos el total desde base*cantidad y aplicamos IVA.
+    const totalConIva = (Array.isArray(productosAgregados) ? productosAgregados : []).reduce((sum, producto) => {
+        const cantidad = Math.max(1, Math.round(_toNumberFlexible(producto?.cantidad ?? producto?.qty ?? 1)) || 1);
+        const precioBase = _toNumberFlexible(producto?.precio ?? producto?.precio_unitario ?? producto?.p_unit);
+        const subtotal = _toNumberFlexible(producto?.subtotal ?? producto?.sub_total);
+        const ivaPercent = _toIvaPercentFlexible(producto);
+
+        let base = 0;
+        if (precioBase > 0) {
+            base = precioBase * cantidad;
+        } else if (subtotal > 0) {
+            base = subtotal;
+        }
+
+        // Si existe un total explícito válido, úsalo, pero no dejes que un 0 "falso" tape una base real.
+        const totalExplicito = _toNumberFlexible(producto?.totalConIva ?? producto?.total_con_iva);
+        let totalLinea = 0;
+
+        if (base > 0) {
+            totalLinea = Math.round((base * (1 + ivaPercent)) * 100) / 100;
+            // Si el total explícito es mayor (por redondeos/ajustes), respetarlo.
+            if (totalExplicito > 0 && Math.abs(totalExplicito - totalLinea) > 0.01) {
+                totalLinea = totalExplicito;
+            }
+        } else {
+            totalLinea = totalExplicito;
+        }
+
+        return sum + (isFinite(totalLinea) ? totalLinea : 0);
+    }, 0);
     const totalRedondeado = Math.round(totalConIva * 100) / 100;
     
     document.getElementById('total-general').textContent = `$${totalRedondeado.toFixed(2)}`;
@@ -2676,13 +2738,329 @@ async function guardarClienteModal() {
 
 <script>
 // Modal simple: solo cerrar o limpiar productos
-let modalMantenerDetallesMostrado = false;
+const NOTA_CREDITO_MANTENER_DETALLES_KEY_PREFIX = 'notaCredito.mantenerDetalles.v1:';
+
+function obtenerFacturaIdDesdeUrl() {
+    try {
+        const path = window.location.pathname || '';
+        const match = path.match(/\/notas-credito\/crear\/(\d+)\/?$/);
+        return match ? match[1] : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function _getMantenerDetallesStorageKey() {
+    const facturaId = obtenerFacturaIdDesdeUrl();
+    return NOTA_CREDITO_MANTENER_DETALLES_KEY_PREFIX + (facturaId || 'sin_factura');
+}
+
+function _tieneProductosIniciales() {
+    const productosInput = document.getElementById('productos');
+    const raw = (productosInput?.value || '').trim();
+    if (!!raw && raw !== '[]' && raw !== 'null' && raw !== 'None') {
+        return true;
+    }
+
+    // Fallback: si el backend no envía productos_factura_json pero sí renderiza filas,
+    // igual debemos activar el flujo (modal/restore) para poder re-renderizar con botones.
+    try {
+        const filas = Array.from(document.querySelectorAll('#tabla-productos tbody tr'));
+        return filas.some((tr) => !tr.classList.contains('fila-vacia'));
+    } catch (e) {
+        return false;
+    }
+}
+
+function _limpiarProductosSoloUI() {
+    try {
+        const productosInput = document.getElementById('productos');
+        if (productosInput) {
+            productosInput.value = '[]';
+        }
+
+        // Forzar limpieza visual aunque haya HTML renderizado server-side
+        const tbody = document.querySelector('#tabla-productos tbody');
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr class="fila-vacia">
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                </tr>
+                <tr class="fila-vacia">
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                </tr>
+                <tr class="fila-vacia">
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                </tr>
+                <tr class="fila-vacia">
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                </tr>
+            `;
+        }
+
+        const totalEl = document.getElementById('total-general');
+        if (totalEl) {
+            totalEl.textContent = '$0.00';
+        }
+
+        if (typeof productosAgregados !== 'undefined') {
+            productosAgregados = [];
+        }
+        if (typeof contadorProductos !== 'undefined') {
+            contadorProductos = 0;
+        }
+        if (typeof actualizarTablaProductos === 'function') {
+            actualizarTablaProductos();
+        }
+        if (typeof actualizarTotales === 'function') {
+            actualizarTotales();
+        }
+    } catch (e) {
+        console.warn('No se pudo limpiar UI de productos:', e);
+    }
+}
+
+function _capturarProductosDesdeTablaServer() {
+    const filas = Array.from(document.querySelectorAll('#tabla-productos tbody tr'));
+    const productos = [];
+
+    filas.forEach((tr) => {
+        if (tr.classList.contains('fila-vacia')) return;
+        const tds = tr.querySelectorAll('td');
+        if (!tds || tds.length < 5) return;
+
+        const codigo = (tds[0].textContent || '').trim();
+        const nombre = (tds[1].textContent || '').trim();
+        const cantidad = Math.max(1, parseInt((tds[2].textContent || '').trim(), 10) || 1);
+        const precio = _toNumberFlexible(tds[3].textContent);
+
+        // El subtotal del server-side puede venir ya con $ y decimales
+        const subtotal = _toNumberFlexible(tds[4].textContent);
+
+        if (!codigo && !nombre) return;
+
+        productos.push({
+            codigo,
+            nombre: nombre || codigo,
+            cantidad,
+            precio,
+            subtotal,
+        });
+    });
+
+    return productos;
+}
+
+function _restaurarProductosDesdeSnapshot() {
+    const raw = (window.__nc_productos_snapshot || '').trim();
+    const snapshotTabla = Array.isArray(window.__nc_productos_tabla_snapshot)
+        ? window.__nc_productos_tabla_snapshot
+        : [];
+
+    if (!raw && snapshotTabla.length === 0) return;
+
+    const parseJsonSeguro = (texto) => {
+        try {
+            return JSON.parse(texto);
+        } catch (e) {
+            // Intentar decodificar entidades HTML (&quot;, etc.)
+            try {
+                const t = document.createElement('textarea');
+                t.innerHTML = texto;
+                return JSON.parse(t.value);
+            } catch (e2) {
+                return null;
+            }
+        }
+    };
+
+    const parsed = raw ? parseJsonSeguro(raw) : null;
+    let lista = Array.isArray(parsed) ? parsed : [];
+
+    // Fallback: si no hay JSON válido, usar snapshot desde tabla server-side
+    if (lista.length === 0 && snapshotTabla.length > 0) {
+        lista = snapshotTabla;
+    }
+
+    // Limpiar tabla actual
+    const tbody = document.querySelector('#tabla-productos tbody');
+    if (tbody) {
+        tbody.innerHTML = '';
+    }
+
+    const normalizarIvaPercent = (valor) => {
+        let v = _toNumberFlexible(valor);
+        if (!isFinite(v)) return 0.12;
+        // Si viene como 12, 15, 5
+        if (v > 1) v = v / 100;
+        if (v < 0) v = 0;
+        return v;
+    };
+
+    const ivaCodigoDesdePercent = (percent) => {
+        if (Math.abs(percent - 0) < 0.0001) return '0';
+        if (Math.abs(percent - 0.12) < 0.01) return '2';
+        if (Math.abs(percent - 0.15) < 0.01) return '4';
+        if (Math.abs(percent - 0.05) < 0.01) return '5';
+        // fallback
+        return percent > 0 ? '2' : '0';
+    };
+
+    // Reconstruir productosAgregados en el formato que usa este template
+    productosAgregados = [];
+    contadorProductos = 0;
+
+    lista.forEach((p) => {
+        const codigo = (p.codigo ?? p.codigo_principal ?? p.cod ?? p.producto_codigo ?? '').toString();
+        const nombre = (p.descripcion ?? p.nombre ?? p.producto ?? '').toString();
+        const cantidad = Math.max(1, parseInt(p.cantidad ?? p.qty ?? p.cant ?? 1, 10) || 1);
+        const subtotalExistente = _toNumberFlexible(p.subtotal ?? p.sub_total);
+        let precio = _toNumberFlexible(p.precio_unitario ?? p.precio ?? p.p_unit ?? 0);
+        // Si no viene precio pero sí subtotal, inferirlo.
+        if (!(precio > 0) && subtotalExistente > 0 && cantidad > 0) {
+            precio = subtotalExistente / cantidad;
+        }
+        const ivaPercent = normalizarIvaPercent(p.ivaPercent ?? p.iva_percent ?? p.tarifa_iva ?? p.iva ?? 0.12);
+        const ivaCodigo = (p.ivaCodigo ?? p.iva_codigo ?? p.codigo_iva ?? '').toString() || ivaCodigoDesdePercent(ivaPercent);
+
+        let precioConIva = precio * (1 + ivaPercent);
+        precioConIva = Math.round(precioConIva * 100) / 100;
+        const subtotal = Math.round(((subtotalExistente > 0 ? subtotalExistente : (precio * cantidad)) * 100)) / 100;
+        const totalConIva = Math.round((Math.max(0, subtotal) * (1 + ivaPercent)) * 100) / 100;
+
+        const productoData = {
+            id: contadorProductos++,
+            codigo,
+            nombre: nombre || codigo,
+            cantidad,
+            precio,
+            precioConIva,
+            subtotal,
+            totalConIva,
+            ivaPercent,
+            ivaCodigo,
+            // extras opcionales
+            descripcionReemplazo: p.descripcionReemplazo ?? p.descripcion_reemplazo ?? '',
+            infoAdicional: p.infoAdicional ?? p.info_adicional ?? '',
+            codigoPersonalizado: p.codigoPersonalizado ?? p.codigo_personalizado ?? '',
+        };
+
+        productosAgregados.push(productoData);
+
+        // Render principal (UI interactiva). Fallback a fila simple si algo falla.
+        if (typeof agregarFilaTabla === 'function') {
+            try {
+                agregarFilaTabla(productoData);
+            } catch (e) {
+                console.warn('No se pudo agregar fila (fallback simple):', e);
+                if (tbody) {
+                    const tr = document.createElement('tr');
+                    tr.setAttribute('data-producto-id', String(productoData.id));
+                    tr.innerHTML = `
+                        <td class="px-3 py-2 text-xs text-gray-700">${productoData.codigo || '-'}</td>
+                        <td class="px-3 py-2 text-xs text-gray-700">${productoData.nombre || '-'}</td>
+                        <td class="px-3 py-2 text-center text-xs text-gray-700">${productoData.cantidad || 1}</td>
+                        <td class="px-3 py-2 text-right text-xs text-gray-700">$${Number(productoData.precio || 0).toFixed(2)}</td>
+                        <td class="px-3 py-2 text-right text-xs text-gray-700 font-medium">$${Number(productoData.subtotal || 0).toFixed(2)}</td>
+                        <td class="px-3 py-2 text-center text-xs">
+                            <button type="button" class="px-2 py-1 text-xs text-white bg-red-600 hover:bg-red-700 rounded" onclick="eliminarProducto(${productoData.id})">
+                                Eliminar
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+            }
+        } else if (tbody) {
+            const tr = document.createElement('tr');
+            tr.setAttribute('data-producto-id', String(productoData.id));
+            tr.innerHTML = `
+                <td class="px-3 py-2 text-xs text-gray-700">${productoData.codigo || '-'}</td>
+                <td class="px-3 py-2 text-xs text-gray-700">${productoData.nombre || '-'}</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-700">${productoData.cantidad || 1}</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-700">$${Number(productoData.precio || 0).toFixed(2)}</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-700 font-medium">$${Number(productoData.subtotal || 0).toFixed(2)}</td>
+                <td class="px-3 py-2 text-center text-xs">
+                    <button type="button" class="px-2 py-1 text-xs text-white bg-red-600 hover:bg-red-700 rounded" onclick="eliminarProducto(${productoData.id})">
+                        Eliminar
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
+    });
+
+    if (productosAgregados.length === 0 && tbody) {
+        // Restaurar filas vacías si no hay nada
+        tbody.innerHTML = `
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+        `;
+    }
+
+    // Actualizar campos ocultos + total con las funciones correctas del template
+    if (typeof actualizarCamposOcultos === 'function') {
+        actualizarCamposOcultos();
+    }
+    if (typeof actualizarTotal === 'function') {
+        actualizarTotal();
+    }
+}
 
 function mostrarModalMantenerDetalles() {
     const modal = document.getElementById('modalMantenerDetalles');
     if (modal) {
         modal.style.display = 'flex';
-        modalMantenerDetallesMostrado = true;
     }
 }
 
@@ -2691,6 +3069,13 @@ function cerrarModal() {
     if (modal) {
         modal.style.display = 'none';
     }
+    try {
+        sessionStorage.setItem(_getMantenerDetallesStorageKey(), 'mantener');
+    } catch (e) {
+        // Ignorar
+    }
+    // Si al inicio dejamos vacío, restaurar ahora
+    _restaurarProductosDesdeSnapshot();
     console.log('✅ Modal cerrado - productos mantenidos');
 }
 
@@ -2699,12 +3084,23 @@ function limpiarProductos() {
     if (modal) {
         modal.style.display = 'none';
     }
+
+    try {
+        sessionStorage.setItem(_getMantenerDetallesStorageKey(), 'limpiar');
+    } catch (e) {
+        // Ignorar
+    }
     
     // Esperar a que las funciones estén disponibles
     setTimeout(function() {
         if (typeof productosAgregados !== 'undefined') {
             productosAgregados = [];
             contadorProductos = 0;
+
+            const productosInput = document.getElementById('productos');
+            if (productosInput) {
+                productosInput.value = '[]';
+            }
             
             if (typeof actualizarTablaProductos === 'function') {
                 actualizarTablaProductos();
@@ -2717,11 +3113,72 @@ function limpiarProductos() {
     }, 100);
 }
 
-// Mostrar el modal después de que se carguen los productos
+// Mostrar el modal solo si hay productos iniciales (desde factura) y solo la primera vez.
 document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(function() {
+    // Mostrar modal cuando estamos creando NC desde una factura.
+    // Si el backend no mandó productos (aún), igual preguntamos.
+    const facturaId = obtenerFacturaIdDesdeUrl();
+    if (!_tieneProductosIniciales() && !facturaId) {
+        return;
+    }
+
+    // Detectar tipo de navegación: si es reload, NO volver a preguntar.
+    let navType = 'navigate';
+    try {
+        const navEntries = performance.getEntriesByType('navigation');
+        navType = navEntries && navEntries.length ? navEntries[0].type : 'navigate';
+    } catch (e) {
+        navType = 'navigate';
+    }
+
+    // Guardar snapshot para poder restaurar si el usuario elige "Mantener"
+    const productosInput = document.getElementById('productos');
+    window.__nc_productos_snapshot = (productosInput?.value || '').trim();
+    // Fallback robusto: capturar también desde la tabla renderizada por el servidor
+    window.__nc_productos_tabla_snapshot = _capturarProductosDesdeTablaServer();
+
+    let decision = null;
+    const key = _getMantenerDetallesStorageKey();
+    try {
+        // Si el usuario entra nuevamente (navigate/back_forward), volver a preguntar.
+        // Solo en reload respetamos la decisión previa.
+        if (navType !== 'reload') {
+            sessionStorage.removeItem(key);
+            decision = null;
+        } else {
+            decision = sessionStorage.getItem(key);
+        }
+    } catch (e) {
+        decision = null;
+    }
+
+    // En reload: no mostrar modal. Aplicar decisión si existe; si no existe, dejar vacío por defecto.
+    if (navType === 'reload') {
+        if (decision === 'mantener') {
+            // Renderizar de forma interactiva (con editar/eliminar), no dejar la tabla server-side con '-'
+            _restaurarProductosDesdeSnapshot();
+        } else {
+            _limpiarProductosSoloUI();
+        }
+        return;
+    }
+
+    // En navegación normal: iniciar vacío y preguntar.
+    _limpiarProductosSoloUI();
+    try {
         mostrarModalMantenerDetalles();
-    }, 1000); // Esperar a que se carguen los productos primero
+        // Failsafe: si algo/algún CSS lo deja oculto, forzar display.
+        setTimeout(function() {
+            const modal = document.getElementById('modalMantenerDetalles');
+            if (modal && getComputedStyle(modal).display === 'none') {
+                modal.style.display = 'flex';
+            }
+        }, 50);
+    } catch (e) {
+        // Si por algún motivo falla el modal, no dejes la pantalla muerta.
+        console.warn('No se pudo mostrar modal, restaurando productos:', e);
+        _restaurarProductosDesdeSnapshot();
+    }
 });
 </script>
 

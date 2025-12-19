@@ -1087,6 +1087,8 @@ class Panel(LoginRequiredMixin, View):
 
     def get(self, request):
         from datetime import date
+        from django.db.models import Sum
+        from django.db.models.functions import ExtractMonth
 
         empresa_id = request.session.get('empresa_activa')
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
@@ -1101,6 +1103,130 @@ class Panel(LoginRequiredMixin, View):
         except Empresa.DoesNotExist:
             return redirect('inventario:seleccionar_empresa')
 
+        # Ventas por mes (año actual vs año anterior) para el gráfico
+        hoy = date.today()
+        year_cur = hoy.year
+        year_prev = hoy.year - 1
+
+        labels_meses = ["Ene.", "Feb.", "Mar.", "Abr.", "May.", "Jun.", "Jul.", "Ago.", "Sep.", "Oct.", "Nov.", "Dic."]
+        ventas_ytd_cur = [0.0] * 12
+        ventas_ytd_prev = [0.0] * 12
+
+        qs_base = Factura.objects.filter(empresa_id=empresa_id)
+
+        for year_val, target in ((year_prev, ventas_ytd_prev), (year_cur, ventas_ytd_cur)):
+            rows = (
+                qs_base.filter(fecha_emision__year=year_val)
+                .annotate(m=ExtractMonth("fecha_emision"))
+                .values("m")
+                .annotate(total=Sum("monto_general"))
+                .order_by("m")
+            )
+            for row in rows:
+                month_num = row.get("m")
+                if not month_num:
+                    continue
+                idx = int(month_num) - 1
+                if 0 <= idx < 12:
+                    total = row.get("total") or 0
+                    try:
+                        target[idx] = float(total)
+                    except (TypeError, ValueError):
+                        target[idx] = 0.0
+
+        # Puntos para SVG (sin dependencias externas)
+        chart_width = 900
+        chart_height = 150
+        padding_left = 44
+        padding_right = 18
+        padding_top = 14
+        padding_bottom = 44
+
+        inner_w = chart_width - padding_left - padding_right
+        inner_h = chart_height - padding_top - padding_bottom
+
+        x_start = float(padding_left)
+        x_end = float(chart_width - padding_right)
+        y_bottom = float(chart_height - padding_bottom)
+
+        max_val = max([0.0] + ventas_ytd_prev + ventas_ytd_cur)
+        has_data = max_val > 0
+        if max_val <= 0:
+            max_val = 1.0
+
+        def _x(i: int) -> float:
+            if i <= 0:
+                return x_start
+            if i >= 11:
+                return float(padding_left + inner_w)
+            return float(padding_left + (inner_w * (i / 11.0)))
+
+        def _y(v: float) -> float:
+            vv = 0.0
+            try:
+                vv = float(v or 0)
+            except (TypeError, ValueError):
+                vv = 0.0
+            # 0 en el eje inferior
+            return float(padding_top + inner_h - (inner_h * (vv / max_val)))
+
+        points_prev = " ".join([f"{_x(i):.2f},{_y(ventas_ytd_prev[i]):.2f}" for i in range(12)])
+        points_cur = " ".join([f"{_x(i):.2f},{_y(ventas_ytd_cur[i]):.2f}" for i in range(12)])
+
+        def _fmt_val(v: float) -> str:
+            try:
+                vv = float(v or 0)
+            except (TypeError, ValueError):
+                vv = 0.0
+            return f"{int(round(vv)):,}"
+
+        # Puntos con etiquetas (para mostrar valores como en el ejemplo)
+        points_prev_markers = []
+        points_cur_markers = []
+        for i in range(12):
+            px = _x(i)
+            py_prev = _y(ventas_ytd_prev[i])
+            py_cur = _y(ventas_ytd_cur[i])
+
+            # Etiquetas: prev arriba, cur abajo (reduce solapamientos)
+            prev_label_y = max(float(padding_top + 10), float(py_prev - 6))
+            cur_label_y = min(float(y_bottom - 10), float(py_cur + 14))
+
+            points_prev_markers.append(
+                {
+                    "x": px,
+                    "y": py_prev,
+                    "label": _fmt_val(ventas_ytd_prev[i]),
+                    "label_y": prev_label_y,
+                }
+            )
+            points_cur_markers.append(
+                {
+                    "x": px,
+                    "y": py_cur,
+                    "label": _fmt_val(ventas_ytd_cur[i]),
+                    "label_y": cur_label_y,
+                }
+            )
+
+        # Ticks sencillos (0, 50%, 100%)
+        tick_0 = 0.0
+        tick_50 = max_val * 0.5
+        tick_100 = max_val
+        y_0 = _y(tick_0)
+        y_50 = _y(tick_50)
+        y_100 = _y(tick_100)
+
+        x_mid = (x_start + x_end) / 2.0
+        y_mid = float(padding_top + (inner_h / 2.0))
+
+        month_ticks = []
+        for i, label in enumerate(labels_meses):
+            month_ticks.append({
+                'label': label,
+                'x': _x(i),
+            })
+
         #Recupera los datos del usuario despues del login
         contexto = {
             'usuario': request.user.username,
@@ -1109,6 +1235,7 @@ class Panel(LoginRequiredMixin, View):
             'apellido': request.user.last_name,
             'correo': request.user.email,
             'fecha': date.today(),
+            'empresa': empresa,
             'productosRegistrados': Producto.numeroRegistrados(empresa_id),
             'productosVendidos': DetalleFactura.productosVendidos(empresa_id),
             'clientesRegistrados': Cliente.numeroRegistrados(empresa_id),
@@ -1123,6 +1250,37 @@ class Panel(LoginRequiredMixin, View):
             'ventasMesAnterior': Factura.ventasMesAnterior(empresa_id),
             'promedioVentasMensuales': Factura.promedioVentasMensuales(empresa_id=empresa_id),
             'ventasUltimosMeses': Factura.ventasUltimosMeses(6, empresa_id),
+            # Serie para gráfico de líneas (año actual vs anterior)
+            'ventasChartMeses': labels_meses,
+            'ventasChartYearPrev': ventas_ytd_prev,
+            'ventasChartYearCur': ventas_ytd_cur,
+            'ventasChartLabelPrev': str(year_prev),
+            'ventasChartLabelCur': str(year_cur),
+            'ventasLineSvg': {
+                'width': chart_width,
+                'height': chart_height,
+                'padding_left': padding_left,
+                'padding_top': padding_top,
+                'padding_bottom': padding_bottom,
+                'padding_right': padding_right,
+                'x_start': x_start,
+                'x_end': x_end,
+                'x_mid': x_mid,
+                'y_bottom': y_bottom,
+                'y_mid': y_mid,
+                'points_prev': points_prev,
+                'points_cur': points_cur,
+                'points_prev_markers': points_prev_markers,
+                'points_cur_markers': points_cur_markers,
+                'y0': y_0,
+                'y50': y_50,
+                'y100': y_100,
+                'tick0': tick_0,
+                'tick50': tick_50,
+                'tick100': tick_100,
+                'has_data': has_data,
+                'month_ticks': month_ticks,
+            },
             # Datos para top productos vendidos
             'topProductosVendidos': DetalleFactura.topProductosVendidos(5, empresa_id),
         }
