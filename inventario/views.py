@@ -3851,6 +3851,35 @@ def consultar_estado_sri(request, factura_id):
         # Obtener la factura de la empresa activa
         empresa_id = request.session.get('empresa_activa')
         factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
+
+        def _normalizar_estado_sri(valor):
+            """Normaliza el estado devuelto por el SRI a un valor válido en el modelo."""
+            if not valor:
+                return ''
+            estado = str(valor).strip().upper()
+            mapeo = {
+                'AUTORIZADO': 'AUTORIZADA',
+                'NO AUTORIZADO': 'NO_AUTORIZADA',
+                'NO_AUTORIZADO': 'NO_AUTORIZADA',
+                'NO AUTORIZADA': 'NO_AUTORIZADA',
+                'NO_AUTORIZADA': 'NO_AUTORIZADA',
+                'RECHAZADO': 'RECHAZADA',
+            }
+            return mapeo.get(estado, estado)
+
+        # Si ya está autorizada (tiene número + fecha), no forzar consulta ni re-guardar estado.
+        if factura.numero_autorizacion and factura.fecha_autorizacion:
+            from datetime import timedelta
+            fecha_aut_respuesta = (factura.fecha_autorizacion - timedelta(hours=5)).strftime('%d/%m/%Y %H:%M:%S')
+            return JsonResponse({
+                'success': True,
+                'estado': _normalizar_estado_sri(factura.estado_sri) or 'AUTORIZADA',
+                'mensaje': 'Esta factura ya se encuentra autorizada.',
+                'detalle': '',
+                'numero_autorizacion': factura.numero_autorizacion,
+                'fecha_autorizacion': fecha_aut_respuesta,
+                'estado_cambio': False,
+            })
         
         # Verificar que tenga clave de acceso
         if not hasattr(factura, 'clave_acceso') or not factura.clave_acceso:
@@ -3885,6 +3914,7 @@ def consultar_estado_sri(request, factura_id):
         if resultado.get('success'):
             estado_anterior = factura.estado_sri
             res_estado = resultado.get('estado') or resultado.get('resultado', {}).get('estado') or 'DESCONOCIDO'
+            res_estado = _normalizar_estado_sri(res_estado)
             factura.estado_sri = res_estado
             # Mapear posibles estructuras
             numero_aut = resultado.get('numero_autorizacion') or resultado.get('resultado', {}).get('numero_autorizacion')
