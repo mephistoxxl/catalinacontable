@@ -21,6 +21,7 @@ urlpatterns = [
     # path('reset-password/<str:token>/', ResetPassword.as_view(), name='reset_password'),
     
     path('panel', views.Panel.as_view(), name='panel'),
+    path('reportes', views.Reportes.as_view(), name='reportes'),
     path('salir', views.Salir.as_view(), name='salir'),
     path('perfil/<str:modo>/<int:p>', views.Perfil.as_view(), name='perfil'),
     path('eliminar/<str:modo>/<int:p>', views.Eliminar.as_view(), name='eliminar'),

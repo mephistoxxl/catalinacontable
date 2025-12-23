@@ -1143,6 +1143,7 @@ class Panel(LoginRequiredMixin, View):
         padding_bottom = 44
 
         inner_w = chart_width - padding_left - padding_right
+
         inner_h = chart_height - padding_top - padding_bottom
 
         x_start = float(padding_left)
@@ -1289,6 +1290,15 @@ class Panel(LoginRequiredMixin, View):
 
 
 #Fin de vista----------------------------------------------------------------------#
+
+
+class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
+    login_url = '/inventario/login'
+    redirect_field_name = None
+
+    def get(self, request):
+        empresa = get_empresa_activa(request)
+        return render(request, 'inventario/reportes/reportes.html', {'empresa': empresa})
 
 
 #Maneja la salida del usuario------------------------------------------------------#
