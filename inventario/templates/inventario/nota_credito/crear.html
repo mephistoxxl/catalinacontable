@@ -1,0 +1,3185 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+<style>
+/* Compact header/icon helpers */
+.form-header-icon { font-size: 16px !important; }
+.label-icon { font-size: 12px !important; width: 14px !important; text-align: center !important; }
+
+/* ✅ MODAL DE INFORMACIÓN ADICIONAL */
+.modal-info-producto {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+}
+.modal-info-producto.active {
+    display: flex;
+}
+.modal-info-content {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    width: 90%;
+    max-width: 450px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+.modal-info-content h3 {
+    margin: 0 0 15px 0;
+    font-size: 14px;
+    color: #333;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 10px;
+}
+.modal-info-content label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 5px;
+}
+.modal-info-content label span {
+    color: #999;
+    font-weight: normal;
+}
+.modal-info-content input,
+.modal-info-content textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 13px;
+    margin-bottom: 15px;
+}
+.modal-info-content textarea {
+    height: 70px;
+    resize: vertical;
+}
+.modal-info-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+}
+.modal-info-buttons button {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.btn-guardar-info {
+    background: #10b981;
+    color: white;
+    border: none;
+}
+.btn-guardar-info:hover {
+    background: #059669;
+}
+.btn-cancelar-info {
+    background: #6b7280;
+    color: white;
+    border: none;
+}
+.btn-cancelar-info:hover {
+    background: #4b5563;
+}
+/* Indicador de info adicional */
+.tiene-info-adicional {
+    color: #d4a500 !important;
+}
+
+/* ✅ ESTILOS PARA CAMPOS EDITABLES EN TABLA */
+.codigo-display,
+.precio-display,
+.iva-display {
+    cursor: pointer !important;
+    padding: 2px 4px !important;
+    border-radius: 3px !important;
+}
+.codigo-display:hover,
+.precio-display:hover,
+.iva-display:hover {
+    background: #e5e7eb !important;
+    color: #2563eb !important;
+}
+.codigo-editable,
+.precio-editable,
+.iva-editable {
+    border: 1px solid #3b82f6 !important;
+    background: #ffffff !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+    height: 24px !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+}
+.precio-editable::-webkit-outer-spin-button,
+.precio-editable::-webkit-inner-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+}
+.precio-editable {
+    -moz-appearance: textfield !important;
+    width: 80px !important;
+    text-align: right !important;
+}
+.codigo-editable {
+    width: 100px !important;
+}
+.iva-editable {
+    width: 60px !important;
+}
+
+/* ✅ ESTILOS COMPACTOS MEJORADOS PARA INPUTS */
+input[type="text"], 
+input[type="email"], 
+input[type="password"], 
+input[type="number"], 
+input[type="tel"], 
+input[type="url"],
+input[type="date"],
+input[type="datetime-local"],
+textarea,
+select {
+    width: 100% !important;
+    padding: 3px 7px !important; /* ✅ PADDING LIGERAMENTE MEJOR */
+    border: 1px solid #d1d5db !important;
+    border-radius: 4px !important;
+    font-size: 13px !important; /* ✅ FUENTE LIGERAMENTE MEJOR */
+    background-color: #ffffff !important;
+    transition: all 0.15s ease !important;
+    box-shadow: none !important;
+    height: 28px !important; /* ✅ ALTURA LIGERAMENTE MEJOR */
+    line-height: 1.3 !important;
+}
+
+/* Estados focus - bordes aún más sutiles */
+input[type="text"]:focus, 
+input[type="email"]:focus, 
+input[type="password"]:focus, 
+input[type="number"]:focus, 
+input[type="tel"]:focus, 
+input[type="url"]:focus,
+input[type="date"]:focus,
+input[type="datetime-local"]:focus,
+textarea:focus,
+select:focus {
+    outline: none !important;
+    border-color: #60a5fa !important; /* ✅ AZUL MÁS SUAVE */
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.1) !important; /* ✅ SOMBRA MÁS VISIBLE */
+}
+
+/* Estados hover - interacción sutil */
+input[type="text"]:hover, 
+input[type="email"]:hover, 
+input[type="password"]:hover, 
+input[type="number"]:hover, 
+input[type="tel"]:hover, 
+input[type="url"]:hover,
+input[type="date"]:hover,
+input[type="datetime-local"]:hover,
+textarea:hover,
+select:hover {
+    border-color: #9ca3af !important; /* ✅ GRIS MÁS SUAVE AL HOVER */
+}
+
+/* Selects específicos */
+select {
+    background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"></polyline></svg>') !important;
+    background-repeat: no-repeat !important;
+    background-position: right 6px center !important;
+    background-size: 14px !important;
+    padding-right: 28px !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+}
+
+/* Checkboxes y radios */
+input[type="checkbox"],
+input[type="radio"] {
+    width: auto !important;
+    margin-right: 6px !important;
+    accent-color: #60a5fa !important; /* ✅ AZUL MÁS SUAVE */
+}
+
+/* Espaciado equilibrado */
+.space-y-1 > * + * {
+    margin-top: 0.35rem !important; /* ✅ MARGEN EQUILIBRADO */
+}
+
+.space-y-2 > * + * {
+    margin-top: 0.5rem !important; /* ✅ MARGEN EQUILIBRADO */
+}
+
+/* Labels equilibrados */
+label {
+    margin-bottom: 2px !important; /* ✅ MARGEN EQUILIBRADO */
+    font-size: 11px !important; /* ✅ FUENTE EQUILIBRADA */
+}
+
+/* Descripción de ayuda más cómoda */
+.text-xs {
+    font-size: 11px !important; /* ✅ TEXTO MÁS LEGIBLE */
+    line-height: 1.3 !important; /* ✅ ALTURA DE LÍNEA CÓMODA */
+    margin-top: 2px !important; /* ✅ MARGEN MÁS CÓMODO */
+}
+
+/* Estados disabled más sutiles */
+input:disabled,
+select:disabled,
+textarea:disabled {
+    background-color: #f9fafb !important;
+    border-color: #e5e7eb !important;
+    color: #9ca3af !important;
+    cursor: not-allowed !important;
+}
+
+/* Estados readonly */
+input[type="text"][readonly], 
+input[type="number"][readonly] {
+    background-color: #f9fafb !important;
+    border-color: #e5e7eb !important;
+    color: #6b7280 !important;
+    cursor: not-allowed !important;
+}
+
+/* Estilos para botones de cantidad */
+.qty-btn {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease;
+}
+
+.qty-btn:hover {
+    background-color: #f3f4f6;
+}
+
+.qty-btn:active {
+    background-color: #e5e7eb;
+}
+
+/* Ocultar spinners nativos en el input de cantidad */
+.cantidad-input::-webkit-outer-spin-button,
+.cantidad-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.cantidad-input {
+    -moz-appearance: textfield;
+}
+
+/* Tabla responsiva */
+#tabla-productos {
+    font-size: 0.75rem;
+}
+
+#tabla-productos td {
+    padding: 0.5rem 0.75rem;
+}
+
+/* Estilos para formas de pago */
+.btn-forma-pago {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: #000 !important;
+}
+
+.btn-forma-pago .fa {
+    color: #000 !important;
+}
+
+.btn-forma-pago:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.btn-forma-pago.active {
+    background: #007bff;
+    color: white !important;
+    border-color: #0056b3;
+}
+
+.btn-forma-pago.active .fa {
+    color: white !important;
+}
+
+.btn-forma-pago.active .font-medium {
+    color: white !important;
+}
+
+/* Transiciones suaves para formas de pago */
+#forma-efectivo,
+#forma-cheque,
+#forma-tarjeta,
+#forma-deposito,
+#monto-container,
+#tabla-efectivo-container {
+    transition: all 0.3s ease-in-out;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+#forma-efectivo.hidden,
+#forma-cheque.hidden,
+#forma-tarjeta.hidden,
+#forma-deposito.hidden,
+#monto-container.hidden,
+#tabla-efectivo-container.hidden {
+    opacity: 0;
+    transform: translateY(-10px);
+}
+</style>
+
+        <div class="bg-gray-50 p-3" style="min-height: auto; padding-top: 8px; padding-bottom: 12px;">
+    <div class="max-w-5xl mx-auto">
+        <!-- Header Section - Equilibrado -->
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 mb-1 rounded-lg mt-0">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <i class="fas fa-file-invoice text-white form-header-icon mr-2"></i>
+                    <div>
+                        <h2 class="text-base font-semibold text-white">Emitir Nota de Crédito</h2>
+                        <p class="text-gray-300 text-[11px] hidden sm:block">Complete los datos para generar la nota de crédito</p>
+                    </div>
+                </div>
+                {% if facturador %}
+                <div class="text-right">
+                    <p class="text-gray-300 text-xs">
+                        <i class="fa fa-user-circle mr-1"></i>{{ facturador.nombres }}
+                    </p>
+                    <a href="{% url 'inventario:login_facturador' %}" class="text-blue-300 hover:text-blue-200 text-xs">
+                        <i class="fa fa-sign-out mr-1"></i>Cambiar
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="mb-2 flex items-center rounded bg-{% if message.tags == 'error' %}red{% else %}blue{% endif %}-100 px-3 py-1 text-{% if message.tags == 'error' %}red{% else %}blue{% endif %}-800 text-xs mt-2">
+                    <i class="fa fa-{% if message.tags == 'error' %}exclamation-triangle{% else %}check{% endif %} mr-2 text-sm"></i> 
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+    <!-- Main Content - Compacto -->
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+            <div class="p-2">
+                <!-- ✅ Mostrar info de secuencia calculada (como liquidación) -->
+                {% if secuencia_info %}
+                <div class="bg-blue-50 border border-blue-200 rounded-md p-2 mb-3 text-xs">
+                    <i class="fas fa-info-circle text-blue-600 mr-1"></i>
+                    <span class="font-medium">Secuencia calculada:</span>
+                    <span class="ml-1">Establecimiento: {{ secuencia_info.establecimiento_str }} · Punto de emisión: {{ secuencia_info.punto_emision_str }} · Secuencial: {{ secuencia_info.valor_str }}</span>
+                </div>
+                {% endif %}
+                
+                <form method="POST" action="{% url 'inventario:emitirFactura' %}" class="space-y-2">
+                    {% csrf_token %}
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                        <!-- Columna Izquierda -->
+                        <div class="space-y-1">
+                            <!-- Secuencia - Primero -->
+                            <div>
+                                <label for="secuencia" class="block text-xs font-medium text-gray-800 mb-1">
+                    <i class="fas fa-list-ol text-blue-600 mr-1 label-icon"></i>{{ form.secuencia.label }}
+                                </label>
+                                {{ form.secuencia }}
+                            </div>
+                            
+                            <!-- Número de Nota de Crédito -->
+                            <div>
+                                <label for="secuencia_valor" class="block text-xs font-medium text-gray-800 mb-1">
+                    <i class="fas fa-hashtag text-blue-600 mr-1 label-icon"></i>Número de Nota de Crédito
+                                </label>
+                                {{ form.secuencia_valor }}
+                            </div>
+
+                            <!-- CI/RUC -->
+                            <div>
+                                <label for="identificacion_cliente" class="block text-xs font-medium text-gray-800 mb-1">
+                    <i class="fas fa-id-card text-blue-600 mr-1 label-icon"></i>CI/RUC
+                                </label>
+                                <div class="flex space-x-2">
+                                    <div class="flex-1">
+                                        {{ form.identificacion_cliente }}
+                                    </div>
+                                    <button type="button" onclick="buscarCliente()" class="inline-flex items-center px-3 py-2 border border-blue-300 text-xs font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all duration-150">
+                                        <i class="fa fa-search mr-1"></i>Buscar
+                                    </button>
+                                    <input type="hidden" id="cliente_id" name="cliente_id">
+                                </div>
+                            </div>
+
+                            <!-- Nombre del Cliente -->
+                            <div>
+                                <label for="nombre_cliente" class="block text-xs font-medium text-gray-800 mb-1">
+                    <i class="fas fa-user text-blue-600 mr-1 label-icon"></i>Nombre del Cliente
+                                </label>
+                                <div class="flex space-x-2">
+                                    <div class="flex-1">
+                                        {{ form.nombre_cliente }}
+                                    </div>
+                                    <button type="button" id="btnInfoCliente" onclick="abrirModalCliente()" class="inline-flex items-center px-2 py-1 border border-green-500 text-xs font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-1 focus:ring-green-500 transition-all duration-150" style="display: none;" title="Ver/Editar información del cliente">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Correo del Cliente -->
+                            <div>
+                                <label for="id_correo_cliente" class="block text-xs font-medium text-gray-800 mb-1">
+                    <i class="fas fa-envelope text-blue-600 mr-1 label-icon"></i>Correo del Cliente
+                                </label>
+                                <div class="w-full">
+                                    {{ form.correo_cliente }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Columna Derecha -->
+                        <div class="space-y-1">
+                            <!-- Almacén -->
+                            <div>
+                                <label for="almacen" class="block text-xs font-medium text-gray-800 mb-1">
+                    <i class="fas fa-warehouse text-green-600 mr-1 label-icon"></i>{{ form.almacen.label }}
+                                </label>
+                                {{ form.almacen }}
+                            </div>
+
+                            <!-- Establecimiento -->
+                            <div>
+                                <label for="establecimiento" class="block text-xs font-medium text-gray-800 mb-1">
+                    <i class="fas fa-building text-green-600 mr-1 label-icon"></i>Establecimiento
+                                </label>
+                                {{ form.establecimiento }}
+                            </div>
+
+                            <!-- Punto de Emisión -->
+                            <div>
+                                <label for="punto_emision" class="block text-xs font-medium text-gray-800 mb-1">
+                    <i class="fas fa-map-marker-alt text-green-600 mr-1 label-icon"></i>Punto de Emisión
+                                </label>
+                                {{ form.punto_emision }}
+                            </div>
+
+                            <!-- Concepto -->
+                            <div>
+                                <label for="concepto" class="block text-xs font-medium text-gray-800 mb-1">
+                    <i class="fas fa-comment text-purple-600 mr-1 label-icon"></i>{{ form.concepto.label }}
+                                </label>
+                                {{ form.concepto }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sección de Fechas - Compacta -->
+                    <div class="border-t border-gray-200 pt-1 mt-2">
+                        <h3 class="text-xs font-medium text-gray-800 mb-1">
+                <i class="fas fa-calendar text-orange-600 mr-1 label-icon"></i>Fechas
+                        </h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <!-- Fecha de Emisión -->
+                            <div>
+                                <label for="fecha_emision" class="block text-xs font-medium text-gray-800 mb-1">
+                    <i class="fas fa-calendar-plus text-orange-600 mr-1 label-icon"></i>{{ form.fecha_emision.label }}
+                                </label>
+                                {{ form.fecha_emision }}
+                            </div>
+
+                            <!-- Fecha de Vencimiento -->
+                            <div>
+                                <label for="fecha_vencimiento" class="block text-xs font-medium text-gray-800 mb-1">
+                    <i class="fas fa-calendar-times text-orange-600 mr-1 label-icon"></i>{{ form.fecha_vencimiento.label }}
+                                </label>
+                                {{ form.fecha_vencimiento }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sección para agregar productos - Compacta -->
+                    <div class="bg-gray-50 rounded-md p-3 border border-gray-200 mt-3">
+                        <div class="flex items-center mb-3">
+                            <i class="fas fa-plus-circle text-blue-600 label-icon mr-2"></i>
+                            <h5 class="text-sm font-medium text-gray-800">Agregar Producto</h5>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <div>
+                                <label for="codigo_producto" class="block text-xs font-medium text-gray-700 mb-1">Código del Producto:</label>
+                                <div class="flex space-x-2">
+                                    <input type="text" id="codigo_producto" name="codigo_producto" 
+                                           class="flex-1" 
+                                           placeholder="Código del producto">
+                                    <button type="button" onclick="buscarProducto()" id="btnBuscar" 
+                                            class="inline-flex items-center px-3 py-2 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all duration-150">
+                                        <i class="fa fa-search mr-1"></i>Buscar
+                                    </button>
+                                    <button type="button" onclick="agregarProducto()" id="btnAgregar"
+                                            class="inline-flex items-center px-3 py-2 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 transition-all duration-150">
+                                        <i class="fa fa-plus mr-1"></i>Agregar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label for="producto" class="block text-xs font-medium text-gray-700 mb-1">Producto</label>
+                                <input type="text" id="producto" name="producto" 
+                                       class="w-full bg-gray-100 focus:outline-none" 
+                                       placeholder="Nombre del producto" disabled data-precio="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de productos - Compacta -->
+                    <div class="bg-white rounded-md border border-gray-200 overflow-hidden mt-3">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200" id="tabla-productos">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cant.</th>
+                                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">P. Unit.</th>
+                                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    {% if productos_factura %}
+                                        {% for p in productos_factura %}
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-3 py-2 text-xs text-gray-700">{{ p.codigo }}</td>
+                                            <td class="px-3 py-2 text-xs text-gray-700">{{ p.descripcion }}</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-700">{{ p.cantidad|floatformat:0 }}</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-700">${{ p.precio_unitario|floatformat:2 }}</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-700 font-medium">${{ p.subtotal|floatformat:2 }}</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <!-- ✅ 4 FILAS PRELLENADAS VACÍAS -->
+                                        <tr class="fila-vacia">
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                        </tr>
+                                        <tr class="fila-vacia">
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                        </tr>
+                                        <tr class="fila-vacia">
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                        </tr>
+                                        <tr class="fila-vacia">
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                                            <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                                <tfoot class="bg-gray-50">
+                                    <tr>
+                                        <td colspan="4" class="px-3 py-2 text-right text-sm font-semibold text-gray-900">Total:</td>
+                                        <td class="px-3 py-2 text-right text-base font-bold text-gray-900" id="total-general">${{ total_general|default:0|floatformat:2 }}</td>
+                                        <td class="px-3 py-2"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Campos ocultos para enviar los datos (fallback server-side) -->
+                    <div id="productos-hidden">
+                        <input type="hidden" id="productos" name="productos" value="{{ productos_factura_json|escape }}">
+                    </div>
+
+                    <!-- SECCIÓN DE FORMAS DE PAGO - Compacta -->
+                    <div class="bg-white rounded-md border border-gray-200 overflow-hidden mt-3" id="seccion-formas-pago" style="display: none;">
+                        <div class="bg-gradient-to-r from-green-600 to-green-700 px-3 py-2">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <i class="fas fa-money-bill-wave text-white label-icon mr-2"></i>
+                                    <h5 class="text-white font-medium text-sm">Formas de Pago</h5>
+                                </div>
+                                <div class="bg-green-800 px-2 py-1 rounded-full">
+                                    <span class="text-white text-xs font-medium">
+                                        Total a pagar: <span id="total-formas-display" class="font-bold">$0.00</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="p-3">
+                            <div class="grid grid-cols-1 lg:grid-cols-4 gap-3">
+                                <!-- Columna izquierda: Botones de forma de pago -->
+                                <div class="space-y-2">
+                                    <button type="button" class="btn-forma-pago w-full flex items-center px-3 py-2 text-left border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors text-xs" 
+                                            data-forma="efectivo" onclick="cambiarFormaPago('efectivo')">
+                                        <i class="fas fa-money-bill text-green-600 mr-2"></i>
+                                        <span class="font-medium">Efectivo</span>
+                                    </button>
+                                    <button type="button" class="btn-forma-pago w-full flex items-center px-3 py-2 text-left border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors text-xs" 
+                                            data-forma="cheque" onclick="cambiarFormaPago('cheque')">
+                                        <i class="fas fa-money-check text-blue-600 mr-2"></i>
+                                        <span class="font-medium">Cheque</span>
+                                    </button>
+                                    <button type="button" class="btn-forma-pago w-full flex items-center px-3 py-2 text-left border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors text-xs" 
+                                            data-forma="tarjeta" onclick="cambiarFormaPago('tarjeta')">
+                                        <i class="fas fa-credit-card text-purple-600 mr-2"></i>
+                                        <span class="font-medium">Tarjeta</span>
+                                    </button>
+                                    <button type="button" class="btn-forma-pago w-full flex items-center px-3 py-2 text-left border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors text-xs" 
+                                            data-forma="deposito" onclick="cambiarFormaPago('deposito')">
+                                        <i class="fas fa-university text-indigo-600 mr-2"></i>
+                                        <span class="font-medium">Depósito</span>
+                                    </button>
+                                </div>
+                                
+                                <!-- Columna derecha: Formulario de la forma de pago seleccionada -->
+                                <div class="lg:col-span-3">
+                                    <!-- Sección Efectivo -->
+                                    <div id="forma-efectivo" class="p-3 bg-gray-50 rounded-md border border-gray-200 hidden">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                            <div>
+                                                <label for="sri-pago-select" class="block text-xs font-medium text-gray-700 mb-1">SRI Pago:</label>
+                                                <select class="w-full text-xs" id="sri-pago-select" onchange="mostrarCampoMonto()">
+                                                    {% for code, label in formas_pago_sri %}
+                                                        <option value="{{ code }}" {% if code == '01' %}selected{% endif %}>{{ label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label for="caja-select" class="block text-xs font-medium text-gray-700 mb-1">Caja:</label>
+                                                <select class="w-full text-xs" id="caja-select" onchange="mostrarCampoMonto()">
+                                                    <option value="">Seleccionar caja...</option>
+                                                    {% for caja in cajas %}
+                                                        <option value="{{ caja.id }}" data-descripcion="{{ caja.descripcion }}">
+                                                            {{ caja.descripcion }}
+                                                        </option>
+                                                    {% endfor %}
+                                                    {% if not cajas %}
+                                                        <option value="" disabled>No hay cajas disponibles</option>
+                                                    {% endif %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- INPUT DE VALOR - OCULTO HASTA SELECCIONAR CAJA -->
+                                        <div id="monto-container" class="hidden">
+                                            <div class="mb-3">
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Valor:</label>
+                                                <div class="relative">
+                                                    <span class="absolute left-2 top-2 text-gray-500 text-xs">$</span>
+                                                    <input type="number" class="w-full pl-6 pr-3 py-2 text-xs" 
+                                                           id="monto-efectivo" step="0.01" min="0">
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- BOTÓN CONFIRMAR PAGO -->
+                                            <div class="mb-3">
+                                                <button type="button" onclick="confirmarPagoEfectivo()" 
+                                                        class="w-full inline-flex justify-center items-center px-3 py-2 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 transition-all duration-150">
+                                                    <i class="fa fa-check mr-1"></i> Confirmar Pago
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Tabla de pagos en efectivo -->
+                                        <div id="tabla-efectivo-container" class="hidden mt-3">
+                                            <div class="overflow-x-auto">
+                                                <table class="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-md">
+                                                    <thead class="bg-gray-50">
+                                                        <tr>
+                                                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Forma / Caja</th>
+                                                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="tabla-pagos-efectivo" class="bg-white divide-y divide-gray-200">
+                                                        <!-- Los pagos se agregarán aquí dinámicamente -->
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Sección Cheque -->
+                                    <div id="forma-cheque" class="forma-pago-detalle p-3 bg-gray-50 rounded-md border border-gray-200 hidden">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">SRI Pago:</label>
+                                                <select id="cheque-sri" class="w-full text-xs">
+                                                    {% for code, label in formas_pago_sri %}
+                                                        <option value="{{ code }}" {% if code == '20' %}selected{% endif %}>{{ label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Caja:</label>
+                                                <select id="cheque-caja" class="w-full text-xs">
+                                                    <option value="">Seleccionar caja...</option>
+                                                    {% for caja in cajas %}
+                                                    <option value="{{ caja.id }}">{{ caja.descripcion }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Bancos:</label>
+                                                <select id="cheque-banco" class="w-full text-xs">
+                                                    <option value="">Seleccionar banco...</option>
+                                                    {% for nombre in bancos_lista_nombres %}
+                                                        <option value="{{ nombre }}">{{ nombre }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Vence:</label>
+                                                <input id="cheque-vence" type="date" class="w-full text-xs" value="{{ now|date:'Y-m-d' }}">
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="block text-xs font-medium text-gray-700 mb-1">Comprobante:</label>
+                                            <input id="cheque-comprobante" type="text" class="w-full text-xs" placeholder="Número de cheque o referencia" />
+                                        </div>
+                                        <div>
+                                            <button type="button" class="inline-flex items-center px-3 py-2 text-xs rounded-md text-white bg-green-600 hover:bg-green-700" onclick="confirmarPagoCheque()">
+                                                <i class="fa fa-check mr-1"></i> Confirmar Cheque
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Sección Tarjeta -->
+                                    <div id="forma-tarjeta" class="forma-pago-detalle p-3 bg-gray-50 rounded-md border border-gray-200 hidden">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">SRI Pago:</label>
+                                                <select id="tarjeta-sri" class="w-full text-xs">
+                                                    {% for code, label in formas_pago_sri %}
+                                                        <option value="{{ code }}" {% if code == '19' %}selected{% endif %}>{{ label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Caja:</label>
+                                                <select id="tarjeta-caja" class="w-full text-xs">
+                                                    <option value="">Seleccionar caja...</option>
+                                                    {% for caja in cajas %}
+                                                    <option value="{{ caja.id }}">{{ caja.descripcion }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Tarjeta:</label>
+                                                <select id="tarjeta-tipo" class="w-full text-xs">
+                                                    <option value="VISA">VISA</option>
+                                                    <option value="MASTERCARD">MASTERCARD</option>
+                                                    <option value="DINERS">DINERS</option>
+                                                    <option value="DISCOVER">DISCOVER</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Comprobante:</label>
+                                                <input id="tarjeta-comprobante" type="text" class="w-full text-xs" placeholder="Número de voucher o referencia" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <button type="button" class="inline-flex items-center px-3 py-2 text-xs rounded-md text-white bg-green-600 hover:bg-green-700" onclick="confirmarPagoTarjeta()">
+                                                <i class="fa fa-check mr-1"></i> Confirmar Tarjeta
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Sección Depósito -->
+                                    <div id="forma-deposito" class="forma-pago-detalle p-3 bg-gray-50 rounded-md border border-gray-200 hidden">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">SRI Pago:</label>
+                                                <select id="deposito-sri" class="w-full text-xs">
+                                                    {% for code, label in formas_pago_sri %}
+                                                        <option value="{{ code }}" {% if code == '20' %}selected{% endif %}>{{ label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Bancos:</label>
+                                                <select id="deposito-banco" class="w-full text-xs">
+                                                    <option value="">Seleccionar banco...</option>
+                                                    {% for b in bancos_db %}
+                                                        <option value="{{ b.id }}">{{ b.banco }}</option>
+                                                    {% endfor %}
+                                                    {% if not bancos_db %}
+                                                        <option value="" disabled>No hay bancos activos</option>
+                                                    {% endif %}
+                                                </select>
+                                            </div>
+                                            <div class="md:col-span-2">
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Comprobante:</label>
+                                                <input id="deposito-comprobante" type="text" class="w-full text-xs" placeholder="Número de comprobante o referencia" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <button type="button" class="inline-flex items-center px-3 py-2 text-xs rounded-md text-white bg-green-600 hover:bg-green-700" onclick="confirmarPagoDeposito()">
+                                                <i class="fa fa-check mr-1"></i> Confirmar Depósito
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Campo hidden para enviar datos de pagos al servidor -->
+                    <input type="hidden" id="pagos_efectivo_input" name="pagos_efectivo" value="[]">
+                    
+                    <div class="flex justify-end pt-2 border-t border-gray-200 mt-3">
+                        <button type="submit" class="inline-flex items-center px-4 py-1 border border-transparent text-xs font-medium rounded-md shadow-md text-white bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-900 hover:to-black focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-500 transition-all duration-150" id="btnEnviar">
+                            <i class="fa fa-check mr-2 text-xs"></i> 
+                            Finalizar Nota de Crédito
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- ✅ ESPACIADO AMPLIO PARA SEPARAR DEL FOOTER -->
+        <div class="h-24 md:h-32"></div>
+    </div>
+</div>
+
+<!-- Modal de selección de productos/servicios -->
+<div id="modal-lista-productos" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1050;">
+    <div style="background:#fff; width:95%; max-width:980px; max-height:85vh; overflow:hidden; border-radius:6px; box-shadow:0 10px 25px rgba(0,0,0,.2); margin:40px auto;">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid #e5e7eb;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <i class="fa fa-list-alt" aria-hidden="true"></i>
+                <strong>Seleccionar producto o servicio</strong>
+            </div>
+            <button type="button" id="modal-btn-cerrar" class="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+        <div style="padding:10px 12px; border-bottom:1px solid #e5e7eb; display:flex; gap:8px; align-items:center;">
+            <label style="margin:0; font-size:.85rem;">Buscar:</label>
+            <input id="modal-buscar-input" type="text" placeholder="Código o nombre (parcial o completo)" style="flex:1; min-width:160px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px;">
+            <button type="button" id="modal-buscar-btn" class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                <i class="fa fa-search mr-1"></i> Buscar
+            </button>
+        </div>
+        <div class="table-responsive" style="max-height:65vh; overflow:auto;">
+            <table class="min-w-full divide-y divide-gray-200" style="margin:0;">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th style="width:40px; padding: 8px; text-align: center; font-size: 11px;">✓</th>
+                        <th style="width:140px; padding: 8px; text-align: left; font-size: 11px;">Código</th>
+                        <th style="padding: 8px; text-align: left; font-size: 11px;">Descripción</th>
+                        <th style="width:110px; padding: 8px; text-align: right; font-size: 11px;">Precio</th>
+                        <th style="width:110px; padding: 8px; text-align: right; font-size: 11px;">Precio c/IVA</th>
+                    </tr>
+                </thead>
+                <tbody id="modal-lista-tbody" class="bg-white divide-y divide-gray-200"></tbody>
+            </table>
+        </div>
+        <div id="modal-lista-vacio" style="display:none; padding:16px; color:#64748b; text-align:center;">
+            <i class="fa fa-inbox" style="font-size: 48px; opacity: 0.3; display: block; margin-bottom: 10px;"></i>
+            Sin resultados.
+        </div>
+    </div>
+    <!-- loader simple -->
+    <div id="modal-loader" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; background: rgba(255,255,255,0.8);">
+        <div style="border: 4px solid #f3f4f6; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
+    </div>
+</div>
+
+<style>
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+
+<script>
+// ========== VARIABLES GLOBALES ==========
+let productosAgregados = [];
+let contadorProductos = 0;
+// ✅ Variables de formas de pago (movidas aquí para disponibilidad global)
+let pagosEfectivo = [];
+let totalPagado = 0;
+
+// ========== HELPERS NUMÉRICOS (igual que editar factura: tolera $ y separadores) ==========
+function _toNumberFlexible(value) {
+    if (value == null) return 0;
+    if (typeof value === 'number') return isFinite(value) ? value : 0;
+
+    const raw = String(value).trim();
+    if (!raw) return 0;
+
+    // Mantener dígitos, signo, punto y coma. Quitar $ y otros símbolos.
+    let s = raw.replace(/[^0-9,\-\.]/g, '');
+    if (!s) return 0;
+
+    // Si hay coma como separador decimal (y no hay punto), convertir coma a punto.
+    if (s.includes(',') && !s.includes('.')) {
+        s = s.replace(',', '.');
+    }
+    // Quitar separadores de miles restantes.
+    s = s.replace(/,/g, '');
+
+    const n = Number(s);
+    return isFinite(n) ? n : 0;
+}
+
+function _toIvaPercentFlexible(prod) {
+    // Prioridad: ivaPercent (0.12), tarifa_iva (12), iva (12/0.12)
+    let v = _toNumberFlexible(prod?.ivaPercent ?? prod?.iva_percent ?? prod?.tarifa_iva ?? prod?.iva);
+    if (!isFinite(v) || v < 0) v = 0;
+    if (v > 1) v = v / 100;
+    return v;
+}
+
+// ========== FUNCIONES DE RENDERIZADO ==========
+function actualizarTablaProductos() {
+    const tbody = document.querySelector('#tabla-productos tbody');
+    if (!tbody) {
+        console.error('❌ No se encontró tbody de tabla de productos');
+        return;
+    }
+    
+    // Limpiar tabla
+    tbody.innerHTML = '';
+    
+    if (productosAgregados.length === 0) {
+        // Mostrar filas vacías
+        for (let i = 0; i < 4; i++) {
+            tbody.innerHTML += `
+                <tr class="fila-vacia">
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                </tr>
+            `;
+        }
+    } else {
+        // Renderizar productos
+        productosAgregados.forEach(prod => {
+            tbody.innerHTML += `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-3 py-2 text-xs text-gray-700">${prod.codigo || '-'}</td>
+                    <td class="px-3 py-2 text-xs text-gray-700">${prod.descripcion || '-'}</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-700">${prod.cantidad || 0}</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-700">$${(prod.precio_unitario || 0).toFixed(2)}</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-700 font-medium">$${(prod.subtotal || 0).toFixed(2)}</td>
+                    <td class="px-3 py-2 text-center">
+                        <button type="button" onclick="eliminarProducto(${prod.id})" class="text-red-600 hover:text-red-800">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+    
+    console.log('✅ Tabla actualizada con', productosAgregados.length, 'productos');
+}
+
+function actualizarTotales() {
+    let subtotal = 0;
+    let totalIva = 0;
+    
+    productosAgregados.forEach(prod => {
+        const sub = parseFloat(prod.subtotal) || 0;
+        subtotal += sub;
+        
+        // Calcular IVA
+        const tarifa = parseFloat(prod.tarifa_iva) || 0;
+        if (tarifa > 0) {
+            totalIva += sub * (tarifa / 100);
+        }
+    });
+    
+    const total = subtotal + totalIva;
+    
+    // Actualizar en la UI
+    const totalElement = document.getElementById('total-general') ||
+                         document.querySelector('#tabla-productos tfoot td:last-child') || 
+                         document.querySelector('.total-display'); // buscar alternativa
+    
+    if (totalElement) {
+        totalElement.textContent = `$${total.toFixed(2)}`;
+    }
+    
+    console.log('✅ Totales: Subtotal=', subtotal.toFixed(2), 'IVA=', totalIva.toFixed(2), 'Total=', total.toFixed(2));
+}
+
+// ========== INICIALIZACIÓN ==========
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('✅ DOM Cargado - Nota de Crédito');
+    
+    // ========== DEBUG: Verificar qué viene del servidor ==========
+    console.log('🔍 Verificando productos_factura_json...');
+    {% if productos_factura_json %}
+        console.log('✅ productos_factura_json EXISTS');
+    {% else %}
+        console.log('❌ productos_factura_json NO EXISTE');
+    {% endif %}
+    
+    // ========== NO MÁS JAVASCRIPT DE SECUENCIA ==========
+    // Los campos de secuencia se calculan en el servidor como liquidación
+    // Establecimiento, punto_emision y secuencia_valor vienen pre-llenados
+    
+    // Productos se renderizan server-side y se envían en <input name="productos">.
+    
+    // Configurar fechas por defecto
+    const hoy = new Date().toISOString().split('T')[0];
+    const fechaEmision = document.getElementById('id_fecha_emision');
+    const fechaVencimiento = document.getElementById('id_fecha_vencimiento');
+    
+    if (fechaEmision && !fechaEmision.value) {
+        fechaEmision.value = hoy;
+    }
+    if (fechaVencimiento && !fechaVencimiento.value) {
+        fechaVencimiento.value = hoy;
+    }
+    
+    // ✅ AGREGAR: Validación al enviar el formulario
+    const formulario = document.querySelector('form');
+    if (formulario) {
+        formulario.addEventListener('submit', function(e) {
+            // 🔍 DEBUG: Mostrar qué se va a enviar
+            console.log('📤 ENVIANDO FORMULARIO...');
+            console.log('📦 productosAgregados:', JSON.stringify(productosAgregados, null, 2));
+            
+            // Mostrar campos ocultos
+            const container = document.getElementById('productos-hidden');
+            if (container) {
+                const inputs = container.querySelectorAll('input');
+                console.log('📋 Campos ocultos a enviar:');
+                inputs.forEach(inp => {
+                    console.log(`   ${inp.name} = ${inp.value}`);
+                });
+            }
+            
+            if (!validarFormulario()) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    }
+    
+    // Listener para Enter en código de producto
+    const codigoProductoInput = document.getElementById('codigo_producto');
+    if (codigoProductoInput) {
+        codigoProductoInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                buscarProducto();
+            }
+        });
+    }
+    
+    // Event listeners para el modal
+    const btnCerrarModal = document.getElementById('modal-btn-cerrar');
+    if (btnCerrarModal) {
+        btnCerrarModal.addEventListener('click', cerrarModalProductos);
+    }
+    
+    const modal = document.getElementById('modal-lista-productos');
+    if (modal) {
+        modal.addEventListener('click', (e) => { 
+            if (e.target === modal) cerrarModalProductos(); 
+        });
+    }
+    
+    const modalBuscarBtn = document.getElementById('modal-buscar-btn');
+    const modalBuscarInput = document.getElementById('modal-buscar-input');
+    if (modalBuscarBtn) {
+        modalBuscarBtn.addEventListener('click', () => cargarProductosModal(modalBuscarInput.value));
+    }
+    if (modalBuscarInput) {
+        modalBuscarInput.addEventListener('keydown', (e) => { 
+            if (e.key === 'Enter') { 
+                e.preventDefault(); 
+                cargarProductosModal(modalBuscarInput.value); 
+            }
+        });
+    }
+});
+
+// ========== FUNCIONES DE CLIENTES ==========
+// ✅ Variable global para datos adicionales del cliente
+let clienteActualData = null;
+
+// Función de búsqueda de cliente
+function buscarCliente() {
+    const cedula = document.getElementById('id_identificacion_cliente').value.trim();
+    if(!cedula){
+        alert('Ingrese una identificación');
+        return;
+    }
+    fetch(`/inventario/api/clientes/buscar?q=${encodeURIComponent(cedula)}&exact=1`)
+        .then(r=>r.json())
+        .then(resp=>{
+            if(!resp.success){
+                return crearClienteAutomatico(cedula);
+            }
+            if(resp.exact){
+                completarClienteDesdeObjeto(resp.exact);
+                return;
+            }
+            if(resp.results && resp.results.length){
+                completarClienteDesdeObjeto(resp.results[0]);
+            } else {
+                crearClienteAutomatico(cedula);
+            }
+        })
+        .catch(err=>{
+            console.error('Fallo búsqueda API', err);
+            crearClienteAutomatico(cedula);
+        });
+}
+
+function completarClienteDesdeObjeto(obj){
+    const nombreCliente = document.getElementById('id_nombre_cliente');
+    const clienteId = document.getElementById('cliente_id');
+    const correoCliente = document.getElementById('id_correo_cliente');
+    const btnInfoCliente = document.getElementById('btnInfoCliente');
+    if(!obj){ limpiarCamposCliente(); return; }
+    const razon = obj.razon_social || obj.nombre_compuesto || obj.identificacion || '';
+    const nomCom = obj.nombre_comercial || '';
+    const nombreCompleto = nomCom ? `${razon} ${nomCom}`.trim() : razon;
+    if (nombreCliente) nombreCliente.value = nombreCompleto;
+    if (clienteId) clienteId.value = obj.id || '';
+    if (correoCliente && obj.correo !== undefined) correoCliente.value = obj.correo || '';
+    
+    // ✅ Guardar datos adicionales del cliente y mostrar botón de editar
+    if (obj.id) {
+        clienteActualData = {
+            direccion: obj.direccion || '',
+            telefono: obj.telefono || ''
+        };
+        if (btnInfoCliente) btnInfoCliente.style.display = 'flex';
+    }
+    
+    // Intentar enriquecer si razon social == identificacion
+    if(obj.id && razon && obj.identificacion && razon === obj.identificacion){
+        fetch(`/inventario/api/clientes/enriquecer?id=${obj.id}`)
+            .then(r=>r.json())
+            .then(data=>{
+                if(data.success && data.enriquecido && data.cliente){
+                    const c = data.cliente;
+                    const razon2 = c.razon_social || c.identificacion;
+                    const nomCom2 = c.nombre_comercial || '';
+                    const nombreCompleto2 = nomCom2 ? `${razon2} ${nomCom2}`.trim() : razon2;
+                    if (nombreCliente) nombreCliente.value = nombreCompleto2;
+                    // ✅ Actualizar datos adicionales si se enriqueció
+                    clienteActualData = {
+                        direccion: c.direccion || clienteActualData?.direccion || '',
+                        telefono: c.telefono || clienteActualData?.telefono || ''
+                    };
+                }
+            })
+            .catch(()=>{});
+    }
+}
+
+function limpiarCamposCliente(){
+    const nombreCliente = document.getElementById('id_nombre_cliente');
+    const clienteId = document.getElementById('cliente_id');
+    const correoCliente = document.getElementById('id_correo_cliente');
+    const btnInfoCliente = document.getElementById('btnInfoCliente');
+    if (nombreCliente) nombreCliente.value = '';
+    if (clienteId) clienteId.value = '';
+    if (correoCliente) correoCliente.value = '';
+    // ✅ Ocultar botón de editar y limpiar datos
+    if (btnInfoCliente) btnInfoCliente.style.display = 'none';
+    clienteActualData = null;
+}
+
+function crearClienteAutomatico(identificacion){
+    if(!identificacion){
+        limpiarCamposCliente();
+        return;
+    }
+    // Paso 1: intentar obtener datos externos (si hay endpoint de consulta)
+    let tipo = '';
+    if(identificacion.length === 13) tipo = '04'; else if(identificacion.length === 10) tipo = '05';
+    const construirYCrear = (datosCliente) => {
+        const razon_final = (datosCliente.razon_social && datosCliente.razon_social.trim()) ? datosCliente.razon_social.trim() : identificacion;
+        fetch('/inventario/api/clientes/crear', {
+            method: 'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                identificacion: identificacion,
+                razon_social: razon_final,
+                direccion: datosCliente.direccion || '',
+                correo: datosCliente.correo || '',
+                telefono: datosCliente.telefono || ''
+            })
+        })
+            .then(r=>r.json())
+            .then(resp=>{
+                if(resp.success && resp.cliente){
+                    completarClienteDesdeObjeto(resp.cliente);
+                } else {
+                    limpiarCamposCliente();
+                    alert(resp.message || 'No se pudo crear el cliente');
+                }
+            })
+            .catch(err=>{
+                console.error('Error creando cliente', err);
+                limpiarCamposCliente();
+                alert('Error creando cliente');
+            });
+    };
+    if(!tipo){
+        return construirYCrear({});
+    }
+    fetch(`/inventario/consultar-identificacion/?identificacion=${encodeURIComponent(identificacion)}&tipo=${tipo}`)
+        .then(r=>r.json())
+        .then(data=>{
+            if(!data.error){
+                // Extraer todos los datos disponibles del servicio externo
+                const datosCliente = {
+                    razon_social: data.razonSocial || data.razon_social || data.nombre || data.name || '',
+                    direccion: data.direccion || '',
+                    correo: data.email || data.correo || '',
+                    telefono: data.telefono || ''
+                };
+                construirYCrear(datosCliente);
+            } else {
+                construirYCrear({});
+            }
+        })
+        .catch(()=>{
+            construirYCrear({});
+        });
+}
+
+// ========== FUNCIONES DE PRODUCTOS ==========
+function buscarProducto() {
+    const codigo = document.getElementById('codigo_producto').value.trim();
+    
+    // Si el campo está vacío, abrir el modal con listado completo
+    if (!codigo) {
+        abrirModalProductos();
+        return;
+    }
+
+    fetch(`/inventario/buscar_producto/?q=${encodeURIComponent(codigo)}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error en la búsqueda');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('🔍 DATOS RECIBIDOS DEL SERVIDOR:', data);
+            if (data.length > 0) {
+                let producto = data[0];
+                console.log('📦 PRODUCTO SELECCIONADO:', producto);
+                
+                let tipo = producto.tipo === 'servicio' ? 'Servicio' : 'Producto';
+                document.getElementById('producto').value = `${producto.nombre} (${tipo})`;
+                document.getElementById('producto').dataset.precio = producto.precio;
+                document.getElementById('producto').dataset.ivaPercent = producto.iva_percent || '0.12';
+                document.getElementById('producto').dataset.ivaCodigo = producto.iva || '2';
+                document.getElementById('producto').dataset.precioCiva = producto.precio_con_iva;
+                document.getElementById('producto').dataset.codigo = producto.codigo;
+            } else {
+                alert('Producto o servicio no encontrado.');
+                limpiarCamposProducto();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al buscar el producto. Inténtelo de nuevo.');
+            limpiarCamposProducto();
+        });
+}
+
+// ========== FUNCIONES DEL MODAL ==========
+function abrirModalProductos() {
+    const modal = document.getElementById('modal-lista-productos');
+    if (!modal) return;
+    modal.style.display = 'block';
+    cargarProductosModal(); // cargar primeros productos
+}
+
+function cerrarModalProductos() {
+    const modal = document.getElementById('modal-lista-productos');
+    if (!modal) return;
+    modal.style.display = 'none';
+}
+
+function setLoaderModal(on) {
+    const loader = document.getElementById('modal-loader');
+    if (loader) loader.style.display = on ? 'flex' : 'none';
+}
+
+function cargarProductosModal(q) {
+    setLoaderModal(true);
+    const url = q && q.trim()
+        ? `/inventario/buscar_producto/?q=${encodeURIComponent(q.trim())}`
+        : `/inventario/buscar_producto/?all=1`;
+    fetch(url)
+        .then(r => r.json())
+        .then(lista => {
+            renderProductosModal(Array.isArray(lista) ? lista : []);
+        })
+        .catch(() => renderProductosModal([]))
+        .finally(() => setLoaderModal(false));
+}
+
+function renderProductosModal(lista) {
+    const tbody = document.getElementById('modal-lista-tbody');
+    const vacio = document.getElementById('modal-lista-vacio');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (!lista || lista.length === 0) {
+        if (vacio) vacio.style.display = 'block';
+        return;
+    }
+    if (vacio) vacio.style.display = 'none';
+
+    lista.forEach(item => {
+        const tr = document.createElement('tr');
+        const precio = Number(item.precio || 0);
+        const iva = Number(item.iva_percent || 0);
+        const precioConIva = Number(item.precio_con_iva || (precio * (1 + iva)));
+        const tipo = item.tipo === 'servicio' ? '🔧' : '📦';
+        
+        tr.innerHTML = `
+            <td style="text-align:center; padding: 6px;">
+                <button type="button" class="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                    <i class="fa fa-check"></i>
+                </button>
+            </td>
+            <td style="padding: 6px; font-size: 12px;">${item.codigo || ''}</td>
+            <td style="padding: 6px; font-size: 12px;">${tipo} ${(item.nombre || '').replace(/</g,'&lt;')}</td>
+            <td style="text-align:right; padding: 6px; font-size: 12px;">$${precio.toFixed(2)}</td>
+            <td style="text-align:right; padding: 6px; font-size: 12px;">$${precioConIva.toFixed(2)}</td>
+        `;
+        tr.querySelector('button').addEventListener('click', () => seleccionarProductoDesdeModal(item));
+        tbody.appendChild(tr);
+    });
+}
+
+function seleccionarProductoDesdeModal(item) {
+    try {
+        const inputCodigo = document.getElementById('codigo_producto');
+        const inputNombre = document.getElementById('producto');
+        if (!inputCodigo || !inputNombre) return;
+        
+        inputCodigo.value = item.codigo || '';
+        let tipo = item.tipo === 'servicio' ? 'Servicio' : 'Producto';
+        inputNombre.value = `${item.nombre} (${tipo})` || '';
+        inputNombre.dataset.precio = String(item.precio || 0);
+        inputNombre.dataset.codigo = item.codigo || '';
+        inputNombre.dataset.ivaPercent = String(item.iva_percent != null ? item.iva_percent : 0.12);
+        inputNombre.dataset.precioCiva = String(item.precio_con_iva || 0);
+        
+        cerrarModalProductos();
+        
+        // Automáticamente agregar el producto
+        if (typeof agregarProducto === 'function') {
+            agregarProducto();
+        }
+    } catch (e) {
+        console.error('Error al seleccionar producto desde modal', e);
+    }
+}
+
+function limpiarCamposProducto() {
+    document.getElementById('producto').value = '';
+    document.getElementById('producto').dataset.precio = "0";
+    document.getElementById('producto').dataset.codigo = "";
+}
+
+function agregarProducto() {
+    const codigo = document.getElementById('codigo_producto').value.trim();
+    const nombreProducto = document.getElementById('producto').value.trim();
+    let precio = parseFloat(document.getElementById('producto').dataset.precio || "0");
+
+    // Validaciones
+    if (!codigo || !nombreProducto) {
+        alert('Debe buscar un producto válido antes de agregarlo.');
+        return;
+    }
+
+    if (isNaN(precio) || precio <= 0) {
+        alert('El precio del producto no es válido.');
+        return;
+    }
+
+    // Verificar si el producto ya está agregado
+    if (productosAgregados.some(p => p.codigo === codigo)) {
+        alert('Este producto ya ha sido agregado. Para modificar la cantidad, elimínelo y vuelva a agregarlo.');
+        return;
+    }
+
+    let cantidad = parseInt(prompt('Ingrese la cantidad:', '1'));
+    if (!cantidad || isNaN(cantidad) || cantidad <= 0) {
+        alert('Ingrese una cantidad válida.');
+        return;
+    }
+
+    let subtotal = (cantidad * precio);
+    let ivaPercent = parseFloat(document.getElementById('producto').dataset.ivaPercent || '0.12');
+    let ivaCodigo = document.getElementById('producto').dataset.ivaCodigo || '2';
+    
+    // Calcular precio con IVA
+    let precioConIva = precio * (1 + ivaPercent);
+    let totalConIva = cantidad * precioConIva;
+    
+    // Redondear
+    precioConIva = Math.round(precioConIva * 100) / 100;
+    totalConIva = Math.round(totalConIva * 100) / 100;
+    
+    // Agregar al array de productos
+    const productoData = {
+        id: contadorProductos++,
+        codigo: codigo,
+        nombre: nombreProducto,
+        cantidad: cantidad,
+        precio: precio,
+        precioConIva: precioConIva,
+        subtotal: subtotal,
+        totalConIva: totalConIva,
+        ivaPercent: ivaPercent,
+        ivaCodigo: ivaCodigo
+    };
+
+    productosAgregados.push(productoData);
+    
+    console.log('✅ Producto agregado:', productoData);
+
+    // Agregar a la tabla
+    agregarFilaTabla(productoData);
+
+    // Actualizar campos ocultos
+    actualizarCamposOcultos();
+
+    // Actualizar total
+    actualizarTotal();
+
+    // Limpiar campos
+    document.getElementById('codigo_producto').value = '';
+    limpiarCamposProducto();
+}
+
+function agregarFilaTabla(producto) {
+    const tabla = document.getElementById('tabla-productos').getElementsByTagName('tbody')[0];
+    
+    // ✅ ELIMINAR FILAS VACÍAS AL AGREGAR EL PRIMER PRODUCTO REAL
+    const filasVacias = tabla.querySelectorAll('.fila-vacia');
+    if (filasVacias.length > 0) {
+        filasVacias.forEach(fila => fila.remove());
+    }
+    
+    let nuevaFila = document.createElement('tr');
+    nuevaFila.setAttribute('data-producto-id', producto.id);
+    
+    // Calcular IVA para mostrar
+    const ivaValor = (producto.precioConIva - producto.precio).toFixed(2);
+    const ivaPorcentaje = (producto.ivaPercent * 100).toFixed(0);
+    
+    // Opciones de IVA disponibles
+    const opcionesIVA = [
+        { valor: '0', texto: '0%', porcentaje: 0 },
+        { valor: '2', texto: '12%', porcentaje: 0.12 },
+        { valor: '4', texto: '15%', porcentaje: 0.15 },
+        { valor: '5', texto: '5%', porcentaje: 0.05 }
+    ];
+    
+    let selectIVAOptions = opcionesIVA.map(opt => 
+        `<option value="${opt.valor}" ${Math.abs(producto.ivaPercent - opt.porcentaje) < 0.01 ? 'selected' : ''}>${opt.texto}</option>`
+    ).join('');
+    
+    nuevaFila.innerHTML = `
+        <td class="px-2 py-1">
+            <span class="codigo-display text-xs cursor-pointer hover:text-blue-600" onclick="this.style.display='none'; this.nextElementSibling.style.display='inline-block'; this.nextElementSibling.focus();">${producto.codigo}</span>
+            <input type="text" value="${producto.codigo}" class="codigo-editable hidden w-20 text-xs px-1 py-0.5" data-original="${producto.codigo}" onblur="this.style.display='none'; this.previousElementSibling.style.display='inline'; this.previousElementSibling.textContent=this.value;" />
+        </td>
+        <td class="text-xs px-2 py-1 celda-nombre">${producto.descripcionReemplazo ? `<span class="text-yellow-600" title="Descripción original: ${producto.nombre}">${producto.descripcionReemplazo}</span>` : producto.nombre}</td>
+        <td class="text-center px-2 py-1">
+            <div class="inline-flex items-center gap-1">
+                <button type="button" class="px-2 py-1 text-xs border rounded qty-btn" data-action="minus">-</button>
+                <input type="number" min="1" step="1" value="${producto.cantidad}" class="w-16 text-center text-xs border rounded cantidad-input" />
+                <button type="button" class="px-2 py-1 text-xs border rounded qty-btn" data-action="plus">+</button>
+            </div>
+        </td>
+        <td class="text-right px-2 py-1">
+            <div class="space-y-1">
+                <div class="flex items-center justify-end gap-1">
+                    <span class="text-xs text-gray-500">Base:</span>
+                    <span class="precio-display text-xs cursor-pointer hover:text-blue-600" onclick="this.style.display='none'; this.nextElementSibling.style.display='inline-block'; this.nextElementSibling.focus();">$${producto.precio.toFixed(2)}</span>
+                    <input type="number" step="0.01" min="0" value="${producto.precio.toFixed(2)}" class="precio-editable hidden w-20 text-xs text-right px-1 py-0.5" data-producto-id="${producto.id}" />
+                </div>
+                <div class="flex items-center justify-end gap-1">
+                    <span class="text-xs text-gray-500">IVA:</span>
+                    <span class="iva-display text-xs cursor-pointer hover:text-blue-600" onclick="this.style.display='none'; this.nextElementSibling.style.display='inline-block'; this.nextElementSibling.focus();">${producto.ivaPercent * 100}%</span>
+                    <select class="iva-editable hidden text-xs px-1 py-0.5" data-producto-id="${producto.id}">
+                        ${selectIVAOptions}
+                    </select>
+                </div>
+                <div class="font-bold text-xs precio-total-display">Total: $${producto.precioConIva.toFixed(2)}</div>
+            </div>
+        </td>
+        <td class="subtotal text-right text-xs px-2 py-1">
+            <div>Base: $${producto.subtotal.toFixed(2)}</div>
+            <div class="text-gray-500">IVA: $${(producto.totalConIva - producto.subtotal).toFixed(2)}</div>
+            <div class="font-bold">Total: $${producto.totalConIva.toFixed(2)}</div>
+        </td>
+        <td class="text-center px-2 py-1">
+            <div class="flex items-center justify-center gap-1">
+                <button type="button" class="btn-info-producto px-2 py-1 text-xs text-white bg-yellow-500 hover:bg-yellow-600 rounded ${producto.descripcionReemplazo || producto.infoAdicional ? 'tiene-info-adicional' : ''}" onclick="abrirModalInfo(${producto.id})" title="${producto.descripcionReemplazo || producto.infoAdicional ? 'Tiene información adicional' : 'Agregar información'}">
+                    <i class="fa fa-info-circle"></i>
+                </button>
+                <button type="button" class="px-2 py-1 text-xs text-white bg-red-600 hover:bg-red-700 rounded" onclick="eliminarProducto(${producto.id})">
+                    <i class="fa fa-trash"></i>
+                </button>
+            </div>
+        </td>
+    `;
+    
+    tabla.appendChild(nuevaFila);
+
+    // Hook eventos de cantidad
+    const inputCantidad = nuevaFila.querySelector('.cantidad-input');
+    const btns = nuevaFila.querySelectorAll('.qty-btn');
+    if (inputCantidad) {
+        inputCantidad.addEventListener('change', () => {
+            const val = parseInt(inputCantidad.value, 10);
+            const nueva = isNaN(val) || val < 1 ? 1 : val;
+            inputCantidad.value = nueva;
+            actualizarCantidad(producto.id, nueva);
+        });
+    }
+    btns.forEach(b => b.addEventListener('click', () => {
+        let current = parseInt(inputCantidad.value, 10) || 1;
+        if (b.dataset.action === 'plus') current += 1; else current = Math.max(1, current - 1);
+        inputCantidad.value = current;
+        actualizarCantidad(producto.id, current);
+    }));
+    
+    // ✅ Hook eventos de precio editable
+    const inputPrecio = nuevaFila.querySelector('.precio-editable');
+    if (inputPrecio) {
+        inputPrecio.addEventListener('change', () => {
+            const nuevoPrecio = parseFloat(inputPrecio.value) || 0;
+            console.log(`🔄 Precio CHANGE event: ${nuevoPrecio}`);
+            actualizarPrecioProducto(producto.id, nuevoPrecio);
+        });
+        inputPrecio.addEventListener('blur', () => {
+            const nuevoPrecio = parseFloat(inputPrecio.value) || 0;
+            console.log(`🔄 Precio BLUR event: ${nuevoPrecio}`);
+            // Ocultar input y mostrar span
+            inputPrecio.style.display = 'none';
+            const spanDisplay = inputPrecio.previousElementSibling;
+            if (spanDisplay) {
+                spanDisplay.style.display = 'inline';
+                spanDisplay.textContent = '$' + nuevoPrecio.toFixed(2);
+            }
+            actualizarPrecioProducto(producto.id, nuevoPrecio);
+        });
+    }
+    
+    // ✅ Hook eventos de IVA editable
+    const selectIVA = nuevaFila.querySelector('.iva-editable');
+    if (selectIVA) {
+        selectIVA.addEventListener('change', () => {
+            const nuevoIVACodigo = selectIVA.value;
+            console.log(`🔄 IVA CHANGE event: ${nuevoIVACodigo}`);
+            actualizarIVAProducto(producto.id, nuevoIVACodigo);
+        });
+        selectIVA.addEventListener('blur', () => {
+            const nuevoIVACodigo = selectIVA.value;
+            console.log(`🔄 IVA BLUR event: ${nuevoIVACodigo}`);
+            // Ocultar select y mostrar span
+            selectIVA.style.display = 'none';
+            const spanDisplay = selectIVA.previousElementSibling;
+            if (spanDisplay) {
+                spanDisplay.style.display = 'inline';
+                spanDisplay.textContent = selectIVA.options[selectIVA.selectedIndex].text;
+            }
+            actualizarIVAProducto(producto.id, nuevoIVACodigo);
+        });
+    }
+    
+    // ✅ Hook eventos de código editable
+    const inputCodigo = nuevaFila.querySelector('.codigo-editable');
+    if (inputCodigo) {
+        inputCodigo.addEventListener('change', () => {
+            const nuevoCodigo = inputCodigo.value.trim();
+            actualizarCodigoProducto(producto.id, nuevoCodigo);
+        });
+        inputCodigo.addEventListener('blur', () => {
+            const nuevoCodigo = inputCodigo.value.trim();
+            actualizarCodigoProducto(producto.id, nuevoCodigo);
+        });
+    }
+}
+
+// ✅ Función para actualizar precio del producto (solo para esta factura)
+function actualizarPrecioProducto(productoId, nuevoPrecio) {
+    console.log(`💰 actualizarPrecioProducto llamada: ID=${productoId}, nuevoPrecio=${nuevoPrecio}`);
+    
+    const idx = productosAgregados.findIndex(p => p.id === productoId);
+    if (idx === -1) {
+        console.log(`❌ Producto con ID ${productoId} NO encontrado en productosAgregados`);
+        return;
+    }
+    
+    const p = productosAgregados[idx];
+    console.log(`✅ Producto encontrado. Precio anterior: ${p.precio}, nuevo: ${nuevoPrecio}`);
+    
+    p.precio = nuevoPrecio;
+    p.precioConIva = Math.round((nuevoPrecio * (1 + p.ivaPercent)) * 100) / 100;
+    p.subtotal = p.precio * p.cantidad;
+    p.totalConIva = Math.round((p.precioConIva * p.cantidad) * 100) / 100;
+    
+    console.log(`📊 Después de actualización: precio=${p.precio}, precioConIva=${p.precioConIva}, ivaCodigo=${p.ivaCodigo}`);
+    
+    actualizarFilaUI(productoId, p);
+    actualizarCamposOcultos();
+    actualizarTotal();
+}
+
+// ✅ Función para actualizar IVA del producto (solo para esta factura)
+function actualizarIVAProducto(productoId, nuevoIVACodigo) {
+    console.log(`📊 actualizarIVAProducto llamada: ID=${productoId}, nuevoIVACodigo=${nuevoIVACodigo}`);
+    
+    const idx = productosAgregados.findIndex(p => p.id === productoId);
+    if (idx === -1) {
+        console.log(`❌ Producto con ID ${productoId} NO encontrado en productosAgregados`);
+        return;
+    }
+    
+    const p = productosAgregados[idx];
+    console.log(`✅ Producto encontrado. IVA anterior: ${p.ivaCodigo}, nuevo: ${nuevoIVACodigo}`);
+    
+    // Mapeo de códigos de IVA a porcentajes
+    const ivaMap = { '0': 0, '2': 0.12, '4': 0.15, '5': 0.05, '6': 0, '7': 0, '8': 0.08 };
+    p.ivaPercent = ivaMap[nuevoIVACodigo] || 0;
+    p.ivaCodigo = nuevoIVACodigo;
+    p.precioConIva = Math.round((p.precio * (1 + p.ivaPercent)) * 100) / 100;
+    p.subtotal = p.precio * p.cantidad;
+    p.totalConIva = Math.round((p.precioConIva * p.cantidad) * 100) / 100;
+    
+    console.log(`📊 Después de actualización IVA: ivaCodigo=${p.ivaCodigo}, ivaPercent=${p.ivaPercent}, precioConIva=${p.precioConIva}`);
+    
+    actualizarFilaUI(productoId, p);
+    actualizarCamposOcultos();
+    actualizarTotal();
+}
+
+// ✅ Función para actualizar código del producto (solo para esta factura)
+function actualizarCodigoProducto(productoId, nuevoCodigo) {
+    const idx = productosAgregados.findIndex(p => p.id === productoId);
+    if (idx === -1) return;
+    
+    const p = productosAgregados[idx];
+    p.codigoPersonalizado = nuevoCodigo;
+    
+    actualizarCamposOcultos();
+}
+
+// ✅ Función auxiliar para actualizar la UI de una fila
+function actualizarFilaUI(productoId, p) {
+    const fila = document.querySelector(`tr[data-producto-id="${productoId}"]`);
+    if (!fila) return;
+    
+    // Actualizar precio total display
+    const precioTotalDisplay = fila.querySelector('.precio-total-display');
+    if (precioTotalDisplay) {
+        precioTotalDisplay.textContent = `Total: $${p.precioConIva.toFixed(2)}`;
+    }
+    
+    // Actualizar subtotal
+    const tdSubtotal = fila.querySelector('td.subtotal');
+    if (tdSubtotal) {
+        const ivaValorTotal = (p.totalConIva - p.subtotal).toFixed(2);
+        tdSubtotal.innerHTML = `
+            <div>Base: $${p.subtotal.toFixed(2)}</div>
+            <div class="text-gray-500">IVA: $${ivaValorTotal}</div>
+            <div class="font-bold">Total: $${p.totalConIva.toFixed(2)}</div>
+        `;
+    }
+}
+
+function actualizarCantidad(productoId, nuevaCantidad) {
+    const idx = productosAgregados.findIndex(p => p.id === productoId);
+    if (idx === -1) return;
+    const p = productosAgregados[idx];
+    const cantidad = Math.max(1, parseInt(nuevaCantidad, 10) || 1);
+    p.cantidad = cantidad;
+    p.subtotal = p.precio * cantidad;
+    p.totalConIva = Math.round((p.precioConIva * cantidad) * 100) / 100;
+    
+    // Actualizar UI de la fila
+    const fila = document.querySelector(`tr[data-producto-id="${productoId}"]`);
+    if (fila) {
+        const tdSubtotal = fila.querySelector('td.subtotal');
+        if (tdSubtotal) {
+            tdSubtotal.innerHTML = `
+                <div>Base: $${p.subtotal.toFixed(2)}</div>
+                <div class="text-gray-500">IVA: $${(p.totalConIva - p.subtotal).toFixed(2)}</div>
+                <div class="font-bold">Total: $${p.totalConIva.toFixed(2)}</div>
+            `;
+        }
+    }
+    
+    actualizarCamposOcultos();
+    actualizarTotal();
+}
+
+function eliminarProducto(productoId) {
+    productosAgregados = productosAgregados.filter(p => p.id !== productoId);
+    
+    const fila = document.querySelector(`tr[data-producto-id="${productoId}"]`);
+    if (fila) {
+        fila.remove();
+    }
+    
+    // ✅ RESTAURAR FILAS VACÍAS SI NO HAY PRODUCTOS
+    if (productosAgregados.length === 0) {
+        const tabla = document.getElementById('tabla-productos').getElementsByTagName('tbody')[0];
+        tabla.innerHTML = `
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+        `;
+    }
+    
+    actualizarCamposOcultos();
+    actualizarTotal();
+    
+    console.log('Producto eliminado. Productos restantes:', productosAgregados);
+}
+
+function actualizarCamposOcultos() {
+    const container = document.getElementById('productos-hidden');
+    if (!container) return;
+
+    container.innerHTML = '';
+    
+    console.log('🔄 actualizarCamposOcultos() - Estado actual de productos:', productosAgregados);
+
+    productosAgregados.forEach((producto, index) => {
+        console.log(`📦 Producto[${index}]:`, {
+            codigo: producto.codigoPersonalizado || producto.codigo,
+            precio: producto.precio,
+            ivaCodigo: producto.ivaCodigo,
+            cantidad: producto.cantidad
+        });
+        
+        // Código (puede ser personalizado)
+        let inputCodigo = document.createElement('input');
+        inputCodigo.type = 'hidden';
+        inputCodigo.name = 'productos_codigos[]';
+        inputCodigo.value = producto.codigoPersonalizado || producto.codigo;
+        container.appendChild(inputCodigo);
+
+        let inputCantidad = document.createElement('input');
+        inputCantidad.type = 'hidden';
+        inputCantidad.name = 'productos_cantidades[]';
+        inputCantidad.value = producto.cantidad;
+        container.appendChild(inputCantidad);
+
+        let inputNombre = document.createElement('input');
+        inputNombre.type = 'hidden';
+        inputNombre.name = 'productos_nombres[]';
+        inputNombre.value = producto.nombre;
+        container.appendChild(inputNombre);
+        
+        // ✅ Precio personalizado (para esta factura)
+        let inputPrecio = document.createElement('input');
+        inputPrecio.type = 'hidden';
+        inputPrecio.name = 'productos_precios[]';
+        inputPrecio.value = producto.precio.toFixed(2);
+        container.appendChild(inputPrecio);
+        
+        // ✅ Código IVA personalizado (para esta factura)
+        let inputIVA = document.createElement('input');
+        inputIVA.type = 'hidden';
+        inputIVA.name = 'productos_ivas[]';
+        inputIVA.value = producto.ivaCodigo || '';
+        container.appendChild(inputIVA);
+        
+        // ✅ Descripción de reemplazo (para esta factura)
+        let inputDescReemplazo = document.createElement('input');
+        inputDescReemplazo.type = 'hidden';
+        inputDescReemplazo.name = 'productos_descripciones[]';
+        inputDescReemplazo.value = producto.descripcionReemplazo || '';
+        container.appendChild(inputDescReemplazo);
+        
+        // ✅ Información adicional (para esta factura - detalles adicionales SRI)
+        let inputInfoAdicional = document.createElement('input');
+        inputInfoAdicional.type = 'hidden';
+        inputInfoAdicional.name = 'productos_info_adicional[]';
+        inputInfoAdicional.value = producto.infoAdicional || '';
+        container.appendChild(inputInfoAdicional);
+    });
+}
+
+function actualizarTotal() {
+    // En NC puede venir mezcla de formatos (strings con $ / objetos parciales).
+    // Para que quede como editar factura, derivamos el total desde base*cantidad y aplicamos IVA.
+    const totalConIva = (Array.isArray(productosAgregados) ? productosAgregados : []).reduce((sum, producto) => {
+        const cantidad = Math.max(1, Math.round(_toNumberFlexible(producto?.cantidad ?? producto?.qty ?? 1)) || 1);
+        const precioBase = _toNumberFlexible(producto?.precio ?? producto?.precio_unitario ?? producto?.p_unit);
+        const subtotal = _toNumberFlexible(producto?.subtotal ?? producto?.sub_total);
+        const ivaPercent = _toIvaPercentFlexible(producto);
+
+        let base = 0;
+        if (precioBase > 0) {
+            base = precioBase * cantidad;
+        } else if (subtotal > 0) {
+            base = subtotal;
+        }
+
+        // Si existe un total explícito válido, úsalo, pero no dejes que un 0 "falso" tape una base real.
+        const totalExplicito = _toNumberFlexible(producto?.totalConIva ?? producto?.total_con_iva);
+        let totalLinea = 0;
+
+        if (base > 0) {
+            totalLinea = Math.round((base * (1 + ivaPercent)) * 100) / 100;
+            // Si el total explícito es mayor (por redondeos/ajustes), respetarlo.
+            if (totalExplicito > 0 && Math.abs(totalExplicito - totalLinea) > 0.01) {
+                totalLinea = totalExplicito;
+            }
+        } else {
+            totalLinea = totalExplicito;
+        }
+
+        return sum + (isFinite(totalLinea) ? totalLinea : 0);
+    }, 0);
+    const totalRedondeado = Math.round(totalConIva * 100) / 100;
+    
+    document.getElementById('total-general').textContent = `$${totalRedondeado.toFixed(2)}`;
+    
+    // Actualizar también el total en formas de pago
+    const totalFormasDisplay = document.getElementById('total-formas-display');
+    if (totalFormasDisplay) {
+        totalFormasDisplay.textContent = `$${totalRedondeado.toFixed(2)}`;
+    }
+    
+    // ✅ MOSTRAR la sección de formas de pago si hay productos
+    const seccionFormasPago = document.getElementById('seccion-formas-pago');
+    if (seccionFormasPago) {
+        if (productosAgregados.length > 0) {
+            seccionFormasPago.style.display = 'block';
+        } else {
+            seccionFormasPago.style.display = 'none';
+        }
+    }
+    
+    // ✅ LIMPIAR pagos existentes cuando cambia el total (para evitar inconsistencias)
+    if (typeof pagosEfectivo !== 'undefined' && pagosEfectivo.length > 0) {
+        console.log('🔄 Total cambió, limpiando pagos anteriores:', pagosEfectivo);
+        pagosEfectivo = [];
+        totalPagado = 0;
+        if (typeof actualizarTablaPagosEfectivo === 'function') {
+            actualizarTablaPagosEfectivo();
+        }
+        // También limpiar el campo hidden
+        const pagosInput = document.getElementById('pagos_efectivo_input');
+        if (pagosInput) {
+            pagosInput.value = '[]';
+            console.log('🧹 Campo pagos_efectivo_input limpiado');
+        }
+    }
+    
+    // Actualizar el monto de efectivo si está visible
+    actualizarTotalPagado();
+}
+
+// ========== FUNCIONES DE FORMAS DE PAGO ==========
+function cambiarFormaPago(forma) {
+    console.log('🔄 Cambiando a forma de pago:', forma);
+    
+    // Ocultar todas las formas de pago
+    document.querySelectorAll('.forma-pago-detalle').forEach(el => {
+        el.classList.add('hidden');
+    });
+    
+    const efectivoSection = document.getElementById('forma-efectivo');
+    if (efectivoSection) {
+        efectivoSection.classList.add('hidden');
+    }
+    
+    // Mostrar la forma seleccionada
+    setTimeout(() => {
+        if (forma === 'efectivo') {
+            if (efectivoSection) {
+                efectivoSection.classList.remove('hidden');
+                console.log('✅ Sección efectivo mostrada');
+                
+                // Auto-trigger para mostrar campo de monto si ya hay caja seleccionada
+                setTimeout(() => {
+                    const cajaSelect = document.getElementById('caja-select');
+                    if (cajaSelect && cajaSelect.value) {
+                        mostrarCampoMonto();
+                    }
+                }, 100);
+            }
+        } else {
+            const formaSeleccionada = document.getElementById('forma-' + forma);
+            if (formaSeleccionada) {
+                formaSeleccionada.classList.remove('hidden');
+                console.log('✅ Sección', forma, 'mostrada');
+            }
+        }
+    }, 50);
+    
+    // Actualizar estado activo de los botones
+    document.querySelectorAll('.btn-forma-pago').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    const btnSeleccionado = document.querySelector(`[data-forma="${forma}"]`);
+    if (btnSeleccionado) {
+        btnSeleccionado.classList.add('active');
+    }
+}
+
+function mostrarCampoMonto() {
+    const cajaSelect = document.getElementById('caja-select');
+    const montoContainer = document.getElementById('monto-container');
+    
+    if (cajaSelect && cajaSelect.value && montoContainer) {
+        montoContainer.classList.remove('hidden');
+        console.log('✅ Campo monto mostrado');
+        
+        // Auto-completar con el pendiente
+        actualizarTotalPagado();
+    } else if (montoContainer) {
+        montoContainer.classList.add('hidden');
+        const montoEfectivo = document.getElementById('monto-efectivo');
+        if (montoEfectivo) montoEfectivo.value = '';
+    }
+}
+
+function confirmarPagoEfectivo() {
+    const montoInput = document.getElementById('monto-efectivo');
+    const sriPagoSelect = document.getElementById('sri-pago-select');
+    const cajaSelect = document.getElementById('caja-select');
+    
+    if (!montoInput || !sriPagoSelect || !cajaSelect) {
+        alert('Error: Elementos del formulario no encontrados');
+        return;
+    }
+    
+    // Normalizar el valor del monto
+    let montoStr = montoInput.value.replace(',', '.');
+    const monto = Math.round(parseFloat(montoStr) * 100) / 100;
+    const sriPago = sriPagoSelect.value;
+    const cajaId = cajaSelect.value;
+
+    // Validaciones
+    if (!monto || monto <= 0) {
+        alert('Debe ingresar un monto válido');
+        return;
+    }
+    
+    if (!sriPago) {
+        alert('Debe seleccionar una forma de pago SRI');
+        return;
+    }
+    
+    if (!cajaId) {
+        alert('Debe seleccionar una caja válida');
+        return;
+    }
+    
+    // Verificar que no se exceda el total
+    const totalFactura = parseFloat(document.getElementById('total-formas-display').textContent.replace('$', ''));
+    const totalActualPagado = pagosEfectivo.reduce((sum, p) => sum + p.monto, 0);
+    
+    if (totalActualPagado + monto > totalFactura) {
+        const exceso = (totalActualPagado + monto - totalFactura).toFixed(2);
+        alert(`Error: La suma de pagos excedería el total de la factura por $${exceso}.\n\n` +
+              `Total factura: $${totalFactura.toFixed(2)}\n` +
+              `Ya pagado: $${totalActualPagado.toFixed(2)}\n` +
+              `Monto intentado: $${monto.toFixed(2)}\n\n` +
+              `El monto máximo que puede agregar es: $${(totalFactura - totalActualPagado).toFixed(2)}`);
+        return;
+    }
+    
+    // Crear pago
+    const pago = {
+        id: Date.now(),
+        monto: monto,
+        tipo: 'efectivo',
+        sri_pago: sriPago,
+        sri_pago_descripcion: sriPagoSelect.options[sriPagoSelect.selectedIndex].text,
+        caja: cajaId,
+        caja_descripcion: cajaSelect.options[cajaSelect.selectedIndex].text
+    };
+    
+    pagosEfectivo.push(pago);
+    
+    // Actualizar tabla
+    actualizarTablaPagosEfectivo();
+    
+    // Actualizar total pagado
+    actualizarTotalPagado();
+    
+    // Limpiar formulario
+    montoInput.value = '';
+    sriPagoSelect.selectedIndex = 0;
+    if (cajaSelect.options.length > 1) {
+        cajaSelect.selectedIndex = 0;
+    }
+    
+    // Ocultar campo de monto
+    const montoContainer = document.getElementById('monto-container');
+    if (montoContainer) {
+        montoContainer.classList.add('hidden');
+    }
+    
+    console.log('✅ Pago en efectivo confirmado:', pago);
+}
+
+function confirmarPagoCheque() {
+    const totalFactura = parseFloat(document.getElementById('total-formas-display').textContent.replace('$', ''));
+    const yaPagado = pagosEfectivo.reduce((s, p) => s + p.monto, 0);
+    const pendiente = Math.max(0, Math.round((totalFactura - yaPagado) * 100) / 100);
+
+    const sri = document.getElementById('cheque-sri').value || '20';
+    const cajaSel = document.getElementById('cheque-caja');
+    const bancoSel = document.getElementById('cheque-banco');
+    const vence = document.getElementById('cheque-vence').value;
+    const comprobante = (document.getElementById('cheque-comprobante').value || '').trim();
+
+    if (!cajaSel.value) { alert('Seleccione una caja.'); return; }
+    if (!bancoSel.value) { alert('Seleccione un banco.'); return; }
+    if (!vence) { alert('Seleccione fecha de vencimiento.'); return; }
+    if (!comprobante) { alert('Ingrese el comprobante del cheque.'); return; }
+    if (pendiente <= 0) { alert('No hay saldo pendiente.'); return; }
+
+    const pago = {
+        id: Date.now(),
+        tipo: 'cheque',
+        sri_pago: sri,
+        monto: pendiente,
+        caja: cajaSel.value,
+        caja_descripcion: cajaSel.options[cajaSel.selectedIndex].text,
+        banco: bancoSel.value,
+        banco_descripcion: bancoSel.options[bancoSel.selectedIndex].text,
+        vence: vence,
+        comprobante: comprobante
+    };
+
+    pagosEfectivo.push(pago);
+    actualizarTablaPagosEfectivo();
+    actualizarTotalPagado();
+    alert('Cheque registrado.');
+}
+
+function confirmarPagoTarjeta() {
+    const totalFactura = parseFloat(document.getElementById('total-formas-display').textContent.replace('$', ''));
+    const yaPagado = pagosEfectivo.reduce((s, p) => s + p.monto, 0);
+    const pendiente = Math.max(0, Math.round((totalFactura - yaPagado) * 100) / 100);
+
+    const sri = document.getElementById('tarjeta-sri').value || '19';
+    const cajaSel = document.getElementById('tarjeta-caja');
+    const tipoSel = document.getElementById('tarjeta-tipo');
+    const comprobante = (document.getElementById('tarjeta-comprobante').value || '').trim();
+
+    if (!cajaSel.value) { alert('Seleccione una caja.'); return; }
+    if (!tipoSel.value) { alert('Seleccione el tipo de tarjeta.'); return; }
+    if (!comprobante) { alert('Ingrese el comprobante del voucher.'); return; }
+    if (pendiente <= 0) { alert('No hay saldo pendiente.'); return; }
+
+    const pago = {
+        id: Date.now(),
+        tipo: 'tarjeta',
+        sri_pago: sri,
+        monto: pendiente,
+        caja: cajaSel.value,
+        caja_descripcion: cajaSel.options[cajaSel.selectedIndex].text,
+        tarjeta_tipo: tipoSel.value,
+        comprobante: comprobante
+    };
+
+    pagosEfectivo.push(pago);
+    actualizarTablaPagosEfectivo();
+    actualizarTotalPagado();
+    alert('Pago con tarjeta registrado.');
+}
+
+function confirmarPagoDeposito() {
+    const totalFactura = parseFloat(document.getElementById('total-formas-display').textContent.replace('$', ''));
+    const yaPagado = pagosEfectivo.reduce((s, p) => s + p.monto, 0);
+    const pendiente = Math.max(0, Math.round((totalFactura - yaPagado) * 100) / 100);
+
+    const sri = document.getElementById('deposito-sri').value || '20';
+    const bancoSel = document.getElementById('deposito-banco');
+    const comprobante = (document.getElementById('deposito-comprobante').value || '').trim();
+
+    if (!bancoSel.value) { alert('Seleccione un banco.'); return; }
+    if (!comprobante) { alert('Ingrese el comprobante del depósito.'); return; }
+    if (pendiente <= 0) { alert('No hay saldo pendiente.'); return; }
+
+    const pago = {
+        id: Date.now(),
+        tipo: 'deposito',
+        sri_pago: sri,
+        monto: pendiente,
+        banco: bancoSel.value,
+        banco_descripcion: bancoSel.options[bancoSel.selectedIndex].text,
+        comprobante: comprobante
+    };
+
+    pagosEfectivo.push(pago);
+    actualizarTablaPagosEfectivo();
+    actualizarTotalPagado();
+    alert('Depósito registrado.');
+}
+
+function eliminarPagoEfectivo(id) {
+    pagosEfectivo = pagosEfectivo.filter(p => p.id !== id);
+    actualizarTablaPagosEfectivo();
+    actualizarTotalPagado();
+}
+
+function actualizarTablaPagosEfectivo() {
+    const tbody = document.getElementById('tabla-pagos-efectivo');
+    const tablaContainer = document.getElementById('tabla-efectivo-container');
+    
+    if (!tbody || !tablaContainer) return;
+    
+    tbody.innerHTML = '';
+    
+    if (pagosEfectivo.length === 0) {
+        tablaContainer.classList.add('hidden');
+        return;
+    }
+    
+    tablaContainer.classList.remove('hidden');
+    
+    pagosEfectivo.forEach(pago => {
+        const fila = document.createElement('tr');
+        if (pago.tipo === 'cheque') {
+            fila.innerHTML = `
+                <td class="text-xs">
+                    <strong>Cheque</strong><br>
+                    <small class="text-gray-500">Banco: ${pago.banco_descripcion}</small><br>
+                    <small class="text-gray-500">Caja: ${pago.caja_descripcion}</small><br>
+                    <small class="text-gray-500">Vence: ${pago.vence}</small><br>
+                    <small class="text-gray-500">Comp.: ${pago.comprobante}</small>
+                </td>
+                <td class="text-right text-xs"><strong>$${Number(pago.monto).toFixed(2)}</strong></td>
+            `;
+        } else if (pago.tipo === 'tarjeta') {
+            fila.innerHTML = `
+                <td class="text-xs">
+                    <strong>Tarjeta</strong><br>
+                    <small class="text-gray-500">Tipo: ${pago.tarjeta_tipo}</small><br>
+                    <small class="text-gray-500">Caja: ${pago.caja_descripcion}</small><br>
+                    <small class="text-gray-500">Comp.: ${pago.comprobante}</small>
+                </td>
+                <td class="text-right text-xs"><strong>$${Number(pago.monto).toFixed(2)}</strong></td>
+            `;
+        } else if (pago.tipo === 'deposito') {
+            fila.innerHTML = `
+                <td class="text-xs">
+                    <strong>Depósito</strong><br>
+                    <small class="text-gray-500">Banco: ${pago.banco_descripcion}</small><br>
+                    <small class="text-gray-500">Comp.: ${pago.comprobante}</small>
+                </td>
+                <td class="text-right text-xs"><strong>$${Number(pago.monto).toFixed(2)}</strong></td>
+            `;
+        } else {
+            fila.innerHTML = `
+                <td class="text-xs">
+                    <strong>Efectivo</strong><br>
+                    <small class="text-gray-500">Caja: ${pago.caja_descripcion || 'No especificada'}</small><br>
+                    <small class="text-gray-500">SRI: ${pago.sri_pago_descripcion || 'Sin especificar'}</small>
+                </td>
+                <td class="text-right text-xs"><strong>$${Number(pago.monto).toFixed(2)}</strong></td>
+            `;
+        }
+        tbody.appendChild(fila);
+    });
+}
+
+function actualizarTotalPagado() {
+    totalPagado = pagosEfectivo.reduce((sum, pago) => {
+        const montoRedondeado = Math.round(pago.monto * 100) / 100;
+        return sum + montoRedondeado;
+    }, 0);
+    totalPagado = Math.round(totalPagado * 100) / 100;
+    
+    const totalFacturaStr = document.getElementById('total-formas-display')?.textContent || '$0.00';
+    const totalFactura = parseFloat(totalFacturaStr.replace('$', ''));
+    const totalFacturaRedondeado = Math.round(totalFactura * 100) / 100;
+    
+    const montoPendiente = Math.max(0, totalFacturaRedondeado - totalPagado);
+    
+    const montoEfectivo = document.getElementById('monto-efectivo');
+    const formaEfectivo = document.getElementById('forma-efectivo');
+    if (montoEfectivo && formaEfectivo && !formaEfectivo.classList.contains('hidden')) {
+        montoEfectivo.value = montoPendiente.toFixed(2);
+    }
+    
+    console.log('💰 Resumen de pagos:');
+    console.log(`Total factura: $${totalFacturaRedondeado.toFixed(2)}`);
+    console.log(`Total pagado: $${totalPagado.toFixed(2)}`);
+    console.log(`Pendiente: $${montoPendiente.toFixed(2)}`);
+}
+
+// ========== VALIDACIÓN DE FORMULARIO ==========
+function validarFormulario() {
+    console.log('🚀 === INICIANDO VALIDACIÓN ===');
+    
+    // Verificar productos
+    if (!productosAgregados || productosAgregados.length === 0) {
+        alert('Debe agregar al menos un producto.');
+        return false;
+    }
+    
+    console.log('📦 Productos en array:', productosAgregados.length);
+    
+    // FORZAR creación de campos ocultos
+    const formulario = document.getElementById('formularioDetalles') || document.querySelector('form');
+    
+    if (!formulario) {
+        alert('ERROR: Formulario no encontrado');
+        return false;
+    }
+    
+    // Eliminar campos ocultos existentes
+    formulario.querySelectorAll('input[name="productos_codigos[]"]').forEach(el => el.remove());
+    formulario.querySelectorAll('input[name="productos_cantidades[]"]').forEach(el => el.remove());
+    formulario.querySelectorAll('input[name="productos_nombres[]"]').forEach(el => el.remove());
+    formulario.querySelectorAll('input[name="productos_precios[]"]').forEach(el => el.remove());
+    formulario.querySelectorAll('input[name="productos_ivas[]"]').forEach(el => el.remove());
+    formulario.querySelectorAll('input[name="productos_descripciones[]"]').forEach(el => el.remove());
+    formulario.querySelectorAll('input[name="productos_info_adicional[]"]').forEach(el => el.remove());
+
+    console.log('🧹 Campos anteriores eliminados');
+    
+    // Crear campos directamente en el formulario
+    productosAgregados.forEach((producto, index) => {
+        console.log(`🔧 Creando campos para: ${producto.codigo} x ${producto.cantidad} @ $${producto.precio}`);
+        
+        const inputCodigo = document.createElement('input');
+        inputCodigo.type = 'hidden';
+        inputCodigo.name = 'productos_codigos[]';
+        inputCodigo.value = producto.codigoPersonalizado || producto.codigo;
+        formulario.appendChild(inputCodigo);
+        
+        const inputCantidad = document.createElement('input');
+        inputCantidad.type = 'hidden';
+        inputCantidad.name = 'productos_cantidades[]';
+        inputCantidad.value = producto.cantidad;
+        formulario.appendChild(inputCantidad);
+
+        const inputNombre = document.createElement('input');
+        inputNombre.type = 'hidden';
+        inputNombre.name = 'productos_nombres[]';
+        inputNombre.value = producto.nombre;
+        formulario.appendChild(inputNombre);
+        
+        // ✅ PRECIO PERSONALIZADO
+        const inputPrecio = document.createElement('input');
+        inputPrecio.type = 'hidden';
+        inputPrecio.name = 'productos_precios[]';
+        inputPrecio.value = producto.precio.toFixed(2);
+        formulario.appendChild(inputPrecio);
+        
+        // ✅ IVA PERSONALIZADO
+        const inputIVA = document.createElement('input');
+        inputIVA.type = 'hidden';
+        inputIVA.name = 'productos_ivas[]';
+        inputIVA.value = producto.ivaCodigo || '';
+        formulario.appendChild(inputIVA);
+        
+        // ✅ DESCRIPCIÓN REEMPLAZO
+        const inputDescReemplazo = document.createElement('input');
+        inputDescReemplazo.type = 'hidden';
+        inputDescReemplazo.name = 'productos_descripciones[]';
+        inputDescReemplazo.value = producto.descripcionReemplazo || '';
+        formulario.appendChild(inputDescReemplazo);
+        
+        // ✅ INFO ADICIONAL
+        const inputInfoAdicional = document.createElement('input');
+        inputInfoAdicional.type = 'hidden';
+        inputInfoAdicional.name = 'productos_info_adicional[]';
+        inputInfoAdicional.value = producto.infoAdicional || '';
+        formulario.appendChild(inputInfoAdicional);
+    });
+    
+    // Verificar campos creados
+    const codigosVerificacion = formulario.querySelectorAll('input[name="productos_codigos[]"]');
+    console.log(`🔍 VERIFICACIÓN: ${codigosVerificacion.length} códigos creados`);
+    
+    if (codigosVerificacion.length === 0) {
+        alert('ERROR CRÍTICO: No se pudieron crear los campos de productos. Reintente.');
+        return false;
+    }
+    
+    // Verificar formas de pago
+    console.log('🔍 Verificando formas de pago:', pagosEfectivo);
+    
+    if (!pagosEfectivo || pagosEfectivo.length === 0) {
+        alert('ERROR: Debe agregar al menos una forma de pago manualmente.\n\n' +
+              'Pasos:\n' +
+              '1. Haga clic en "Efectivo" en Formas de Pago\n' +
+              '2. Seleccione una caja\n' +
+              '3. Ingrese el monto\n' +
+              '4. Haga clic en "Confirmar Pago"');
+        return false;
+    }
+
+    // Verificar que la suma de pagos coincida con el total
+    const totalFacturaStr = document.getElementById('total-formas-display')?.textContent || '$0.00';
+    const totalFactura = parseFloat(totalFacturaStr.replace('$', ''));
+    const totalPagos = pagosEfectivo.reduce((sum, p) => sum + p.monto, 0);
+    
+    const totalFacturaRedondeado = Math.round(totalFactura * 100) / 100;
+    const totalPagosRedondeado = Math.round(totalPagos * 100) / 100;
+    
+    if (totalPagosRedondeado !== totalFacturaRedondeado) {
+        alert(`ERROR: La suma de pagos no coincide con el total de la factura.\n\n` +
+              `Total factura: $${totalFacturaRedondeado.toFixed(2)}\n` +
+              `Total pagos: $${totalPagosRedondeado.toFixed(2)}\n\n` +
+              `Por favor, asegúrese de que los pagos sumen exactamente el total de la factura.`);
+        return false;
+    }
+    
+    // Actualizar campo de pagos
+    const pagosInput = document.getElementById('pagos_efectivo_input');
+    if (pagosInput) {
+        const pagosJSON = JSON.stringify(pagosEfectivo);
+        pagosInput.value = pagosJSON;
+        console.log('💳 Campo pagos_efectivo_input actualizado:', pagosJSON);
+    } else {
+        console.log('❌ ERROR: Campo pagos_efectivo_input no encontrado');
+        alert('ERROR: No se puede procesar los pagos. Contacte al administrador.');
+        return false;
+    }
+    // Deshabilitar botón para evitar doble envío
+    const btnEnviar = document.getElementById('btnEnviar');
+    if (btnEnviar) {
+        btnEnviar.disabled = true;
+        btnEnviar.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i> Procesando...';
+    }
+    
+    console.log('🎯 VALIDACIÓN EXITOSA - ENVIANDO FORMULARIO');
+    
+    return true;
+}
+
+<!-- ✅ MODAL DE INFORMACIÓN ADICIONAL DEL PRODUCTO -->
+<div id="modalInfoProducto" class="modal-info-producto">
+    <div class="modal-info-content">
+        <h3>
+            <i class="fa fa-info-circle text-yellow-500 mr-2"></i>
+            <span id="modalInfoTitulo">Información del Producto</span>
+        </h3>
+        
+        <input type="hidden" id="modalInfoProductoId" value="">
+        
+        <label>
+            Remplazar Descripción:
+            <span><span id="contadorDescripcion">0</span>/300</span>
+        </label>
+        <input type="text" id="modalDescripcionReemplazo" maxlength="300" placeholder="Dejar vacío para usar descripción original">
+        
+        <label>
+            Agregar Información Ítem:
+            <span><span id="contadorInfoAdicional">0</span>/300</span>
+        </label>
+        <textarea id="modalInfoAdicional" maxlength="300" placeholder="Información adicional que aparecerá en detalles adicionales del RIDE"></textarea>
+        
+        <div class="modal-info-buttons">
+            <button type="button" class="btn-guardar-info" onclick="guardarInfoProducto()">
+                <i class="fa fa-save mr-1"></i> Guardar
+            </button>
+            <button type="button" class="btn-cancelar-info" onclick="cerrarModalInfo()">
+                <i class="fa fa-times mr-1"></i> Cancelar
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ✅ FUNCIONES DEL MODAL DE INFORMACIÓN ADICIONAL
+function abrirModalInfo(productoId) {
+    const producto = productosAgregados.find(p => p.id === productoId);
+    if (!producto) return;
+    
+    document.getElementById('modalInfoProductoId').value = productoId;
+    document.getElementById('modalInfoTitulo').textContent = producto.nombre;
+    document.getElementById('modalDescripcionReemplazo').value = producto.descripcionReemplazo || '';
+    document.getElementById('modalInfoAdicional').value = producto.infoAdicional || '';
+    
+    // Actualizar contadores
+    actualizarContadorModal('modalDescripcionReemplazo', 'contadorDescripcion');
+    actualizarContadorModal('modalInfoAdicional', 'contadorInfoAdicional');
+    
+    document.getElementById('modalInfoProducto').classList.add('active');
+}
+
+function cerrarModalInfo() {
+    document.getElementById('modalInfoProducto').classList.remove('active');
+}
+
+function guardarInfoProducto() {
+    const productoId = parseInt(document.getElementById('modalInfoProductoId').value);
+    const descripcionReemplazo = document.getElementById('modalDescripcionReemplazo').value.trim();
+    const infoAdicional = document.getElementById('modalInfoAdicional').value.trim();
+    
+    const idx = productosAgregados.findIndex(p => p.id === productoId);
+    if (idx === -1) return;
+    
+    // Guardar en el objeto del producto
+    productosAgregados[idx].descripcionReemplazo = descripcionReemplazo;
+    productosAgregados[idx].infoAdicional = infoAdicional;
+    
+    // Actualizar el botón de info para indicar que tiene datos
+    const fila = document.querySelector(`tr[data-id="${productoId}"]`);
+    if (fila) {
+        const btnInfo = fila.querySelector('.btn-info-producto');
+        if (btnInfo) {
+            if (descripcionReemplazo || infoAdicional) {
+                btnInfo.classList.add('tiene-info-adicional');
+                btnInfo.title = 'Tiene información adicional';
+            } else {
+                btnInfo.classList.remove('tiene-info-adicional');
+                btnInfo.title = 'Agregar información';
+            }
+        }
+        
+        // Si hay descripción de reemplazo, mostrarla en la celda de nombre
+        const celdaNombre = fila.querySelector('.celda-nombre');
+        if (celdaNombre) {
+            if (descripcionReemplazo) {
+                celdaNombre.innerHTML = `<span class="text-yellow-600" title="Descripción original: ${productosAgregados[idx].nombre}">${descripcionReemplazo}</span>`;
+            } else {
+                celdaNombre.textContent = productosAgregados[idx].nombre;
+            }
+        }
+    }
+    
+    // Actualizar campos ocultos
+    actualizarCamposOcultos();
+    
+    cerrarModalInfo();
+}
+
+function actualizarContadorModal(inputId, contadorId) {
+    const input = document.getElementById(inputId);
+    const contador = document.getElementById(contadorId);
+    contador.textContent = input.value.length;
+}
+
+// Event listeners para contadores
+document.addEventListener('DOMContentLoaded', function() {
+    const descInput = document.getElementById('modalDescripcionReemplazo');
+    const infoInput = document.getElementById('modalInfoAdicional');
+    
+    if (descInput) {
+        descInput.addEventListener('input', () => actualizarContadorModal('modalDescripcionReemplazo', 'contadorDescripcion'));
+    }
+    if (infoInput) {
+        infoInput.addEventListener('input', () => actualizarContadorModal('modalInfoAdicional', 'contadorInfoAdicional'));
+    }
+    
+    // Cerrar modal con Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            cerrarModalInfo();
+            cerrarModalCliente();
+        }
+    });
+    
+    // Cerrar modal al hacer clic fuera
+    document.getElementById('modalInfoProducto').addEventListener('click', function(e) {
+        if (e.target === this) {
+            cerrarModalInfo();
+        }
+    });
+    
+    // Cerrar modal cliente al hacer clic fuera
+    const modalCliente = document.getElementById('modalInfoCliente');
+    if (modalCliente) {
+        modalCliente.addEventListener('click', function(e) {
+            if (e.target === this) {
+                cerrarModalCliente();
+            }
+        });
+    }
+});
+</script>
+
+<!-- ✅ MODAL PARA EDITAR INFORMACIÓN DEL CLIENTE -->
+<div id="modalInfoCliente" class="modal-info-producto">
+    <div class="modal-info-content" style="max-width: 500px;">
+        <h3><i class="fas fa-user-edit text-green-600 mr-2"></i>Información del Cliente</h3>
+        
+        <input type="hidden" id="modalClienteId">
+        
+        <label>
+            CI/RUC
+            <span>(no editable)</span>
+        </label>
+        <input type="text" id="modalClienteIdentificacion" readonly style="background-color: #f3f4f6; color: #6b7280;">
+        
+        <label>Razón Social / Nombre</label>
+        <input type="text" id="modalClienteRazonSocial" maxlength="200" placeholder="Nombre completo del cliente">
+        
+        <label>Dirección</label>
+        <input type="text" id="modalClienteDireccion" maxlength="200" placeholder="Dirección del cliente">
+        
+        <label>Teléfono</label>
+        <input type="text" id="modalClienteTelefono" maxlength="20" placeholder="Teléfono de contacto">
+        
+        <label>Correo Electrónico</label>
+        <input type="email" id="modalClienteCorreo" maxlength="100" placeholder="correo@ejemplo.com">
+        
+        <div class="modal-info-buttons">
+            <button type="button" class="btn-cancelar-info" onclick="cerrarModalCliente()">
+                <i class="fas fa-times mr-1"></i>Cancelar
+            </button>
+            <button type="button" class="btn-guardar-info" onclick="guardarClienteModal()">
+                <i class="fas fa-save mr-1"></i>Guardar Cambios
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ✅ FUNCIONES PARA MODAL DE CLIENTE (clienteActualData ya declarada arriba)
+
+function abrirModalCliente() {
+    const clienteId = document.getElementById('cliente_id')?.value;
+    if (!clienteId) {
+        alert('Primero busque un cliente');
+        return;
+    }
+    
+    // Llenar modal con datos actuales
+    document.getElementById('modalClienteId').value = clienteId;
+    document.getElementById('modalClienteIdentificacion').value = document.getElementById('id_identificacion_cliente')?.value || '';
+    document.getElementById('modalClienteRazonSocial').value = document.getElementById('id_nombre_cliente')?.value || '';
+    document.getElementById('modalClienteCorreo').value = document.getElementById('id_correo_cliente')?.value || '';
+    
+    // Si tenemos datos adicionales guardados del cliente
+    if (clienteActualData) {
+        document.getElementById('modalClienteDireccion').value = clienteActualData.direccion || '';
+        document.getElementById('modalClienteTelefono').value = clienteActualData.telefono || '';
+    } else {
+        document.getElementById('modalClienteDireccion').value = '';
+        document.getElementById('modalClienteTelefono').value = '';
+    }
+    
+    document.getElementById('modalInfoCliente').classList.add('active');
+    document.getElementById('modalClienteRazonSocial').focus();
+}
+
+function cerrarModalCliente() {
+    document.getElementById('modalInfoCliente').classList.remove('active');
+}
+
+async function guardarClienteModal() {
+    const clienteId = document.getElementById('modalClienteId').value;
+    if (!clienteId) {
+        alert('Error: No hay cliente seleccionado');
+        return;
+    }
+    
+    const datos = {
+        id: parseInt(clienteId),
+        razon_social: document.getElementById('modalClienteRazonSocial').value.trim(),
+        direccion: document.getElementById('modalClienteDireccion').value.trim(),
+        telefono: document.getElementById('modalClienteTelefono').value.trim(),
+        correo: document.getElementById('modalClienteCorreo').value.trim()
+    };
+    
+    if (!datos.razon_social) {
+        alert('La razón social es obligatoria');
+        document.getElementById('modalClienteRazonSocial').focus();
+        return;
+    }
+    
+    try {
+        const response = await fetch('{% url "inventario:actualizar_cliente_api" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(datos)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Actualizar campos del formulario principal
+            document.getElementById('id_nombre_cliente').value = result.cliente.razon_social;
+            document.getElementById('id_correo_cliente').value = result.cliente.correo || '';
+            
+            // Guardar datos adicionales
+            clienteActualData = {
+                direccion: result.cliente.direccion,
+                telefono: result.cliente.telefono
+            };
+            
+            cerrarModalCliente();
+            
+            // Mostrar notificación de éxito
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+            toast.innerHTML = '<i class="fas fa-check mr-2"></i>Cliente actualizado correctamente';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        } else {
+            alert('Error: ' + (result.message || 'No se pudo actualizar el cliente'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error de conexión al guardar el cliente');
+    }
+}
+</script>
+
+<!-- Modal de confirmación para mantener detalles -->
+<div id="modalMantenerDetalles" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center;">
+    <div style="background:#fff; width:90%; max-width:400px; border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.3); padding:24px;">
+        <div style="text-align:center; margin-bottom:20px;">
+            <i class="fas fa-question-circle" style="font-size:48px; color:#3b82f6;"></i>
+            <h3 style="margin-top:12px; font-size:18px; font-weight:600; color:#1f2937;">¿Mantener detalles del documento?</h3>
+            <p style="margin-top:8px; color:#6b7280; font-size:14px;">¿Desea conservar los productos y detalles de la factura para esta nota de crédito?</p>
+        </div>
+        <div style="display:flex; gap:12px; justify-content:center;">
+            <button type="button" onclick="cerrarModal()" class="btn-modal-si" style="flex:1; padding:10px 20px; background:#10b981; color:#fff; border:none; border-radius:6px; font-weight:500; cursor:pointer; transition:background 0.2s;">
+                <i class="fas fa-check mr-2"></i>Mantener
+            </button>
+            <button type="button" onclick="limpiarProductos()" class="btn-modal-no" style="flex:1; padding:10px 20px; background:#ef4444; color:#fff; border:none; border-radius:6px; font-weight:500; cursor:pointer; transition:background 0.2s;">
+                <i class="fas fa-times mr-2"></i>Limpiar
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+.btn-modal-si:hover {
+    background: #059669 !important;
+}
+.btn-modal-no:hover {
+    background: #dc2626 !important;
+}
+</style>
+
+<script>
+// Modal simple: solo cerrar o limpiar productos
+const NOTA_CREDITO_MANTENER_DETALLES_KEY_PREFIX = 'notaCredito.mantenerDetalles.v1:';
+
+function obtenerFacturaIdDesdeUrl() {
+    try {
+        const path = window.location.pathname || '';
+        const match = path.match(/\/notas-credito\/crear\/(\d+)\/?$/);
+        return match ? match[1] : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function _getMantenerDetallesStorageKey() {
+    const facturaId = obtenerFacturaIdDesdeUrl();
+    return NOTA_CREDITO_MANTENER_DETALLES_KEY_PREFIX + (facturaId || 'sin_factura');
+}
+
+function _tieneProductosIniciales() {
+    const productosInput = document.getElementById('productos');
+    const raw = (productosInput?.value || '').trim();
+    if (!!raw && raw !== '[]' && raw !== 'null' && raw !== 'None') {
+        return true;
+    }
+
+    // Fallback: si el backend no envía productos_factura_json pero sí renderiza filas,
+    // igual debemos activar el flujo (modal/restore) para poder re-renderizar con botones.
+    try {
+        const filas = Array.from(document.querySelectorAll('#tabla-productos tbody tr'));
+        return filas.some((tr) => !tr.classList.contains('fila-vacia'));
+    } catch (e) {
+        return false;
+    }
+}
+
+function _limpiarProductosSoloUI() {
+    try {
+        const productosInput = document.getElementById('productos');
+        if (productosInput) {
+            productosInput.value = '[]';
+        }
+
+        // Forzar limpieza visual aunque haya HTML renderizado server-side
+        const tbody = document.querySelector('#tabla-productos tbody');
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr class="fila-vacia">
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                </tr>
+                <tr class="fila-vacia">
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                </tr>
+                <tr class="fila-vacia">
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                </tr>
+                <tr class="fila-vacia">
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                    <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                </tr>
+            `;
+        }
+
+        const totalEl = document.getElementById('total-general');
+        if (totalEl) {
+            totalEl.textContent = '$0.00';
+        }
+
+        if (typeof productosAgregados !== 'undefined') {
+            productosAgregados = [];
+        }
+        if (typeof contadorProductos !== 'undefined') {
+            contadorProductos = 0;
+        }
+        if (typeof actualizarTablaProductos === 'function') {
+            actualizarTablaProductos();
+        }
+        if (typeof actualizarTotales === 'function') {
+            actualizarTotales();
+        }
+    } catch (e) {
+        console.warn('No se pudo limpiar UI de productos:', e);
+    }
+}
+
+function _capturarProductosDesdeTablaServer() {
+    const filas = Array.from(document.querySelectorAll('#tabla-productos tbody tr'));
+    const productos = [];
+
+    filas.forEach((tr) => {
+        if (tr.classList.contains('fila-vacia')) return;
+        const tds = tr.querySelectorAll('td');
+        if (!tds || tds.length < 5) return;
+
+        const codigo = (tds[0].textContent || '').trim();
+        const nombre = (tds[1].textContent || '').trim();
+        const cantidad = Math.max(1, parseInt((tds[2].textContent || '').trim(), 10) || 1);
+        const precio = _toNumberFlexible(tds[3].textContent);
+
+        // El subtotal del server-side puede venir ya con $ y decimales
+        const subtotal = _toNumberFlexible(tds[4].textContent);
+
+        if (!codigo && !nombre) return;
+
+        productos.push({
+            codigo,
+            nombre: nombre || codigo,
+            cantidad,
+            precio,
+            subtotal,
+        });
+    });
+
+    return productos;
+}
+
+function _restaurarProductosDesdeSnapshot() {
+    const raw = (window.__nc_productos_snapshot || '').trim();
+    const snapshotTabla = Array.isArray(window.__nc_productos_tabla_snapshot)
+        ? window.__nc_productos_tabla_snapshot
+        : [];
+
+    if (!raw && snapshotTabla.length === 0) return;
+
+    const parseJsonSeguro = (texto) => {
+        try {
+            return JSON.parse(texto);
+        } catch (e) {
+            // Intentar decodificar entidades HTML (&quot;, etc.)
+            try {
+                const t = document.createElement('textarea');
+                t.innerHTML = texto;
+                return JSON.parse(t.value);
+            } catch (e2) {
+                return null;
+            }
+        }
+    };
+
+    const parsed = raw ? parseJsonSeguro(raw) : null;
+    let lista = Array.isArray(parsed) ? parsed : [];
+
+    // Fallback: si no hay JSON válido, usar snapshot desde tabla server-side
+    if (lista.length === 0 && snapshotTabla.length > 0) {
+        lista = snapshotTabla;
+    }
+
+    // Limpiar tabla actual
+    const tbody = document.querySelector('#tabla-productos tbody');
+    if (tbody) {
+        tbody.innerHTML = '';
+    }
+
+    const normalizarIvaPercent = (valor) => {
+        let v = _toNumberFlexible(valor);
+        if (!isFinite(v)) return 0.12;
+        // Si viene como 12, 15, 5
+        if (v > 1) v = v / 100;
+        if (v < 0) v = 0;
+        return v;
+    };
+
+    const ivaCodigoDesdePercent = (percent) => {
+        if (Math.abs(percent - 0) < 0.0001) return '0';
+        if (Math.abs(percent - 0.12) < 0.01) return '2';
+        if (Math.abs(percent - 0.15) < 0.01) return '4';
+        if (Math.abs(percent - 0.05) < 0.01) return '5';
+        // fallback
+        return percent > 0 ? '2' : '0';
+    };
+
+    // Reconstruir productosAgregados en el formato que usa este template
+    productosAgregados = [];
+    contadorProductos = 0;
+
+    lista.forEach((p) => {
+        const codigo = (p.codigo ?? p.codigo_principal ?? p.cod ?? p.producto_codigo ?? '').toString();
+        const nombre = (p.descripcion ?? p.nombre ?? p.producto ?? '').toString();
+        const cantidad = Math.max(1, parseInt(p.cantidad ?? p.qty ?? p.cant ?? 1, 10) || 1);
+        const subtotalExistente = _toNumberFlexible(p.subtotal ?? p.sub_total);
+        let precio = _toNumberFlexible(p.precio_unitario ?? p.precio ?? p.p_unit ?? 0);
+        // Si no viene precio pero sí subtotal, inferirlo.
+        if (!(precio > 0) && subtotalExistente > 0 && cantidad > 0) {
+            precio = subtotalExistente / cantidad;
+        }
+        const ivaPercent = normalizarIvaPercent(p.ivaPercent ?? p.iva_percent ?? p.tarifa_iva ?? p.iva ?? 0.12);
+        const ivaCodigo = (p.ivaCodigo ?? p.iva_codigo ?? p.codigo_iva ?? '').toString() || ivaCodigoDesdePercent(ivaPercent);
+
+        let precioConIva = precio * (1 + ivaPercent);
+        precioConIva = Math.round(precioConIva * 100) / 100;
+        const subtotal = Math.round(((subtotalExistente > 0 ? subtotalExistente : (precio * cantidad)) * 100)) / 100;
+        const totalConIva = Math.round((Math.max(0, subtotal) * (1 + ivaPercent)) * 100) / 100;
+
+        const productoData = {
+            id: contadorProductos++,
+            codigo,
+            nombre: nombre || codigo,
+            cantidad,
+            precio,
+            precioConIva,
+            subtotal,
+            totalConIva,
+            ivaPercent,
+            ivaCodigo,
+            // extras opcionales
+            descripcionReemplazo: p.descripcionReemplazo ?? p.descripcion_reemplazo ?? '',
+            infoAdicional: p.infoAdicional ?? p.info_adicional ?? '',
+            codigoPersonalizado: p.codigoPersonalizado ?? p.codigo_personalizado ?? '',
+        };
+
+        productosAgregados.push(productoData);
+
+        // Render principal (UI interactiva). Fallback a fila simple si algo falla.
+        if (typeof agregarFilaTabla === 'function') {
+            try {
+                agregarFilaTabla(productoData);
+            } catch (e) {
+                console.warn('No se pudo agregar fila (fallback simple):', e);
+                if (tbody) {
+                    const tr = document.createElement('tr');
+                    tr.setAttribute('data-producto-id', String(productoData.id));
+                    tr.innerHTML = `
+                        <td class="px-3 py-2 text-xs text-gray-700">${productoData.codigo || '-'}</td>
+                        <td class="px-3 py-2 text-xs text-gray-700">${productoData.nombre || '-'}</td>
+                        <td class="px-3 py-2 text-center text-xs text-gray-700">${productoData.cantidad || 1}</td>
+                        <td class="px-3 py-2 text-right text-xs text-gray-700">$${Number(productoData.precio || 0).toFixed(2)}</td>
+                        <td class="px-3 py-2 text-right text-xs text-gray-700 font-medium">$${Number(productoData.subtotal || 0).toFixed(2)}</td>
+                        <td class="px-3 py-2 text-center text-xs">
+                            <button type="button" class="px-2 py-1 text-xs text-white bg-red-600 hover:bg-red-700 rounded" onclick="eliminarProducto(${productoData.id})">
+                                Eliminar
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+            }
+        } else if (tbody) {
+            const tr = document.createElement('tr');
+            tr.setAttribute('data-producto-id', String(productoData.id));
+            tr.innerHTML = `
+                <td class="px-3 py-2 text-xs text-gray-700">${productoData.codigo || '-'}</td>
+                <td class="px-3 py-2 text-xs text-gray-700">${productoData.nombre || '-'}</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-700">${productoData.cantidad || 1}</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-700">$${Number(productoData.precio || 0).toFixed(2)}</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-700 font-medium">$${Number(productoData.subtotal || 0).toFixed(2)}</td>
+                <td class="px-3 py-2 text-center text-xs">
+                    <button type="button" class="px-2 py-1 text-xs text-white bg-red-600 hover:bg-red-700 rounded" onclick="eliminarProducto(${productoData.id})">
+                        Eliminar
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
+    });
+
+    if (productosAgregados.length === 0 && tbody) {
+        // Restaurar filas vacías si no hay nada
+        tbody.innerHTML = `
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+            <tr class="fila-vacia">
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-right text-xs text-gray-400">$0.00</td>
+                <td class="px-3 py-2 text-center text-xs text-gray-400">-</td>
+            </tr>
+        `;
+    }
+
+    // Actualizar campos ocultos + total con las funciones correctas del template
+    if (typeof actualizarCamposOcultos === 'function') {
+        actualizarCamposOcultos();
+    }
+    if (typeof actualizarTotal === 'function') {
+        actualizarTotal();
+    }
+}
+
+function mostrarModalMantenerDetalles() {
+    const modal = document.getElementById('modalMantenerDetalles');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function cerrarModal() {
+    const modal = document.getElementById('modalMantenerDetalles');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    try {
+        sessionStorage.setItem(_getMantenerDetallesStorageKey(), 'mantener');
+    } catch (e) {
+        // Ignorar
+    }
+    // Si al inicio dejamos vacío, restaurar ahora
+    _restaurarProductosDesdeSnapshot();
+    console.log('✅ Modal cerrado - productos mantenidos');
+}
+
+function limpiarProductos() {
+    const modal = document.getElementById('modalMantenerDetalles');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+
+    try {
+        sessionStorage.setItem(_getMantenerDetallesStorageKey(), 'limpiar');
+    } catch (e) {
+        // Ignorar
+    }
+    
+    // Esperar a que las funciones estén disponibles
+    setTimeout(function() {
+        if (typeof productosAgregados !== 'undefined') {
+            productosAgregados = [];
+            contadorProductos = 0;
+
+            const productosInput = document.getElementById('productos');
+            if (productosInput) {
+                productosInput.value = '[]';
+            }
+            
+            if (typeof actualizarTablaProductos === 'function') {
+                actualizarTablaProductos();
+            }
+            if (typeof actualizarTotales === 'function') {
+                actualizarTotales();
+            }
+            console.log('✅ Productos limpiados');
+        }
+    }, 100);
+}
+
+// Mostrar el modal solo si hay productos iniciales (desde factura) y solo la primera vez.
+document.addEventListener('DOMContentLoaded', function() {
+    // Mostrar modal cuando estamos creando NC desde una factura.
+    // Si el backend no mandó productos (aún), igual preguntamos.
+    const facturaId = obtenerFacturaIdDesdeUrl();
+    if (!_tieneProductosIniciales() && !facturaId) {
+        return;
+    }
+
+    // Detectar tipo de navegación: si es reload, NO volver a preguntar.
+    let navType = 'navigate';
+    try {
+        const navEntries = performance.getEntriesByType('navigation');
+        navType = navEntries && navEntries.length ? navEntries[0].type : 'navigate';
+    } catch (e) {
+        navType = 'navigate';
+    }
+
+    // Guardar snapshot para poder restaurar si el usuario elige "Mantener"
+    const productosInput = document.getElementById('productos');
+    window.__nc_productos_snapshot = (productosInput?.value || '').trim();
+    // Fallback robusto: capturar también desde la tabla renderizada por el servidor
+    window.__nc_productos_tabla_snapshot = _capturarProductosDesdeTablaServer();
+
+    let decision = null;
+    const key = _getMantenerDetallesStorageKey();
+    try {
+        // Si el usuario entra nuevamente (navigate/back_forward), volver a preguntar.
+        // Solo en reload respetamos la decisión previa.
+        if (navType !== 'reload') {
+            sessionStorage.removeItem(key);
+            decision = null;
+        } else {
+            decision = sessionStorage.getItem(key);
+        }
+    } catch (e) {
+        decision = null;
+    }
+
+    // En reload: no mostrar modal. Aplicar decisión si existe; si no existe, dejar vacío por defecto.
+    if (navType === 'reload') {
+        if (decision === 'mantener') {
+            // Renderizar de forma interactiva (con editar/eliminar), no dejar la tabla server-side con '-'
+            _restaurarProductosDesdeSnapshot();
+        } else {
+            _limpiarProductosSoloUI();
+        }
+        return;
+    }
+
+    // En navegación normal: iniciar vacío y preguntar.
+    _limpiarProductosSoloUI();
+    try {
+        mostrarModalMantenerDetalles();
+        // Failsafe: si algo/algún CSS lo deja oculto, forzar display.
+        setTimeout(function() {
+            const modal = document.getElementById('modalMantenerDetalles');
+            if (modal && getComputedStyle(modal).display === 'none') {
+                modal.style.display = 'flex';
+            }
+        }, 50);
+    } catch (e) {
+        // Si por algún motivo falla el modal, no dejes la pantalla muerta.
+        console.warn('No se pudo mostrar modal, restaurando productos:', e);
+        _restaurarProductosDesdeSnapshot();
+    }
+});
+</script>
+
+{% endblock %}

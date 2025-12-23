@@ -35,35 +35,108 @@ let numeroUsuarios = '{{ usuarios }}'
             <p class="text-[11px] text-gray-500 mb-1">{{ fecha }}</p>
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 <div class="bg-white border border-gray-300 p-3 rounded-md hover:border-gray-400 transition-colors">
-                    <i class="fa fa-rocket metric-icon mb-1 text-gray-600"></i>
+                    <i class="fa fa-rocket metric-icon mb-1 text-indigo-600"></i>
                     <div class="text-2xl font-bold text-gray-800">{{ productosRegistrados }}</div>
                     <div class="text-xs text-gray-600">Productos registrados</div>
                 </div>
                 <div class="bg-white border border-gray-300 p-3 rounded-md hover:border-gray-400 transition-colors">
-                    <i class="fa fa-shopping-cart metric-icon mb-1 text-gray-600"></i>
+                    <i class="fa fa-shopping-cart metric-icon mb-1 text-emerald-600"></i>
                     <div class="text-2xl font-bold text-gray-800">{{ productosVendidos }}</div>
                     <div class="text-xs text-gray-600">Productos vendidos</div>
                 </div>
                 <div class="bg-white border border-gray-300 p-3 rounded-md hover:border-gray-400 transition-colors">
-                    <i class="fa fa-line-chart metric-icon mb-1 text-gray-600"></i>
+                    <i class="fa fa-line-chart metric-icon mb-1 text-sky-600"></i>
                     <div class="text-2xl font-bold text-gray-800">{{ clientesRegistrados }}</div>
                     <div class="text-xs text-gray-600">Clientes registrados</div>
                 </div>
                 <div class="bg-white border border-gray-300 p-3 rounded-md hover:border-gray-400 transition-colors">
-                    <i class="fa fa-users metric-icon mb-1 text-gray-600"></i>
+                    <i class="fa fa-users metric-icon mb-1 text-violet-600"></i>
                     <div class="text-2xl font-bold text-gray-800">{{ usuariosRegistrados }}</div>
                     <div class="text-xs text-gray-600">Número de usuarios</div>
                 </div>
                 <div class="bg-white border border-gray-300 p-3 rounded-md hover:border-gray-400 transition-colors">
-                    <i class="fa fa-list-alt metric-icon mb-1 text-gray-600"></i>
+                    <i class="fa fa-list-alt metric-icon mb-1 text-amber-600"></i>
                     <div class="text-2xl font-bold text-gray-800">{{ facturasEmitidas }}</div>
                     <div class="text-xs text-gray-600">Facturas emitidas</div>
                 </div>
                 <div class="bg-white border border-gray-300 p-3 rounded-md hover:border-gray-400 transition-colors">
-                    <i class="fa fa-dollar metric-icon mb-1 text-gray-600"></i>
+                    <i class="fa fa-dollar metric-icon mb-1 text-green-600"></i>
                     <div class="text-2xl font-bold text-gray-800 whitespace-nowrap">$ {{ ingresoTotal|floatformat:2 }}</div>
                     <div class="text-xs text-gray-600">Ingreso total</div>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Gráfico ancho: Ventas por Mes (Comparativo anual) -->
+    <section class="mb-3">
+        <div class="bg-white border border-gray-300 rounded-lg p-4">
+            <div class="border border-gray-200 rounded-lg p-2">
+                {% if ventasLineSvg.has_data %}
+                    <div class="flex items-start">
+                        <div class="flex-1">
+                            <svg viewBox="0 0 {{ ventasLineSvg.width }} {{ ventasLineSvg.height }}" class="w-full block">
+                                <!-- Grid lines -->
+                                <line x1="{{ ventasLineSvg.x_start }}" y1="{{ ventasLineSvg.y100 }}" x2="{{ ventasLineSvg.x_end }}" y2="{{ ventasLineSvg.y100 }}" class="text-gray-200" stroke="currentColor" />
+                                <line x1="{{ ventasLineSvg.x_start }}" y1="{{ ventasLineSvg.y50 }}" x2="{{ ventasLineSvg.x_end }}" y2="{{ ventasLineSvg.y50 }}" class="text-gray-200" stroke="currentColor" />
+                                <line x1="{{ ventasLineSvg.x_start }}" y1="{{ ventasLineSvg.y0 }}" x2="{{ ventasLineSvg.x_end }}" y2="{{ ventasLineSvg.y0 }}" class="text-gray-200" stroke="currentColor" />
+
+                                <!-- Axis (X) -->
+                                <line x1="{{ ventasLineSvg.x_start }}" y1="{{ ventasLineSvg.y_bottom }}" x2="{{ ventasLineSvg.x_end }}" y2="{{ ventasLineSvg.y_bottom }}" class="text-gray-300" stroke="currentColor" />
+
+                                <!-- Axis labels (Y) -->
+                                <text x="6" y="{{ ventasLineSvg.y100|add:"4" }}" class="text-gray-600" style="font-size:10px;" fill="currentColor">{{ ventasLineSvg.tick100|floatformat:0 }}</text>
+                                <text x="6" y="{{ ventasLineSvg.y50|add:"4" }}" class="text-gray-600" style="font-size:10px;" fill="currentColor">{{ ventasLineSvg.tick50|floatformat:0 }}</text>
+                                <text x="6" y="{{ ventasLineSvg.y0|add:"4" }}" class="text-gray-600" style="font-size:10px;" fill="currentColor">0</text>
+
+                                <!-- Y axis title -->
+                                <text x="14" y="{{ ventasLineSvg.y_mid }}" transform="rotate(-90 14 {{ ventasLineSvg.y_mid }})" class="text-gray-700" style="font-size:10px;" fill="currentColor">Dólares</text>
+
+                                <!-- Lines -->
+                                <polyline points="{{ ventasLineSvg.points_prev }}" fill="none" stroke-width="2" class="text-blue-500" stroke="currentColor" />
+                                <polyline points="{{ ventasLineSvg.points_cur }}" fill="none" stroke-width="2" class="text-green-500" stroke="currentColor" />
+
+                                <!-- Points + value labels (prev) -->
+                                {% for p in ventasLineSvg.points_prev_markers %}
+                                    <circle cx="{{ p.x }}" cy="{{ p.y }}" r="2" class="text-blue-500" fill="currentColor" />
+                                    <text x="{{ p.x }}" y="{{ p.label_y }}" text-anchor="middle" class="text-gray-700" style="font-size:9px;" fill="currentColor">{{ p.label }}</text>
+                                {% endfor %}
+
+                                <!-- Points + value labels (cur) -->
+                                {% for p in ventasLineSvg.points_cur_markers %}
+                                    <circle cx="{{ p.x }}" cy="{{ p.y }}" r="2" class="text-green-500" fill="currentColor" />
+                                    <text x="{{ p.x }}" y="{{ p.label_y }}" text-anchor="middle" class="text-gray-800" style="font-size:9px;" fill="currentColor">{{ p.label }}</text>
+                                {% endfor %}
+
+                                <!-- Month labels -->
+                                {% for t in ventasLineSvg.month_ticks %}
+                                    <text x="{{ t.x }}" y="{{ ventasLineSvg.y_bottom|add:"18" }}" text-anchor="middle" class="text-gray-700" style="font-size:10px;" fill="currentColor">{{ t.label }}</text>
+                                {% endfor %}
+
+                                <!-- X axis title -->
+                                <text x="{{ ventasLineSvg.x_mid }}" y="{{ ventasLineSvg.y_bottom|add:"40" }}" text-anchor="middle" class="text-gray-700" style="font-size:10px;" fill="currentColor">Meses</text>
+
+                                <!-- Chart title -->
+                                <text x="{{ ventasLineSvg.x_mid }}" y="12" text-anchor="middle" class="text-gray-800" style="font-size:12px; font-weight:700;" fill="currentColor">Ventas por Mes</text>
+                            </svg>
+                        </div>
+
+                        <div class="ml-3">
+                            <div class="border border-gray-200 rounded-lg p-2">
+                                <div class="flex items-center space-x-2 mb-2">
+                                    <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
+                                    <span class="text-xs text-gray-700">{{ ventasChartLabelPrev }}</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                                    <span class="text-xs text-gray-700">{{ ventasChartLabelCur }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="text-sm text-gray-500 text-center py-8">No hay datos de ventas para graficar</div>
+                {% endif %}
             </div>
         </div>
     </section>
@@ -130,9 +203,9 @@ let numeroUsuarios = '{{ usuarios }}'
                     <h3 class="text-base font-bold text-gray-800">Ventas por Mes</h3>
                     <div class="flex items-center space-x-2">
                         <span class="w-3 h-3 bg-gray-400 rounded-full"></span>
-                        <span class="text-sm text-gray-600">2024</span>
+                        <span class="text-sm text-gray-600">{{ ventasChartLabelPrev }}</span>
                         <span class="w-3 h-3 bg-gray-600 rounded-full"></span>
-                        <span class="text-sm text-gray-600">2025</span>
+                        <span class="text-sm text-gray-600">{{ ventasChartLabelCur }}</span>
                     </div>
                 </div>
 
@@ -156,36 +229,7 @@ let numeroUsuarios = '{{ usuarios }}'
                     </div>
                 </div>
 
-                <!-- Mini gráfico de barras -->
-                <div class="space-y-2">
-                    <div class="text-sm text-gray-600 mb-3">Últimos 6 meses</div>
-                    <div class="flex items-end justify-between h-20 space-x-2">
-                        {% if ventasUltimosMeses %}
-                            {% for venta in ventasUltimosMeses %}
-                                <div class="flex flex-col items-center flex-1">
-                                    {% if venta.total %}
-                                        {% if venta.total > 10000 %}
-                                            <div class="bg-gray-600 rounded-t w-full" style="height: 90%"></div>
-                                        {% elif venta.total > 5000 %}
-                                            <div class="bg-gray-600 rounded-t w-full" style="height: 70%"></div>
-                                        {% elif venta.total > 1000 %}
-                                            <div class="bg-gray-600 rounded-t w-full" style="height: 50%"></div>
-                                        {% else %}
-                                            <div class="bg-gray-600 rounded-t w-full" style="height: 30%"></div>
-                                        {% endif %}
-                                    {% else %}
-                                        <div class="bg-gray-300 rounded-t w-full" style="height: 10%"></div>
-                                    {% endif %}
-                                    <span class="text-[10px] mt-1 text-gray-500">{{ venta.mes|date:"M" }}</span>
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <div class="w-full text-center text-sm text-gray-500">
-                                No hay datos de ventas disponibles
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
+                <div class="text-xs text-gray-500 mb-1">Comparativo anual en el gráfico superior</div>
 
                 <!-- Indicadores de tendencia -->
                 <div class="mt-4 flex items-center justify-between">
@@ -210,4 +254,5 @@ let numeroUsuarios = '{{ usuarios }}'
     <div class="h-2"></div>
     </div>
 </div>
+
 {% endblock %}

@@ -283,10 +283,10 @@
                                                     <i class="fa fa-truck mr-2 text-orange-500 action-icon"></i>
                                                     <span>Guía de Remisión</span>
                                                 </a>
-                                                <a href="/inventario/notas-credito/crear/?factura_id={{ fila.id }}" class="flex items-center w-full text-left px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 hover:text-red-900">
+                                                <button type="button" onclick="abrirModalFacturadorNotaCredito({{ fila.id }})" class="flex items-center w-full text-left px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 hover:text-red-900 border-none bg-transparent cursor-pointer">
                                                     <i class="fa fa-minus-circle mr-2 text-red-500 action-icon"></i>
                                                     <span>Nota de Crédito</span>
-                                                </a>
+                                                </button>
                                                 {% endif %}
                                                 <div class="border-t border-gray-100"></div>
                                                 <a href="/inventario/generarFactura/{{ fila.id }}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900">
@@ -392,17 +392,55 @@
     let filasOriginales = []; // Para almacenar todas las filas
     let filasFiltradas = []; // Para almacenar filas filtradas
 
+    // ✅ Persistencia SOLO de fechas (Desde/Hasta)
+    const LISTA_FACTURAS_FECHAS_STORAGE_KEY = 'listarFacturas.fechas.v1';
+
+    function guardarFechas() {
+        try {
+            localStorage.setItem(
+                LISTA_FACTURAS_FECHAS_STORAGE_KEY,
+                JSON.stringify({
+                    desde: document.getElementById('fecha-desde')?.value || '',
+                    hasta: document.getElementById('fecha-hasta')?.value || '',
+                })
+            );
+        } catch (e) {
+            // noop
+        }
+    }
+
+    function restaurarFechas() {
+        try {
+            const raw = localStorage.getItem(LISTA_FACTURAS_FECHAS_STORAGE_KEY);
+            if (!raw) return false;
+            const parsed = JSON.parse(raw);
+            const desde = parsed?.desde || '';
+            const hasta = parsed?.hasta || '';
+            const desdeEl = document.getElementById('fecha-desde');
+            const hastaEl = document.getElementById('fecha-hasta');
+            if (desdeEl) desdeEl.value = desde;
+            if (hastaEl) hastaEl.value = hasta;
+            return !!(desde || hasta);
+        } catch (e) {
+            return false;
+        }
+    }
+
     // ✅ INICIALIZAR PAGINACIÓN AL CARGAR LA PÁGINA
     document.addEventListener('DOMContentLoaded', function() {
         // Guardar referencia a todas las filas
         filasOriginales = Array.from(document.querySelectorAll('.factura-row'));
         filasFiltradas = [...filasOriginales];
         inicializarPaginacion();
-        
-        // ✅ Establecer fecha de hoy en "Desde" y "Hasta"
-        const hoy = new Date().toISOString().split('T')[0];
-        document.getElementById('fecha-desde').value = hoy;
-        document.getElementById('fecha-hasta').value = hoy;
+
+        // ✅ Restaurar fechas guardadas; si no hay, usar hoy-hoy
+        const teniaGuardadas = restaurarFechas();
+        if (!teniaGuardadas) {
+            const hoy = new Date().toISOString().split('T')[0];
+            document.getElementById('fecha-desde').value = hoy;
+            document.getElementById('fecha-hasta').value = hoy;
+            guardarFechas();
+        }
         
         // Aplicar filtro de fechas al cargar
         filtrarPorFechas();
@@ -415,6 +453,7 @@
 
     // ✅ FUNCIÓN PARA FILTRAR POR FECHAS
     function filtrarPorFechas() {
+        guardarFechas();
         aplicarTodosLosFiltros();
     }
 
@@ -469,6 +508,7 @@
     function limpiarFiltrosFecha() {
         document.getElementById('fecha-desde').value = '';
         document.getElementById('fecha-hasta').value = '';
+        guardarFechas();
         aplicarTodosLosFiltros();
     }
 
@@ -768,10 +808,7 @@
                     detalles: data.resultado.mensajes && data.resultado.mensajes.length ? `<pre class="mt-4 text-xs bg-gray-100 p-2 rounded">${JSON.stringify(data.resultado.mensajes, null, 2)}</pre>` : '',
                     tipo: 'success'
                 });
-
-                setTimeout(() => {
-                    window.location.reload();
-                }, 3000);
+                // No recargar: mantener fechas y filtros del usuario.
             } else {
                 mostrarModal({
                     titulo: '❌ Error en Envío',
@@ -813,7 +850,7 @@
                     mensaje: data.message,
                     tipo: 'success'
                 });
-                setTimeout(() => { window.location.reload(); }, 3000);
+                // No recargar: mantener fechas y filtros del usuario.
             } else {
                 mostrarModal({
                     titulo: '❌ Error',
@@ -838,17 +875,29 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    const info = data.resultado || {};
-                    mostrarModal({
-                        titulo: '🔍 Estado del SRI',
-                        mensaje: `Estado: ${info.estado_sri || 'DESCONOCIDO'}`,
-                        detalles: info.mensaje_sri ? `<p class="mt-4 text-sm">${info.mensaje_sri}</p>` : '',
-                        tipo: 'info'
-                    });
+                    // La vista suele devolver en el root (no siempre en data.resultado)
+                    const info = data.resultado || data || {};
+                    const estadoTxt = (info.estado_sri || info.estado || '').toString().toUpperCase().trim();
+                    const esAutorizada = estadoTxt === 'AUTORIZADA' || estadoTxt === 'AUTORIZADO' || (!!info.numero_autorizacion && !!info.fecha_autorizacion);
+                    const tipo = esAutorizada ? 'success' : 'info';
+                    const titulo = esAutorizada ? '✅ Factura autorizada' : '🔍 Estado del SRI';
+                    const mensaje = esAutorizada
+                        ? (info.mensaje || 'Esta factura ya se encuentra autorizada.')
+                        : `Estado: ${estadoTxt || 'DESCONOCIDO'}`;
+                    const detallesExtra = [];
+                    if (info.numero_autorizacion) detallesExtra.push(`<p class="mt-2 text-sm">Número autorización: <span class="font-mono">${info.numero_autorizacion}</span></p>`);
+                    if (info.fecha_autorizacion) detallesExtra.push(`<p class="mt-1 text-sm">Fecha autorización: ${info.fecha_autorizacion}</p>`);
+                    const detalleMsg = info.mensaje_sri || info.detalle || '';
+                    const detalles = [
+                        detalleMsg ? `<p class="mt-4 text-sm">${detalleMsg}</p>` : '',
+                        ...detallesExtra,
+                    ].join('');
+
+                    mostrarModal({ titulo, mensaje, detalles, tipo });
                 } else {
                     mostrarModal({
                         titulo: '❌ Error en Consulta',
-                        mensaje: data.message,
+                        mensaje: data.message || 'No se pudo consultar el estado.',
                         tipo: 'error'
                     });
                 }
@@ -898,5 +947,102 @@
         `;
         document.body.insertAdjacentHTML('beforeend', modalHtml);
     }
+
+    // ===== MODAL DE AUTENTICACIÓN PARA NOTA DE CRÉDITO =====
+    let facturaIdParaNotaCredito = null;
+
+    function abrirModalFacturadorNotaCredito(facturaId) {
+        facturaIdParaNotaCredito = facturaId;
+        document.getElementById('modalAutenticacionFacturador').style.display = 'flex';
+        document.getElementById('passwordFacturador').value = '';
+        document.getElementById('passwordFacturador').focus();
+    }
+
+    function cerrarModalFacturador() {
+        document.getElementById('modalAutenticacionFacturador').style.display = 'none';
+        facturaIdParaNotaCredito = null;
+    }
+
+    async function validarFacturadorYRedirigir() {
+        const password = document.getElementById('passwordFacturador').value;
+        const errorDiv = document.getElementById('errorPassword');
+        
+        if (!password) {
+            errorDiv.textContent = 'Ingrese su contraseña';
+            errorDiv.style.display = 'block';
+            return;
+        }
+
+        try {
+            const response = await fetch('{% url "inventario:validar_facturador" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ password: password })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Autenticación exitosa, redirigir a crear nota de crédito
+                window.location.href = `/inventario/notas-credito/crear/${facturaIdParaNotaCredito}/`;
+            } else {
+                errorDiv.textContent = data.error || 'Contraseña incorrecta';
+                errorDiv.style.display = 'block';
+                document.getElementById('passwordFacturador').value = '';
+                document.getElementById('passwordFacturador').focus();
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            errorDiv.textContent = 'Error de conexión';
+            errorDiv.style.display = 'block';
+        }
+    }
+
+    // Permitir Enter en el campo de contraseña
+    document.addEventListener('DOMContentLoaded', function() {
+        const passwordInput = document.getElementById('passwordFacturador');
+        if (passwordInput) {
+            passwordInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    validarFacturadorYRedirigir();
+                }
+            });
+        }
+    });
 </script>
+
+<!-- Modal de Autenticación del Facturador -->
+<div id="modalAutenticacionFacturador" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 8px; padding: 30px; max-width: 400px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <i class="fa fa-lock" style="font-size: 48px; color: #10b981; margin-bottom: 15px;"></i>
+            <h3 style="margin: 0; font-size: 20px; color: #333;">Autenticación Requerida</h3>
+            <p style="margin: 10px 0 0 0; color: #666; font-size: 14px;">Ingrese su contraseña de facturador</p>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <label for="passwordFacturador" style="display: block; margin-bottom: 8px; font-weight: 600; color: #555; font-size: 14px;">
+                Contraseña
+            </label>
+            <input type="password" id="passwordFacturador" placeholder="Ingrese su contraseña" 
+                   style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+            <div id="errorPassword" style="display: none; color: #dc2626; font-size: 12px; margin-top: 8px;"></div>
+        </div>
+        
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button onclick="cerrarModalFacturador()" type="button"
+                    style="padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;">
+                <i class="fa fa-times mr-1"></i> Cancelar
+            </button>
+            <button onclick="validarFacturadorYRedirigir()" type="button"
+                    style="padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;">
+                <i class="fa fa-check mr-1"></i> Continuar
+            </button>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
