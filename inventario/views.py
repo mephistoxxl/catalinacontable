@@ -1298,6 +1298,99 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
 
     def get(self, request):
         empresa = get_empresa_activa(request)
+        # Si el usuario presiona "Imprimir", generar el PDF
+        accion = (request.GET.get('accion') or '').strip().lower()
+        if accion == 'imprimir':
+            from datetime import datetime
+            from django.http import HttpResponse
+            from .models import Factura, Opciones
+            from inventario.reportes.pdf_facturacion import (
+                ReporteFacturacionFiltros,
+                generar_pdf_listado_facturacion,
+            )
+
+            if not empresa:
+                return redirect('inventario:seleccionar_empresa')
+
+            # Parseo básico de filtros
+            desde_str = request.GET.get('desde')
+            hasta_str = request.GET.get('hasta')
+            try:
+                desde = datetime.strptime(desde_str, '%Y-%m-%d').date() if desde_str else datetime.now().date()
+            except Exception:
+                desde = datetime.now().date()
+            try:
+                hasta = datetime.strptime(hasta_str, '%Y-%m-%d').date() if hasta_str else datetime.now().date()
+            except Exception:
+                hasta = datetime.now().date()
+
+            ordenado_por = (request.GET.get('ordenado_por') or 'secuencia').strip().lower()
+            agrupado_por = (request.GET.get('agrupado_por') or 'ninguno').strip().lower()
+            ci_ruc = (request.GET.get('ci_ruc') or '').strip()
+
+            informe_resumido = bool(request.GET.get('informe_resumido'))
+            exportar_excel = bool(request.GET.get('exportar_excel'))
+
+            almacenes = request.GET.getlist('almacenes')
+            secuencias = request.GET.getlist('secuencias')
+            formas_pago = request.GET.getlist('formas_pago')
+            facturadores = request.GET.getlist('facturadores')
+
+            filtros = ReporteFacturacionFiltros(
+                desde=desde,
+                hasta=hasta,
+                ordenado_por=ordenado_por,
+                agrupado_por=agrupado_por,
+                ci_ruc=ci_ruc,
+                informe_resumido=informe_resumido,
+                exportar_excel=exportar_excel,
+                almacenes=almacenes,
+                secuencias=secuencias,
+                formas_pago=formas_pago,
+                facturadores=facturadores,
+            )
+
+            # Query: Facturas de la empresa en rango de fechas
+            qs = (
+                Factura.objects.filter(empresa_id=empresa.id, fecha_emision__gte=desde, fecha_emision__lte=hasta)
+                .select_related('cliente', 'almacen', 'facturador')
+                .prefetch_related('totales_impuestos', 'formas_pago')
+            )
+            if ci_ruc:
+                qs = qs.filter(identificacion_cliente__icontains=ci_ruc)
+
+            if ordenado_por == 'fecha':
+                qs = qs.order_by('fecha_emision', 'establecimiento', 'punto_emision', 'secuencia')
+            elif ordenado_por == 'cliente':
+                qs = qs.order_by('nombre_cliente', 'fecha_emision', 'establecimiento', 'punto_emision', 'secuencia')
+            else:
+                qs = qs.order_by('establecimiento', 'punto_emision', 'secuencia')
+
+            # Datos empresa (tomar de Opciones si existe)
+            opciones = None
+            try:
+                opciones = Opciones.objects.filter(empresa_id=empresa.id).first()
+            except Exception:
+                opciones = None
+
+            empresa_nombre = getattr(opciones, 'razon_social', None) or getattr(empresa, 'razon_social', '')
+            empresa_ruc = getattr(opciones, 'identificacion', None) or getattr(empresa, 'ruc', '')
+            empresa_telefonos = getattr(opciones, 'telefono', '') if opciones else ''
+            usuario_nombre = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+
+            pdf_bytes = generar_pdf_listado_facturacion(
+                empresa_nombre=empresa_nombre,
+                empresa_ruc=empresa_ruc,
+                empresa_telefonos=empresa_telefonos,
+                usuario_nombre=usuario_nombre,
+                filtros=filtros,
+                facturas=qs,
+            )
+
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = 'inline; filename="listado_facturacion_general.pdf"'
+            return response
+
         return render(request, 'inventario/reportes/reportes.html', {'empresa': empresa})
 
 
