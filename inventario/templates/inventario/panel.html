@@ -35,32 +35,32 @@ let numeroUsuarios = '{{ usuarios }}'
             <p class="text-[11px] text-gray-500 mb-1">{{ fecha }}</p>
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 <div class="bg-white border border-gray-300 p-3 rounded-md hover:border-gray-400 transition-colors">
-                    <i class="fa fa-rocket metric-icon mb-1 text-gray-600"></i>
+                    <i class="fa fa-rocket metric-icon mb-1 text-indigo-600"></i>
                     <div class="text-2xl font-bold text-gray-800">{{ productosRegistrados }}</div>
                     <div class="text-xs text-gray-600">Productos registrados</div>
                 </div>
                 <div class="bg-white border border-gray-300 p-3 rounded-md hover:border-gray-400 transition-colors">
-                    <i class="fa fa-shopping-cart metric-icon mb-1 text-gray-600"></i>
+                    <i class="fa fa-shopping-cart metric-icon mb-1 text-emerald-600"></i>
                     <div class="text-2xl font-bold text-gray-800">{{ productosVendidos }}</div>
                     <div class="text-xs text-gray-600">Productos vendidos</div>
                 </div>
                 <div class="bg-white border border-gray-300 p-3 rounded-md hover:border-gray-400 transition-colors">
-                    <i class="fa fa-line-chart metric-icon mb-1 text-gray-600"></i>
+                    <i class="fa fa-line-chart metric-icon mb-1 text-sky-600"></i>
                     <div class="text-2xl font-bold text-gray-800">{{ clientesRegistrados }}</div>
                     <div class="text-xs text-gray-600">Clientes registrados</div>
                 </div>
                 <div class="bg-white border border-gray-300 p-3 rounded-md hover:border-gray-400 transition-colors">
-                    <i class="fa fa-users metric-icon mb-1 text-gray-600"></i>
+                    <i class="fa fa-users metric-icon mb-1 text-violet-600"></i>
                     <div class="text-2xl font-bold text-gray-800">{{ usuariosRegistrados }}</div>
                     <div class="text-xs text-gray-600">Número de usuarios</div>
                 </div>
                 <div class="bg-white border border-gray-300 p-3 rounded-md hover:border-gray-400 transition-colors">
-                    <i class="fa fa-list-alt metric-icon mb-1 text-gray-600"></i>
+                    <i class="fa fa-list-alt metric-icon mb-1 text-amber-600"></i>
                     <div class="text-2xl font-bold text-gray-800">{{ facturasEmitidas }}</div>
                     <div class="text-xs text-gray-600">Facturas emitidas</div>
                 </div>
                 <div class="bg-white border border-gray-300 p-3 rounded-md hover:border-gray-400 transition-colors">
-                    <i class="fa fa-dollar metric-icon mb-1 text-gray-600"></i>
+                    <i class="fa fa-dollar metric-icon mb-1 text-green-600"></i>
                     <div class="text-2xl font-bold text-gray-800 whitespace-nowrap">$ {{ ingresoTotal|floatformat:2 }}</div>
                     <div class="text-xs text-gray-600">Ingreso total</div>
                 </div>
@@ -93,18 +93,18 @@ let numeroUsuarios = '{{ usuarios }}'
                                 <text x="14" y="{{ ventasLineSvg.y_mid }}" transform="rotate(-90 14 {{ ventasLineSvg.y_mid }})" class="text-gray-700" style="font-size:10px;" fill="currentColor">Dólares</text>
 
                                 <!-- Lines -->
-                                <polyline points="{{ ventasLineSvg.points_prev }}" fill="none" stroke-width="2" class="text-gray-400" stroke="currentColor" />
-                                <polyline points="{{ ventasLineSvg.points_cur }}" fill="none" stroke-width="2" class="text-gray-600" stroke="currentColor" />
+                                <polyline points="{{ ventasLineSvg.points_prev }}" fill="none" stroke-width="2" class="text-blue-500" stroke="currentColor" />
+                                <polyline points="{{ ventasLineSvg.points_cur }}" fill="none" stroke-width="2" class="text-green-500" stroke="currentColor" />
 
                                 <!-- Points + value labels (prev) -->
                                 {% for p in ventasLineSvg.points_prev_markers %}
-                                    <circle cx="{{ p.x }}" cy="{{ p.y }}" r="2" class="text-gray-400" fill="currentColor" />
+                                    <circle cx="{{ p.x }}" cy="{{ p.y }}" r="2" class="text-blue-500" fill="currentColor" />
                                     <text x="{{ p.x }}" y="{{ p.label_y }}" text-anchor="middle" class="text-gray-700" style="font-size:9px;" fill="currentColor">{{ p.label }}</text>
                                 {% endfor %}
 
                                 <!-- Points + value labels (cur) -->
                                 {% for p in ventasLineSvg.points_cur_markers %}
-                                    <circle cx="{{ p.x }}" cy="{{ p.y }}" r="2" class="text-gray-600" fill="currentColor" />
+                                    <circle cx="{{ p.x }}" cy="{{ p.y }}" r="2" class="text-green-500" fill="currentColor" />
                                     <text x="{{ p.x }}" y="{{ p.label_y }}" text-anchor="middle" class="text-gray-800" style="font-size:9px;" fill="currentColor">{{ p.label }}</text>
                                 {% endfor %}
 
@@ -124,11 +124,11 @@ let numeroUsuarios = '{{ usuarios }}'
                         <div class="ml-3">
                             <div class="border border-gray-200 rounded-lg p-2">
                                 <div class="flex items-center space-x-2 mb-2">
-                                    <span class="w-2 h-2 bg-gray-400 rounded-full"></span>
+                                    <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
                                     <span class="text-xs text-gray-700">{{ ventasChartLabelPrev }}</span>
                                 </div>
                                 <div class="flex items-center space-x-2">
-                                    <span class="w-2 h-2 bg-gray-600 rounded-full"></span>
+                                    <span class="w-2 h-2 bg-green-500 rounded-full"></span>
                                     <span class="text-xs text-gray-700">{{ ventasChartLabelCur }}</span>
                                 </div>
                             </div>
