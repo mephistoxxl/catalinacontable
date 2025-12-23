@@ -4054,8 +4054,8 @@ def consultar_estado_sri(request, factura_id):
         # Crear instancia de integración
         integration = SRIIntegration(empresa=get_empresa_activa(request))
         
-        # Consultar estado usando integración estándar
-        # La integración expone consultar_estado_factura(factura_id)
+        # Consultar estado usando integración estándar.
+        # La integración expone consultar_estado_factura(factura_id) y actualiza la factura en BD.
         try:
             resultado = integration.consultar_estado_factura(factura.id)
         except AttributeError:
@@ -4071,27 +4071,80 @@ def consultar_estado_sri(request, factura_id):
         # Procesar resultado
         if resultado.get('success'):
             estado_anterior = factura.estado_sri
-            res_estado = resultado.get('estado') or resultado.get('resultado', {}).get('estado') or 'DESCONOCIDO'
+
+            # IMPORTANTE:
+            # `integration.consultar_estado_factura` ya actualiza la factura en BD.
+            # Refrescamos el objeto local para no sobrescribir campos (p.ej. numero/fecha autorización)
+            # con valores stale.
+            try:
+                factura.refresh_from_db()
+            except Exception:
+                pass
+
+            raw_resultado = resultado.get('resultado') if isinstance(resultado.get('resultado'), dict) else {}
+
+            res_estado = (
+                resultado.get('estado')
+                or raw_resultado.get('estado')
+                or factura.estado_sri
+                or 'DESCONOCIDO'
+            )
             res_estado = _normalizar_estado_sri(res_estado)
-            factura.estado_sri = res_estado
-            # Mapear posibles estructuras
-            numero_aut = resultado.get('numero_autorizacion') or resultado.get('resultado', {}).get('numero_autorizacion')
-            fecha_aut = resultado.get('fecha_autorizacion') or resultado.get('resultado', {}).get('fecha_autorizacion')
-            mensaje_detalle = resultado.get('detalle') or resultado.get('mensaje_detalle') or ''
-            mensaje_principal = resultado.get('mensaje') or 'Consulta realizada exitosamente'
-            if mensaje_principal:
+
+            # Extraer número/fecha desde múltiples variantes (snake_case, camelCase y autorizaciones[0])
+            numero_aut = (
+                resultado.get('numero_autorizacion')
+                or resultado.get('numeroAutorizacion')
+                or raw_resultado.get('numero_autorizacion')
+                or raw_resultado.get('numeroAutorizacion')
+            )
+            fecha_aut = (
+                resultado.get('fecha_autorizacion')
+                or resultado.get('fechaAutorizacion')
+                or raw_resultado.get('fecha_autorizacion')
+                or raw_resultado.get('fechaAutorizacion')
+            )
+            if (not numero_aut or not fecha_aut) and isinstance(raw_resultado.get('autorizaciones'), list) and raw_resultado.get('autorizaciones'):
+                aut0 = raw_resultado['autorizaciones'][0] or {}
+                if isinstance(aut0, dict):
+                    numero_aut = numero_aut or aut0.get('numero_autorizacion') or aut0.get('numeroAutorizacion')
+                    fecha_aut = fecha_aut or aut0.get('fecha_autorizacion') or aut0.get('fechaAutorizacion')
+
+            # Mensajes (la integración suele devolver `message`)
+            mensaje_detalle = (
+                resultado.get('detalle')
+                or resultado.get('mensaje_detalle')
+                or raw_resultado.get('detalle')
+                or ''
+            )
+            mensaje_principal = resultado.get('mensaje') or resultado.get('message') or 'Consulta realizada exitosamente'
+
+            # Actualizar solo campos necesarios, evitando clobber de autorización.
+            update_fields = []
+            if factura.estado_sri != res_estado:
+                factura.estado_sri = res_estado
+                update_fields.append('estado_sri')
+            if mensaje_principal and getattr(factura, 'mensaje_sri', None) != mensaje_principal:
                 factura.mensaje_sri = mensaje_principal
-            if mensaje_detalle:
+                update_fields.append('mensaje_sri')
+            if mensaje_detalle and getattr(factura, 'mensaje_sri_detalle', None) != mensaje_detalle:
                 factura.mensaje_sri_detalle = mensaje_detalle
-            if numero_aut:
+                update_fields.append('mensaje_sri_detalle')
+            if numero_aut and not factura.numero_autorizacion:
                 factura.numero_autorizacion = numero_aut
-            if fecha_aut:
+                update_fields.append('numero_autorizacion')
+            if fecha_aut and not factura.fecha_autorizacion:
                 try:
                     from datetime import datetime
-                    factura.fecha_autorizacion = datetime.strptime(fecha_aut, '%d/%m/%Y %H:%M:%S')
+                    # Formato típico usado por el frontend/otros handlers
+                    factura.fecha_autorizacion = datetime.strptime(str(fecha_aut).strip(), '%d/%m/%Y %H:%M:%S')
+                    update_fields.append('fecha_autorizacion')
                 except Exception:
+                    # Si llega en ISO u otro formato, evitamos romper; la integración ya intenta parsearlo.
                     pass
-            factura.save()
+
+            if update_fields:
+                factura.save(update_fields=update_fields)
 
             # Ajustar fecha de autorización para mostrar (restar 5 horas)
             fecha_aut_respuesta = ''
@@ -4149,7 +4202,7 @@ def consultar_estado_sri(request, factura_id):
                 'estado': factura.estado_sri,
                 'mensaje': mensaje_principal,
                 'detalle': mensaje_detalle,
-                'numero_autorizacion': numero_aut or '',
+                'numero_autorizacion': factura.numero_autorizacion or (numero_aut or ''),
                 'fecha_autorizacion': fecha_aut_respuesta,
                 'estado_cambio': estado_cambio
             })
