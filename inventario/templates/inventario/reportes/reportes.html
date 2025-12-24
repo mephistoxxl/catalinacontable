@@ -24,10 +24,15 @@
           <div class="lg:col-span-3">
             <div class="border border-gray-300 rounded-md p-3">
               <div class="text-xs font-semibold text-gray-800 mb-2">Periodo Fechas</div>
-              <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                <input type="date" name="desde" value="{% now 'Y-m-d' %}" class="w-full min-w-0 border border-gray-300 rounded px-2 py-1 text-sm" />
-                <span class="text-gray-500 text-sm">-</span>
-                <input type="date" name="hasta" value="{% now 'Y-m-d' %}" class="w-full min-w-0 border border-gray-300 rounded px-2 py-1 text-sm" />
+              <div class="space-y-2">
+                <input
+                  id="rango_fechas"
+                  type="text"
+                  class="w-full min-w-0 border border-gray-300 rounded px-2 py-1 text-sm"
+                  autocomplete="off"
+                />
+                <input type="hidden" id="desde" name="desde" value="{{ desde_ui|default:'' }}" />
+                <input type="hidden" id="hasta" name="hasta" value="{{ hasta_ui|default:'' }}" />
               </div>
             </div>
           </div>
@@ -225,4 +230,113 @@
   </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+
+  <!-- Date range picker (tipo captura: Hoy/Ayer/Esta semana/...) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css">
+  <style>
+    /* Verde para selección (daterangepicker) */
+    .daterangepicker td.in-range {
+      background-color: #bbf7d0; /* verde suave */
+    }
+    .daterangepicker td.active,
+    .daterangepicker td.active:hover,
+    .daterangepicker td.start-date,
+    .daterangepicker td.end-date {
+      background-color: #16a34a !important; /* verde */
+      border-color: #16a34a !important;
+      color: #fff !important;
+    }
+    .daterangepicker .ranges li.active {
+      background-color: #16a34a !important;
+      color: #fff !important;
+    }
+    .daterangepicker .drp-buttons .btn.applyBtn {
+      background-color: #16a34a !important;
+      border-color: #16a34a !important;
+      color: #fff !important;
+    }
+    .daterangepicker .drp-buttons .btn.applyBtn:hover {
+      background-color: #15803d !important;
+      border-color: #15803d !important;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+
+  <script>
+    (function () {
+      function safeParseISO(value) {
+        if (!value) return null;
+        var m = moment(value, 'YYYY-MM-DD', true);
+        return m.isValid() ? m : null;
+      }
+
+      var $input = $('#rango_fechas');
+      if (!$input.length || typeof $input.daterangepicker !== 'function') return;
+
+      var $desde = $('#desde');
+      var $hasta = $('#hasta');
+
+      var start = safeParseISO($desde.val()) || moment();
+      var end = safeParseISO($hasta.val()) || moment();
+
+      moment.locale('es');
+
+      function setHidden(s, e) {
+        $desde.val(s.format('YYYY-MM-DD'));
+        $hasta.val(e.format('YYYY-MM-DD'));
+        $input.val(s.format('DD/MM/YYYY') + ' - ' + e.format('DD/MM/YYYY'));
+      }
+
+      $input.daterangepicker({
+        autoUpdateInput: false,
+        showDropdowns: true,
+        startDate: start,
+        endDate: end,
+        opens: 'center',
+        locale: {
+          format: 'DD/MM/YYYY',
+          separator: ' - ',
+          applyLabel: 'Aplicar',
+          cancelLabel: 'Cancelar',
+          fromLabel: 'Desde',
+          toLabel: 'Hasta',
+          customRangeLabel: 'Personalizado',
+          weekLabel: 'S',
+          daysOfWeek: ['D', 'L', 'M', 'M', 'J', 'V', 'S'],
+          monthNames: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+          firstDay: 1
+        },
+        ranges: {
+          'Hoy': [moment(), moment()],
+          'Ayer': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+          'Esta semana': [moment().startOf('week').add(1, 'days'), moment().endOf('week').add(1, 'days')],
+          'Los últimos 7 días': [moment().subtract(6, 'days'), moment()],
+          'La semana pasada': [moment().subtract(1, 'week').startOf('week').add(1, 'days'), moment().subtract(1, 'week').endOf('week').add(1, 'days')],
+          'Últimos 14 días': [moment().subtract(13, 'days'), moment()],
+          'Este mes': [moment().startOf('month'), moment().endOf('month')],
+          'Últimos 30 días': [moment().subtract(29, 'days'), moment()],
+          'Mes pasado': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')],
+          'El año actual': [moment().startOf('year'), moment().endOf('year')],
+          'Año Anterior': [moment().subtract(1, 'year').startOf('year'), moment().subtract(1, 'year').endOf('year')]
+        }
+      });
+
+      $input.on('apply.daterangepicker', function(ev, picker) {
+        setHidden(picker.startDate, picker.endDate);
+      });
+
+      $input.on('cancel.daterangepicker', function() {
+        // Mantener valores actuales (no limpiar)
+        setHidden(start, end);
+      });
+
+      // Inicializar input visible
+      setHidden(start, end);
+    })();
+  </script>
 {% endblock %}

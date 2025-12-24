@@ -1298,15 +1298,34 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
 
     def get(self, request):
         empresa = get_empresa_activa(request)
+        from .models import Almacen, Facturador
+        from datetime import datetime
+
+        # Defaults para UI (mantener selección en GET)
+        hoy_str = datetime.now().date().strftime('%Y-%m-%d')
+        desde_ui = (request.GET.get('desde') or hoy_str).strip()
+        hasta_ui = (request.GET.get('hasta') or hoy_str).strip()
+
+        almacenes_disponibles = (
+            Almacen.objects.filter(activo=True, empresa=empresa).order_by('descripcion')
+            if empresa
+            else Almacen.objects.none()
+        )
+        facturadores_disponibles = (
+            Facturador.tenant_objects.filter(activo=True, empresa=empresa).order_by('nombres')
+            if empresa
+            else Facturador.tenant_objects.none()
+        )
+
         # Si el usuario presiona "Imprimir", generar el PDF
         accion = (request.GET.get('accion') or '').strip().lower()
         if accion == 'imprimir':
-            from datetime import datetime
             from django.http import HttpResponse
             from .models import Factura, Opciones
             from inventario.reportes.pdf_facturacion import (
                 ReporteFacturacionFiltros,
                 generar_pdf_listado_facturacion,
+                generar_pdf_resumen_facturacion,
             )
 
             if not empresa:
@@ -1327,14 +1346,45 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
             ordenado_por = (request.GET.get('ordenado_por') or 'secuencia').strip().lower()
             agrupado_por = (request.GET.get('agrupado_por') or 'ninguno').strip().lower()
             ci_ruc = (request.GET.get('ci_ruc') or '').strip()
+            secuencia_inicia_raw = (request.GET.get('secuencia_inicia') or '').strip()
 
             informe_resumido = bool(request.GET.get('informe_resumido'))
             exportar_excel = bool(request.GET.get('exportar_excel'))
 
-            almacenes = request.GET.getlist('almacenes')
+            almacenes_sel = request.GET.getlist('almacenes')
             secuencias = request.GET.getlist('secuencias')
             formas_pago = request.GET.getlist('formas_pago')
-            facturadores = request.GET.getlist('facturadores')
+            facturadores_sel = request.GET.getlist('facturadores')
+
+            # Normalizar filtros (IDs y códigos)
+            almacenes_ids: list[int] = [int(v) for v in almacenes_sel if str(v).isdigit()]
+            facturadores_ids: list[int] = [int(v) for v in facturadores_sel if str(v).isdigit()]
+
+            # Para imprimir filtros legibles en PDF
+            almacenes_labels: list[str] = []
+            if almacenes_ids:
+                almacenes_labels = list(
+                    Almacen.objects.filter(empresa=empresa, id__in=almacenes_ids).order_by('descripcion').values_list('descripcion', flat=True)
+                )
+
+            facturadores_labels: list[str] = []
+            if facturadores_ids:
+                facturadores_labels = list(
+                    Facturador.tenant_objects.filter(empresa=empresa, id__in=facturadores_ids).order_by('nombres').values_list('nombres', flat=True)
+                )
+
+            # Mapeo UI -> códigos SRI almacenados en FormaPago.forma_pago
+            formas_pago_codigo_map = {
+                'efectivo': ['01'],
+                'tarjeta_credito': ['19'],
+                'credito': ['20'],
+                'cheque': ['20'],
+                'deposito': ['20'],
+            }
+            formas_pago_codigos: list[str] = []
+            for fp in formas_pago:
+                formas_pago_codigos.extend(formas_pago_codigo_map.get(str(fp), []))
+            formas_pago_codigos = sorted(set(formas_pago_codigos))
 
             filtros = ReporteFacturacionFiltros(
                 desde=desde,
@@ -1344,10 +1394,10 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                 ci_ruc=ci_ruc,
                 informe_resumido=informe_resumido,
                 exportar_excel=exportar_excel,
-                almacenes=almacenes,
+                almacenes=almacenes_labels,
                 secuencias=secuencias,
                 formas_pago=formas_pago,
-                facturadores=facturadores,
+                facturadores=facturadores_labels,
             )
 
             # Query: Facturas de la empresa en rango de fechas
@@ -1359,12 +1409,40 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
             if ci_ruc:
                 qs = qs.filter(identificacion_cliente__icontains=ci_ruc)
 
+            # ✅ Aplicar filtros reales desde checkboxes
+            if almacenes_ids:
+                qs = qs.filter(almacen_id__in=almacenes_ids)
+
+            if facturadores_ids:
+                qs = qs.filter(facturador_id__in=facturadores_ids)
+
+            # Forma de pago: filtra por códigos SRI registrados en las formas de pago
+            if formas_pago_codigos:
+                qs = qs.filter(formas_pago__forma_pago__in=formas_pago_codigos).distinct()
+
+            # Secuencias (por ahora este PDF lista Facturas; si seleccionan y no incluyen Facturas, no hay resultados)
+            if secuencias and 'facturas_electronicas' not in secuencias:
+                qs = qs.none()
+
+            # Secuencia inicia en: campo es CharField de 9 (cero a la izquierda)
+            if secuencia_inicia_raw:
+                sec = ''.join([c for c in secuencia_inicia_raw if c.isdigit()])
+                if sec:
+                    sec = sec[-9:].zfill(9)
+                    qs = qs.filter(secuencia__gte=sec)
+
             if ordenado_por == 'fecha':
-                qs = qs.order_by('fecha_emision', 'establecimiento', 'punto_emision', 'secuencia')
+                if agrupado_por == 'clientes':
+                    qs = qs.order_by('nombre_cliente', 'fecha_emision', 'establecimiento', 'punto_emision', 'secuencia')
+                else:
+                    qs = qs.order_by('fecha_emision', 'establecimiento', 'punto_emision', 'secuencia')
             elif ordenado_por == 'cliente':
                 qs = qs.order_by('nombre_cliente', 'fecha_emision', 'establecimiento', 'punto_emision', 'secuencia')
             else:
-                qs = qs.order_by('establecimiento', 'punto_emision', 'secuencia')
+                if agrupado_por == 'clientes':
+                    qs = qs.order_by('nombre_cliente', 'establecimiento', 'punto_emision', 'secuencia')
+                else:
+                    qs = qs.order_by('establecimiento', 'punto_emision', 'secuencia')
 
             # Datos empresa (tomar de Opciones si existe)
             opciones = None
@@ -1387,11 +1465,54 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                 facturas=qs,
             )
 
+            # Exportar a Excel tiene prioridad sobre PDF
+            if exportar_excel:
+                from inventario.reportes.excel_facturacion import generar_xlsx_listado_facturacion
+
+                xlsx_bytes = generar_xlsx_listado_facturacion(
+                    empresa_nombre=empresa_nombre,
+                    empresa_ruc=empresa_ruc,
+                    usuario_nombre=usuario_nombre,
+                    filtros=filtros,
+                    facturas=qs,
+                )
+                response = HttpResponse(
+                    xlsx_bytes,
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                )
+                response['Content-Disposition'] = 'attachment; filename="listado_facturacion_general.xlsx"'
+                return response
+
+            # PDF resumido
+            if informe_resumido:
+                pdf_bytes = generar_pdf_resumen_facturacion(
+                    empresa_nombre=empresa_nombre,
+                    empresa_ruc=empresa_ruc,
+                    empresa_telefonos=empresa_telefonos,
+                    usuario_nombre=usuario_nombre,
+                    filtros=filtros,
+                    facturas=qs,
+                )
+                response = HttpResponse(pdf_bytes, content_type='application/pdf')
+                response['Content-Disposition'] = 'inline; filename="listado_facturacion_general_resumido.pdf"'
+                return response
+
+            # PDF detallado
             response = HttpResponse(pdf_bytes, content_type='application/pdf')
             response['Content-Disposition'] = 'inline; filename="listado_facturacion_general.pdf"'
             return response
 
-        return render(request, 'inventario/reportes/reportes.html', {'empresa': empresa})
+        return render(
+            request,
+            'inventario/reportes/reportes.html',
+            {
+                'empresa': empresa,
+                'almacenes_disponibles': almacenes_disponibles,
+                'facturadores_disponibles': facturadores_disponibles,
+                'desde_ui': desde_ui,
+                'hasta_ui': hasta_ui,
+            },
+        )
 
 
 #Maneja la salida del usuario------------------------------------------------------#
