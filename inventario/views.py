@@ -1136,11 +1136,11 @@ class Panel(LoginRequiredMixin, View):
 
         # Puntos para SVG (sin dependencias externas)
         chart_width = 900
-        chart_height = 150
-        padding_left = 44
+        chart_height = 108
+        padding_left = 72
         padding_right = 18
-        padding_top = 14
-        padding_bottom = 44
+        padding_top = 11
+        padding_bottom = 34
 
         inner_w = chart_width - padding_left - padding_right
 
@@ -1181,6 +1181,40 @@ class Panel(LoginRequiredMixin, View):
                 vv = 0.0
             return f"{int(round(vv)):,}"
 
+        def _fmt_val_or_blank(v: float) -> str:
+            try:
+                vv = float(v or 0)
+            except (TypeError, ValueError):
+                vv = 0.0
+            if vv <= 0:
+                return ""
+            return _fmt_val(vv)
+
+        def _fmt_money(v: float) -> str:
+            try:
+                vv = float(v or 0)
+            except (TypeError, ValueError):
+                vv = 0.0
+            return f"${vv:,.2f}"
+
+        def _fmt_money_signed(v: float) -> str:
+            try:
+                vv = float(v or 0)
+            except (TypeError, ValueError):
+                vv = 0.0
+            sign = "+" if vv > 0 else ""
+            return f"{sign}${vv:,.2f}"
+
+        def _pct_change(cur: float, prev: float) -> float | None:
+            try:
+                c = float(cur or 0)
+                p = float(prev or 0)
+            except (TypeError, ValueError):
+                return None
+            if p <= 0:
+                return None
+            return ((c - p) / p) * 100.0
+
         # Puntos con etiquetas (para mostrar valores como en el ejemplo)
         points_prev_markers = []
         points_cur_markers = []
@@ -1188,6 +1222,15 @@ class Panel(LoginRequiredMixin, View):
             px = _x(i)
             py_prev = _y(ventas_ytd_prev[i])
             py_cur = _y(ventas_ytd_cur[i])
+
+            mes_label = labels_meses[i]
+
+            prev_val = float(ventas_ytd_prev[i] or 0)
+            cur_val = float(ventas_ytd_cur[i] or 0)
+            delta_val = cur_val - prev_val
+            pct_val = _pct_change(cur_val, prev_val)
+            pct_fmt = f"{pct_val:+.1f}%" if pct_val is not None else "—"
+            trend = "up" if delta_val > 0 else ("down" if delta_val < 0 else "flat")
 
             # Etiquetas: prev arriba, cur abajo (reduce solapamientos)
             prev_label_y = max(float(padding_top + 10), float(py_prev - 6))
@@ -1197,16 +1240,32 @@ class Panel(LoginRequiredMixin, View):
                 {
                     "x": px,
                     "y": py_prev,
-                    "label": _fmt_val(ventas_ytd_prev[i]),
+                    "label": _fmt_val_or_blank(ventas_ytd_prev[i]),
                     "label_y": prev_label_y,
+                    "month": mes_label,
+                    "year_prev": str(year_prev),
+                    "year_cur": str(year_cur),
+                    "prev_money": _fmt_money(prev_val),
+                    "cur_money": _fmt_money(cur_val),
+                    "delta_money": _fmt_money_signed(delta_val),
+                    "pct": pct_fmt,
+                    "trend": trend,
                 }
             )
             points_cur_markers.append(
                 {
                     "x": px,
                     "y": py_cur,
-                    "label": _fmt_val(ventas_ytd_cur[i]),
+                    "label": _fmt_val_or_blank(ventas_ytd_cur[i]),
                     "label_y": cur_label_y,
+                    "month": mes_label,
+                    "year_prev": str(year_prev),
+                    "year_cur": str(year_cur),
+                    "prev_money": _fmt_money(prev_val),
+                    "cur_money": _fmt_money(cur_val),
+                    "delta_money": _fmt_money_signed(delta_val),
+                    "pct": pct_fmt,
+                    "trend": trend,
                 }
             )
 
