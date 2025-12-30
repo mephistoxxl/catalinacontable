@@ -14,14 +14,14 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='opciones',
-            name='mensaje_factura',
-        ),
-        migrations.RemoveField(
-            model_name='opciones',
-            name='nombre_negocio',
-        ),
+        # migrations.RemoveField(
+        #     model_name='opciones',
+        #     name='mensaje_factura',
+        # ),
+        # migrations.RemoveField(
+        #     model_name='opciones',
+        #     name='nombre_negocio',
+        # ),
         migrations.AlterField(
             model_name='producto',
             name='codigo_barras',
