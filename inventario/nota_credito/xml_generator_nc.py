@@ -5,7 +5,7 @@ Según especificación técnica del SRI - codDoc: 04
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from decimal import Decimal, ROUND_HALF_UP
-from datetime import datetime
+from datetime import datetime, date
 import logging
 
 logger = logging.getLogger(__name__)
@@ -121,7 +121,12 @@ class XMLGeneratorNotaCredito:
         # 3. Tipo de identificación del comprador (requerido)
         factura = self.nc.factura_modificada
         cliente = factura.cliente
-        tipo_id = cliente.tipoIdentificacion if cliente else '05'
+        tipo_id = getattr(cliente, 'tipoIdentificacion', None) if cliente else None
+        if not tipo_id:
+            # Fallback simple por longitud
+            ident_raw = (getattr(cliente, 'identificacion', None) if cliente else None) or getattr(factura, 'identificacion_cliente', None) or ''
+            ident_len = len(str(ident_raw).strip())
+            tipo_id = '04' if ident_len == 13 else '05' if ident_len == 10 else '08'
         ET.SubElement(info_nc, 'tipoIdentificacionComprador').text = tipo_id
         
         # 4. Razón social del comprador (requerido)
@@ -129,7 +134,14 @@ class XMLGeneratorNotaCredito:
         ET.SubElement(info_nc, 'razonSocialComprador').text = self._limpiar_texto(razon_social_comprador)
         
         # 5. Identificación del comprador (requerido)
-        identificacion = cliente.cedula if cliente else factura.identificacion_cliente
+        identificacion = (
+            (getattr(cliente, 'identificacion', None) if cliente else None)
+            or (getattr(cliente, 'ruc', None) if cliente else None)
+            or (getattr(cliente, 'cedula', None) if cliente else None)
+            or getattr(factura, 'identificacion_cliente', None)
+            or getattr(factura, 'identificacion', None)
+            or ''
+        )
         ET.SubElement(info_nc, 'identificacionComprador').text = identificacion
         
         # 6. Contribuyente especial (opcional)
@@ -153,10 +165,12 @@ class XMLGeneratorNotaCredito:
         # 11. Fecha de emisión del documento sustento (requerido)
         fecha_sustento = self.nc.fecha_emision_doc_sustento.strftime('%d/%m/%Y')
         ET.SubElement(info_nc, 'fechaEmisionDocSustento').text = fecha_sustento
+
+        subtotal_calc, total_impuestos_calc, _grupos = self._calcular_totales_normalizados()
         
         # 12. Total sin impuestos (requerido)
         ET.SubElement(info_nc, 'totalSinImpuestos').text = self._formatear_decimal(
-            self.nc.subtotal_sin_impuestos
+            subtotal_calc
         )
         
         # 13. Compensaciones (opcional) - No implementado
@@ -164,7 +178,7 @@ class XMLGeneratorNotaCredito:
         
         # 14. Valor modificación (requerido) - Total de la NC
         ET.SubElement(info_nc, 'valorModificacion').text = self._formatear_decimal(
-            self.nc.valor_modificacion
+            (subtotal_calc + total_impuestos_calc)
         )
         
         # 15. Moneda (opcional)
@@ -179,14 +193,15 @@ class XMLGeneratorNotaCredito:
     def _agregar_total_impuestos(self, parent):
         """Agrega el bloque totalConImpuestos"""
         total_impuestos = ET.SubElement(parent, 'totalConImpuestos')
-        
-        for ti in self.nc.totales_impuestos.all():
+
+        _subtotal, _total_imp, grupos = self._calcular_totales_normalizados()
+
+        for (codigo_porcentaje, _tarifa), data in sorted(grupos.items(), key=lambda x: x[0][0]):
             total_impuesto = ET.SubElement(total_impuestos, 'totalImpuesto')
-            
-            ET.SubElement(total_impuesto, 'codigo').text = ti.codigo
-            ET.SubElement(total_impuesto, 'codigoPorcentaje').text = ti.codigo_porcentaje
-            ET.SubElement(total_impuesto, 'baseImponible').text = self._formatear_decimal(ti.base_imponible)
-            ET.SubElement(total_impuesto, 'valor').text = self._formatear_decimal(ti.valor)
+            ET.SubElement(total_impuesto, 'codigo').text = '2'
+            ET.SubElement(total_impuesto, 'codigoPorcentaje').text = codigo_porcentaje
+            ET.SubElement(total_impuesto, 'baseImponible').text = self._formatear_decimal(data['base'])
+            ET.SubElement(total_impuesto, 'valor').text = self._formatear_decimal(data['valor'])
     
     def _agregar_detalles(self, root):
         """Agrega el bloque detalles"""
@@ -228,37 +243,169 @@ class XMLGeneratorNotaCredito:
         """Agrega los impuestos de un detalle"""
         impuestos = ET.SubElement(parent, 'impuestos')
         impuesto = ET.SubElement(impuestos, 'impuesto')
-        
+
+        codigo_porcentaje, tarifa = self._normalizar_iva_vigente(getattr(detalle, 'codigo_iva', None), getattr(detalle, 'tarifa_iva', None))
+        base = getattr(detalle, 'precio_total_sin_impuesto', None) or Decimal('0.00')
+        valor = (Decimal(str(base)) * (tarifa / Decimal('100')))
+
         ET.SubElement(impuesto, 'codigo').text = '2'  # IVA
-        ET.SubElement(impuesto, 'codigoPorcentaje').text = detalle.codigo_iva
-        ET.SubElement(impuesto, 'tarifa').text = self._formatear_decimal(detalle.tarifa_iva)
-        ET.SubElement(impuesto, 'baseImponible').text = self._formatear_decimal(
-            detalle.precio_total_sin_impuesto
-        )
-        ET.SubElement(impuesto, 'valor').text = self._formatear_decimal(detalle.valor_iva)
+        ET.SubElement(impuesto, 'codigoPorcentaje').text = codigo_porcentaje
+        ET.SubElement(impuesto, 'tarifa').text = self._formatear_decimal(tarifa)
+        ET.SubElement(impuesto, 'baseImponible').text = self._formatear_decimal(base)
+        ET.SubElement(impuesto, 'valor').text = self._formatear_decimal(valor)
+
+    def _normalizar_iva_vigente(self, codigo_porcentaje, tarifa):
+        """Normaliza IVA para emisiones actuales (15% vigente)."""
+        try:
+            fecha_emision = getattr(self.nc, 'fecha_emision', None)
+            if isinstance(fecha_emision, datetime):
+                fecha_emision = fecha_emision.date()
+            if not isinstance(fecha_emision, date):
+                fecha_emision = date.today()
+        except Exception:
+            fecha_emision = date.today()
+
+        try:
+            tarifa_val = Decimal(str(tarifa))
+        except Exception:
+            tarifa_val = None
+
+        codigo = str(codigo_porcentaje or '').strip()
+
+        # Reglas base
+        tarifa_por_codigo = {
+            '0': Decimal('0'),
+            '2': Decimal('12'),
+            '3': Decimal('14'),
+            '4': Decimal('15'),
+            '5': Decimal('5'),
+            '6': Decimal('0'),
+            '7': Decimal('0'),
+            '8': Decimal('0'),
+            '10': Decimal('13'),
+        }
+        codigo_por_tarifa = {
+            Decimal('0'): '0',
+            Decimal('5'): '5',
+            Decimal('12'): '2',
+            Decimal('13'): '10',
+            Decimal('14'): '3',
+            Decimal('15'): '4',
+        }
+
+        # Primero: si hay tarifa, mapear por tarifa
+        if tarifa_val is not None:
+            tarifa_int = tarifa_val.quantize(Decimal('1'))
+            if tarifa_int in codigo_por_tarifa:
+                codigo_norm = codigo_por_tarifa[tarifa_int]
+                tarifa_norm = tarifa_int
+            else:
+                codigo_norm = codigo if codigo in tarifa_por_codigo else '4'
+                tarifa_norm = tarifa_por_codigo.get(codigo_norm, Decimal('15'))
+        else:
+            codigo_norm = codigo if codigo in tarifa_por_codigo else '4'
+            tarifa_norm = tarifa_por_codigo.get(codigo_norm, Decimal('15'))
+
+        # ✅ Vigencia: desde 2024-04-01, código '2'/12% no está vigente para emisiones actuales
+        if fecha_emision >= date(2024, 4, 1) and (codigo_norm == '2' or tarifa_norm == Decimal('12')):
+            codigo_norm = '4'
+            tarifa_norm = Decimal('15')
+
+        return codigo_norm, tarifa_norm
+
+    def _calcular_totales_normalizados(self):
+        """Recalcula subtotal e impuestos desde detalles, con IVA vigente normalizado."""
+        subtotal = Decimal('0.00')
+        total_impuestos = Decimal('0.00')
+        grupos = {}
+
+        for detalle in self.nc.detalles.all():
+            base = getattr(detalle, 'precio_total_sin_impuesto', None) or Decimal('0.00')
+            base = Decimal(str(base))
+            subtotal += base
+
+            codigo_porcentaje, tarifa = self._normalizar_iva_vigente(getattr(detalle, 'codigo_iva', None), getattr(detalle, 'tarifa_iva', None))
+            valor = (base * (tarifa / Decimal('100'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            total_impuestos += valor
+
+            key = (codigo_porcentaje, tarifa)
+            if key not in grupos:
+                grupos[key] = {'base': Decimal('0.00'), 'valor': Decimal('0.00')}
+            grupos[key]['base'] += base
+            grupos[key]['valor'] += valor
+
+        # Redondeos finales
+        subtotal = subtotal.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        total_impuestos = total_impuestos.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        for key in list(grupos.keys()):
+            grupos[key]['base'] = grupos[key]['base'].quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            grupos[key]['valor'] = grupos[key]['valor'].quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+        return subtotal, total_impuestos, grupos
     
     def _agregar_info_adicional(self, root):
         """Agrega el bloque infoAdicional (opcional)"""
         info_adicional = ET.SubElement(root, 'infoAdicional')
         
-        # Email del cliente
-        factura = self.nc.factura_modificada
-        if factura.correo:
+        factura = getattr(self.nc, 'factura_modificada', None)
+        if not factura:
+            return
+
+        cliente = getattr(factura, 'cliente', None)
+
+        def obtener_campo_adicional(posibles_nombres):
+            try:
+                campos = getattr(factura, 'campos_adicionales', None)
+                if not campos:
+                    return None
+                mapa = {
+                    (c.nombre or '').strip().upper(): (c.valor or '').strip()
+                    for c in campos.all()
+                }
+                for nombre in posibles_nombres:
+                    valor = mapa.get(str(nombre).strip().upper())
+                    if valor:
+                        return valor
+            except Exception:
+                return None
+            return None
+
+        # Email del cliente (FacturaCampoAdicional -> Cliente)
+        email = (
+            obtener_campo_adicional(['E-MAIL', 'EMAIL', 'CORREO', 'MAIL'])
+            or (
+                cliente.get_email_efectivo(factura.empresa)
+                if cliente and hasattr(cliente, 'get_email_efectivo')
+                else getattr(cliente, 'email', None)
+            )
+        )
+        if email:
             campo = ET.SubElement(info_adicional, 'campoAdicional')
             campo.set('nombre', 'Email')
-            campo.text = factura.correo
-        
-        # Teléfono del cliente
-        if factura.telefono:
+            campo.text = str(email).strip()[:300]
+
+        # Teléfono del cliente (FacturaCampoAdicional -> Cliente)
+        telefono = (
+            obtener_campo_adicional(['TELÉFONO', 'TELEFONO', 'TEL'])
+            or getattr(cliente, 'telefono', None)
+            or getattr(cliente, 'telefono1', None)
+            or getattr(cliente, 'telefono2', None)
+        )
+        if telefono:
             campo = ET.SubElement(info_adicional, 'campoAdicional')
             campo.set('nombre', 'Teléfono')
-            campo.text = factura.telefono
-        
-        # Dirección del cliente
-        if factura.direccion:
+            campo.text = str(telefono).strip()[:300]
+
+        # Dirección del cliente (FacturaCampoAdicional -> Factura.prop -> Cliente)
+        direccion = (
+            obtener_campo_adicional(['DIRECCIÓN', 'DIRECCION', 'DIR'])
+            or getattr(factura, 'direccion_comprador_xml', None)
+            or getattr(cliente, 'direccion', None)
+        )
+        if direccion:
             campo = ET.SubElement(info_adicional, 'campoAdicional')
             campo.set('nombre', 'Dirección')
-            campo.text = self._limpiar_texto(factura.direccion)
+            campo.text = self._limpiar_texto(direccion)
     
     def _limpiar_texto(self, texto):
         """Limpia caracteres especiales del texto para XML"""

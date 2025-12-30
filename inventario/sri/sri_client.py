@@ -320,6 +320,27 @@ class SRIClient:
             autorizaciones = []
             mensajes = []
 
+            def _normalizar_mensajes(mensajes_aut):
+                """Zeep suele devolver mensajes como mensajes.mensaje; normalizar a lista de items."""
+                if mensajes_aut is None:
+                    return []
+
+                # dict con clave 'mensaje'
+                if isinstance(mensajes_aut, dict) and 'mensaje' in mensajes_aut:
+                    mensajes_aut = mensajes_aut.get('mensaje')
+
+                # objeto con atributo .mensaje
+                if hasattr(mensajes_aut, 'mensaje'):
+                    try:
+                        mensajes_aut = getattr(mensajes_aut, 'mensaje')
+                    except Exception:
+                        pass
+
+                if mensajes_aut is None:
+                    return []
+
+                return mensajes_aut if self._is_iterable_safe(mensajes_aut) else [mensajes_aut]
+
             # Obtener dato de autorizaciones desde dict u objeto
             if isinstance(response, dict):
                 autorizaciones_data = response.get('autorizaciones')
@@ -372,9 +393,7 @@ class SRIClient:
                     }
 
                     if mensajes_aut:
-                        mensajes_iter = mensajes_aut if self._is_iterable_safe(mensajes_aut) else [mensajes_aut]
-
-                        for msg in mensajes_iter:
+                        for msg in _normalizar_mensajes(mensajes_aut):
                             if isinstance(msg, dict):
                                 mensaje = {
                                     'identificador': msg.get('identificador', ''),
@@ -389,6 +408,10 @@ class SRIClient:
                                     'tipo': getattr(msg, 'tipo', ''),
                                     'informacionAdicional': getattr(msg, 'informacionAdicional', '')
                                 }
+
+                            # Evitar agregar mensajes totalmente vacíos
+                            if not any((mensaje.get('identificador'), mensaje.get('mensaje'), mensaje.get('tipo'), mensaje.get('informacionAdicional'))):
+                                continue
                             autorizacion['mensajes'].append(mensaje)
                             mensajes.append(mensaje)
 

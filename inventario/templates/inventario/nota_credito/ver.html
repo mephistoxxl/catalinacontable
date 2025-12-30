@@ -1,0 +1,129 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+<div class="bg-gray-50 p-4" style="padding-bottom: 64px;">
+  <div class="max-w-5xl mx-auto">
+
+    <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 mb-3 rounded-lg">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center">
+          <i class="fas fa-file-invoice text-white mr-2"></i>
+          <div>
+            <h2 class="text-base font-semibold text-white">{{ titulo|default:"Nota de Crédito" }}</h2>
+            <p class="text-gray-300 text-xs">Detalle de la nota de crédito</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="{% url 'inventario:notas_credito_listar' %}" class="px-3 py-2 rounded bg-gray-700 text-white text-xs hover:bg-gray-600">
+            <i class="fas fa-arrow-left mr-1"></i>Volver
+          </a>
+          <a href="{% url 'inventario:notas_credito_pdf' nota_credito.id %}" class="px-3 py-2 rounded bg-blue-600 text-white text-xs hover:bg-blue-700">
+            <i class="fas fa-file-pdf mr-1"></i>PDF
+          </a>
+          {% if nota_credito.clave_acceso %}
+          <form method="post" action="{% url 'inventario:notas_credito_consultar_estado' nota_credito.id %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="px-3 py-2 rounded bg-gray-700 text-white text-xs hover:bg-gray-600">
+              <i class="fas fa-sync-alt mr-1"></i>Consultar SRI
+            </button>
+          </form>
+          {% endif %}
+          {% if nota_credito.estado_sri != 'AUTORIZADO' %}
+          <form method="post" action="{% url 'inventario:notas_credito_autorizar' nota_credito.id %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="px-3 py-2 rounded bg-green-600 text-white text-xs hover:bg-green-700">
+              <i class="fas fa-paper-plane mr-1"></i>Autorizar SRI
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if messages %}
+      {% for message in messages %}
+        <div class="mb-3 flex items-center rounded px-4 py-2 text-sm {% if message.tags == 'error' %}bg-red-100 text-red-800{% elif message.tags == 'success' %}bg-green-100 text-green-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+          <i class="fa {% if message.tags == 'error' %}fa-exclamation-triangle{% else %}fa-check{% endif %} mr-2"></i>
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div class="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden">
+        <div class="bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-800">
+          Información
+        </div>
+        <div class="p-4 text-sm text-gray-800 space-y-2">
+          <div class="flex justify-between"><span class="text-gray-600">Número</span><span class="font-medium">{{ nota_credito.numero_completo }}</span></div>
+          <div class="flex justify-between"><span class="text-gray-600">Fecha emisión</span><span class="font-medium">{{ nota_credito.fecha_emision }}</span></div>
+          <div class="flex justify-between"><span class="text-gray-600">Estado SRI</span><span class="font-medium">{{ nota_credito.estado_sri }}</span></div>
+          <div class="flex justify-between"><span class="text-gray-600">Factura sustento</span><span class="font-medium">{{ nota_credito.num_doc_modificado }}</span></div>
+          <div class="flex justify-between"><span class="text-gray-600">Fecha factura</span><span class="font-medium">{{ nota_credito.fecha_emision_doc_sustento }}</span></div>
+          <div class="pt-2">
+            <div class="text-gray-600 mb-1">Motivo</div>
+            <div class="font-medium">{{ nota_credito.tipo_motivo }}{% if nota_credito.motivo %}: {{ nota_credito.motivo }}{% endif %}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden">
+        <div class="bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-800">
+          Valores
+        </div>
+        <div class="p-4 text-sm text-gray-800 space-y-2">
+          <div class="flex justify-between"><span class="text-gray-600">Subtotal</span><span class="font-medium">${{ nota_credito.subtotal_sin_impuestos|floatformat:2 }}</span></div>
+          <div class="flex justify-between"><span class="text-gray-600">IVA</span><span class="font-medium">${{ nota_credito.total_iva|floatformat:2 }}</span></div>
+          <div class="flex justify-between border-t pt-2"><span class="text-gray-700 font-semibold">Total modificación</span><span class="font-semibold">${{ nota_credito.valor_modificacion|floatformat:2 }}</span></div>
+          {% if nota_credito.numero_autorizacion %}
+          <div class="pt-2">
+            <div class="text-gray-600 mb-1">Autorización</div>
+            <div class="font-medium break-all">{{ nota_credito.numero_autorizacion }}</div>
+            {% if nota_credito.fecha_autorizacion %}
+              <div class="text-xs text-gray-500">{{ nota_credito.fecha_autorizacion }}</div>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden mt-3">
+      <div class="bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-800">
+        Detalles
+      </div>
+      <div class="p-4">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descripción</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Cant.</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">P. Unit.</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              {% for d in nota_credito.detalles.all %}
+              <tr>
+                <td class="px-3 py-2 text-sm text-gray-800">{{ d.codigo_principal }}</td>
+                <td class="px-3 py-2 text-sm text-gray-800">{{ d.descripcion }}</td>
+                <td class="px-3 py-2 text-sm text-gray-800 text-right">{{ d.cantidad }}</td>
+                <td class="px-3 py-2 text-sm text-gray-800 text-right">${{ d.precio_unitario|floatformat:2 }}</td>
+                <td class="px-3 py-2 text-sm text-gray-800 text-right">${{ d.precio_total_sin_impuesto|floatformat:2 }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="5" class="px-3 py-6 text-center text-sm text-gray-500">Sin detalles</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
