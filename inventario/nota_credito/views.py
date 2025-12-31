@@ -9,11 +9,24 @@ from django.http import JsonResponse, HttpResponse
 from django.db import transaction
 from django.utils import timezone
 from decimal import Decimal
+from datetime import date
 import json
 import logging
 
 from .models import NotaCredito, DetalleNotaCredito, TotalImpuestoNotaCredito
-from inventario.models import Factura, Empresa, Opciones, DetalleFactura, Cliente, Almacen, Secuencia, Facturador
+from inventario.models import (
+    Factura,
+    Empresa,
+    Opciones,
+    DetalleFactura,
+    Cliente,
+    Almacen,
+    Secuencia,
+    Facturador,
+    Caja,
+    FormaPago,
+    Banco,
+)
 from inventario.views import complementarContexto
 from inventario.forms import EmitirFacturaFormulario
 from django.db.models import Max
@@ -131,6 +144,24 @@ class CrearNotaCredito(LoginRequiredMixin, View):
             return redirect(f'/inventario/login_facturador/?next={next_url}')
         
         empresa = get_object_or_404(Empresa, id=empresa_id)
+
+        # ✅ Cajas + formas de pago SRI + bancos (igual que EmitirFactura)
+        cajas_activas = Caja.objects.filter(activo=True, empresa_id=empresa_id).order_by('descripcion')
+        formas_pago_sri = getattr(FormaPago, 'FORMAS_PAGO_CHOICES', [])
+
+        try:
+            if hasattr(Banco, 'bancos_disponibles'):
+                bancos_db = set(Banco.bancos_disponibles())
+            else:
+                bancos_db = set(Banco.objects.filter(empresa_id=empresa_id).values_list('banco', flat=True))
+        except Exception:
+            bancos_db = set()
+
+        bancos_fallback = {
+            'Pichincha', 'Produbanco', 'Pacifico', 'Machala', 'Guayaquil', 'Banecuador',
+            'Internacional', 'Procredit', 'Austro', 'Bolivariano', 'Loja', 'Amazonas', 'Ruminahui'
+        }
+        lista_bancos = sorted({*(bancos_db or set()), *bancos_fallback})
         
         # Obtener la factura - Solo facturas autorizadas pueden tener NC
         factura = get_object_or_404(
@@ -217,7 +248,7 @@ class CrearNotaCredito(LoginRequiredMixin, View):
         for detalle in factura.detallefactura_set.all():
             # Mapeo de códigos IVA a tarifas
             tarifas_iva = {
-                '0': 0, '2': 12, '3': 14, '4': 15, '5': 5,
+                '0': 0, '2': 15, '3': 14, '4': 15, '5': 5,
                 '6': 0, '7': 0, '8': 0, '10': 13,
             }
             
@@ -225,23 +256,27 @@ class CrearNotaCredito(LoginRequiredMixin, View):
                 codigo = detalle.producto.codigo
                 descripcion = detalle.producto.descripcion
                 precio = float(detalle.precio_unitario or detalle.producto.precio or 0)
-                codigo_iva = detalle.iva_codigo or detalle.producto.iva or '2'
+                codigo_iva = detalle.iva_codigo or detalle.producto.iva or '4'
                 producto_id = detalle.producto_id
                 servicio_id = None
             elif detalle.servicio:
                 codigo = detalle.servicio.codigo
                 descripcion = detalle.servicio.descripcion
                 precio = float(detalle.precio_unitario or detalle.servicio.precio1 or 0)
-                codigo_iva = detalle.iva_codigo or detalle.servicio.iva or '2'
+                codigo_iva = detalle.iva_codigo or detalle.servicio.iva or '4'
                 producto_id = None
                 servicio_id = detalle.servicio_id
             else:
                 codigo = 'SIN_CODIGO'
                 descripcion = 'Sin descripción'
                 precio = float(detalle.precio_unitario or 0)
-                codigo_iva = '2'
+                codigo_iva = '4'
                 producto_id = None
                 servicio_id = None
+
+            # ✅ IVA vigente: si viene '2' (12%) convertir a '4' (15%) para emisiones actuales
+            if str(codigo_iva) == '2':
+                codigo_iva = '4'
             
             productos_factura.append({
                 'producto_id': producto_id,
@@ -281,13 +316,19 @@ class CrearNotaCredito(LoginRequiredMixin, View):
             'productos_factura_json': json.dumps(productos_factura),  # ✅ Productos como JSON
             'total_general': float(total_general),
             'today': date.today(),
-            'titulo': f'Nueva Nota de Crédito - Factura {factura.numero_completo}'
+            'titulo': f'Nueva Nota de Crédito - Factura {factura.numero_completo}',
+            'cajas': cajas_activas,
+            'formas_pago_sri': formas_pago_sri,
+            'bancos_lista_nombres': lista_bancos,
+            'bancos_db': Banco.objects.filter(activo=True, empresa_id=empresa_id).order_by('banco'),
+            'now': timezone.now(),
+            'motivo_choices': getattr(NotaCredito, 'MOTIVO_CHOICES', []),
         }
         contexto = complementarContexto(contexto, request.user)
         
         return render(request, 'inventario/nota_credito/crear.html', contexto)
     
-    def post(self, request):
+    def post(self, request, factura_id=None):
         empresa_id = request.session.get('empresa_activa')
         if not empresa_id:
             return JsonResponse({'success': False, 'message': 'Empresa no válida'})
@@ -297,7 +338,10 @@ class CrearNotaCredito(LoginRequiredMixin, View):
         try:
             with transaction.atomic():
                 # Obtener datos del formulario
-                factura_id = request.POST.get('factura_modificada')
+                factura_id = factura_id or request.POST.get('factura_modificada') or request.POST.get('factura_id')
+                if not factura_id:
+                    messages.error(request, 'Debe especificar la factura a la que aplica la Nota de Crédito.')
+                    return redirect('inventario:listarFacturas')
                 factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
                 
                 # ========== VALIDACIONES CRÍTICAS (Error 68 SRI) ==========
@@ -311,9 +355,28 @@ class CrearNotaCredito(LoginRequiredMixin, View):
                     messages.error(request, 'ERROR: La factura no tiene clave de acceso del SRI.')
                     return redirect('inventario:verFactura', p=factura_id)
                 
-                tipo_motivo = request.POST.get('tipo_motivo')
-                motivo = request.POST.get('motivo')
+                tipo_motivo = (request.POST.get('tipo_motivo') or 'DEVOLUCION').strip()
+                motivo = (request.POST.get('motivo') or '').strip()
                 fecha_emision = request.POST.get('fecha_emision')
+
+                # Fecha efectiva IVA 15% (SRI): desde 2024-04-01
+                try:
+                    fecha_emision_dt = date.fromisoformat(str(fecha_emision))
+                except Exception:
+                    fecha_emision_dt = date.today()
+
+                # Validar motivo (requerido por el modelo)
+                if not motivo:
+                    messages.error(request, 'Debe ingresar el motivo de la Nota de Crédito.')
+                    return redirect('inventario:notas_credito_crear_factura', factura_id=factura_id)
+
+                # Validar tipo_motivo contra choices (evita NULL / valores raros)
+                try:
+                    valid_motivos = {c for c, _ in NotaCredito.MOTIVO_CHOICES}
+                except Exception:
+                    valid_motivos = {'DEVOLUCION'}
+                if tipo_motivo not in valid_motivos:
+                    tipo_motivo = 'DEVOLUCION'
                 
                 # Obtener productos seleccionados
                 productos_json = request.POST.get('productos', '[]')
@@ -321,7 +384,7 @@ class CrearNotaCredito(LoginRequiredMixin, View):
                 
                 if not productos:
                     messages.error(request, 'Debe seleccionar al menos un producto.')
-                    return redirect('inventario:notas_credito_crear', factura_id=factura_id)
+                    return redirect('inventario:notas_credito_crear_factura', factura_id=factura_id)
                 
                 # Calcular totales
                 subtotal = Decimal('0.00')
@@ -333,6 +396,14 @@ class CrearNotaCredito(LoginRequiredMixin, View):
                     precio = Decimal(str(prod['precio_unitario']))
                     descuento = Decimal(str(prod.get('descuento', 0)))
                     tarifa = Decimal(str(prod.get('tarifa_iva', 15)))
+
+                    # ✅ Normalizar IVA vigente: si llega 12%/código '2' en fechas no vigentes, convertir a 15% ('4')
+                    codigo_iva_in = str(prod.get('codigo_iva', '4') or '4').strip()
+                    if fecha_emision_dt >= date(2024, 4, 1) and (codigo_iva_in == '2' or tarifa == Decimal('12')):
+                        codigo_iva_in = '4'
+                        tarifa = Decimal('15')
+                        prod['codigo_iva'] = '4'
+                        prod['tarifa_iva'] = '15'
                     
                     subtotal_item = (cantidad * precio) - descuento
                     iva_item = subtotal_item * (tarifa / Decimal('100'))
@@ -394,6 +465,11 @@ class CrearNotaCredito(LoginRequiredMixin, View):
                 
                 # Crear detalles
                 for prod in productos:
+                    codigo_iva = str(prod.get('codigo_iva', '4') or '4').strip()
+                    tarifa = Decimal(str(prod.get('tarifa_iva', 15)))
+                    if fecha_emision_dt >= date(2024, 4, 1) and (codigo_iva == '2' or tarifa == Decimal('12')):
+                        codigo_iva = '4'
+                        tarifa = Decimal('15')
                     DetalleNotaCredito.objects.create(
                         nota_credito=nota_credito,
                         empresa=empresa,
@@ -404,19 +480,22 @@ class CrearNotaCredito(LoginRequiredMixin, View):
                         cantidad=Decimal(str(prod['cantidad'])),
                         precio_unitario=Decimal(str(prod['precio_unitario'])),
                         descuento=Decimal(str(prod.get('descuento', 0))),
-                        codigo_iva=prod.get('codigo_iva', '4'),
-                        tarifa_iva=Decimal(str(prod.get('tarifa_iva', 15)))
+                        codigo_iva=codigo_iva,
+                        tarifa_iva=tarifa
                     )
                 
                 # Crear totales de impuestos
                 for tarifa, base in subtotales_iva.items():
-                    valor_imp = base * (Decimal(tarifa) / Decimal('100'))
+                    tarifa_dec = Decimal(tarifa)
+                    if fecha_emision_dt >= date(2024, 4, 1) and tarifa_dec == Decimal('12'):
+                        tarifa_dec = Decimal('15')
+                    valor_imp = base * (tarifa_dec / Decimal('100'))
                     TotalImpuestoNotaCredito.objects.create(
                         nota_credito=nota_credito,
                         empresa=empresa,
                         codigo='2',  # IVA
-                        codigo_porcentaje=self._get_codigo_porcentaje(Decimal(tarifa)),
-                        tarifa=Decimal(tarifa),
+                        codigo_porcentaje=self._get_codigo_porcentaje(tarifa_dec),
+                        tarifa=tarifa_dec,
                         base_imponible=base,
                         valor=valor_imp
                     )
@@ -434,11 +513,13 @@ class CrearNotaCredito(LoginRequiredMixin, View):
         mapeo = {
             Decimal('0'): '0',
             Decimal('5'): '5',
-            Decimal('12'): '2',
             Decimal('13'): '10',
             Decimal('14'): '3',
             Decimal('15'): '4',
         }
+        # Desde 2024, 12% (código '2') no está vigente para emisiones actuales.
+        if tarifa == Decimal('12'):
+            return '4'
         return mapeo.get(tarifa, '4')
 
 
@@ -486,6 +567,9 @@ class ObtenerDetallesFacturaView(LoginRequiredMixin, View):
             
             detalles = []
             for d in factura.detallefactura_set.all():
+                codigo_iva = d.iva_codigo or (d.producto.iva if d.producto else d.servicio.iva if d.servicio else '4')
+                if str(codigo_iva) == '2':
+                    codigo_iva = '4'
                 detalles.append({
                     'id': d.id,
                     'producto_id': d.producto_id,
@@ -497,8 +581,8 @@ class ObtenerDetallesFacturaView(LoginRequiredMixin, View):
                     'precio_unitario': float(d.precio_unitario or (d.producto.precio if d.producto else d.servicio.precio1 if d.servicio else 0)),
                     'descuento': float(d.descuento or 0),
                     'subtotal': float(d.sub_total or 0),
-                    'codigo_iva': d.iva_codigo or (d.producto.iva if d.producto else d.servicio.iva if d.servicio else '4'),
-                    'tarifa_iva': self._get_tarifa_from_codigo(d.iva_codigo or (d.producto.iva if d.producto else d.servicio.iva if d.servicio else '4')),
+                    'codigo_iva': codigo_iva,
+                    'tarifa_iva': self._get_tarifa_from_codigo(codigo_iva),
                 })
             
             return JsonResponse({
@@ -524,7 +608,7 @@ class ObtenerDetallesFacturaView(LoginRequiredMixin, View):
         mapeo = {
             '0': 0,
             '5': 5,
-            '2': 12,
+            '2': 15,
             '10': 13,
             '3': 14,
             '4': 15,
@@ -573,6 +657,61 @@ class AutorizarNotaCredito(LoginRequiredMixin, View):
             logger.exception("Error autorizando NC")
             messages.error(request, f'Error al autorizar: {str(e)}')
         
+        return redirect('inventario:notas_credito_ver', pk=pk)
+
+
+class ConsultarEstadoNotaCredito(LoginRequiredMixin, View):
+    """Consulta el estado actual de la Nota de Crédito en el SRI (sin reenviar)."""
+    login_url = '/inventario/login'
+
+    def get(self, request, pk):
+        return self.post(request, pk)
+
+    def post(self, request, pk):
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id:
+            messages.error(request, 'Empresa no válida.')
+            return redirect('inventario:panel')
+
+        nota_credito = get_object_or_404(
+            NotaCredito,
+            id=pk,
+            empresa_id=empresa_id
+        )
+
+        if not nota_credito.clave_acceso:
+            messages.error(request, 'Esta nota de crédito no tiene clave de acceso. No se puede consultar el estado en el SRI.')
+            return redirect('inventario:notas_credito_ver', pk=pk)
+
+        try:
+            opciones = Opciones.objects.for_tenant(nota_credito.empresa).first()
+            if not opciones:
+                messages.error(request, 'No se encontró configuración de opciones para la empresa.')
+                return redirect('inventario:notas_credito_ver', pk=pk)
+
+            ambiente = 'pruebas' if str(getattr(opciones, 'tipo_ambiente', '1')) == '1' else 'produccion'
+
+            from inventario.sri.sri_client import SRIClient
+            from .integracion_sri_nc import IntegracionSRINotaCredito
+
+            cliente = SRIClient(ambiente=ambiente)
+            respuesta = cliente.consultar_autorizacion(nota_credito.clave_acceso)
+
+            integracion = IntegracionSRINotaCredito(nota_credito)
+            estado = integracion.procesar_respuesta(respuesta)
+
+            if estado == 'AUTORIZADO':
+                messages.success(request, f'✅ Estado SRI: {estado}. Autorización: {nota_credito.numero_autorizacion or ""}')
+            elif estado in ('RECHAZADO', 'NO AUTORIZADO'):
+                # mostrar el motivo ya formateado en mensaje_sri
+                messages.error(request, f'❌ Estado SRI: {estado}. {nota_credito.mensaje_sri or ""}')
+            else:
+                messages.info(request, f'ℹ️ Estado SRI: {estado}. {nota_credito.mensaje_sri or ""}')
+
+        except Exception as e:
+            logger.exception('Error consultando estado SRI de NC')
+            messages.error(request, f'Error al consultar estado SRI: {str(e)}')
+
         return redirect('inventario:notas_credito_ver', pk=pk)
 
 

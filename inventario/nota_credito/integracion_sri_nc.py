@@ -3,10 +3,10 @@ Integración con el SRI para Notas de Crédito Electrónicas
 """
 import os
 import logging
+import tempfile
 from datetime import datetime
 from django.conf import settings
 
-from inventario.sri.integracion_django import IntegracionSRI
 from inventario.models import Opciones
 from .models import NotaCredito
 from .xml_generator_nc import XMLGeneratorNotaCredito
@@ -45,65 +45,118 @@ class IntegracionSRINotaCredito:
     
     def firmar_xml(self, xml_content):
         """Firma el XML con la firma electrónica"""
-        from inventario.sri.firmador_xades import firmar_xml_xades_bes
-        
-        # Obtener ruta de la firma y contraseña
+        # Nota: No usar `.path` porque storages tipo S3 no lo soportan.
+        # Reutilizar el firmador oficial del proyecto (endesive) que lee PKCS#12 vía `.open()`.
+        from inventario.sri.firmador_xades_sri import firmar_xml_xades_bes
+
         if not self.opciones.firma_electronica:
             raise ValueError("No hay firma electrónica configurada")
-        
-        firma_path = self.opciones.firma_electronica.path
-        password = self.opciones.password_firma
-        
-        if not password:
+        if not self.opciones.password_firma:
             raise ValueError("No hay contraseña de firma configurada")
-        
-        # Firmar
-        xml_firmado = firmar_xml_xades_bes(xml_content, firma_path, password)
-        return xml_firmado
+
+        xml_text = xml_content if isinstance(xml_content, str) else str(xml_content)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            xml_in = os.path.join(tmpdir, f"nc_{self.nc.id}_sin_firmar.xml")
+            xml_out = os.path.join(tmpdir, f"nc_{self.nc.id}_firmado.xml")
+
+            with open(xml_in, "w", encoding="utf-8") as f:
+                f.write(xml_text)
+
+            firmar_xml_xades_bes(xml_in, xml_out, empresa=self.empresa)
+
+            with open(xml_out, "r", encoding="utf-8") as f:
+                return f.read()
     
     def enviar_sri(self, xml_firmado):
         """Envía el XML firmado al SRI"""
-        from inventario.sri.cliente_sri import ClienteSRI
+        from inventario.sri.sri_client import SRIClient
         
         # Determinar ambiente
         ambiente = 'pruebas' if self.opciones.tipo_ambiente == '1' else 'produccion'
         
-        cliente = ClienteSRI(ambiente=ambiente)
-        
-        # Enviar al SRI
-        respuesta_recepcion = cliente.enviar_comprobante(xml_firmado)
-        
-        if respuesta_recepcion.get('estado') == 'RECIBIDA':
-            # Autorizar
-            clave_acceso = self.nc.clave_acceso
-            respuesta_autorizacion = cliente.autorizar_comprobante(clave_acceso)
-            
-            return respuesta_autorizacion
-        else:
-            return respuesta_recepcion
+        cliente = SRIClient(ambiente=ambiente)
+
+        # Envío + consulta autorización (con reintentos internos)
+        clave_acceso = self.nc.clave_acceso
+        xml_text = xml_firmado if isinstance(xml_firmado, str) else str(xml_firmado)
+        return cliente.procesar_comprobante_completo(xml_text, clave_acceso)
     
     def procesar_respuesta(self, respuesta):
         """Procesa la respuesta del SRI y actualiza la NC"""
-        
-        if respuesta.get('estado') == 'AUTORIZADO':
+
+        def _extraer_autorizacion(respuesta_dict):
+            try:
+                autorizaciones = respuesta_dict.get('autorizaciones') or []
+                if isinstance(autorizaciones, list) and autorizaciones:
+                    return autorizaciones[0] or {}
+            except Exception:
+                return {}
+            return {}
+
+        def _formatear_mensajes(mensajes):
+            lineas = []
+            for m in (mensajes or []):
+                tipo = (m.get('tipo') or '').strip()
+                identificador = (m.get('identificador') or '').strip()
+                mensaje = (m.get('mensaje') or '').strip()
+                info = (m.get('informacionAdicional') or '').strip()
+
+                # Si viene completamente vacío, ignorar (y caeremos a raw_response)
+                if not any((tipo, identificador, mensaje, info)):
+                    continue
+
+                partes = []
+                if tipo:
+                    partes.append(tipo)
+                if identificador:
+                    partes.append(identificador)
+                encabezado = ': '.join(partes) if partes else 'SRI'
+
+                detalle = mensaje or '(sin mensaje)'
+                if info:
+                    detalle = f"{detalle} | {info}"
+
+                lineas.append(f"{encabezado}: {detalle}")
+            return '\n'.join(lineas).strip()
+
+        estado_resp = respuesta.get('estado')
+
+        if estado_resp == 'AUTORIZADO':
             self.nc.estado_sri = 'AUTORIZADO'
-            self.nc.numero_autorizacion = respuesta.get('numeroAutorizacion', self.nc.clave_acceso)
-            self.nc.fecha_autorizacion = datetime.now()
+            aut0 = _extraer_autorizacion(respuesta)
+            numero_aut = (
+                respuesta.get('numeroAutorizacion')
+                or aut0.get('numeroAutorizacion')
+                or self.nc.clave_acceso
+            )
+            self.nc.numero_autorizacion = numero_aut
+
+            fecha_aut = aut0.get('fechaAutorizacion') or respuesta.get('fechaAutorizacion')
+            if fecha_aut:
+                try:
+                    # Manejar ISO con zona (Python 3.11+ lo soporta con fromisoformat)
+                    self.nc.fecha_autorizacion = datetime.fromisoformat(str(fecha_aut).replace('Z', '+00:00'))
+                except Exception:
+                    self.nc.fecha_autorizacion = datetime.now()
+            else:
+                self.nc.fecha_autorizacion = datetime.now()
             self.nc.mensaje_sri = 'Autorizado correctamente'
             
             # Actualizar inventario si aplica
             self.nc.actualizar_inventario()
             
-        elif respuesta.get('estado') == 'RECHAZADO':
+        elif estado_resp in ('RECHAZADO', 'NO AUTORIZADO'):
             self.nc.estado_sri = 'RECHAZADO'
             mensajes = respuesta.get('mensajes', [])
-            self.nc.mensaje_sri = '\n'.join([
-                f"{m.get('tipo', '')}: {m.get('mensaje', '')}"
-                for m in mensajes
-            ])
+            raw = str(respuesta.get('raw_response') or respuesta)
+            self.nc.mensaje_sri = _formatear_mensajes(mensajes) or raw[:2000]
         else:
-            self.nc.estado_sri = 'ENVIADO'
-            self.nc.mensaje_sri = str(respuesta)
+            # Estados intermedios típicos: RECIBIDA / PENDIENTE / DEVUELTA / ERROR
+            self.nc.estado_sri = estado_resp or 'ENVIADO'
+            mensajes = respuesta.get('mensajes', [])
+            raw = str(respuesta.get('raw_response') or respuesta)
+            self.nc.mensaje_sri = _formatear_mensajes(mensajes) or raw[:2000]
         
         self.nc.save()
         return self.nc.estado_sri

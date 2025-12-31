@@ -128,6 +128,7 @@ urlpatterns = [
     path('notas-credito/crear/<int:factura_id>/', nota_credito_views.CrearNotaCredito.as_view(), name='notas_credito_crear_factura'),
     path('notas-credito/ver/<int:pk>/', nota_credito_views.VerNotaCredito.as_view(), name='notas_credito_ver'),
     path('notas-credito/autorizar/<int:pk>/', nota_credito_views.AutorizarNotaCredito.as_view(), name='notas_credito_autorizar'),
+    path('notas-credito/consultar-estado/<int:pk>/', nota_credito_views.ConsultarEstadoNotaCredito.as_view(), name='notas_credito_consultar_estado'),
     path('notas-credito/pdf/<int:pk>/', nota_credito_views.DescargarPDF.as_view(), name='notas_credito_pdf'),
 
     # Bancos

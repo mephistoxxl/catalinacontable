@@ -388,8 +388,10 @@ input[type="number"][readonly] {
                 </div>
                 {% endif %}
                 
-                <form method="POST" action="{% url 'inventario:emitirFactura' %}" class="space-y-2">
+                <form method="POST" action="{% url 'inventario:notas_credito_crear_factura' factura.id %}" class="space-y-2">
                     {% csrf_token %}
+
+                    <input type="hidden" name="factura_modificada" value="{{ factura.id }}">
                     
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-2">
                         <!-- Columna Izquierda -->
@@ -508,6 +510,28 @@ input[type="number"][readonly] {
                     <i class="fas fa-calendar-times text-orange-600 mr-1 label-icon"></i>{{ form.fecha_vencimiento.label }}
                                 </label>
                                 {{ form.fecha_vencimiento }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Motivo de la Nota de Crédito -->
+                    <div class="border-t border-gray-200 pt-1 mt-2">
+                        <h3 class="text-xs font-medium text-gray-800 mb-1">
+                            <i class="fas fa-undo text-purple-600 mr-1 label-icon"></i>Motivo
+                        </h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                                <label for="tipo_motivo" class="block text-xs font-medium text-gray-800 mb-1">Tipo de Motivo</label>
+                                <select id="tipo_motivo" name="tipo_motivo" class="w-full">
+                                    {% for code, label in motivo_choices %}
+                                        <option value="{{ code }}" {% if code == 'DEVOLUCION' %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="motivo" class="block text-xs font-medium text-gray-800 mb-1">Descripción</label>
+                                <input type="text" id="motivo" name="motivo" maxlength="300" required
+                                       placeholder="Ej: Devolución / descuento / corrección" />
                             </div>
                         </div>
                     </div>
@@ -1823,6 +1847,36 @@ function actualizarCamposOcultos() {
     if (!container) return;
 
     container.innerHTML = '';
+
+    // ✅ Mantener SIEMPRE el payload JSON que espera el backend (`request.POST['productos']`)
+    // Formato: [{codigo, descripcion, cantidad, precio_unitario, descuento, tarifa_iva, codigo_iva, producto_id, servicio_id}, ...]
+    const payload = (Array.isArray(productosAgregados) ? productosAgregados : []).map((p) => {
+        const codigo = (p.codigoPersonalizado || p.codigo || '').toString();
+        const descripcion = (p.descripcionReemplazo || p.nombre || p.descripcion || '').toString();
+        const cantidad = Math.max(1, parseInt(p.cantidad ?? 1, 10) || 1);
+        const precio_unitario = _toNumberFlexible(p.precio ?? p.precio_unitario ?? 0);
+        const ivaPercent = _toIvaPercentFlexible(p);
+        const tarifa_iva = Math.round((ivaPercent * 100) * 1000) / 1000; // 12, 15, 5, 0
+        const codigo_iva = (p.ivaCodigo ?? p.iva_codigo ?? p.codigo_iva ?? '').toString();
+
+        return {
+            codigo,
+            descripcion,
+            cantidad,
+            precio_unitario,
+            descuento: _toNumberFlexible(p.descuento ?? 0),
+            tarifa_iva,
+            codigo_iva,
+            producto_id: p.producto_id ?? p.productoId ?? null,
+            servicio_id: p.servicio_id ?? p.servicioId ?? null,
+        };
+    });
+    const productosJsonInput = document.createElement('input');
+    productosJsonInput.type = 'hidden';
+    productosJsonInput.id = 'productos';
+    productosJsonInput.name = 'productos';
+    productosJsonInput.value = JSON.stringify(payload);
+    container.appendChild(productosJsonInput);
     
     console.log('🔄 actualizarCamposOcultos() - Estado actual de productos:', productosAgregados);
 
@@ -2961,6 +3015,9 @@ function _restaurarProductosDesdeSnapshot() {
             totalConIva,
             ivaPercent,
             ivaCodigo,
+            // ✅ IDs si vienen del server/factura (para que el backend cree el detalle con FK)
+            producto_id: p.producto_id ?? p.productoId ?? null,
+            servicio_id: p.servicio_id ?? p.servicioId ?? null,
             // extras opcionales
             descripcionReemplazo: p.descripcionReemplazo ?? p.descripcion_reemplazo ?? '',
             infoAdicional: p.infoAdicional ?? p.info_adicional ?? '',
@@ -3139,33 +3196,26 @@ document.addEventListener('DOMContentLoaded', function() {
     // Fallback robusto: capturar también desde la tabla renderizada por el servidor
     window.__nc_productos_tabla_snapshot = _capturarProductosDesdeTablaServer();
 
-    let decision = null;
+    // ✅ Respetar decisión guardada por factura (no volver a molestar si ya eligió)
     const key = _getMantenerDetallesStorageKey();
+    let decision = null;
     try {
-        // Si el usuario entra nuevamente (navigate/back_forward), volver a preguntar.
-        // Solo en reload respetamos la decisión previa.
-        if (navType !== 'reload') {
-            sessionStorage.removeItem(key);
-            decision = null;
-        } else {
-            decision = sessionStorage.getItem(key);
-        }
+        decision = sessionStorage.getItem(key);
     } catch (e) {
         decision = null;
     }
 
-    // En reload: no mostrar modal. Aplicar decisión si existe; si no existe, dejar vacío por defecto.
-    if (navType === 'reload') {
-        if (decision === 'mantener') {
-            // Renderizar de forma interactiva (con editar/eliminar), no dejar la tabla server-side con '-'
-            _restaurarProductosDesdeSnapshot();
-        } else {
-            _limpiarProductosSoloUI();
-        }
+    // Si ya hay decisión, aplicarla y salir (sin modal)
+    if (decision === 'mantener') {
+        _restaurarProductosDesdeSnapshot();
+        return;
+    }
+    if (decision === 'limpiar') {
+        _limpiarProductosSoloUI();
         return;
     }
 
-    // En navegación normal: iniciar vacío y preguntar.
+    // Sin decisión: iniciar vacío y preguntar.
     _limpiarProductosSoloUI();
     try {
         mostrarModalMantenerDetalles();
@@ -3177,7 +3227,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 50);
     } catch (e) {
-        // Si por algún motivo falla el modal, no dejes la pantalla muerta.
         console.warn('No se pudo mostrar modal, restaurando productos:', e);
         _restaurarProductosDesdeSnapshot();
     }

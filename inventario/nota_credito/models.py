@@ -411,7 +411,7 @@ class DetalleNotaCredito(models.Model):
     # IVA
     codigo_iva = models.CharField(
         max_length=2,
-        default='2',
+        default='4',
         help_text="Código de IVA: 0=0%, 2=12%, 3=14%, 4=15%, 5=5%, 6=No objeto, 7=Exento"
     )
     tarifa_iva = models.DecimalField(
@@ -433,6 +433,25 @@ class DetalleNotaCredito(models.Model):
         return f"{self.codigo_principal} - {self.descripcion[:50]}"
     
     def save(self, *args, **kwargs):
+        # Normalizar tarifa IVA según código (evita inconsistencias tipo codigo=2 con tarifa=15)
+        try:
+            tarifa_por_codigo = {
+                '0': Decimal('0'),
+                '2': Decimal('12'),
+                '3': Decimal('14'),
+                '4': Decimal('15'),
+                '5': Decimal('5'),
+                '6': Decimal('0'),
+                '7': Decimal('0'),
+                '8': Decimal('0'),
+                '10': Decimal('13'),
+            }
+            codigo = str(self.codigo_iva or '').strip()
+            if codigo in tarifa_por_codigo:
+                self.tarifa_iva = tarifa_por_codigo[codigo]
+        except Exception:
+            pass
+
         # Calcular precio total sin impuesto
         self.precio_total_sin_impuesto = (self.cantidad * self.precio_unitario) - self.descuento
         

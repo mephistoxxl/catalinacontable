@@ -99,9 +99,20 @@ class RIDEGeneratorNotaCredito:
         """Obtiene el logo de la empresa si existe"""
         if self.opciones and self.opciones.logo:
             try:
-                logo_path = self.opciones.logo.path
-                if os.path.exists(logo_path):
-                    return Image(logo_path, width=40*mm, height=20*mm)
+                # No usar `.path` (S3/no-local storage). Pasar por archivo temporal.
+                with self.opciones.logo.open('rb') as f:
+                    logo_bytes = f.read()
+                if not logo_bytes:
+                    return None
+
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(self.opciones.logo.name or '')[1] or '.img')
+                try:
+                    tmp.write(logo_bytes)
+                    tmp.flush()
+                finally:
+                    tmp.close()
+
+                return Image(tmp.name, width=40*mm, height=20*mm)
             except Exception as e:
                 logger.warning(f"No se pudo cargar el logo: {e}")
         return None
@@ -200,10 +211,23 @@ class RIDEGeneratorNotaCredito:
         
         factura = self.nc.factura_modificada
         cliente = factura.cliente if factura else None
+
+        identificacion = (
+            (getattr(cliente, 'identificacion', None) if cliente else None)
+            or (getattr(cliente, 'ruc', None) if cliente else None)
+            or (getattr(cliente, 'cedula', None) if cliente else None)
+            or (getattr(factura, 'identificacion_cliente', None) if factura else None)
+            or ''
+        )
+        tipo_display = ''
+        try:
+            tipo_display = cliente.get_tipo_identificacion_display() if cliente else ''
+        except Exception:
+            tipo_display = ''
         
         datos = [
             ['Razón Social:', cliente.razon_social if cliente else ''],
-            ['Identificación:', f"{cliente.get_tipo_identificacion_display() if cliente else ''}: {cliente.cedula if cliente else ''}"],
+            ['Identificación:', f"{tipo_display}: {identificacion}"],
             ['Dirección:', cliente.direccion if cliente else ''],
         ]
         
