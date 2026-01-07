@@ -95,6 +95,18 @@
                                     <div class="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
                                         <i class="fa fa-filter text-green-600"></i> Filtros
                                     </div>
+                                    <!-- Filtro por Ambiente -->
+                                    <div class="mb-3">
+                                        <label class="text-xs text-gray-600 block mb-1">Ambiente:</label>
+                                        <select 
+                                            id="filtro-ambiente" 
+                                            class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                            onchange="aplicarFiltros()"
+                                        >
+                                            <option value="produccion" selected>Producción</option>
+                                            <option value="pruebas">Pruebas</option>
+                                        </select>
+                                    </div>
                                     <!-- Filtro por Almacén -->
                                     <div class="mb-3">
                                         <label class="text-xs text-gray-600 block mb-1">Almacén:</label>
@@ -122,6 +134,18 @@
                                             <option value="pendiente">⏳ Pendientes</option>
                                             <option value="local">📦 Locales</option>
                                             <option value="rechazada">❌ Rechazadas</option>
+                                        </select>
+                                    </div>
+                                    <!-- Filtro por Estado de Factura -->
+                                    <div class="mb-3">
+                                        <label class="text-xs text-gray-600 block mb-1">Estado Factura:</label>
+                                        <select 
+                                            id="filtro-anulada" 
+                                            class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                            onchange="aplicarFiltros()"
+                                        >
+                                            <option value="activas" selected>Activas</option>
+                                            <option value="anuladas">Anuladas</option>
                                         </select>
                                     </div>
                                     <!-- Botón limpiar filtros -->
@@ -167,14 +191,21 @@
                             <tr class="factura-row hover:bg-gray-50 transition-colors duration-150" 
                                 style="display: none"
                                 data-almacen-id="{{ fila.almacen.id|default:'' }}"
+                                data-ambiente="{% with amb=fila.clave_acceso|default:''|slice:'23:24' %}{% if amb == '1' %}pruebas{% else %}produccion{% endif %}{% endwith %}"
+                                data-anulada="{% if fila.estado == 'ANULADA' %}anuladas{% else %}activas{% endif %}"
                                 data-estado="{% if fila.numero_autorizacion and fila.fecha_autorizacion %}autorizada{% elif fila.estado_sri == 'AUTORIZADA' or fila.estado_sri == 'AUTORIZADO' %}autorizada{% elif fila.estado_sri == 'RECHAZADA' or fila.estado_sri == 'NO_AUTORIZADA' or fila.estado_sri == 'NO AUTORIZADO' %}rechazada{% elif fila.estado_sri == 'PENDIENTE' or fila.estado_sri == 'RECIBIDA' %}pendiente{% else %}local{% endif %}"
                             >
                                 <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.id }}</td>
                                 <td class="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">{{ fila.cliente.identificacion }}</td>
                                 <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.fecha_emision|date:"d/m/Y" }}</td>
                                 <td class="px-3 py-2 whitespace-nowrap text-xs">
-                                    {# Mostrar Autorizada, Rechazada/No Autorizada, Recibida o Pendiente #}
-                                    {% if fila.numero_autorizacion and fila.fecha_autorizacion %}
+                                    {# Mostrar Anulada primero, luego Autorizada, Rechazada/No Autorizada, Recibida o Pendiente #}
+                                    {% if fila.estado == 'ANULADA' %}
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            <i class="fa fa-ban mr-1 text-xs"></i>🚫 Anulada
+                                        </span>
+                                        <div class="text-xs text-gray-500 mt-0.5">Documento anulado</div>
+                                    {% elif fila.numero_autorizacion and fila.fecha_autorizacion %}
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                             <i class="fa fa-check-circle mr-1 text-xs"></i>✅ Autorizada
                                         </span>
@@ -272,6 +303,13 @@
                                                     <i class="fa fa-refresh mr-2 text-blue-500 action-icon"></i>
                                                     <span>Consultar</span>
                                                 </button>
+                                                {% if not fila.estado_sri %}
+                                                <div class="border-t border-gray-100"></div>
+                                                <button type="button" onclick="eliminarFactura({{ fila.id }})" class="flex items-center w-full text-left px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 hover:text-red-900 border-none bg-transparent cursor-pointer">
+                                                    <i class="fa fa-trash mr-2 text-red-500 action-icon"></i>
+                                                    <span>Eliminar</span>
+                                                </button>
+                                                {% endif %}
                                                 {% if fila.estado_sri == 'AUTORIZADA' or fila.estado_sri == 'AUTORIZADO' %}
                                                 <button onclick="enviarFacturaEmail({{ fila.id }})"
                                                         class="flex items-center w-full text-left px-3 py-1.5 text-xs text-indigo-700 hover:bg-indigo-50 hover:text-indigo-900 border-none bg-transparent">
@@ -286,6 +324,11 @@
                                                 <button type="button" onclick="abrirModalFacturadorNotaCredito({{ fila.id }})" class="flex items-center w-full text-left px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 hover:text-red-900 border-none bg-transparent cursor-pointer">
                                                     <i class="fa fa-minus-circle mr-2 text-red-500 action-icon"></i>
                                                     <span>Nota de Crédito</span>
+                                                </button>
+                                                <div class="border-t border-gray-100"></div>
+                                                <button type="button" onclick="anularFactura({{ fila.id }})" class="flex items-center w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900 border-none bg-transparent cursor-pointer">
+                                                    <i class="fa fa-ban mr-2 text-gray-500 action-icon"></i>
+                                                    <span>Anular Factura</span>
                                                 </button>
                                                 {% endif %}
                                                 <div class="border-t border-gray-100"></div>
@@ -394,6 +437,8 @@
 
     // ✅ Persistencia SOLO de fechas (Desde/Hasta)
     const LISTA_FACTURAS_FECHAS_STORAGE_KEY = 'listarFacturas.fechas.v1';
+    // ✅ Persistencia de filtros avanzados (Ambiente, Almacén, Estado, Anulada, Búsqueda)
+    const LISTA_FACTURAS_FILTROS_STORAGE_KEY = 'listarFacturas.filtros.v1';
 
     function guardarFechas() {
         try {
@@ -426,28 +471,63 @@
         }
     }
 
+    // ✅ GUARDAR FILTROS AVANZADOS
+    function guardarFiltrosAvanzados() {
+        try {
+            const data = {
+                ambiente: document.getElementById('filtro-ambiente')?.value || 'produccion',
+                almacen: document.getElementById('filtro-almacen')?.value || '',
+                estado: document.getElementById('filtro-estado')?.value || '',
+                anulada: document.getElementById('filtro-anulada')?.value || 'activas',
+                texto: document.getElementById('buscar-factura')?.value || ''
+            };
+            localStorage.setItem(LISTA_FACTURAS_FILTROS_STORAGE_KEY, JSON.stringify(data));
+        } catch (e) {
+            // noop
+        }
+    }
+
+    // ✅ RESTAURAR FILTROS AVANZADOS
+    function restaurarFiltrosAvanzados() {
+        try {
+            const raw = localStorage.getItem(LISTA_FACTURAS_FILTROS_STORAGE_KEY);
+            if (!raw) return false;
+            const parsed = JSON.parse(raw);
+            const ambEl = document.getElementById('filtro-ambiente');
+            const almEl = document.getElementById('filtro-almacen');
+            const estEl = document.getElementById('filtro-estado');
+            const anulEl = document.getElementById('filtro-anulada');
+            const buscarEl = document.getElementById('buscar-factura');
+            if (ambEl && parsed?.ambiente) ambEl.value = parsed.ambiente;
+            if (almEl && parsed?.almacen !== undefined) almEl.value = parsed.almacen;
+            if (estEl && parsed?.estado !== undefined) estEl.value = parsed.estado;
+            if (anulEl && parsed?.anulada) anulEl.value = parsed.anulada;
+            if (buscarEl && parsed?.texto !== undefined) buscarEl.value = parsed.texto;
+            actualizarContadorFiltros();
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
     // ✅ INICIALIZAR PAGINACIÓN AL CARGAR LA PÁGINA
     document.addEventListener('DOMContentLoaded', function() {
         // Guardar referencia a todas las filas
         filasOriginales = Array.from(document.querySelectorAll('.factura-row'));
         filasFiltradas = [...filasOriginales];
-        inicializarPaginacion();
 
-        // ✅ Restaurar fechas guardadas; si no hay, usar hoy-hoy
-        const teniaGuardadas = restaurarFechas();
-        if (!teniaGuardadas) {
-            const hoy = new Date().toISOString().split('T')[0];
-            document.getElementById('fecha-desde').value = hoy;
-            document.getElementById('fecha-hasta').value = hoy;
-            guardarFechas();
-        }
-        
-        // Aplicar filtro de fechas al cargar
-        filtrarPorFechas();
+        // Restaurar fechas si existen; si no, mostrar todo
+        restaurarFechas();
+        // Restaurar filtros avanzados (Ambiente, etc.)
+        restaurarFiltrosAvanzados();
+
+        // Mostrar resultados iniciales
+        aplicarTodosLosFiltros();
     });
 
     // ✅ FUNCIÓN DE BÚSQUEDA
     function buscarFactura() {
+        guardarFiltrosAvanzados();
         aplicarTodosLosFiltros();
     }
 
@@ -474,6 +554,7 @@
 
     // ✅ FUNCIÓN PARA APLICAR FILTROS (almacén y estado)
     function aplicarFiltros() {
+        guardarFiltrosAvanzados();
         aplicarTodosLosFiltros();
         actualizarContadorFiltros();
         // Cerrar el dropdown después de aplicar filtro
@@ -482,11 +563,15 @@
 
     // ✅ FUNCIÓN PARA ACTUALIZAR CONTADOR DE FILTROS ACTIVOS
     function actualizarContadorFiltros() {
+        const filtroAmbiente = document.getElementById('filtro-ambiente')?.value || 'produccion';
         const filtroAlmacen = document.getElementById('filtro-almacen').value;
         const filtroEstado = document.getElementById('filtro-estado').value;
+        const filtroAnulada = document.getElementById('filtro-anulada')?.value || 'activas';
         let count = 0;
+        if (filtroAmbiente && filtroAmbiente !== 'produccion') count++;
         if (filtroAlmacen) count++;
         if (filtroEstado) count++;
+        if (filtroAnulada && filtroAnulada !== 'activas') count++;
         
         const badge = document.getElementById('filtrosActivos');
         if (count > 0) {
@@ -499,6 +584,10 @@
 
     // ✅ FUNCIÓN PARA LIMPIAR FILTROS AVANZADOS
     function limpiarFiltrosAvanzados() {
+        const ambienteEl = document.getElementById('filtro-ambiente');
+        if (ambienteEl) ambienteEl.value = 'produccion';
+        const anuladaEl = document.getElementById('filtro-anulada');
+        if (anuladaEl) anuladaEl.value = 'activas';
         document.getElementById('filtro-almacen').value = '';
         document.getElementById('filtro-estado').value = '';
         aplicarFiltros();
@@ -517,7 +606,9 @@
         const textoBusqueda = document.getElementById('buscar-factura').value.toLowerCase().trim();
         const fechaDesde = document.getElementById('fecha-desde').value;
         const fechaHasta = document.getElementById('fecha-hasta').value;
+        const filtroAmbiente = document.getElementById('filtro-ambiente')?.value || 'produccion';
         const filtroAlmacen = document.getElementById('filtro-almacen').value;
+        const filtroAnulada = document.getElementById('filtro-anulada')?.value || 'activas';
         const filtroEstado = document.getElementById('filtro-estado').value;
         
         filasFiltradas = filasOriginales.filter(fila => {
@@ -555,6 +646,20 @@
                 const almacenId = fila.dataset.almacenId || '';
                 cumpleAlmacen = almacenId === filtroAlmacen;
             }
+
+            // Filtro por ambiente (por defecto: producción)
+            let cumpleAmbiente = true;
+            if (filtroAmbiente) {
+                const ambienteFila = fila.dataset.ambiente || 'produccion';
+                cumpleAmbiente = ambienteFila === filtroAmbiente;
+            }
+
+            // Filtro por estado de factura (activas/anuladas)
+            let cumpleAnulada = true;
+            if (filtroAnulada) {
+                const anuladaFila = fila.dataset.anulada || 'activas';
+                cumpleAnulada = anuladaFila === filtroAnulada;
+            }
             
             // Filtro por estado
             let cumpleEstado = true;
@@ -563,7 +668,7 @@
                 cumpleEstado = estadoFila === filtroEstado;
             }
             
-            return cumpleTexto && cumpleFecha && cumpleAlmacen && cumpleEstado;
+            return cumpleTexto && cumpleFecha && cumpleAlmacen && cumpleAmbiente && cumpleAnulada && cumpleEstado;
         });
         
         // Actualizar contador visible
@@ -1012,6 +1117,66 @@
             });
         }
     });
+
+    // ===== ANULAR FACTURA =====
+    async function anularFactura(facturaId) {
+        if (!confirm('⚠️ ¿Está seguro de que desea anular esta factura?\n\nEsta acción no se puede deshacer.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/inventario/facturas/${facturaId}/anular/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                mostrarResultado('success', 'Factura Anulada', data.message || 'La factura ha sido anulada correctamente.');
+                // Recargar la página después de 2 segundos
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                mostrarResultado('error', 'Error al Anular', data.error || 'No se pudo anular la factura.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            mostrarResultado('error', 'Error de Conexión', 'No se pudo conectar con el servidor.');
+        }
+    }
+
+    // ===== ELIMINAR FACTURA LOCAL (Modal de confirmación) =====
+    function eliminarFactura(facturaId) {
+        const modalId = 'confirmar-eliminar-factura-modal';
+        const existente = document.getElementById(modalId);
+        if (existente) existente.remove();
+
+        const host = window.location.host;
+        const nextParam = encodeURIComponent(window.location.pathname + window.location.search);
+        const html = `
+            <div id="${modalId}" class="fixed inset-0 z-50 overflow-y-auto" style="background-color: rgba(0, 0, 0, 0.5);">
+                <div class="flex items-center justify-center min-h-screen">
+                    <div class="bg-white rounded-lg p-5 max-w-sm mx-4 shadow-lg">
+                        <div class="flex items-center mb-3">
+                            <i class="fa fa-globe text-gray-700 mr-2"></i>
+                            <span class="text-xs text-gray-500">${host}</span>
+                        </div>
+                        <h3 class="text-sm font-semibold text-gray-900 mb-2">¿Está seguro de eliminar esta factura local?</h3>
+                        <p class="text-xs text-gray-600 mb-4">Esta acción no se puede deshacer.</p>
+                        <div class="flex justify-end gap-2">
+                            <button type="button" class="px-3 py-1.5 text-xs bg-gray-200 text-gray-800 rounded hover:bg-gray-300" onclick="document.getElementById('${modalId}').remove()">Cancelar</button>
+                            <button type="button" class="px-3 py-1.5 text-xs bg-red-600 text-white rounded hover:bg-red-700" onclick="window.location.href='/inventario/eliminar/factura/${facturaId}?next=${nextParam}'">Aceptar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', html);
+    }
 </script>
 
 <!-- Modal de Autenticación del Facturador -->

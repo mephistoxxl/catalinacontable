@@ -1810,6 +1810,24 @@ class Eliminar(LoginRequiredMixin, View):
             messages.success(request, f'Proforma {numero} eliminada exitosamente.')
             return redirect('inventario:listarProformas')
 
+        elif modo == 'factura':
+            from .models import Factura
+            factura = get_object_or_404(Factura, id=p, empresa_id=empresa_id)
+            # Solo permitir eliminar facturas locales (no enviadas al SRI)
+            es_local = (not factura.estado_sri) and (not factura.numero_autorizacion) and (not factura.fecha_autorizacion)
+            if not es_local:
+                messages.error(request, 'Solo se pueden eliminar facturas locales que no hayan sido enviadas al SRI.')
+                return HttpResponseRedirect('/inventario/listarFacturas')
+
+            numero = getattr(factura, 'numero', factura.id)
+            factura.delete()
+            messages.success(request, f'Factura {numero} eliminada exitosamente.')
+            # Redirigir a la URL previa (incluye filtros) si viene en next
+            next_url = request.GET.get('next')
+            if next_url:
+                return HttpResponseRedirect(next_url)
+            return HttpResponseRedirect('/inventario/listarFacturas')
+
 
         elif modo == 'proveedor':
             proveedor = get_object_or_404(Proveedor, id=p, empresa_id=empresa_id)
@@ -7814,6 +7832,53 @@ def validar_facturador(request):
             return JsonResponse({'success': False, 'error': f'Error del servidor: {str(e)}'})
     
     return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
+
+
+@csrf_exempt
+@require_empresa_activa
+def anular_factura(request, factura_id):
+    """Anula una factura autorizada cambiando su estado"""
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False,
+            'error': 'Método no permitido'
+        }, status=405)
+
+    try:
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'Empresa no válida'
+            }, status=403)
+
+        # Buscar la factura
+        factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
+
+        # Verificar que esté autorizada
+        if not (factura.numero_autorizacion and factura.fecha_autorizacion):
+            return JsonResponse({
+                'success': False,
+                'error': 'Solo se pueden anular facturas autorizadas'
+            }, status=400)
+
+        # Cambiar estado a ANULADA (agregar nuevo estado si no existe en choices)
+        factura.estado_sri = 'ANULADA'
+        factura.save(update_fields=['estado_sri'])
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Factura #{factura.id} anulada correctamente'
+        })
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error al anular factura {factura_id}: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Error al anular factura: {str(e)}'
+        }, status=500)
 
 
 # ✅ NUEVAS VISTAS PARA INTEGRACIÓN SRI COMPLETA

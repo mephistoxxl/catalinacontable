@@ -926,7 +926,8 @@ class Factura(models.Model):
             ('RECIBIDA', 'Recibida por SRI'),
             ('AUTORIZADA', 'Autorizada'),
             ('RECHAZADA', 'Rechazada'),
-            ('ERROR', 'Error en procesamiento')
+            ('ERROR', 'Error en procesamiento'),
+            ('ANULADA', 'Anulada')
         ],
         help_text="Estado de la factura en el SRI"
     )
