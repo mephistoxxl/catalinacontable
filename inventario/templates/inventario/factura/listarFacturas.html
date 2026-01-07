@@ -199,8 +199,13 @@
                                 <td class="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">{{ fila.cliente.identificacion }}</td>
                                 <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.fecha_emision|date:"d/m/Y" }}</td>
                                 <td class="px-3 py-2 whitespace-nowrap text-xs">
-                                    {# Mostrar Autorizada, Rechazada/No Autorizada, Recibida o Pendiente #}
-                                    {% if fila.numero_autorizacion and fila.fecha_autorizacion %}
+                                    {# Mostrar Anulada primero, luego Autorizada, Rechazada/No Autorizada, Recibida o Pendiente #}
+                                    {% if fila.estado == 'ANULADA' %}
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            <i class="fa fa-ban mr-1 text-xs"></i>🚫 Anulada
+                                        </span>
+                                        <div class="text-xs text-gray-500 mt-0.5">Documento anulado</div>
+                                    {% elif fila.numero_autorizacion and fila.fecha_autorizacion %}
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                             <i class="fa fa-check-circle mr-1 text-xs"></i>✅ Autorizada
                                         </span>
