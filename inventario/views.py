@@ -3321,7 +3321,23 @@ class EmitirFactura(LoginRequiredMixin, View):
 
             print(f"🎉 FACTURA COMPLETADA: {establecimiento}-{punto_emision}-{secuencia_formateada}")
             messages.success(request, f'¡Factura {establecimiento}-{punto_emision}-{secuencia_formateada} creada exitosamente!')
-            
+
+            # ✅ NUEVA NORMATIVA: Al emitir, enviar automáticamente al SRI
+            try:
+                from inventario.sri.integracion_django import SRIIntegration
+
+                integration = SRIIntegration(empresa=get_empresa_activa(request))
+                resultado_envio = integration.enviar_factura(factura.id)
+
+                if resultado_envio.get('success'):
+                    estado = resultado_envio.get('estado') or 'ENVIADA'
+                    messages.success(request, f'✅ Factura enviada automáticamente al SRI. Estado: {estado}')
+                else:
+                    msg = resultado_envio.get('message') or 'No se pudo enviar al SRI.'
+                    messages.warning(request, f'⚠️ Factura creada, pero NO se pudo enviar automáticamente al SRI: {msg}')
+            except Exception as e:
+                messages.warning(request, f'⚠️ Factura creada, pero falló el envío automático al SRI: {str(e)}')
+
             # Redirigir directamente a VER la factura (verFactura.html)
             return redirect('inventario:verFactura', p=factura.id)
 
