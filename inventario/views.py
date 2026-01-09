@@ -3341,8 +3341,18 @@ class EmitirFactura(LoginRequiredMixin, View):
                     elif email_res and not email_res.get('success'):
                         messages.warning(request, f"⚠️ Factura autorizada, pero NO se pudo enviar email automáticamente: {email_res.get('message','')}")
                 else:
-                    msg = resultado_proc.get('message') or 'No se pudo procesar en SRI.'
-                    messages.warning(request, f'⚠️ Factura creada, pero el SRI no la autorizó aún / falló el procesamiento automático: {msg}')
+                    estado = (resultado_proc.get('estado') or factura.estado_sri or '').strip().upper()
+                    msg = (resultado_proc.get('message') or 'No se pudo procesar en SRI.').strip()
+
+                    # Nota: PENDIENTE/RECIBIDA suele ser normal; la autorización puede tardar.
+                    if estado in {'PENDIENTE', 'RECIBIDA'} or 'PENDIENTE' in msg.upper() or 'AÚN NO' in msg.upper() or 'AUN NO' in msg.upper():
+                        messages.info(
+                            request,
+                            f'⏳ Factura enviada al SRI y quedó pendiente de autorización. {msg} '
+                            'Puede tardar unos minutos; en la vista de la factura puedes consultar el estado.'
+                        )
+                    else:
+                        messages.warning(request, f'⚠️ Factura creada, pero falló el procesamiento automático en SRI: {msg}')
             except Exception as e:
                 messages.warning(request, f'⚠️ Factura creada, pero falló el procesamiento automático en SRI: {str(e)}')
 
