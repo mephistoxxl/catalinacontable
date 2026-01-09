@@ -16,6 +16,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm, inch
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.lib.utils import ImageReader
 from xml.etree import ElementTree as ET
 import logging
 
@@ -126,6 +127,60 @@ class RIDEGenerator:
             leading=8
         ))
 
+    def _resolve_catalinasoft_logo_path(self):
+        """Resuelve el path local del logo (staticfiles o ruta del repo)."""
+        try:
+            from django.contrib.staticfiles import finders
+
+            logo_path = finders.find('inventario/assets/logo/logo-catalina.png')
+            if logo_path:
+                return str(logo_path)
+        except Exception:
+            pass
+
+        base_dir = Path(getattr(settings, 'BASE_DIR', Path(__file__).resolve().parents[2]))
+        logo_path = base_dir / 'inventario' / 'static' / 'inventario' / 'assets' / 'logo' / 'logo-catalina.png'
+        return str(logo_path)
+
+    def _draw_catalinasoft_footer(self, canvas, doc):
+        """Dibuja el pie de página centrado (solo logo) en cada página."""
+        try:
+            logo_path = self._resolve_catalinasoft_logo_path()
+            logo_w = 0
+            logo_h = 0
+
+            # Logo (tamaño ajustado)
+            max_h = 22 * mm
+            if logo_path and os.path.exists(logo_path):
+                reader = ImageReader(logo_path)
+                orig_w, orig_h = reader.getSize()
+                if orig_w and orig_h:
+                    ratio = float(max_h) / float(orig_h)
+                    logo_h = max_h
+                    logo_w = float(orig_w) * ratio
+            else:
+                reader = None
+
+            canvas.saveState()
+
+            total_w = logo_w
+            x_start = (doc.pagesize[0] - total_w) / 2.0 if total_w else doc.leftMargin
+
+            # Posición: dentro del margen inferior reservado (evitar invadir el cuerpo)
+            if logo_h:
+                y = doc.bottomMargin - logo_h - (2 * mm)
+            else:
+                y = doc.bottomMargin - (7 * mm)
+            if y < 6 * mm:
+                y = 6 * mm
+
+            x = x_start
+            if logo_w and logo_h and reader is not None:
+                canvas.drawImage(reader, x, y, width=logo_w, height=logo_h, mask='auto', preserveAspectRatio=True)
+            canvas.restoreState()
+        except Exception as e:
+            logger.warning(f"No se pudo dibujar el footer de CatalinaSoft en el RIDE: {e}")
+
     def generar_codigo_barras(self, clave_acceso):
         """Generar código de barras horizontal con la clave de acceso"""
         try:
@@ -188,7 +243,8 @@ class RIDEGenerator:
                 rightMargin=8*mm,
                 leftMargin=8*mm,
                 topMargin=8*mm,
-                bottomMargin=8*mm
+                # Reservar espacio para el logo del pie de página
+                bottomMargin=34*mm
             )
             elementos = []
 
@@ -719,7 +775,11 @@ class RIDEGenerator:
             ]))
             elementos.append(observacion_table)
 
-            doc.build(elementos)
+            doc.build(
+                elementos,
+                onFirstPage=self._draw_catalinasoft_footer,
+                onLaterPages=self._draw_catalinasoft_footer,
+            )
             pdf_bytes = buffer.getvalue()
             logger.info(f"RIDE generado exitosamente: {output_path}")
             return pdf_bytes
