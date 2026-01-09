@@ -202,14 +202,19 @@ class SRIIntegration:
                 # 🔧 FIX CRÍTICO: Reconocer tanto AUTORIZADA como AUTORIZADO en consulta
                 if resultado_auth.get('estado') in ('AUTORIZADA', 'AUTORIZADO'):
                     self._generar_ride_autorizado(factura, resultado_auth)
-                    
-                    # 📧 NOTA: Envío automático DESHABILITADO para evitar bucles
-                    # El usuario debe usar el botón "Enviar Email" manualmente
-                    
+
+                    email_res = None
+                    try:
+                        if hasattr(factura, 'email_enviado') and not factura.email_enviado:
+                            email_res = self.enviar_factura_email(factura)
+                    except Exception as e:
+                        logger.warning(f"Fallo envío automático de email (consulta) para factura {factura.id}: {e}")
+
                     return {
                         'success': True,
                         'message': 'Factura autorizada exitosamente',
-                        'resultado': resultado_auth
+                        'resultado': resultado_auth,
+                        'email': email_res,
                     }
                 else:
                     logger.error(
@@ -286,13 +291,18 @@ class SRIIntegration:
                     # Generar RIDE autorizado
                     self._generar_ride_autorizado(factura, resultado_auth)
 
-                    # 📧 NOTA: Envío automático DESHABILITADO para evitar bucles
-                    # El usuario debe usar el botón "Enviar Email" manualmente
+                    email_res = None
+                    try:
+                        if hasattr(factura, 'email_enviado') and not factura.email_enviado:
+                            email_res = self.enviar_factura_email(factura)
+                    except Exception as e:
+                        logger.warning(f"Fallo envío automático de email (proceso) para factura {factura.id}: {e}")
 
                     return {
                         'success': True,
                         'message': 'Factura autorizada exitosamente',
-                        'resultado': resultado_auth
+                        'resultado': resultado_auth,
+                        'email': email_res,
                     }
                 elif estado_auth == 'PENDIENTE':
                     # Estado pendiente - no es un error, solo necesita más tiempo
@@ -1045,9 +1055,43 @@ Saludos cordiales,
                 email.attach(f"Factura_{numero_factura}.xml", xml_file.read(), 'application/xml')
 
             email.send(fail_silently=False)
+
+            # Marcar envío en la factura (si existen campos)
+            try:
+                update_fields = []
+                if hasattr(factura, 'email_enviado') and not factura.email_enviado:
+                    factura.email_enviado = True
+                    update_fields.append('email_enviado')
+                if hasattr(factura, 'email_enviado_at'):
+                    factura.email_enviado_at = timezone.now()
+                    update_fields.append('email_enviado_at')
+                if hasattr(factura, 'email_envio_intentos'):
+                    factura.email_envio_intentos = (factura.email_envio_intentos or 0) + 1
+                    update_fields.append('email_envio_intentos')
+                if hasattr(factura, 'email_ultimo_error'):
+                    factura.email_ultimo_error = None
+                    update_fields.append('email_ultimo_error')
+                if update_fields:
+                    factura.save(update_fields=update_fields)
+            except Exception as e:
+                logger.warning(f"No se pudo actualizar tracking de email en factura {getattr(factura,'id',None)}: {e}")
+
             return {'success': True, 'message': 'Factura enviada por correo exitosamente'}
         except Exception as e:
             logger.error(f"Error enviando factura por correo: {e}")
+            # Registrar intento fallido en la factura (si existen campos)
+            try:
+                update_fields = []
+                if hasattr(factura, 'email_envio_intentos'):
+                    factura.email_envio_intentos = (factura.email_envio_intentos or 0) + 1
+                    update_fields.append('email_envio_intentos')
+                if hasattr(factura, 'email_ultimo_error'):
+                    factura.email_ultimo_error = str(e)
+                    update_fields.append('email_ultimo_error')
+                if update_fields:
+                    factura.save(update_fields=update_fields)
+            except Exception:
+                pass
             return {'success': False, 'message': str(e)}
 
     def consultar_estado_factura(self, factura_id):
@@ -1093,10 +1137,14 @@ Saludos cordiales,
                         self._generar_ride_autorizado(factura, resultado)
                     except Exception as e:
                         logger.warning(f"Error generando RIDE para factura {factura.id}: {e}")
-                
-                # 📧 NOTA: Envío automático DESHABILITADO para evitar bucles
-                # El usuario debe usar el botón "Enviar Email" manualmente
-                
+
+                # 📧 Envío automático de email si está autorizada y aún no se envió
+                try:
+                    if hasattr(factura, 'email_enviado') and not factura.email_enviado:
+                        self.enviar_factura_email(factura)
+                except Exception as e:
+                    logger.warning(f"Fallo envío automático de email (consultar_estado_factura) para factura {factura.id}: {e}")
+
                 message = 'Factura autorizada exitosamente'
                 success = True
             elif estado == 'PENDIENTE':
