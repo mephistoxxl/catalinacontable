@@ -3322,21 +3322,29 @@ class EmitirFactura(LoginRequiredMixin, View):
             print(f"🎉 FACTURA COMPLETADA: {establecimiento}-{punto_emision}-{secuencia_formateada}")
             messages.success(request, f'¡Factura {establecimiento}-{punto_emision}-{secuencia_formateada} creada exitosamente!')
 
-            # ✅ NUEVA NORMATIVA: Al emitir, enviar automáticamente al SRI
+            # ✅ NUEVA NORMATIVA: Al emitir, procesar automáticamente en SRI (recepción + autorización)
             try:
                 from inventario.sri.integracion_django import SRIIntegration
 
                 integration = SRIIntegration(empresa=get_empresa_activa(request))
-                resultado_envio = integration.enviar_factura(factura.id)
 
-                if resultado_envio.get('success'):
-                    estado = resultado_envio.get('estado') or 'ENVIADA'
-                    messages.success(request, f'✅ Factura enviada automáticamente al SRI. Estado: {estado}')
+                resultado_proc = integration.procesar_factura(factura.id)
+
+                if resultado_proc.get('success'):
+                    res = resultado_proc.get('resultado') if isinstance(resultado_proc.get('resultado'), dict) else {}
+                    estado = (resultado_proc.get('estado') or res.get('estado') or factura.estado_sri or 'PROCESADA')
+                    messages.success(request, f'✅ Factura procesada automáticamente en SRI. Estado: {estado}')
+
+                    email_res = resultado_proc.get('email') if isinstance(resultado_proc.get('email'), dict) else None
+                    if email_res and email_res.get('success'):
+                        messages.success(request, '📧 Email enviado automáticamente al cliente.')
+                    elif email_res and not email_res.get('success'):
+                        messages.warning(request, f"⚠️ Factura autorizada, pero NO se pudo enviar email automáticamente: {email_res.get('message','')}")
                 else:
-                    msg = resultado_envio.get('message') or 'No se pudo enviar al SRI.'
-                    messages.warning(request, f'⚠️ Factura creada, pero NO se pudo enviar automáticamente al SRI: {msg}')
+                    msg = resultado_proc.get('message') or 'No se pudo procesar en SRI.'
+                    messages.warning(request, f'⚠️ Factura creada, pero el SRI no la autorizó aún / falló el procesamiento automático: {msg}')
             except Exception as e:
-                messages.warning(request, f'⚠️ Factura creada, pero falló el envío automático al SRI: {str(e)}')
+                messages.warning(request, f'⚠️ Factura creada, pero falló el procesamiento automático en SRI: {str(e)}')
 
             # Redirigir directamente a VER la factura (verFactura.html)
             return redirect('inventario:verFactura', p=factura.id)
@@ -8308,7 +8316,7 @@ def enviar_factura_email(request, factura_id):
         # Usar el método de integración SRI
         from inventario.sri.integracion_django import SRIIntegration
         
-        sri_integration = SRIIntegration()
+        sri_integration = SRIIntegration(empresa=get_empresa_activa(request))
         resultado = sri_integration.enviar_factura_email(factura)
         
         if resultado.get('success'):
