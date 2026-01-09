@@ -3333,7 +3333,11 @@ class EmitirFactura(LoginRequiredMixin, View):
                 if resultado_proc.get('success'):
                     res = resultado_proc.get('resultado') if isinstance(resultado_proc.get('resultado'), dict) else {}
                     estado = (resultado_proc.get('estado') or res.get('estado') or factura.estado_sri or 'PROCESADA')
-                    messages.success(request, f'✅ Factura procesada automáticamente en SRI. Estado: {estado}')
+                    estado_norm = str(estado).strip().upper()
+                    if estado_norm in {'PENDIENTE', 'RECIBIDA'}:
+                        messages.info(request, f'⏳ Factura enviada al SRI. Estado: {estado_norm}. La autorización puede tardar unos minutos.')
+                    else:
+                        messages.success(request, f'✅ Factura procesada automáticamente en SRI. Estado: {estado}')
 
                     email_res = resultado_proc.get('email') if isinstance(resultado_proc.get('email'), dict) else None
                     if email_res and email_res.get('success'):

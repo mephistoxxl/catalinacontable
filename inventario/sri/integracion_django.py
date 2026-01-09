@@ -165,13 +165,6 @@ class SRIIntegration:
             except Exception:
                 logger.warning("No se pudo establecer tenant antes de procesar_factura")
             
-            # 🎯 ESTABLECER ESTADO PENDIENTE AL INICIAR PROCESAMIENTO SRI
-            # Solo si no tiene estado SRI previo (estado_sri vacío = factura local)
-            if not factura.estado_sri or factura.estado_sri == '':
-                factura.estado_sri = 'PENDIENTE'
-                factura.save(update_fields=['estado_sri'])
-                logger.info(f"Factura {factura.id} cambió estado: LOCAL → PENDIENTE (enviando al SRI)")
-            
             # Lógica de idempotencia y control por estados existentes
             # 🔧 FIX CRÍTICO: Reconocer tanto AUTORIZADA como AUTORIZADO
             if hasattr(factura, 'estado_sri') and factura.estado_sri in ('AUTORIZADA', 'AUTORIZADO'):
@@ -192,8 +185,16 @@ class SRIIntegration:
                     'message': 'La factura fue RECHAZADA por el SRI. Use la opción de Reenviar para generar un nuevo intento.'
                 }
 
-            # Si ya tiene clave_acceso y está RECIBIDA/PENDIENTE, solo consultar autorización sin reenviar
-            if getattr(factura, 'clave_acceso', None) and hasattr(factura, 'estado_sri') and factura.estado_sri in ['RECIBIDA', 'PENDIENTE']:
+            # Si ya fue enviada (evidencia: estado_sri RECIBIDA/PENDIENTE + mensajes SRI guardados), consultar autorización sin reenviar.
+            # Importante: NO consultar solo por tener clave_acceso + estado_sri=PENDIENTE, porque eso puede ser un estado local
+            # (o haber sido seteado por error) y terminaría "consultando" algo que nunca se envió.
+            evidencia_envio = bool(getattr(factura, 'mensaje_sri', None) or getattr(factura, 'mensaje_sri_detalle', None))
+            if (
+                getattr(factura, 'clave_acceso', None)
+                and hasattr(factura, 'estado_sri')
+                and factura.estado_sri in ['RECIBIDA', 'PENDIENTE']
+                and evidencia_envio
+            ):
                 estado_recep = factura.estado_sri
                 resultado_auth = self.cliente.consultar_autorizacion(factura.clave_acceso)
                 self._actualizar_factura_con_resultado(factura, resultado_auth, factura.clave_acceso)
@@ -221,9 +222,11 @@ class SRIIntegration:
                         "Autorización pendiente o rechazada - estado_recep=%s, estado_auth=%s, raw_response=%s",
                         estado_recep, estado_auth, raw_response
                     )
+                    # Pendiente de autorización NO es un error; el SRI puede tardar.
                     return {
-                        'success': False,
-                        'message': 'La factura aún no está autorizada. Intente consultar nuevamente en unos minutos.',
+                        'success': True,
+                        'message': 'Pendiente de autorización. Intente consultar nuevamente en unos minutos.',
+                        'estado': 'PENDIENTE',
                         'resultado': resultado_auth
                     }
 
@@ -237,6 +240,16 @@ class SRIIntegration:
                     'success': False,
                     'message': f'La factura debe estar en estado PENDIENTE. Estado actual: {factura.estado}'
                 }
+
+            # Desde aquí, vamos a intentar un envío real al SRI.
+            if not factura.estado_sri or factura.estado_sri == '':
+                try:
+                    factura.estado_sri = 'PENDIENTE'
+                    factura.save(update_fields=['estado_sri'])
+                    logger.info(f"Factura {factura.id} cambió estado: LOCAL → PENDIENTE (iniciando envío real al SRI)")
+                except Exception:
+                    # No bloquear el envío por un fallo de guardado del estado
+                    logger.warning(f"No se pudo actualizar estado_sri a PENDIENTE para factura {factura.id}")
             
             # 🔧 FIX CRÍTICO: NUNCA regenerar clave de acceso - usar siempre la existente
             # La clave debe haberse generado al crear/guardar la factura
@@ -313,7 +326,7 @@ class SRIIntegration:
                         estado_recep, estado_auth, raw_response
                     )
                     return {
-                        'success': False,
+                        'success': True,
                         'message': f"Pendiente de autorización: {mensaje_detalle}. Intente nuevamente en unos minutos.",
                         'estado': 'PENDIENTE',
                         'resultado': resultado_auth
@@ -368,6 +381,25 @@ class SRIIntegration:
                 "Estados SRI al error - estado_recep=%s, estado_auth=%s, raw_response=%s",
                 estado_recep, estado_auth, raw_response
             )
+
+            # Intentar dejar trazabilidad en la factura (sin romper el handler por otro error)
+            try:
+                factura = Factura.objects.get(id=factura_id)
+                campos = []
+                if hasattr(factura, 'estado_sri') and factura.estado_sri != 'ERROR':
+                    factura.estado_sri = 'ERROR'
+                    campos.append('estado_sri')
+                if hasattr(factura, 'mensaje_sri'):
+                    factura.mensaje_sri = 'Error procesando envío/consulta SRI'
+                    campos.append('mensaje_sri')
+                if hasattr(factura, 'mensaje_sri_detalle'):
+                    factura.mensaje_sri_detalle = str(e)
+                    campos.append('mensaje_sri_detalle')
+                if campos:
+                    factura.save(update_fields=list(dict.fromkeys(campos)))
+            except Exception:
+                pass
+
             return {
                 'success': False,
                 'message': f'Error interno: {str(e)}'
