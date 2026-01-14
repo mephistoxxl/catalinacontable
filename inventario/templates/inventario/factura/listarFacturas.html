@@ -321,6 +321,10 @@
                                                     <i class="fa fa-truck mr-2 text-orange-500 action-icon"></i>
                                                     <span>Guía de Remisión</span>
                                                 </a>
+                                                <button type="button" onclick="abrirModalFacturadorNotaDebito({{ fila.id }})" class="flex items-center w-full text-left px-3 py-1.5 text-xs text-orange-700 hover:bg-orange-50 hover:text-orange-900 border-none bg-transparent cursor-pointer">
+                                                    <i class="fa fa-plus-circle mr-2 text-orange-500 action-icon"></i>
+                                                    <span>Nota de Débito</span>
+                                                </button>
                                                 <button type="button" onclick="abrirModalFacturadorNotaCredito({{ fila.id }})" class="flex items-center w-full text-left px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 hover:text-red-900 border-none bg-transparent cursor-pointer">
                                                     <i class="fa fa-minus-circle mr-2 text-red-500 action-icon"></i>
                                                     <span>Nota de Crédito</span>
@@ -1053,11 +1057,23 @@
         document.body.insertAdjacentHTML('beforeend', modalHtml);
     }
 
-    // ===== MODAL DE AUTENTICACIÓN PARA NOTA DE CRÉDITO =====
-    let facturaIdParaNotaCredito = null;
+    // ===== MODAL DE AUTENTICACIÓN PARA NOTA DE CRÉDITO / DÉBITO =====
+    let facturaIdParaNota = null;
+    let tipoNota = null; // 'credito' | 'debito'
 
     function abrirModalFacturadorNotaCredito(facturaId) {
-        facturaIdParaNotaCredito = facturaId;
+        facturaIdParaNota = facturaId;
+        tipoNota = 'credito';
+        document.getElementById('errorPassword').style.display = 'none';
+        document.getElementById('modalAutenticacionFacturador').style.display = 'flex';
+        document.getElementById('passwordFacturador').value = '';
+        document.getElementById('passwordFacturador').focus();
+    }
+
+    function abrirModalFacturadorNotaDebito(facturaId) {
+        facturaIdParaNota = facturaId;
+        tipoNota = 'debito';
+        document.getElementById('errorPassword').style.display = 'none';
         document.getElementById('modalAutenticacionFacturador').style.display = 'flex';
         document.getElementById('passwordFacturador').value = '';
         document.getElementById('passwordFacturador').focus();
@@ -1065,7 +1081,8 @@
 
     function cerrarModalFacturador() {
         document.getElementById('modalAutenticacionFacturador').style.display = 'none';
-        facturaIdParaNotaCredito = null;
+        facturaIdParaNota = null;
+        tipoNota = null;
     }
 
     async function validarFacturadorYRedirigir() {
@@ -1091,8 +1108,12 @@
             const data = await response.json();
 
             if (data.success) {
-                // Autenticación exitosa, redirigir a crear nota de crédito
-                window.location.href = `/inventario/notas-credito/crear/${facturaIdParaNotaCredito}/`;
+                // Autenticación exitosa, redirigir según tipo
+                if (tipoNota === 'debito') {
+                    window.location.href = `/inventario/notas-debito/crear/${facturaIdParaNota}/`;
+                } else {
+                    window.location.href = `/inventario/notas-credito/crear/${facturaIdParaNota}/`;
+                }
             } else {
                 errorDiv.textContent = data.error || 'Contraseña incorrecta';
                 errorDiv.style.display = 'block';

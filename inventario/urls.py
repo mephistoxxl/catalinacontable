@@ -3,6 +3,7 @@ from . import views
 from .views import FirmaElectronicaView, ConfiguracionGeneral
 from .liquidacion_compra import views as liquidacion_views
 from .nota_credito import views as nota_credito_views
+from .nota_debito import views as nota_debito_views
 # TEMPORAL: Deshabilitado password reset por error en producción
 # from .views_password_reset import SolicitarResetPassword, ResetPassword
 from django.conf import settings
@@ -131,6 +132,15 @@ urlpatterns = [
     path('notas-credito/autorizar/<int:pk>/', nota_credito_views.AutorizarNotaCredito.as_view(), name='notas_credito_autorizar'),
     path('notas-credito/consultar-estado/<int:pk>/', nota_credito_views.ConsultarEstadoNotaCredito.as_view(), name='notas_credito_consultar_estado'),
     path('notas-credito/pdf/<int:pk>/', nota_credito_views.DescargarPDF.as_view(), name='notas_credito_pdf'),
+
+    # Notas de Débito (codDoc 05)
+    path('notas-debito/', nota_debito_views.ListarNotasDebito.as_view(), name='notas_debito_listar'),
+    path('notas-debito/crear/', nota_debito_views.CrearNotaDebito.as_view(), name='notas_debito_crear'),
+    path('notas-debito/crear/<int:factura_id>/', nota_debito_views.CrearNotaDebito.as_view(), name='notas_debito_crear_factura'),
+    path('notas-debito/ver/<int:pk>/', nota_debito_views.VerNotaDebito.as_view(), name='notas_debito_ver'),
+    path('notas-debito/autorizar/<int:pk>/', nota_debito_views.AutorizarNotaDebito.as_view(), name='notas_debito_autorizar'),
+    path('notas-debito/consultar-estado/<int:pk>/', nota_debito_views.ConsultarEstadoNotaDebito.as_view(), name='notas_debito_consultar_estado'),
+    path('notas-debito/pdf/<int:pk>/', nota_debito_views.DescargarPDFNotaDebito.as_view(), name='notas_debito_pdf'),
 
     # Bancos
     path('bancos/', views.ListarBancos.as_view(), name='listar_bancos'),

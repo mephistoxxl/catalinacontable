@@ -11,5 +11,9 @@ class RIDENotaDebitoGenerator:
         self.nd = nota_debito
         self.opciones = opciones
 
-    def generar_pdf(self) -> bytes:
+    def generar_pdf(self):
+        """Debe devolver un file-like (BytesIO) con PDF (igual que NC).
+
+        Por ahora se deja explícito para evitar confusiones en la vista.
+        """
         raise NotImplementedError('Pendiente: generar RIDE para Nota de Débito')
