@@ -162,7 +162,7 @@
                                 <input 
                                     type="text" 
                                     id="buscar-factura" 
-                                    placeholder="Buscar por ID, cliente, fecha..." 
+                                    placeholder="Buscar por N° factura, cliente, fecha..." 
                                     class="w-full sm:w-64 px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pl-8"
                                     onkeyup="buscarFactura()"
                                 />
@@ -176,7 +176,7 @@
                     <table class="min-w-full divide-y divide-gray-200 tabla-compacta">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">N° Factura</th>
                                 <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID del cliente</th>
                                 <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
                                 <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado SRI</th>
@@ -195,7 +195,13 @@
                                 data-anulada="{% if fila.estado == 'ANULADA' %}anuladas{% else %}activas{% endif %}"
                                 data-estado="{% if fila.numero_autorizacion and fila.fecha_autorizacion %}autorizada{% elif fila.estado_sri == 'AUTORIZADA' or fila.estado_sri == 'AUTORIZADO' %}autorizada{% elif fila.estado_sri == 'RECHAZADA' or fila.estado_sri == 'NO_AUTORIZADA' or fila.estado_sri == 'NO AUTORIZADO' %}rechazada{% elif fila.estado_sri == 'PENDIENTE' or fila.estado_sri == 'RECIBIDA' %}pendiente{% else %}local{% endif %}"
                             >
-                                <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.id }}</td>
+                                <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                                    {% if fila.establecimiento and fila.punto_emision and fila.secuencia %}
+                                        {{ fila.establecimiento }}-{{ fila.punto_emision }}-{{ fila.secuencia }}
+                                    {% else %}
+                                        {{ fila.id }}
+                                    {% endif %}
+                                </td>
                                 <td class="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">{{ fila.cliente.identificacion }}</td>
                                 <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.fecha_emision|date:"d/m/Y" }}</td>
                                 <td class="px-3 py-2 whitespace-nowrap text-xs">

@@ -4313,7 +4313,7 @@ class ListarFacturas(LoginRequiredMixin, View):
         empresa = Empresa.objects.get(id=empresa_id)
         
         #Lista de productos de la BDD
-        facturas = Factura.objects.filter(empresa_id=empresa_id)
+        facturas = Factura.objects.filter(empresa_id=empresa_id).order_by('-fecha_emision', '-id')
         
         # Obtener almacenes para el filtro (usar for_tenant para evitar problemas con TenantManager)
         almacenes = Almacen.objects.for_tenant(empresa)
