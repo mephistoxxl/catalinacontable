@@ -355,7 +355,9 @@ class CrearNotaCredito(LoginRequiredMixin, View):
                     messages.error(request, 'ERROR: La factura no tiene clave de acceso del SRI.')
                     return redirect('inventario:verFactura', p=factura_id)
                 
-                tipo_motivo = (request.POST.get('tipo_motivo') or 'DEVOLUCION').strip()
+                # Por ahora no pedimos "tipo de motivo" en UI.
+                # Guardamos un valor fijo para mantener consistencia y evitar que el tipo controle comportamiento.
+                tipo_motivo = 'CORRECCION'
                 motivo = (request.POST.get('motivo') or '').strip()
                 fecha_emision = request.POST.get('fecha_emision')
 
@@ -370,13 +372,13 @@ class CrearNotaCredito(LoginRequiredMixin, View):
                     messages.error(request, 'Debe ingresar el motivo de la Nota de Crédito.')
                     return redirect('inventario:notas_credito_crear_factura', factura_id=factura_id)
 
-                # Validar tipo_motivo contra choices (evita NULL / valores raros)
+                # Validación defensiva (por si cambian choices en el futuro)
                 try:
                     valid_motivos = {c for c, _ in NotaCredito.MOTIVO_CHOICES}
+                    if tipo_motivo not in valid_motivos:
+                        tipo_motivo = 'CORRECCION'
                 except Exception:
-                    valid_motivos = {'DEVOLUCION'}
-                if tipo_motivo not in valid_motivos:
-                    tipo_motivo = 'DEVOLUCION'
+                    pass
                 
                 # Obtener productos seleccionados
                 productos_json = request.POST.get('productos', '[]')

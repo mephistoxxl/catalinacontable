@@ -1136,11 +1136,13 @@ class Panel(LoginRequiredMixin, View):
 
         # Puntos para SVG (sin dependencias externas)
         chart_width = 900
-        chart_height = 108
+        # Un poco más alto para mejorar legibilidad del comparativo anual.
+        chart_height = 150
         padding_left = 72
         padding_right = 18
         padding_top = 11
-        padding_bottom = 34
+        # Más espacio inferior para etiquetas de meses y título del eje.
+        padding_bottom = 48
 
         inner_w = chart_width - padding_left - padding_right
 
@@ -4313,7 +4315,7 @@ class ListarFacturas(LoginRequiredMixin, View):
         empresa = Empresa.objects.get(id=empresa_id)
         
         #Lista de productos de la BDD
-        facturas = Factura.objects.filter(empresa_id=empresa_id)
+        facturas = Factura.objects.filter(empresa_id=empresa_id).order_by('-fecha_emision', '-id')
         
         # Obtener almacenes para el filtro (usar for_tenant para evitar problemas con TenantManager)
         almacenes = Almacen.objects.for_tenant(empresa)

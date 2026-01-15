@@ -76,11 +76,17 @@ class CrearNotaDebito(LoginRequiredMixin, View):
         if not empresa or not secuencia:
             return None
 
+        # NotaDebito.establecimiento / punto_emision se guardan como strings zero-padded ("001").
+        # Secuencia suele almacenar enteros (1). Para calcular el siguiente correctamente,
+        # debemos comparar usando el mismo formato.
+        establecimiento_str = f"{int(secuencia.establecimiento):03d}"
+        punto_emision_str = f"{int(secuencia.punto_emision):03d}"
+
         max_existente = (
             NotaDebito.objects.filter(
                 empresa=empresa,
-                establecimiento=secuencia.establecimiento,
-                punto_emision=secuencia.punto_emision,
+                establecimiento=establecimiento_str,
+                punto_emision=punto_emision_str,
             ).aggregate(m=Max('secuencial'))['m']
             or 0
         )
@@ -96,11 +102,11 @@ class CrearNotaDebito(LoginRequiredMixin, View):
 
         return {
             'secuencia': secuencia,
-            'establecimiento': secuencia.establecimiento,
-            'punto_emision': secuencia.punto_emision,
+            'establecimiento': establecimiento_str,
+            'punto_emision': punto_emision_str,
             'valor': siguiente,
-            'establecimiento_str': f"{int(secuencia.establecimiento):03d}",
-            'punto_emision_str': f"{int(secuencia.punto_emision):03d}",
+            'establecimiento_str': establecimiento_str,
+            'punto_emision_str': punto_emision_str,
             'valor_str': f"{int(siguiente):09d}",
         }
 
@@ -287,8 +293,6 @@ class CrearNotaDebito(LoginRequiredMixin, View):
             'bancos_lista_nombres': lista_bancos,
             'bancos_db': Banco.objects.filter(activo=True, empresa_id=empresa_id).order_by('banco'),
             'now': timezone.now(),
-            # La plantilla es copia de NC y espera motivo_choices/tipo_motivo.
-            'motivo_choices': [('AJUSTE', 'Ajuste'), ('INTERES', 'Interés'), ('OTRO', 'Otro')],
         }
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/nota_debito/crear.html', contexto)
@@ -301,6 +305,9 @@ class CrearNotaDebito(LoginRequiredMixin, View):
         empresa = get_object_or_404(Empresa, id=empresa_id)
 
         try:
+            nota_debito_id = None
+            nota_debito_numero = None
+
             with transaction.atomic():
                 factura_id_url = factura_id
                 factura_id_hidden = request.POST.get('factura_modificada')
@@ -457,8 +464,31 @@ class CrearNotaDebito(LoginRequiredMixin, View):
                         valor=valor_imp,
                     )
 
-                messages.success(request, f'Nota de Débito {nota_debito.numero_completo} creada correctamente.')
-                return redirect('inventario:notas_debito_ver', pk=nota_debito.id)
+                nota_debito_id = nota_debito.id
+                nota_debito_numero = nota_debito.numero_completo
+
+            # Normativa: enviar ND al SRI al emitirla.
+            # Se hace fuera del `atomic()` para no perder la ND si falla el SRI.
+            messages.success(request, f'Nota de Débito {nota_debito_numero} creada. Enviando al SRI...')
+            try:
+                from .integracion_sri_nd import IntegracionSRINotaDebito
+
+                nota_debito = NotaDebito.objects.get(id=nota_debito_id, empresa_id=empresa_id)
+                integracion = IntegracionSRINotaDebito(nota_debito)
+                resultado = integracion.procesar_completo()
+
+                if resultado.get('success'):
+                    messages.success(request, '✅ Nota de Débito procesada correctamente en SRI.')
+                else:
+                    messages.error(
+                        request,
+                        f"❌ No se pudo autorizar en SRI: {resultado.get('mensaje', 'Error desconocido')}",
+                    )
+            except Exception as e:
+                logger.exception('Error enviando ND automáticamente al SRI')
+                messages.error(request, f'Error al enviar al SRI: {str(e)}')
+
+            return redirect('inventario:notas_debito_ver', pk=nota_debito_id)
 
         except Exception as e:
             logger.exception('Error creando nota de débito')

@@ -16,15 +16,11 @@ class NotaCreditoForm(forms.ModelForm):
         fields = [
             'factura_modificada',
             'fecha_emision',
-            'tipo_motivo',
             'motivo',
         ]
         widgets = {
             'fecha_emision': forms.DateInput(
                 attrs={'type': 'date', 'class': 'form-control'}
-            ),
-            'tipo_motivo': forms.Select(
-                attrs={'class': 'form-control', 'id': 'tipo_motivo'}
             ),
             'motivo': forms.Textarea(
                 attrs={
@@ -39,6 +35,10 @@ class NotaCreditoForm(forms.ModelForm):
     def __init__(self, *args, empresa=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.empresa = empresa
+
+        # Por ahora no exponemos tipo_motivo al usuario; se maneja en backend.
+        # Mantenerlo consistente para futuras integraciones/reportes.
+        self.instance.tipo_motivo = getattr(self.instance, 'tipo_motivo', None) or 'CORRECCION'
         
         # Filtrar facturas por empresa y estado AUTORIZADO
         if empresa:
@@ -73,13 +73,11 @@ class NotaCreditoForm(forms.ModelForm):
     
     def clean(self):
         cleaned_data = super().clean()
-        tipo_motivo = cleaned_data.get('tipo_motivo')
         motivo = cleaned_data.get('motivo')
         
-        # Si el motivo está vacío, usar el tipo como descripción
-        if not motivo and tipo_motivo:
-            motivo_dict = dict(NotaCredito.MOTIVO_CHOICES)
-            cleaned_data['motivo'] = motivo_dict.get(tipo_motivo, 'Nota de crédito')
+        # Si el motivo está vacío, usar un texto genérico
+        if not motivo:
+            cleaned_data['motivo'] = 'Nota de crédito'
         
         return cleaned_data
 
