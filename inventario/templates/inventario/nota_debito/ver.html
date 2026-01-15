@@ -61,8 +61,8 @@
           <div class="flex justify-between"><span class="text-gray-600">Factura sustento</span><span class="font-medium">{{ nota_debito.num_doc_modificado }}</span></div>
           <div class="flex justify-between"><span class="text-gray-600">Fecha factura</span><span class="font-medium">{{ nota_debito.fecha_emision_doc_sustento }}</span></div>
           <div class="pt-2">
-            <div class="text-gray-600 mb-1">Motivo</div>
-            <div class="font-medium">{{ nota_debito.tipo_motivo }}{% if nota_debito.motivo %}: {{ nota_debito.motivo }}{% endif %}</div>
+            <div class="text-gray-600 mb-1">Descripción</div>
+            <div class="font-medium">{% if nota_debito.motivo %}{{ nota_debito.motivo }}{% else %}—{% endif %}</div>
           </div>
         </div>
       </div>

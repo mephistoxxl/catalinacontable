@@ -1136,11 +1136,13 @@ class Panel(LoginRequiredMixin, View):
 
         # Puntos para SVG (sin dependencias externas)
         chart_width = 900
-        chart_height = 108
+        # Un poco más alto para mejorar legibilidad del comparativo anual.
+        chart_height = 150
         padding_left = 72
         padding_right = 18
         padding_top = 11
-        padding_bottom = 34
+        # Más espacio inferior para etiquetas de meses y título del eje.
+        padding_bottom = 48
 
         inner_w = chart_width - padding_left - padding_right
 

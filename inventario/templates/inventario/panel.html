@@ -7,14 +7,14 @@ let numeroUsuarios = '{{ usuarios }}'
 </script>
 <style>
     .form-header-icon { font-size: 14px !important; }
-    .metric-icon { font-size: 13px !important; line-height: 1 !important; }
+    .metric-icon { font-size: 22px !important; line-height: 1 !important; }
     .metric-icon-wrap {
-        width: 18px;
-        height: 18px;
+        width: 28px;
+        height: 28px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        flex: 0 0 18px;
+        flex: 0 0 28px;
     }
     .card-compact { padding: 0.75rem !important; }
     .grid-gap-compact { gap: 0.5rem !important; }
@@ -146,32 +146,32 @@ let numeroUsuarios = '{{ usuarios }}'
             <h4 class="text-sm font-bold text-indigo-700 mb-1">Estadísticas</h4>
             <p class="text-[11px] text-gray-500 mb-1">{{ fecha }}</p>
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-                <div class="bg-white border border-gray-300 p-2 rounded-md hover:border-gray-400 transition-colors">
+                <div class="p-2 rounded-md flex flex-col items-center text-center">
                     <span class="metric-icon-wrap"><i class="fa fa-rocket metric-icon text-indigo-600"></i></span>
                     <div class="text-xl font-bold text-gray-800 leading-tight">{{ productosRegistrados }}</div>
                     <div class="text-xs text-gray-600">Productos registrados</div>
                 </div>
-                <div class="bg-white border border-gray-300 p-2 rounded-md hover:border-gray-400 transition-colors">
+                <div class="p-2 rounded-md flex flex-col items-center text-center">
                     <span class="metric-icon-wrap"><i class="fa fa-shopping-cart metric-icon text-emerald-600"></i></span>
                     <div class="text-xl font-bold text-gray-800 leading-tight">{{ productosVendidos }}</div>
                     <div class="text-xs text-gray-600">Productos vendidos</div>
                 </div>
-                <div class="bg-white border border-gray-300 p-2 rounded-md hover:border-gray-400 transition-colors">
+                <div class="p-2 rounded-md flex flex-col items-center text-center">
                     <span class="metric-icon-wrap"><i class="fa fa-line-chart metric-icon text-sky-600"></i></span>
                     <div class="text-xl font-bold text-gray-800 leading-tight">{{ clientesRegistrados }}</div>
                     <div class="text-xs text-gray-600">Clientes registrados</div>
                 </div>
-                <div class="bg-white border border-gray-300 p-2 rounded-md hover:border-gray-400 transition-colors">
+                <div class="p-2 rounded-md flex flex-col items-center text-center">
                     <span class="metric-icon-wrap"><i class="fa fa-users metric-icon text-violet-600"></i></span>
                     <div class="text-xl font-bold text-gray-800 leading-tight">{{ usuariosRegistrados }}</div>
                     <div class="text-xs text-gray-600">Número de usuarios</div>
                 </div>
-                <div class="bg-white border border-gray-300 p-2 rounded-md hover:border-gray-400 transition-colors">
+                <div class="p-2 rounded-md flex flex-col items-center text-center">
                     <span class="metric-icon-wrap"><i class="fa fa-list-alt metric-icon text-amber-600"></i></span>
                     <div class="text-xl font-bold text-gray-800 leading-tight">{{ facturasEmitidas }}</div>
                     <div class="text-xs text-gray-600">Facturas emitidas</div>
                 </div>
-                <div class="bg-white border border-gray-300 p-2 rounded-md hover:border-gray-400 transition-colors">
+                <div class="p-2 rounded-md flex flex-col items-center text-center">
                     <span class="metric-icon-wrap"><i class="fa fa-dollar metric-icon text-green-600"></i></span>
                     <div class="text-xl font-bold text-gray-800 whitespace-nowrap leading-tight">$ {{ ingresoTotal|floatformat:2 }}</div>
                     <div class="text-xs text-gray-600">Ingreso total</div>
