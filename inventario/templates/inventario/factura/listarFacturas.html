@@ -192,7 +192,7 @@
                                 style="display: none"
                                 data-almacen-id="{{ fila.almacen.id|default:'' }}"
                                 data-ambiente="{% with amb=fila.clave_acceso|default:''|slice:'23:24' %}{% if amb == '1' %}pruebas{% else %}produccion{% endif %}{% endwith %}"
-                                data-anulada="{% if fila.estado == 'ANULADA' %}anuladas{% else %}activas{% endif %}"
+                                data-anulada="{% if fila.estado_sri == 'ANULADA' or fila.estado == 'ANULADA' %}anuladas{% else %}activas{% endif %}"
                                 data-estado="{% if fila.numero_autorizacion and fila.fecha_autorizacion %}autorizada{% elif fila.estado_sri == 'AUTORIZADA' or fila.estado_sri == 'AUTORIZADO' %}autorizada{% elif fila.estado_sri == 'RECHAZADA' or fila.estado_sri == 'NO_AUTORIZADA' or fila.estado_sri == 'NO AUTORIZADO' %}rechazada{% elif fila.estado_sri == 'PENDIENTE' or fila.estado_sri == 'RECIBIDA' %}pendiente{% else %}local{% endif %}"
                             >
                                 <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
@@ -206,7 +206,7 @@
                                 <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.fecha_emision|date:"d/m/Y" }}</td>
                                 <td class="px-3 py-2 whitespace-nowrap text-xs">
                                     {# Mostrar Anulada primero, luego Autorizada, Rechazada/No Autorizada, Recibida o Pendiente #}
-                                    {% if fila.estado == 'ANULADA' %}
+                                    {% if fila.estado_sri == 'ANULADA' or fila.estado == 'ANULADA' %}
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                             <i class="fa fa-ban mr-1 text-xs"></i>🚫 Anulada
                                         </span>

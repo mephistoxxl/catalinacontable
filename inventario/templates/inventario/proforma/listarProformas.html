@@ -9,6 +9,66 @@
   /* Tabla compacta */
   .tabla-compacta th { padding: 8px 12px !important; font-size: 11px !important; font-weight: 600 !important; }
   .tabla-compacta td { padding: 6px 12px !important; font-size: 12px !important; }
+
+  /* Botones de opciones: sin subrayado + look moderno */
+  .pf-opt-btn {
+    text-decoration: none !important;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 7px 12px;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    user-select: none;
+    -webkit-user-select: none;
+    box-shadow: 0 1px 0 rgba(17,24,39,0.04);
+  }
+  .pf-opt-btn, .pf-opt-btn * { text-decoration: none !important; }
+  .pf-opt-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 18px rgba(17,24,39,0.10); }
+  .pf-opt-btn:active { transform: translateY(0px); box-shadow: 0 4px 10px rgba(17,24,39,0.10); }
+  .pf-opt-btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,0.18), 0 10px 18px rgba(17,24,39,0.10); }
+
+  .pf-opt-ico {
+    width: 22px;
+    height: 22px;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    flex: 0 0 auto;
+  }
+
+  .pf-opt-view { background: #f3f4f6; color: #111827; border-color: #e5e7eb; }
+  .pf-opt-view .pf-opt-ico { background: #e5e7eb; color: #374151; }
+  .pf-opt-view:hover { background: #e5e7eb; }
+
+  .pf-opt-edit { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+  .pf-opt-edit .pf-opt-ico { background: #fef3c7; color: #b45309; }
+  .pf-opt-edit:hover { background: #fef3c7; }
+
+  .pf-opt-pdf { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+  .pf-opt-pdf .pf-opt-ico { background: #dbeafe; color: #2563eb; }
+  .pf-opt-pdf:hover { background: #dbeafe; }
+
+  .pf-opt-del { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+  .pf-opt-del .pf-opt-ico { background: #fee2e2; color: #dc2626; }
+  .pf-opt-del:hover { background: #fee2e2; }
+
+  .pf-opt-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 8px 22px rgba(17,24,39,0.08);
+  }
 </style>
 
 <div class="bg-gray-50 p-3" style="padding-top: 8px; padding-bottom: 12px;">
@@ -87,15 +147,18 @@
                   <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ p.fecha_emision }}</td>
                   <td class="px-3 py-2 whitespace-nowrap text-xs text-right text-gray-900">{{ p.total }}</td>
                   <td class="px-3 py-2 whitespace-nowrap text-xs text-right">
-                    <div class="inline-flex items-center gap-1">
-                      <a class="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 border border-gray-300" href="{% url 'inventario:verProforma' p.id %}">
-                        <i class="fa fa-eye mr-1 text-[11px]"></i> Ver
+                    <div class="pf-opt-group">
+                      <a class="pf-opt-btn pf-opt-view" href="{% url 'inventario:verProforma' p.id %}">
+                        <span class="pf-opt-ico"><i class="fa fa-eye"></i></span><span>Ver</span>
                       </a>
-                      <a class="inline-flex items-center px-2 py-1 bg-yellow-50 text-yellow-700 rounded-md hover:bg-yellow-100 border border-yellow-300" href="{% url 'inventario:emitirProforma' %}?editar={{ p.id }}" title="Editar (pendiente)">
-                        <i class="fa fa-edit mr-1 text-[11px]"></i> Editar
+                      <a class="pf-opt-btn pf-opt-pdf" href="{% url 'inventario:ride_proforma' p.id %}" target="_blank" rel="noopener" title="Descargar PDF">
+                        <span class="pf-opt-ico"><i class="fa fa-file-pdf"></i></span><span>Descargar</span>
                       </a>
-                      <a class="inline-flex items-center px-2 py-1 bg-red-50 text-red-700 rounded-md hover:bg-red-100 border border-red-300" href="{% url 'inventario:eliminar' 'proforma' p.id %}" onclick="return confirm('¿Eliminar proforma {{ p.numero }}?');">
-                        <i class="fa fa-trash mr-1 text-[11px]"></i> Eliminar
+                      <a class="pf-opt-btn pf-opt-edit" href="{% url 'inventario:emitirProforma' %}?editar={{ p.id }}" title="Editar (pendiente)">
+                        <span class="pf-opt-ico"><i class="fa fa-edit"></i></span><span>Editar</span>
+                      </a>
+                      <a class="pf-opt-btn pf-opt-del" href="{% url 'inventario:eliminar' 'proforma' p.id %}" onclick="return confirm('¿Eliminar proforma {{ p.numero }}?');">
+                        <span class="pf-opt-ico"><i class="fa fa-trash"></i></span><span>Eliminar</span>
                       </a>
                     </div>
                   </td>

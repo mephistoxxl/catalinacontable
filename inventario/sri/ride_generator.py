@@ -466,11 +466,15 @@ class RIDEGenerator:
             cliente_dir = getattr(cliente, 'direccion', '')
             cliente_email = getattr(cliente, 'correo', '')
             cliente_telefono = getattr(cliente, 'telefono', '')
+
+            guia_remision = getattr(factura, 'guia_remision', '') or ''
+            if str(guia_remision).strip().lower() == 'none':
+                guia_remision = ''
             cliente_data = [
                 [Paragraph(f'<b>Razón Social / Nombres y Apellidos:</b> {cliente_nombre}', self.styles['Campo']),
                  Paragraph(f'<b>Identificación:</b> {cliente_ident}', self.styles['Campo'])],
                 [Paragraph(f'<b>Fecha de Emisión:</b> {(getattr(factura, "fecha_emision", None) or datetime.now()).strftime("%d/%m/%Y")}', self.styles['Campo']),
-                 Paragraph(f'<b>Guía de Remisión:</b> {getattr(factura, "guia_remision", "")}', self.styles['Campo'])],
+                 Paragraph(f'<b>Guía de Remisión:</b> {guia_remision}', self.styles['Campo'])],
                 [Paragraph(f'<b>Dirección:</b> {cliente_dir}', self.styles['Campo']),
                  Paragraph(f'<b>Email:</b> {cliente_email}', self.styles['Campo'])],
                 [Paragraph(f'<b>Teléfono:</b> {cliente_telefono}', self.styles['Campo']),

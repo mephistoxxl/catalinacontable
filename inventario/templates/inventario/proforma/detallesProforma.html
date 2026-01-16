@@ -21,7 +21,18 @@
           <td class="px-2 py-1 text-right"><input name="cantidad[]" type="number" step="1" value="" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()" /></td>
           <td class="px-2 py-1 text-right"><input name="precio[]" type="number" step="0.01" value="" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()" /></td>
           <td class="px-2 py-1 text-right"><input name="descuento[]" type="number" step="0.01" value="" class="w-full border rounded px-2 py-1 text-right" oninput="pf_recalc()" /></td>
-          <td class="px-2 py-1 text-right"><span class="pf-iva" data-iva="0.15">15%</span><input type="hidden" name="iva[]" value="0.15"></td>
+          <td class="px-2 py-1 text-right">
+            <select class="pf-iva-select w-full border rounded px-2 py-1 text-right" aria-label="IVA" onchange="pf_recalc()">
+              <option value="0">0%</option>
+              <option value="0.05">5%</option>
+              <option value="0.08">8%</option>
+              <option value="0.12">12%</option>
+              <option value="0.13">13%</option>
+              <option value="0.14">14%</option>
+              <option value="0.15" selected>15%</option>
+            </select>
+            <input type="hidden" name="iva[]" value="0.15">
+          </td>
           <td class="px-2 py-1 text-right"><span class="pf-total">0.00</span></td>
         </tr>
       </tbody>
@@ -92,8 +103,8 @@ function pf_fillRow(row, item, ivaPercent) {
   const qty = row.querySelector('input[name="cantidad[]"]');
   const price = row.querySelector('input[name="precio[]"]');
   const disc = row.querySelector('input[name="descuento[]"]');
-  const ivaSpan = row.querySelector('.pf-iva');
   const ivaHidden = row.querySelector('input[name="iva[]"]');
+  const ivaSel = row.querySelector('.pf-iva-select');
 
   code.value = item.codigo || '';
   desc.value = item.descripcion || '';
@@ -102,16 +113,16 @@ function pf_fillRow(row, item, ivaPercent) {
   disc.value = (item.descuento != null ? Number(item.descuento) : 0).toFixed(2);
 
   const ivaP = (ivaPercent != null ? Number(ivaPercent) : 0.15);
-  if (ivaSpan) { ivaSpan.dataset.iva = String(ivaP); ivaSpan.textContent = `${Math.round(ivaP * 100)}%`; }
   if (ivaHidden) ivaHidden.value = String(ivaP);
+  if (ivaSel) ivaSel.value = String(ivaP);
 }
 
 function pf_clearRow(row) {
   row.querySelectorAll('input').forEach(inp => inp.value = '');
-  const ivaSpan = row.querySelector('.pf-iva');
   const ivaHidden = row.querySelector('input[name="iva[]"]');
-  if (ivaSpan) { ivaSpan.dataset.iva = '0.15'; ivaSpan.textContent = '15%'; }
+  const ivaSel = row.querySelector('.pf-iva-select');
   if (ivaHidden) ivaHidden.value = '0.15';
+  if (ivaSel) ivaSel.value = '0.15';
   const totalCell = row.querySelector('.pf-total');
   if (totalCell) totalCell.textContent = '0.00';
 }
@@ -124,7 +135,7 @@ function pf_recalc() {
     const qty = parseFloat((r.querySelector('input[name="cantidad[]"]')?.value || '').replace(',', '.')) || 0;
     const price = parseFloat((r.querySelector('input[name="precio[]"]')?.value || '').replace(',', '.')) || 0;
     const descPct = parseFloat((r.querySelector('input[name="descuento[]"]')?.value || '').replace(',', '.')) || 0;
-    const iva = parseFloat(r.querySelector('.pf-iva')?.dataset.iva || '0.15') || 0.15;
+    const iva = parseFloat(r.querySelector('input[name="iva[]"]')?.value || r.querySelector('.pf-iva-select')?.value || '0.15') || 0.15;
     if (qty <= 0 || price <= 0) { r.querySelector('.pf-total').textContent = '0.00'; return; }
 
     const base = qty * price; // sin IVA
@@ -145,6 +156,16 @@ function pf_recalc() {
   document.getElementById('pf_subtotal_neto').textContent = subNeto.toFixed(2);
   document.getElementById('pf_importe_total').textContent = totalConIva.toFixed(2);
 }
+
+// Mantener hidden iva[] sincronizado con el select
+document.addEventListener('change', (e) => {
+  const sel = e.target.closest('.pf-iva-select');
+  if (!sel) return;
+  const row = sel.closest('tr');
+  if (!row) return;
+  const hidden = row.querySelector('input[name="iva[]"]');
+  if (hidden) hidden.value = String(sel.value || '0.15');
+});
 
 // Navegación rápida con Enter: salta a la siguiente celda
 document.addEventListener('keydown', (e) => {

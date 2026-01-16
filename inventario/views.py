@@ -439,7 +439,8 @@ class EmitirProforma(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                     'success': True,
                     'message': f'Proforma {proforma.numero} guardada correctamente',
                     'proforma_id': proforma.id,
-                    'proforma_numero': proforma.numero
+                    'proforma_numero': proforma.numero,
+                    'redirect_url': reverse('inventario:verProforma', args=[proforma.id]),
                 })
                 
             except Exception as e:
@@ -642,21 +643,18 @@ def ride_proforma(request, p):
         'correo': (opciones.correo if opciones and getattr(opciones, 'correo', None) else ''),
     }
 
-# === Helper centralizado para obtener factura multi-tenant ===
-def get_factura_tenant(request, factura_id):
-    """Retorna una factura filtrada por empresa activa o levanta 404.
-
-    Uso en vistas sensibles (SRI, RIDE, pagos, etc.) para evitar repetir patrón.
-    Precondición: usuario autenticado; empresa_activa en sesión.
-    """
-    empresa_id = request.session.get('empresa_activa')
-    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
-        raise Http404("Empresa no válida")
-    return get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
-
     # Desglose de IVA por porcentaje y detalles enriquecidos para el PDF
-    MAPEO_IVA = { '0': Decimal('0.00'), '5': Decimal('5.00'), '2': Decimal('12.00'), '10': Decimal('13.00'),
-                  '3': Decimal('14.00'), '4': Decimal('15.00'), '6': Decimal('0.00'), '7': Decimal('0.00'), '8': Decimal('8.00') }
+    MAPEO_IVA = {
+        '0': Decimal('0.00'),
+        '5': Decimal('5.00'),
+        '2': Decimal('12.00'),
+        '10': Decimal('13.00'),
+        '3': Decimal('14.00'),
+        '4': Decimal('15.00'),
+        '6': Decimal('0.00'),
+        '7': Decimal('0.00'),
+        '8': Decimal('8.00'),
+    }
 
     def obtener_porcentaje_iva(det):
         if det.producto:
@@ -714,7 +712,10 @@ def get_factura_tenant(request, factura_id):
     subtotal_iva_base = (subtotal_neto - subtotal_0).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
     # Ordenar IVA breakdown por porcentaje ascendente
-    iva_items = sorted([(str(k).rstrip('0').rstrip('.') if '.' in str(k) else str(k), v) for k, v in iva_breakdown.items()], key=lambda x: Decimal(x[0]))
+    iva_items = sorted(
+        [(str(k).rstrip('0').rstrip('.') if '.' in str(k) else str(k), v) for k, v in iva_breakdown.items()],
+        key=lambda x: Decimal(x[0]),
+    )
 
     # Metadata de generación
     try:
@@ -730,7 +731,6 @@ def get_factura_tenant(request, factura_id):
     forma_pago_text = None
     try:
         if 'forma de pago' in obs_text.lower():
-            # Extraer línea que contenga 'forma de pago'
             for line in obs_text.splitlines():
                 if 'forma de pago' in line.lower():
                     forma_pago_text = line.split(':', 1)[-1].strip() or None
@@ -742,11 +742,11 @@ def get_factura_tenant(request, factura_id):
     nota_text = (proforma.observaciones or (getattr(opciones, 'mensaje_factura', '') if opciones else '')).strip()
 
     # Extras de presentación
-    vendedor_nombre = None
     try:
         vendedor_nombre = proforma.facturador.nombres if proforma.facturador else None
     except Exception:
         vendedor_nombre = None
+
     # Validez (días) estimada con base en vencimiento si existe
     try:
         validez_dias = (proforma.fecha_vencimiento - proforma.fecha_emision).days if (proforma.fecha_vencimiento and proforma.fecha_emision) else None
@@ -771,32 +771,32 @@ def get_factura_tenant(request, factura_id):
         'opciones': opciones,
         'logo_url': logo_url,
         'detalles_pdf': detalles_pdf,
-    'detalles_pdf_display': detalles_pdf_display,
-    'detalles_omitidos': detalles_omitidos,
-        'iva_items': iva_items,  # lista de tuplas: [(porcentaje_str, {'base': x, 'iva': y}), ...]
+        'detalles_pdf_display': detalles_pdf_display,
+        'detalles_omitidos': detalles_omitidos,
+        'iva_items': iva_items,
         'subtotal_neto': subtotal_neto,
         'subtotal_0': subtotal_0,
         'subtotal_iva_base': subtotal_iva_base,
         'generado_por': generado_por,
         'generado_el': generado_el,
-    # Condiciones dinámicas: usa observaciones de la proforma o mensaje de factura de opciones como fallback
-    'condiciones_text': (proforma.observaciones or (getattr(opciones, 'mensaje_factura', '') if opciones else '')),
+        'condiciones_text': (proforma.observaciones or (getattr(opciones, 'mensaje_factura', '') if opciones else '')),
         'forma_pago_text': forma_pago_text,
         'nota_text': nota_text,
         'vendedor_nombre': vendedor_nombre,
         'validez_dias': validez_dias,
-    'cuenta_bancaria_text': cuenta_bancaria_text,
+        'cuenta_bancaria_text': cuenta_bancaria_text,
     }
+
     # Intentar usar el generador de archivo estilo RIDE para proforma
     try:
         gen = ProformaRIDEGenerator()
         pdf_path = gen.generar_ride_proforma_file(proforma)
-        if pdf_path and os.path.exists(pdf_path):
+        if pdf_path and default_storage.exists(pdf_path):
             from django.utils.text import slugify
             empresa_name = empresa_ctx.get('nombre_comercial') or empresa_ctx.get('razon_social') or 'empresa'
             filename_base = f"proforma_{proforma.numero or proforma.id}_{empresa_name}"
             safe_name = slugify(str(filename_base)) or f"proforma-{proforma.id}"
-            return FileResponse(open(pdf_path, 'rb'), as_attachment=True, filename=f"{safe_name}.pdf")
+            return FileResponse(default_storage.open(pdf_path, 'rb'), as_attachment=True, filename=f"{safe_name}.pdf")
     except Exception as e:
         logger.warning(f"Fallo generador de proforma RIDE: {e}. Se usará plantilla HTML.")
 
@@ -810,7 +810,6 @@ def get_factura_tenant(request, factura_id):
 
         def link_callback(uri, rel):
             """Convierte rutas STATIC/MEDIA a rutas absolutas de sistema para xhtml2pdf."""
-            # MEDIA
             media_url = getattr(settings, 'MEDIA_URL', '')
             media_root = getattr(settings, 'MEDIA_ROOT', '')
             static_url = getattr(settings, 'STATIC_URL', '')
@@ -820,15 +819,12 @@ def get_factura_tenant(request, factura_id):
                 path = os.path.join(media_root, uri.replace(media_url, ""))
                 return path
             if static_url and uri.startswith(static_url):
-                # Intentar resolver con finders (útil en dev)
                 rel_path = uri.replace(static_url, "")
                 found = finders.find(rel_path)
                 if found:
                     return found
-                # Fallback a STATIC_ROOT si está colectado
                 path = os.path.join(static_root, rel_path)
                 return path
-            # Devolver tal cual (http/https u otros)
             return uri
 
         template = get_template('inventario/PDF/proforma.html')
@@ -837,7 +833,6 @@ def get_factura_tenant(request, factura_id):
         pisa_status = pisa.CreatePDF(html, dest=pdf_buffer, link_callback=link_callback)
 
         if pisa_status.err:
-            # Si falla, devolver HTML como fallback para inspección rápida
             return render(request, 'inventario/PDF/proforma.html', contexto)
 
         pdf_buffer.seek(0)
@@ -848,8 +843,19 @@ def get_factura_tenant(request, factura_id):
         response['Content-Disposition'] = f'attachment; filename="{safe_name}.pdf"'
         return response
     except Exception:
-        # Ante cualquier error inesperado, mostrar HTML
         return render(request, 'inventario/PDF/proforma.html', contexto)
+
+# === Helper centralizado para obtener factura multi-tenant ===
+def get_factura_tenant(request, factura_id):
+    """Retorna una factura filtrada por empresa activa o levanta 404.
+
+    Uso en vistas sensibles (SRI, RIDE, pagos, etc.) para evitar repetir patrón.
+    Precondición: usuario autenticado; empresa_activa en sesión.
+    """
+    empresa_id = request.session.get('empresa_activa')
+    if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        raise Http404("Empresa no válida")
+    return get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
 
 
 #Interfaz de inicio de sesion----------------------------------------------------#
@@ -2438,6 +2444,22 @@ def consultar_identificacion(request):
     """Vista para consultar información de cédula o RUC."""
 
     try:
+        # Evitar consumo del API sin sesión válida
+        if not getattr(request, 'user', None) or not request.user.is_authenticated:
+            return JsonResponse({
+                'error': True,
+                'message': 'No autorizado',
+                'status_code': 401,
+            }, status=401)
+
+        empresa = get_empresa_activa(request)
+        if not empresa:
+            return JsonResponse({
+                'error': True,
+                'message': 'No hay empresa activa seleccionada',
+                'status_code': 400,
+            }, status=400)
+
         identificacion = request.GET.get('identificacion', '').strip()
         tipo = request.GET.get('tipo', request.GET.get('tipoIdentificacion', '')).strip()
 
@@ -2469,13 +2491,114 @@ def consultar_identificacion(request):
                 'status_code': 400
             }, status=400)
 
+        # 1) Cache en BD: si el cliente existe para la empresa, NO consumir API
+        try:
+            cliente_bd = Cliente.objects.filter(empresa=empresa, identificacion=identificacion).first()
+        except Exception:
+            cliente_bd = None
+
+        if cliente_bd:
+            return JsonResponse({
+                'error': False,
+                'status_code': 200,
+                'message': 'Datos obtenidos desde clientes (BD)',
+                'fuente': 'bd',
+                'cliente_id': cliente_bd.id,
+                'tipo': tipo,
+                'tipo_identificacion': tipo_mapeado,
+                # Campos más usados por el frontend
+                'razon_social': cliente_bd.razon_social,
+                'razonSocial': cliente_bd.razon_social,
+                'nombre_comercial': cliente_bd.nombre_comercial or '',
+                'direccion': cliente_bd.direccion or '',
+                'telefono': cliente_bd.telefono or '',
+                'correo': cliente_bd.correo or '',
+            }, status=200)
+
         from services import consultar_identificacion as servicio_consultar_identificacion
 
         resultado = servicio_consultar_identificacion(identificacion)
         resultado['tipo_identificacion'] = tipo_mapeado
         logger.info(f"Resultado del servicio: {resultado}")
 
-        status_code = resultado.get('status_code', 200)
+        # 2) Si la consulta externa fue exitosa, persistir como Cliente para evitar futuras consultas
+        try:
+            status_code = int(resultado.get('status_code', 200) or 200)
+        except Exception:
+            status_code = 200
+
+        # Normalizar razón social
+        razon_social_api = (
+            (resultado.get('razon_social') or '')
+            or (resultado.get('razonSocial') or '')
+            or (resultado.get('nombre') or '')
+            or (resultado.get('name') or '')
+        ).strip()
+        nombre_comercial_api = (resultado.get('nombre_comercial') or resultado.get('nombreComercial') or '').strip()
+        direccion_api = (resultado.get('direccion') or '').strip()
+        telefono_api = (resultado.get('telefono') or '').strip()
+        correo_api = (resultado.get('correo') or resultado.get('email') or '').strip()
+
+        if not resultado.get('error') and status_code < 400 and razon_social_api:
+            try:
+                # Determinar tipoCliente básico
+                tipo_cliente = '1'
+                if tipo == '04' and len(identificacion) >= 3:
+                    if identificacion[2] in ('6', '9'):
+                        tipo_cliente = '2'
+
+                defaults = {
+                    'tipoIdentificacion': tipo,
+                    'razon_social': razon_social_api,
+                    'nombre_comercial': nombre_comercial_api or None,
+                    'direccion': direccion_api or 'Por definir',
+                    'telefono': telefono_api or None,
+                    'correo': correo_api or '',
+                    'observaciones': None,
+                    'convencional': None,
+                    'tipoVenta': '1',
+                    'tipoRegimen': '1',
+                    'tipoCliente': tipo_cliente,
+                }
+
+                cliente_obj, created = Cliente.objects.get_or_create(
+                    empresa=empresa,
+                    identificacion=identificacion,
+                    defaults=defaults,
+                )
+
+                # Si ya existía pero tenía placeholders, completar sin pisar datos “buenos”
+                if not created:
+                    changed = False
+                    if cliente_obj.tipoIdentificacion != tipo:
+                        cliente_obj.tipoIdentificacion = tipo
+                        changed = True
+                    if (not (cliente_obj.razon_social or '').strip()) or (cliente_obj.razon_social.strip() == identificacion):
+                        cliente_obj.razon_social = razon_social_api
+                        changed = True
+                    if (not (cliente_obj.direccion or '').strip()) or (cliente_obj.direccion.strip().lower() in ('por definir', 'por definir.')):
+                        if direccion_api:
+                            cliente_obj.direccion = direccion_api
+                            changed = True
+                    if (not (cliente_obj.correo or '').strip()) and correo_api:
+                        cliente_obj.correo = correo_api
+                        changed = True
+                    if (not (cliente_obj.telefono or '').strip()) and telefono_api:
+                        cliente_obj.telefono = telefono_api
+                        changed = True
+                    if (not (cliente_obj.nombre_comercial or '').strip()) and nombre_comercial_api:
+                        cliente_obj.nombre_comercial = nombre_comercial_api
+                        changed = True
+                    if changed:
+                        cliente_obj.save()
+
+                # enriquecer respuesta con info de guardado
+                resultado['fuente'] = 'api'
+                resultado['cliente_id'] = getattr(cliente_obj, 'id', None)
+                resultado['guardado_en_bd'] = True
+            except Exception as e:
+                logger.warning(f"No se pudo persistir Cliente desde API: {e}")
+
         return JsonResponse(resultado, status=status_code)
 
     except Exception as e:
