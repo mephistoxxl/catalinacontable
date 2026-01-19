@@ -7,6 +7,7 @@ import os
 import time
 from datetime import datetime
 from pathlib import Path
+from django.utils import timezone
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
@@ -68,6 +69,45 @@ class IntegracionGuiaRemisionSRI:
             # 2. Generar XML
             xml_sin_firmar = self.generar_xml(guia)
             logger.info(f"📄 XML SIN FIRMAR generado ({len(xml_sin_firmar)} bytes)")
+
+            # 2.1 Validar XML contra XSD (antes de firmar/enviar)
+            try:
+                xsd_path = Path(settings.BASE_DIR) / 'inventario' / 'guia_remision' / 'GuiaRemision_V1.1.0.xsd'
+                generator = XMLGeneratorGuiaRemision(guia, self.empresa, self.opciones)
+                resultado_validacion = generator.validar_xml_contra_xsd(xml_sin_firmar, str(xsd_path))
+                if not resultado_validacion.get('valido'):
+                    errores = (resultado_validacion.get('errores') or '').strip()
+                    logger.error(f"❌ XML de guía NO válido según XSD: {resultado_validacion.get('mensaje')}\n{errores}")
+                    # Guardar debug local para inspección
+                    try:
+                        debug_dir = Path(settings.BASE_DIR) / 'media' / 'guias_xml_debug' / str(self.empresa.id)
+                        debug_dir.mkdir(parents=True, exist_ok=True)
+                        debug_path = debug_dir / f'guia_{guia.numero_completo.replace("-", "_")}_sin_firmar_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xml'
+                        debug_path.write_text(xml_sin_firmar, encoding='utf-8')
+                        logger.info(f"🧪 XML debug guardado en: {debug_path}")
+                    except Exception as e:
+                        logger.warning(f"No se pudo guardar XML debug: {e}")
+
+                    # Mensaje corto para UI: tomar la primera línea real tipo "Línea X: ..."
+                    primer_error = ''
+                    if errores:
+                        for linea in errores.split('\n'):
+                            if linea.strip().lower().startswith('línea') or linea.strip().lower().startswith('linea'):
+                                primer_error = linea.strip()
+                                break
+                        if not primer_error:
+                            primer_error = errores.split('\n', 1)[0].strip()
+                    return {
+                        'success': False,
+                        'message': f"XML inválido según XSD (antes de enviar al SRI). {primer_error or 'Revise estructura del XML.'}",
+                        'detalle': resultado_validacion,
+                    }
+            except Exception as e:
+                logger.error(f"No se pudo validar XML contra XSD (se detiene): {e}")
+                return {
+                    'success': False,
+                    'message': f"No se pudo validar el XML localmente contra XSD: {str(e)}",
+                }
             
             # DEBUG: Guardar XML sin firmar para inspección
             import re
@@ -81,6 +121,43 @@ class IntegracionGuiaRemisionSRI:
             # 3. Firmar XML
             xml_firmado = self.firmar_xml(xml_sin_firmar)
             logger.info(f"🔏 XML FIRMADO generado ({len(xml_firmado)} bytes)")
+
+            # 3.1 Validar XML firmado contra XSD (muchos errores 35 vienen de aquí)
+            try:
+                xsd_path = Path(settings.BASE_DIR) / 'inventario' / 'guia_remision' / 'GuiaRemision_V1.1.0.xsd'
+                generator = XMLGeneratorGuiaRemision(guia, self.empresa, self.opciones)
+                resultado_validacion_firmado = generator.validar_xml_contra_xsd(xml_firmado, str(xsd_path))
+                if not resultado_validacion_firmado.get('valido'):
+                    errores = (resultado_validacion_firmado.get('errores') or '').strip()
+                    logger.error(f"❌ XML FIRMADO de guía NO válido según XSD: {resultado_validacion_firmado.get('mensaje')}\n{errores}")
+                    try:
+                        debug_dir = Path(settings.BASE_DIR) / 'media' / 'guias_xml_debug' / str(self.empresa.id)
+                        debug_dir.mkdir(parents=True, exist_ok=True)
+                        debug_path = debug_dir / f'guia_{guia.numero_completo.replace("-", "_")}_firmado_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xml'
+                        debug_path.write_text(xml_firmado, encoding='utf-8')
+                        logger.info(f"🧪 XML firmado debug guardado en: {debug_path}")
+                    except Exception as e:
+                        logger.warning(f"No se pudo guardar XML firmado debug: {e}")
+
+                    primer_error = ''
+                    if errores:
+                        for linea in errores.split('\n'):
+                            if linea.strip().lower().startswith('línea') or linea.strip().lower().startswith('linea'):
+                                primer_error = linea.strip()
+                                break
+                        if not primer_error:
+                            primer_error = errores.split('\n', 1)[0].strip()
+                    return {
+                        'success': False,
+                        'message': f"XML firmado inválido según XSD (antes de enviar al SRI). {primer_error or 'Revise firma/estructura.'}",
+                        'detalle': resultado_validacion_firmado,
+                    }
+            except Exception as e:
+                logger.error(f"No se pudo validar XML firmado contra XSD (se detiene): {e}")
+                return {
+                    'success': False,
+                    'message': f"No se pudo validar el XML firmado localmente contra XSD: {str(e)}",
+                }
             
             # DEBUG: Verificar clave en XML firmado
             clave_en_xml_firmado = re.search(r'<claveAcceso>(.*?)</claveAcceso>', xml_firmado)
@@ -129,6 +206,7 @@ class IntegracionGuiaRemisionSRI:
                     
                     resultado_autorizacion = self.consultar_autorizacion(guia)
                     estado = resultado_autorizacion.get('estado')
+                    estado_norm = (estado or '').strip().upper().replace(' ', '_')
                     
                     logger.info(f"📋 Estado de autorización: {estado}")
                     
@@ -151,7 +229,7 @@ class IntegracionGuiaRemisionSRI:
                                 for msg in aut.get('mensajes', []):
                                     logger.info(f"         * {msg.get('identificador')}: {msg.get('mensaje')}")
                     
-                    if estado == 'AUTORIZADO':
+                    if estado_norm in ('AUTORIZADO', 'AUTORIZADA'):
                         # Extraer número de autorización
                         numero_autorizacion = None
                         autorizaciones = resultado_autorizacion.get('autorizaciones', [])
@@ -174,7 +252,7 @@ class IntegracionGuiaRemisionSRI:
                             'numero_autorizacion': guia.numero_autorizacion
                         }
                     
-                    elif estado in ['NO_AUTORIZADO', 'ERROR']:
+                    elif estado_norm in ('NO_AUTORIZADO', 'NO_AUTORIZADA', 'RECHAZADO', 'RECHAZADA', 'DEVUELTA', 'ERROR'):
                         # Error definitivo, no reintentar
                         logger.error(f"❌ Guía NO AUTORIZADA - Estado: {estado}")
                         
@@ -321,8 +399,9 @@ class IntegracionGuiaRemisionSRI:
         """
         try:
             # Crear cliente SRI con el ambiente de Opciones
-            ambiente = self.opciones.tipo_ambiente
-            logger.info(f"🌐 Iniciando envío al SRI - Ambiente: {ambiente} ({'PRUEBAS' if ambiente == '1' else 'PRODUCCIÓN'})")
+            tipo_ambiente = self.opciones.tipo_ambiente
+            ambiente = 'produccion' if tipo_ambiente == '2' else 'pruebas'
+            logger.info(f"🌐 Iniciando envío al SRI - Ambiente: {tipo_ambiente} ({'PRUEBAS' if tipo_ambiente == '1' else 'PRODUCCIÓN'})")
             logger.info(f"📋 Clave de acceso: {guia.clave_acceso}")
             
             cliente = SRIClient(ambiente=ambiente)
@@ -331,7 +410,6 @@ class IntegracionGuiaRemisionSRI:
             resultado = cliente.enviar_comprobante(xml_firmado, guia.clave_acceso)
             
             logger.info(f"✅ Guía {guia.numero_completo} enviada al SRI - Estado: {resultado.get('estado')}")
-            return resultado
             return resultado
             
         except Exception as e:
@@ -363,7 +441,8 @@ class IntegracionGuiaRemisionSRI:
                 }
             
             # Crear cliente SRI con el ambiente de Opciones
-            ambiente = self.opciones.tipo_ambiente
+            tipo_ambiente = self.opciones.tipo_ambiente
+            ambiente = 'produccion' if tipo_ambiente == '2' else 'pruebas'
             cliente = SRIClient(ambiente=ambiente)
             
             # Consultar autorización

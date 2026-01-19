@@ -15,8 +15,8 @@ class XMLGeneratorGuiaRemision:
     Genera el XML de Guías de Remisión según el esquema del SRI Ecuador
     """
     
-    # Namespaces para Guía de Remisión
-    NAMESPACE = "http://www.sri.gob.ec/DocElectronicos/guiaRemision/V1.1.0"
+    # IMPORTANTE: El XSD oficial de Guía (V1.1.0) es "no-namespace".
+    # Por lo tanto, el XML NO debe declarar un namespace por defecto en <guiaRemision>.
     
     def __init__(self, guia, empresa, opciones):
         """
@@ -41,8 +41,7 @@ class XMLGeneratorGuiaRemision:
         try:
             # Crear elemento raíz
             root = etree.Element(
-                "{%s}guiaRemision" % self.NAMESPACE,
-                nsmap={None: self.NAMESPACE},
+                "guiaRemision",
                 id="comprobante",
                 version="1.1.0"
             )
@@ -78,6 +77,79 @@ class XMLGeneratorGuiaRemision:
         except Exception as e:
             logger.error(f"Error generando XML de guía de remisión: {e}")
             raise
+
+    def validar_xml_contra_xsd(self, xml_content: str, xsd_path: str) -> dict:
+        """Valida el XML de guía contra el XSD oficial.
+
+        Returns:
+            dict: { 'valido': bool, 'mensaje': str, 'errores': str (opcional) }
+        """
+        import os
+        from lxml import etree
+
+        if not os.path.exists(xsd_path):
+            raise FileNotFoundError(f"Archivo XSD no encontrado: {xsd_path}")
+
+        xsd_dir = os.path.dirname(xsd_path)
+        # El XSD de guía está en inventario/guia_remision pero el xmldsig está en inventario/sri.
+        # Resolver ambos escenarios.
+        xmldsig_candidates = [
+            os.path.join(xsd_dir, 'xmldsig-core-schema.xsd'),
+        ]
+
+        try:
+            from django.conf import settings
+            xmldsig_candidates.append(
+                os.path.join(settings.BASE_DIR, 'inventario', 'sri', 'xmldsig-core-schema.xsd')
+            )
+        except Exception:
+            pass
+
+        xmldsig_path = next((p for p in xmldsig_candidates if os.path.exists(p)), None)
+
+        with open(xsd_path, 'rb') as xsd_file:
+            class SchemaResolver(etree.Resolver):
+                def resolve(self, url, id, context):
+                    if 'xmldsig' in url or 'xmldsig-core-schema' in url:
+                        if xmldsig_path and os.path.exists(xmldsig_path):
+                            return self.resolve_filename(xmldsig_path, context)
+                    return None
+
+            parser = etree.XMLParser()
+            parser.resolvers.add(SchemaResolver())
+
+            try:
+                schema_doc = etree.parse(xsd_file, parser)
+                schema = etree.XMLSchema(schema_doc)
+            except etree.XMLSchemaParseError:
+                xsd_file.seek(0)
+                schema_root = etree.XML(xsd_file.read())
+                schema = etree.XMLSchema(schema_root)
+
+        try:
+            xml_doc = etree.fromstring(xml_content.encode('utf-8'))
+        except etree.XMLSyntaxError as e:
+            return {
+                'valido': False,
+                'mensaje': 'Error de sintaxis XML',
+                'errores': f"Error de sintaxis en línea {e.lineno}: {e.msg}",
+            }
+
+        if schema.validate(xml_doc):
+            return {
+                'valido': True,
+                'mensaje': 'XML válido según el esquema XSD del SRI',
+            }
+
+        errores = []
+        for error in schema.error_log:
+            errores.append(f"Línea {error.line}: {error.message}")
+
+        return {
+            'valido': False,
+            'mensaje': 'XML inválido',
+            'errores': "El XML no cumple con el XSD del SRI:\n" + "\n".join(errores),
+        }
     
     def _generar_info_tributaria(self):
         """Genera la sección de información tributaria"""

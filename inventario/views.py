@@ -2903,7 +2903,8 @@ def obtener_datos_secuencia(request, secuencia_id):
         """
         try:
             from django.db import transaction
-            from django.db.models import Max
+            from django.db.models import Max, IntegerField
+            from django.db.models.functions import Cast
             empresa_id = request.session.get('empresa_activa')
             empresa = None
             if empresa_id:
@@ -2925,7 +2926,7 @@ def obtener_datos_secuencia(request, secuencia_id):
                         empresa=empresa,
                         establecimiento=establecimiento_formatted,
                         punto_emision=punto_emision_formatted
-                    ).aggregate(m=Max('secuencia'))['m'])
+                    ).aggregate(m=Max(Cast('secuencia', output_field=IntegerField())))['m'])
                     if max_seq:
                         try:
                             siguiente_numero = int(max_seq) + 1
@@ -2936,7 +2937,7 @@ def obtener_datos_secuencia(request, secuencia_id):
                         empresa=empresa,
                         establecimiento=establecimiento_formatted,
                         punto_emision=punto_emision_formatted
-                    ).aggregate(m=Max('secuencial'))['m'])
+                    ).aggregate(m=Max(Cast('secuencial', output_field=IntegerField())))['m'])
                     if max_seq:
                         try:
                             siguiente_numero = int(max_seq) + 1
@@ -2962,6 +2963,24 @@ def obtener_datos_secuencia(request, secuencia_id):
                 # next calculado arriba es el siguiente libre según tablas; si base_actual > (siguiente_numero-1) usar base_actual+1
                 if base_actual >= (siguiente_numero - 1):
                     siguiente_numero = base_actual + 1
+
+                # Robustez extra: si por cualquier motivo el número ya existe, avanzar hasta uno libre
+                if secuencia.tipo_documento == '01':
+                    while Factura.objects.filter(
+                        empresa=empresa,
+                        establecimiento=establecimiento_formatted,
+                        punto_emision=punto_emision_formatted,
+                        secuencia=f"{siguiente_numero:09d}",
+                    ).exists():
+                        siguiente_numero += 1
+                elif secuencia.tipo_documento == '06':
+                    while GuiaRemision.objects.filter(
+                        empresa=empresa,
+                        establecimiento=establecimiento_formatted,
+                        punto_emision=punto_emision_formatted,
+                        secuencial=f"{siguiente_numero:09d}",
+                    ).exists():
+                        siguiente_numero += 1
 
                 if reservar:
                     # Persistir nuevo valor (ya validado que no exceda 9 dígitos en modelo)
@@ -3201,7 +3220,8 @@ class EmitirFactura(LoginRequiredMixin, View):
                 raise ValueError('Los datos de establecimiento/punto de emisión no coinciden con la secuencia seleccionada.')
 
             def reservar_siguiente_secuencia(secuencia):
-                from django.db.models import Max
+                from django.db.models import Max, IntegerField
+                from django.db.models.functions import Cast
                 bloqueada = (Secuencia.objects.select_for_update()
                              .get(id=secuencia.id, empresa_id=secuencia.empresa_id))
                 base = int(bloqueada.secuencial or 0)
@@ -8641,24 +8661,65 @@ def emitir_guia_remision(request):
             with transaction.atomic():
                 # Obtener configuración
                 config = ConfiguracionGuiaRemision.get_configuracion()
-                
-                # Establecimiento/Punto/Secuencial desde selección de Secuencia (si llega)
-                est_post = (request.POST.get('establecimiento') or '').strip()
-                pemi_post = (request.POST.get('punto_emision') or '').strip()
-                secu_post = (request.POST.get('secuencial') or '').strip()
 
-                establecimiento = est_post if est_post else config.establecimiento_defecto
-                punto_emision = pemi_post if pemi_post else config.punto_emision_defecto
+                # ✅ Reservar/asignar secuencial de forma atómica desde Secuencia
+                # (evita duplicados por concurrencia / formularios abiertos)
+                from django.db.models import Max, IntegerField
+                from django.db.models.functions import Cast
 
-                # Normalizar a 3 y 9 dígitos
+                secuencia_guia_id = (request.POST.get('secuencia_guia') or request.POST.get('secuencia') or '').strip()
+                if not secuencia_guia_id:
+                    raise ValueError('Debe seleccionar una secuencia para la guía.')
                 try:
-                    establecimiento = f"{int(establecimiento):03d}"
+                    secuencia_guia_id_int = int(secuencia_guia_id)
                 except Exception:
-                    establecimiento = f"{str(establecimiento).zfill(3)}" if establecimiento else "001"
+                    raise ValueError('Secuencia inválida para la guía.')
+
+                secuencia_guia = (Secuencia.objects.select_for_update().get(
+                    id=secuencia_guia_id_int,
+                    empresa=empresa,
+                    tipo_documento='06',
+                    activo=True,
+                ))
+
+                establecimiento = secuencia_guia.get_establecimiento_formatted() or (config.establecimiento_defecto or '001')
+                punto_emision = secuencia_guia.get_punto_emision_formatted() or (config.punto_emision_defecto or '001')
+
+                # Siguiente número libre basado en: max(tabla) vs secuencia.secuencial
+                siguiente_numero = 1
+                max_seq = (GuiaRemision.objects.filter(
+                    empresa=empresa,
+                    establecimiento=establecimiento,
+                    punto_emision=punto_emision,
+                ).aggregate(m=Max(Cast('secuencial', output_field=IntegerField())))['m'])
+
+                if max_seq:
+                    siguiente_numero = int(max_seq) + 1
+
                 try:
-                    punto_emision = f"{int(punto_emision):03d}"
-                except Exception:
-                    punto_emision = f"{str(punto_emision).zfill(3)}" if punto_emision else "001"
+                    base_actual = int(secuencia_guia.secuencial)
+                except (TypeError, ValueError):
+                    base_actual = 0
+
+                if base_actual >= (siguiente_numero - 1):
+                    siguiente_numero = base_actual + 1
+
+                # Si la data histórica tiene huecos/formatos raros, asegurar unicidad
+                while GuiaRemision.objects.filter(
+                    empresa=empresa,
+                    establecimiento=establecimiento,
+                    punto_emision=punto_emision,
+                    secuencial=f"{siguiente_numero:09d}",
+                ).exists():
+                    siguiente_numero += 1
+
+                if siguiente_numero > 999999999:
+                    raise ValueError('El secuencial de la guía excede 9 dígitos. Revise la configuración de secuencias.')
+
+                # Persistir reserva (secuencia.secuencial guarda el último reservado/usado)
+                secuencia_guia.secuencial = siguiente_numero
+                secuencia_guia.save(update_fields=['secuencial'])
+                secuencial_formateado = f"{siguiente_numero:09d}"
 
                 # Crear la guía con los campos correctos del modelo según XSD SRI
                 # Obtener factura relacionada (si existe)
@@ -8670,20 +8731,29 @@ def emitir_guia_remision(request):
                     except Factura.DoesNotExist:
                         pass
                 
+                placa_value = (request.POST.get('placa') or '').strip().upper()
+                if not placa_value:
+                    raise ValueError('La placa del vehículo es obligatoria.')
+
+                fecha_fin_value = (request.POST.get('fecha_fin_traslado') or '').strip()
+                if not fecha_fin_value:
+                    raise ValueError('La fecha de llegada es obligatoria.')
+
                 guia = GuiaRemision(
                     empresa=empresa,
                     factura=factura_obj,  # ✅ Vincular factura si existe
                     establecimiento=establecimiento,
                     punto_emision=punto_emision,
+                    secuencial=secuencial_formateado,
                     fecha_inicio_traslado=request.POST.get('fecha_inicio_traslado'),
-                    fecha_fin_traslado=request.POST.get('fecha_fin_traslado') or None,
+                    fecha_fin_traslado=fecha_fin_value,
                     direccion_partida=(request.POST.get('direccion_partida') or ''),
                     direccion_destino=(request.POST.get('direccion_destino') or ''),
                     dir_establecimiento=(request.POST.get('dir_establecimiento') or ''),
                     transportista_ruc=request.POST.get('transportista_ruc'),
                     transportista_nombre=request.POST.get('transportista_nombre'),
                     tipo_identificacion_transportista=request.POST.get('tipo_identificacion_transportista', '05'),
-                    placa=request.POST.get('placa'),
+                    placa=placa_value,
                     rise=request.POST.get('rise', ''),
                     obligado_contabilidad=request.POST.get('obligado_contabilidad', ''),
                     contribuyente_especial=request.POST.get('contribuyente_especial', ''),
@@ -8693,10 +8763,27 @@ def emitir_guia_remision(request):
                     usuario_creacion=request.user,
                     estado='borrador'
                 )
-                # Si llega un secuencial calculado, úsalo; si no, el save lo generará
-                if secu_post and secu_post.isdigit():
-                    guia.secuencial = str(int(secu_post)).zfill(9)
                 guia.save()
+
+                # Persistir/actualizar transportista frecuente para no consumir API externo en el futuro
+                try:
+                    transportista_ruc = (request.POST.get('transportista_ruc') or '').strip()
+                    transportista_nombre = (request.POST.get('transportista_nombre') or '').strip()
+                    transportista_direccion = (request.POST.get('dir_establecimiento') or '').strip()
+                    transportista_placa = (request.POST.get('placa') or '').strip()
+                    if transportista_ruc:
+                        Transportista.objects.update_or_create(
+                            empresa=empresa,
+                            ruc_cedula=transportista_ruc,
+                            defaults={
+                                'nombre': transportista_nombre or transportista_ruc,
+                                'direccion': transportista_direccion,
+                                'placa_principal': transportista_placa,
+                                'activo': True,
+                            }
+                        )
+                except Exception as e:
+                    logger.warning(f"No se pudo persistir transportista desde guía: {e}")
                 
                 # Procesar destinatarios y sus productos
                 destinatarios = {}
@@ -8785,8 +8872,9 @@ def emitir_guia_remision(request):
                     guia.save()
                     messages.warning(request, f"⚠️ Clave temporal asignada. Error: {e}")
                 
-                messages.success(request, f'Guia de remision {guia.numero_completo} creada exitosamente.')
-                return redirect('inventario:ver_guia_remision', guia_id=guia.id)
+                # Nuevo flujo: emitir al momento (firma + envío SRI) y luego ir al resumen
+                messages.info(request, f'Procesando emisión de la guía {guia.numero_completo}...')
+                return redirect('inventario:autorizar_guia_remision', guia_id=guia.id)
                 
         except Exception as e:
             logger.error(f"Error al crear guia de remision: {str(e)}")
@@ -8960,7 +9048,10 @@ def editar_guia_remision(request, guia_id):
                 # Actualizar datos de la guía
                 guia.fecha_emision = request.POST.get('fecha_emision')
                 guia.fecha_inicio_traslado = request.POST.get('fecha_inicio_traslado')
-                guia.fecha_fin_traslado = request.POST.get('fecha_fin_traslado') or None
+                fecha_fin_value = (request.POST.get('fecha_fin_traslado') or '').strip()
+                if not fecha_fin_value:
+                    raise ValueError('La fecha de llegada es obligatoria.')
+                guia.fecha_fin_traslado = fecha_fin_value
                 guia.motivo_traslado = request.POST.get('motivo_traslado')
                 guia.destinatario_identificacion = request.POST.get('destinatario_identificacion')
                 guia.destinatario_nombre = request.POST.get('destinatario_nombre')
@@ -8968,7 +9059,10 @@ def editar_guia_remision(request, guia_id):
                 guia.direccion_destino = request.POST.get('direccion_destino')
                 guia.transportista_ruc = request.POST.get('transportista_ruc')
                 guia.transportista_nombre = request.POST.get('transportista_nombre')
-                guia.placa = request.POST.get('placa')
+                placa_value = (request.POST.get('placa') or '').strip().upper()
+                if not placa_value:
+                    raise ValueError('La placa del vehículo es obligatoria.')
+                guia.placa = placa_value
                 guia.transportista_observaciones = request.POST.get('transportista_observaciones', '')
                 guia.usuario_modificacion = request.user
                 guia.save()
@@ -9037,26 +9131,89 @@ def anular_guia_remision(request, guia_id):
         })
 
 @csrf_exempt
+@login_required
 @require_http_methods(["GET"])
 def buscar_transportista(request):
-    """Endpoint para consultar información de transportista por RUC/Cédula"""
+    """Endpoint para consultar información de transportista por RUC/Cédula.
+
+    Auditoría/optimización: primero intenta resolver desde BD (Transportista) por empresa activa
+    y solo consulta el servicio externo si no existe; si consulta externo, persiste el resultado.
+    """
     identificacion = request.GET.get('q', '').strip()
     if not identificacion:
         return JsonResponse({'error': True, 'message': 'La identificación es requerida'}, status=400)
-    
+
+    # Resolver empresa activa (para multi-tenant y cache por empresa)
+    empresa_id = request.session.get('empresa_activa')
+    empresa = None
+    if empresa_id:
+        empresa = request.user.empresas.filter(id=empresa_id).first()
+    if not empresa:
+        return JsonResponse({'error': True, 'message': 'Empresa no válida.'}, status=400)
+
+    # Determinar tipo de identificación según longitud
+    tipo_id = '05'  # Por defecto cédula
+    if len(identificacion) == 13:
+        tipo_id = '04'  # RUC
+    elif len(identificacion) == 10:
+        tipo_id = '05'  # Cédula
+    else:
+        tipo_id = '06'  # Pasaporte u otro
+
+    # 1) Cache BD: Transportista frecuente
+    try:
+        existente = Transportista.objects.filter(
+            empresa=empresa,
+            ruc_cedula=identificacion,
+            activo=True,
+        ).first()
+        if existente:
+            return JsonResponse({
+                'error': False,
+                'razon_social': existente.nombre or '',
+                'nombre_comercial': '',
+                'direccion': existente.direccion or '',
+                'tipo_identificacion': tipo_id,
+                'rise': '',
+                'obligado_contabilidad': 'NO',
+                'source': 'db',
+            })
+    except Exception as e:
+        logger.warning(f"No se pudo consultar cache BD de transportista: {e}")
+
+    # 2) Externo (Zampisoft vía services.consultar_identificacion)
     try:
         from services import consultar_identificacion as servicio_consultar_identificacion
         resultado = servicio_consultar_identificacion(identificacion)
-        
-        # Determinar tipo de identificación según longitud
-        tipo_id = '05'  # Por defecto cédula
-        if len(identificacion) == 13:
-            tipo_id = '04'  # RUC
-        elif len(identificacion) == 10:
-            tipo_id = '05'  # Cédula
-        else:
-            tipo_id = '06'  # Pasaporte u otro
-        
+
+        if resultado.get('error'):
+            # Propagar error del servicio externo
+            return JsonResponse({
+                'error': True,
+                'message': resultado.get('message', 'No se pudo consultar la identificación'),
+            }, status=400)
+
+        nombre = (resultado.get('razon_social') or resultado.get('nombre_comercial') or '').strip()
+        direccion = (resultado.get('direccion') or '').strip()
+        telefono = (resultado.get('telefono') or '').strip()
+        email = (resultado.get('email') or '').strip()
+
+        # Persistir para no volver a consultar
+        try:
+            Transportista.objects.update_or_create(
+                empresa=empresa,
+                ruc_cedula=identificacion,
+                defaults={
+                    'nombre': nombre or identificacion,
+                    'direccion': direccion,
+                    'telefono': telefono,
+                    'email': email,
+                    'activo': True,
+                }
+            )
+        except Exception as e:
+            logger.warning(f"No se pudo guardar transportista en BD: {e}")
+
         respuesta = {
             'error': False,
             'razon_social': resultado.get('razon_social', ''),
@@ -9065,14 +9222,15 @@ def buscar_transportista(request):
             'tipo_identificacion': tipo_id,
             'rise': resultado.get('tipo_regimen', '') if resultado.get('tipo_regimen') == 'RISE' else '',
             'obligado_contabilidad': resultado.get('obligado_contabilidad', 'NO'),
+            'source': 'external',
         }
-        
+
         return JsonResponse(respuesta)
-        
+
     except Exception as e:
         logger.error(f"Error en buscar_transportista: {e}")
         return JsonResponse({
-            'error': True, 
+            'error': True,
             'message': f'No se pudo consultar la identificación: {str(e)}'
         }, status=500)
 
@@ -9104,6 +9262,53 @@ def descargar_guia_pdf(request, guia_id):
         logger.error(f"Error al generar PDF de guía {guia_id}: {str(e)}")
         messages.error(request, f'Error al generar PDF: {str(e)}')
         return redirect('inventario:ver_guia_remision', guia_id=guia.id)
+
+
+@login_required
+def descargar_guia_xml(request, guia_id):
+    """Vista para descargar el XML de una guía de remisión.
+
+    Usa el XML persistido en GuiaRemision.xml_autorizado o, si no existe,
+    intenta leerlo desde media/guias_xml/<empresa_id>/guia_<numero>.xml.
+    """
+    empresa_id = request.session.get('empresa_activa')
+    empresa = None
+    if empresa_id:
+        empresa = request.user.empresas.filter(id=empresa_id).first()
+    if not empresa:
+        messages.error(request, 'Seleccione una empresa válida.')
+        return redirect('inventario:seleccionar_empresa')
+
+    guia = get_object_or_404(GuiaRemision, id=guia_id, empresa=empresa)
+
+    if guia.estado != 'autorizada':
+        messages.error(request, 'Solo se puede descargar XML de guías autorizadas.')
+        return redirect('inventario:ver_guia_remision', guia_id=guia.id)
+
+    xml_content = (guia.xml_autorizado or '').strip()
+    if not xml_content:
+        try:
+            from pathlib import Path
+            from django.conf import settings
+
+            base_dir = Path(settings.BASE_DIR) / 'media' / 'guias_xml' / str(empresa.id)
+            nombre_archivo = f'guia_{guia.numero_completo.replace("-", "_")}.xml'
+            ruta_completa = base_dir / nombre_archivo
+            if ruta_completa.exists():
+                xml_content = ruta_completa.read_text(encoding='utf-8').strip()
+        except Exception as e:
+            logger.warning(f"No se pudo leer XML local para guía {guia_id}: {e}")
+
+    if not xml_content:
+        messages.error(request, 'No se encontró el XML autorizado de esta guía.')
+        return redirect('inventario:ver_guia_remision', guia_id=guia.id)
+
+    from django.http import HttpResponse
+
+    filename = f"guia_remision_{guia.numero_completo}.xml".replace(' ', '_')
+    response = HttpResponse(xml_content, content_type='application/xml; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 @login_required
 def autorizar_guia_remision(request, guia_id):

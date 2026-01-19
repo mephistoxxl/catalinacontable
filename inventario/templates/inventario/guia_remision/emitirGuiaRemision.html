@@ -2,288 +2,364 @@
 {% block content %}
 
 <style>
-  /* Estilos ULTRA-COMPACTOS */
+  /* UI Guía de Remisión (responsive, ancho completo)
+     Mantiene .form-control e IDs/names para no romper JS/backend. */
+  .guia-page {
+    background: #f9fafb;
+    padding: 8px 12px;
+  }
   .guia-container {
-    max-width: 900px;
+    width: 90%;
+    max-width: 1600px;
     margin: 0 auto;
-    padding: 4px;
+  }
+  @media (max-width: 640px) {
+    .guia-page { padding: 10px; }
+    .guia-container { width: 98%; }
+  }
+
+  .guia-header {
+    background: linear-gradient(to right, #1f2937, #111827);
+    color: #fff;
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .guia-header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .guia-header p {
+    margin: 0;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.80);
+  }
+  .secuencia-numero {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 14px;
+    font-weight: 700;
   }
 
   .guia-card {
-    background: white;
-    border-radius: 3px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    padding: 6px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
   }
 
-  .form-section {
-    margin-bottom: 4px;
+  /* Evita que el footer sticky tape el contenido al hacer scroll */
+  .guia-form {
+    padding-bottom: 84px;
   }
-
-  .form-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 4px;
-    margin-bottom: 3px;
+  @media (max-width: 640px) {
+    .guia-form {
+      padding-bottom: 160px;
+    }
   }
-
-  .form-group {
-    display: flex;
-    flex-direction: column;
+  .guia-section {
+    padding: 8px;
+    border-top: 1px solid #e5e7eb;
   }
-
-  .form-group label {
-    font-size: 9px;
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 1px;
-  }
-
-  .form-control {
-    padding: 2px 6px;
-    border: 1px solid #d1d5db;
-    border-radius: 2px;
-    font-size: 11px;
-    transition: all 0.15s;
-    height: 24px;
-  }
-
-  .form-control:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.08);
-  }
-
-  .form-control:read-only {
-    background-color: #f3f4f6;
-    color: #6b7280;
-    cursor: not-allowed;
+  .guia-section:first-child {
+    border-top: 0;
   }
 
   .section-title {
-    font-size: 10px;
+    font-size: 13px;
     font-weight: 700;
-    color: #1f2937;
-    padding-bottom: 2px;
-    border-bottom: 1px solid #e5e7eb;
-    margin-bottom: 3px;
+    color: #111827;
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+  .section-title i { color: #2563eb; }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .col-12 { grid-column: span 12 / span 12; }
+  .col-6 { grid-column: span 6 / span 6; }
+  .col-4 { grid-column: span 4 / span 4; }
+  .col-3 { grid-column: span 3 / span 3; }
+  .col-2 { grid-column: span 2 / span 2; }
+  @media (max-width: 1024px) {
+    .col-6, .col-4, .col-3, .col-2 { grid-column: span 12 / span 12; }
   }
 
-  .btn-group {
-    display: flex;
-    gap: 4px;
-    justify-content: space-between;
-    margin-top: 6px;
-    padding: 8px 12px;
-    border-top: 1px solid #e5e7eb;
-    background: white;
-    position: sticky;
-    bottom: 0;
-    z-index: 100;
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-  }
-
-  .btn {
-    padding: 2px 8px;
-    border: none;
-    border-radius: 2px;
-    font-size: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s;
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    height: 24px;
-  }
-
-  .btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
-  }
-
-  .btn-primary {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-    color: white;
-  }
-
-  .btn-success {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-  }
-
-  .btn-secondary {
-    background: #1f2937;
-    color: white;
-  }
-
-  .btn-secondary:hover {
-    background: #111827;
-  }
-
-  .btn-danger {
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-    color: white;
-  }
-
-  .header-section {
-    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 3px;
-    margin-bottom: 4px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .header-title {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .header-title i {
+  .form-group label {
     font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 2px;
+    display: block;
   }
 
-  .header-info h2 {
-    margin: 0;
-    font-size: 11px;
-    font-weight: 700;
+  .guia-form .form-control {
+    width: 100%;
+    height: 32px;
+    padding: 4px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 13px;
+    background: #fff;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
   }
-
-  .header-info p {
-    margin: 0;
-    font-size: 8px;
-    opacity: 0.8;
+  .guia-form .form-control:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.12);
   }
-
-  .secuencia-info {
-    text-align: right;
-  }
-
-  .secuencia-label {
-    font-size: 8px;
-    opacity: 0.7;
-    margin-bottom: 0;
-  }
-
-  .secuencia-numero {
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    font-weight: 700;
+  .guia-form .form-control:read-only {
+    background: #f3f4f6;
+    color: #6b7280;
   }
 
   .input-group {
-    display: flex !important;
-    gap: 4px !important;
-    align-items: center !important;
-    width: 100% !important;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    width: 100%;
   }
-
-  .input-group .form-control {
-    flex: 1 !important;
-    min-width: 0 !important;
-  }
-  
-  .input-group .btn {
-    flex-shrink: 0 !important;
-  }
-
-  .btn-icon {
-    padding: 4px 8px !important;
-    min-width: 28px !important;
-    width: auto !important;
-    height: 24px !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    flex-shrink: 0 !important;
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 2px !important;
-    cursor: pointer !important;
-  }
-  
-  .btn-icon:hover {
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
-    transform: translateY(-1px);
-  }
-  
-  .btn-icon i {
-    font-size: 12px !important;
-    color: white !important;
-  }
-
   .input-small {
-    width: 50px;
+    width: 100%;
+    min-width: 0;
+  }
+  @media (min-width: 1024px) {
+    .input-small { max-width: 120px; }
   }
 
-  .btn i {
-    font-size: 9px;
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .section-title i {
-    font-size: 9px;
+  .btn-group {
+    position: sticky;
+    bottom: 0;
+    z-index: 50;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(6px);
+    border-top: 1px solid #e5e7eb;
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
   }
+  @media (max-width: 640px) {
+    .guia-header { flex-direction: column; align-items: flex-start; }
+    .btn-group { flex-direction: column; align-items: stretch; }
+  }
+
+  .btnx {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 9px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px solid transparent;
+    transition: all 0.15s ease-in-out;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .btnx i { font-size: 12px; }
+
+  /* Tipografía compacta SOLO para Destinatarios/Productos */
+  .dest-card {
+    font-size: 12px;
+  }
+  .dest-card label {
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+  .dest-card strong {
+    font-size: 13px;
+    line-height: 1.2;
+  }
+  .dest-card .font-semibold {
+    font-size: 12px;
+  }
+  .dest-card table {
+    font-size: 11px;
+  }
+  .dest-card th,
+  .dest-card td {
+    line-height: 1.2;
+  }
+  .btnx:active { transform: translateY(1px); }
+  /* Botones verdes (consistente con el sistema); eliminar permanece rojo */
+  .btnx-primary { background: #059669; color: #fff; }
+  .btnx-primary:hover { background: #047857; }
+  .btnx-success { background: #059669; color: #fff; }
+  .btnx-success:hover { background: #047857; }
+  .btnx-secondary { background: #065f46; color: #fff; }
+  .btnx-secondary:hover { background: #064e3b; }
+  .btnx-danger { background: #dc2626; color: #fff; }
+  .btnx-danger:hover { background: #b91c1c; }
+  .btnx-outline { background: #fff; color: #059669; border-color: #a7f3d0; }
+  .btnx-outline:hover { background: #ecfdf5; }
 
   /* Animaciones para notificaciones */
   @keyframes slideIn {
-    from {
-      transform: translateX(100%);
-      opacity: 0;
-    }
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes slideOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
   }
 
-  @keyframes slideOut {
-    from {
-      transform: translateX(0);
-      opacity: 1;
+  /* Modal (reemplazo de alert/confirm nativos) */
+  .modalx-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 24, 39, 0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 10000;
+  }
+  .modalx-backdrop.show { display: flex; }
+  .modalx {
+    width: min(560px, 96vw);
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    transform: translateY(6px);
+    opacity: 0;
+    animation: modalxIn 140ms ease forwards;
+  }
+  @keyframes modalxIn {
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .modalx-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .modalx-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #111827;
+  }
+  .modalx-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 12px;
+  }
+  .modalx-icon.success { background: #10b981; }
+  .modalx-icon.warning { background: #f59e0b; }
+  .modalx-icon.error { background: #ef4444; }
+  .modalx-icon.info { background: #3b82f6; }
+  .modalx-close {
+    border: 0;
+    background: transparent;
+    color: #6b7280;
+    font-size: 22px;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .modalx-close:hover { background: rgba(107,114,128,0.12); }
+  .modalx-body {
+    padding: 10px 12px;
+    color: #111827;
+    font-size: 12.5px;
+    line-height: 1.25;
+    max-height: min(40vh, 220px);
+    overflow: auto;
+  }
+  .modalx-body .muted { color: #6b7280; }
+  .modalx-body ul { margin: 6px 0 0 16px; }
+  .modalx-body li { margin: 2px 0; }
+  .modalx-kv {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  @media (min-width: 520px) {
+    .modalx-kv {
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 14px;
     }
-    to {
-      transform: translateX(100%);
-      opacity: 0;
-    }
+  }
+  .modalx-kv b { color: #111827; }
+  .modalx-footer {
+    padding: 10px 12px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    background: #ffffff;
+  }
+
+  /* Botón del modal más compacto */
+  .modalx-footer .btnx {
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: 10px;
   }
 </style>
 
-<div class="guia-container">
-  <!-- Header ultra-compacto -->
-  <div class="header-section">
-    <div class="header-title">
-      <i class="fas fa-truck"></i>
-      <div class="header-info">
-        <h2>Guía de Remisión Electrónica</h2>
-        <p>Documento de traslado de mercaderías</p>
+<div class="guia-page">
+  <div class="guia-container">
+    <!-- Header -->
+    <div class="guia-header">
+      <div class="flex items-center gap-3">
+        <div class="h-9 w-9 rounded-lg bg-white/10 flex items-center justify-center">
+          <i class="fas fa-truck text-white"></i>
+        </div>
+        <div>
+          <h2>Guía de Remisión Electrónica</h2>
+          <p>Documento de traslado de mercaderías</p>
+        </div>
+      </div>
+      <div class="text-right">
+        <div class="text-xs text-white/70">Número siguiente</div>
+        <div class="secuencia-numero" id="numero-siguiente">001-001-000000001</div>
       </div>
     </div>
-    <div class="secuencia-info">
-      <div class="secuencia-label">Número siguiente</div>
-      <div class="secuencia-numero" id="numero-siguiente">001-001-000000001</div>
-    </div>
-  </div>
 
-  <!-- Formulario ultra-compacto -->
-  <div class="guia-card">
-    <form method="post" id="form-guia-remision" action="{% url 'inventario:emitir_guia_remision' %}">
+    <!-- Formulario -->
+    <div class="guia-card">
+      <form method="post" id="form-guia-remision" action="{% url 'inventario:emitir_guia_remision' %}" class="guia-form">
       {% csrf_token %}
       
       <!-- Numeración -->
-      <div class="form-section">
+      <div class="guia-section">
         <div class="section-title">
           <i class="fas fa-list-ol"></i> Numeración
         </div>
         <div class="form-row">
-          <div class="form-group">
+          <div class="form-group col-6">
             <label>Secuencia</label>
             <select id="secuencia_guia" name="secuencia_guia" class="form-control" required>
               <option value="">Seleccione...</option>
@@ -292,14 +368,14 @@
               {% endfor %}
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group col-3">
             <label>Serie</label>
             <div class="input-group">
               <input type="text" id="establecimiento" name="establecimiento" value="001" maxlength="3" readonly class="form-control input-small">
               <input type="text" id="punto_emision" name="punto_emision" value="001" maxlength="3" readonly class="form-control input-small">
             </div>
           </div>
-          <div class="form-group">
+          <div class="form-group col-3">
             <label>Secuencial</label>
             <input type="text" id="secuencial" name="secuencial" value="000000001" maxlength="9" readonly class="form-control">
           </div>
@@ -307,12 +383,12 @@
       </div>
 
       <!-- Factura Relacionada (NUEVO) -->
-      <div class="form-section">
+      <div class="guia-section">
         <div class="section-title">
           <i class="fas fa-file-invoice"></i> Factura Relacionada (Opcional - Solo para traslados por venta)
         </div>
         <div class="form-row">
-          <div class="form-group">
+          <div class="form-group col-6">
             <label>Seleccionar Factura Autorizada</label>
             <select id="factura_id" name="factura_id" class="form-control" onchange="cargarDatosFactura()">
               <option value="">Sin factura (traslado sin venta)</option>
@@ -329,90 +405,88 @@
               {% endfor %}
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group col-3">
             <label>Número Factura</label>
             <input type="text" id="factura_numero" readonly class="form-control" placeholder="Se carga automáticamente">
           </div>
-          <div class="form-group">
+          <div class="form-group col-3">
             <label>Clave Acceso Factura</label>
             <input type="text" id="factura_clave" readonly class="form-control" placeholder="Se carga automáticamente">
           </div>
         </div>
-        <div class="alert alert-info" style="font-size: 10px; padding: 4px 8px; margin-top: 4px; background: #dbeafe; border: 1px solid #93c5fd; border-radius: 2px;">
-          <i class="fas fa-info-circle"></i> 
-          <strong>¿Cuándo seleccionar factura?</strong> Solo cuando el motivo del traslado sea VENTA (código 01). Los datos del destinatario y productos se cargarán automáticamente desde la factura.
-        </div>
       </div>
 
       <!-- Transportista y Transporte -->
-      <div class="form-section">
+      <div class="guia-section">
         <div class="section-title">
           <i class="fas fa-truck"></i> Datos de Transporte
         </div>
         <div class="form-row">
-          <div class="form-group">
+          <div class="form-group col-4">
             <label>Cédula/RUC Transportista *</label>
-            <div class="input-group" style="display: flex !important; gap: 4px !important;">
-              <input type="text" id="transportista_ruc" name="transportista_ruc" maxlength="13" placeholder="Ej: 1234567890" class="form-control" required style="flex: 1;">
-              <button type="button" class="btn btn-primary btn-icon" onclick="buscarTransportista()" title="Buscar datos del transportista" style="padding: 4px 8px; height: 24px; min-width: 28px; background: #3b82f6; color: white; border: none; border-radius: 2px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">
-                <i class="fas fa-search" style="font-size: 12px; color: white;"></i>
+            <div class="input-group">
+              <input type="text" id="transportista_ruc" name="transportista_ruc" maxlength="13" placeholder="Ej: 1234567890" class="form-control" required>
+              <button type="button" class="btnx btnx-outline" onclick="buscarTransportista(this)" title="Buscar datos del transportista">
+                <i class="fas fa-search"></i>
+                <span class="hidden sm:inline">Buscar</span>
               </button>
             </div>
           </div>
-          <div class="form-group">
+          <div class="form-group col-4">
             <label>Tipo Identificación *</label>
             <select id="tipo_identificacion_transportista" name="tipo_identificacion_transportista" class="form-control" required>
-              <option value="05" selected>Cédula</option>
+              <option value="" selected>Seleccione...</option>
+              <option value="05">Cédula</option>
               <option value="04">RUC</option>
               <option value="06">Pasaporte</option>
               <option value="08">Identificación del exterior</option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group col-4">
             <label>Nombre Transportista</label>
             <input type="text" id="transportista_nombre" name="transportista_nombre" placeholder="Nombre" class="form-control">
           </div>
-          <div class="form-group">
+          <div class="form-group col-3">
             <label>Placa Vehículo *</label>
-            <input type="text" id="placa" name="placa" maxlength="10" placeholder="PXA-1234" class="form-control" required>
+            <input type="text" id="placa" name="placa" maxlength="10" minlength="1" placeholder="PXA-1234" class="form-control" required onblur="this.value = (this.value || '').trim().toUpperCase();">
           </div>
-          <div class="form-group">
+          <div class="form-group col-3">
             <label>Fecha Salida *</label>
-            <input type="date" id="fecha_inicio_traslado" name="fecha_inicio_traslado" value="{{ fecha_hoy }}" class="form-control" required>
+            <input type="date" id="fecha_inicio_traslado" name="fecha_inicio_traslado" class="form-control" required>
           </div>
-          <div class="form-group">
-            <label>Fecha Llegada</label>
-            <input type="date" id="fecha_fin_traslado" name="fecha_fin_traslado" class="form-control">
+          <div class="form-group col-3">
+            <label>Fecha Llegada *</label>
+            <input type="date" id="fecha_fin_traslado" name="fecha_fin_traslado" class="form-control" required>
           </div>
         </div>
-        <div class="form-row">
-          <div class="form-group">
+        <div class="form-row" style="margin-top: 6px;">
+          <div class="form-group col-4">
             <label>Dirección Partida *</label>
             <input type="text" id="direccion_partida" name="direccion_partida" placeholder="Desde donde parte" class="form-control" required>
           </div>
-          <div class="form-group">
+          <div class="form-group col-4">
             <label>Dirección Llegada *</label>
             <input type="text" id="direccion_destino" name="direccion_destino" placeholder="Donde llega" class="form-control" required>
           </div>
-          <div class="form-group">
+          <div class="form-group col-4">
             <label>Dirección Establecimiento</label>
             <input type="text" id="dir_establecimiento" name="dir_establecimiento" placeholder="Dirección del establecimiento emisor" class="form-control">
           </div>
         </div>
-        <div class="form-row">
-          <div class="form-group">
+        <div class="form-row" style="margin-top: 6px;">
+          <div class="form-group col-4">
             <label>RISE</label>
             <input type="text" id="rise" name="rise" maxlength="40" placeholder="Régimen RISE (si aplica)" class="form-control">
           </div>
-          <div class="form-group">
+          <div class="form-group col-4">
             <label>Obligado Contabilidad</label>
             <select id="obligado_contabilidad" name="obligado_contabilidad" class="form-control">
-              <option value="">N/A</option>
+              <option value="" selected>N/A</option>
               <option value="SI">SI</option>
-              <option value="NO" selected>NO</option>
+              <option value="NO">NO</option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group col-4">
             <label>Contribuyente Especial</label>
             <input type="text" id="contribuyente_especial" name="contribuyente_especial" maxlength="13" placeholder="Nº Resolución" class="form-control">
           </div>
@@ -420,57 +494,62 @@
       </div>
 
       <!-- Tabla de Destinatarios -->
-      <div class="form-section">
+      <div class="guia-section">
         <div class="section-title">
           <i class="fas fa-users"></i> Destinatarios
         </div>
-        <div style="margin-bottom: 6px;">
-          <button type="button" class="btn btn-primary" onclick="agregarDestinatario()">
-            <i class="fas fa-plus"></i> Agregar Actual
+        <div class="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+          <button type="button" class="btnx btnx-primary" onclick="agregarDestinatario()">
+            <i class="fas fa-plus"></i> Agregar destinatario
           </button>
+          <div class="text-xs text-gray-600">Agrega uno o varios destinatarios y sus productos.</div>
         </div>
-        <div style="overflow-x: auto;">
-          <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+        <div class="table-wrap">
+          <table class="min-w-full">
             <tbody id="tabla-destinatarios">
               <!-- Filas expandibles con destinatarios y productos -->
             </tbody>
           </table>
         </div>
-        <div style="margin-top: 3px;">
-          <label style="font-size: 9px; font-weight: 600; color: #374151; margin-right: 4px;">Correo:</label>
-          <input type="email" id="correo_envio" name="correo_envio" placeholder="correo@ejemplo.com" class="form-control" style="display: inline-block; width: auto; min-width: 200px;">
+        <div class="mt-2 form-row">
+          <div class="form-group col-6">
+            <label for="correo_envio">Correo</label>
+            <input type="email" id="correo_envio" name="correo_envio" placeholder="correo@ejemplo.com" class="form-control">
+          </div>
         </div>
       </div>
 
       <!-- Información Adicional -->
-      <div class="form-section">
-        <div style="margin-bottom: 3px;">
-          <label style="font-size: 9px; font-weight: 600; color: #374151; margin-right: 4px;">Clave Acceso:</label>
-          <input type="text" id="clave_acceso" name="clave_acceso" maxlength="49" placeholder="Auto-generada" class="form-control" readonly style="display: inline-block; width: auto; min-width: 300px;">
+      <div class="guia-section">
+        <div class="section-title">
+          <i class="fas fa-info-circle"></i> Información adicional
         </div>
-        <div style="margin-bottom: 3px;">
-          <label style="font-size: 9px; font-weight: 600; color: #374151; margin-right: 4px;">Info Adicional:</label>
-          <input type="text" id="informacion_adicional" name="informacion_adicional" placeholder="Info adicional" class="form-control" style="display: inline-block; width: auto; min-width: 300px;">
-        </div>
-        <div style="margin-bottom: 0;">
-          <label style="font-size: 9px; font-weight: 600; color: #374151; margin-right: 4px;">Ruta:</label>
-          <input type="text" id="ruta" name="ruta" placeholder="Ruta" class="form-control" style="display: inline-block; width: auto; min-width: 300px;">
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label for="clave_acceso">Clave Acceso</label>
+            <input type="text" id="clave_acceso" name="clave_acceso" maxlength="49" placeholder="Auto-generada" class="form-control" readonly>
+          </div>
+          <div class="form-group col-6">
+            <label for="informacion_adicional">Info Adicional</label>
+            <input type="text" id="informacion_adicional" name="informacion_adicional" placeholder="Info adicional" class="form-control">
+          </div>
+          <div class="form-group col-12">
+            <label for="ruta">Ruta</label>
+            <input type="text" id="ruta" name="ruta" placeholder="Ruta" class="form-control">
+          </div>
         </div>
       </div>
 
       <!-- Botones -->
       <div class="btn-group">
-        <div style="display: flex; gap: 3px;">
-          <button type="button" class="btn btn-danger" onclick="eliminarGuia()">
+        <div class="flex flex-col sm:flex-row gap-2">
+          <button type="button" class="btnx btnx-danger" onclick="eliminarGuia()">
             <i class="fas fa-trash"></i> Eliminar
           </button>
         </div>
-        <div style="display: flex; gap: 3px;">
-          <button type="button" class="btn btn-secondary" onclick="guardarGuia()">
-            <i class="fas fa-save"></i> Guardar
-          </button>
-          <button type="submit" class="btn btn-success">
-            <i class="fas fa-paper-plane"></i> Emitir
+        <div class="flex flex-col sm:flex-row gap-2">
+          <button type="submit" class="btnx btnx-success">
+            <i class="fas fa-paper-plane"></i> Emitir guía de remisión
           </button>
         </div>
       </div>
@@ -479,9 +558,308 @@
   </div>
 </div>
 
+<!-- Modal reutilizable (reemplaza alert nativo) -->
+<div id="modalx-backdrop" class="modalx-backdrop" aria-hidden="true">
+  <div class="modalx" role="dialog" aria-modal="true" aria-labelledby="modalx-title" tabindex="-1">
+    <div class="modalx-header">
+      <div class="modalx-title" id="modalx-title">
+        <span id="modalx-icon" class="modalx-icon info"><i class="fas fa-info"></i></span>
+        <span id="modalx-title-text">Mensaje</span>
+      </div>
+      <button type="button" class="modalx-close" id="modalx-close" aria-label="Cerrar">×</button>
+    </div>
+    <div class="modalx-body" id="modalx-body"></div>
+    <div class="modalx-footer">
+      <button type="button" class="btnx btnx-primary" id="modalx-ok">Aceptar</button>
+    </div>
+  </div>
+</div>
+
 <script>
+// Mensajes del backend (Django messages)
+window.__DJANGO_MESSAGES__ = [
+  {% if messages %}
+    {% for message in messages %}
+      { tags: "{{ message.tags|escapejs }}", text: "{{ message|escapejs }}" },
+    {% endfor %}
+  {% endif %}
+];
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function tagToVariant(tags) {
+  const t = String(tags || '').toLowerCase();
+  if (t.includes('error') || t.includes('danger')) return 'error';
+  if (t.includes('warning')) return 'warning';
+  if (t.includes('success')) return 'success';
+  return 'info';
+}
+
+const ModalX = (() => {
+  const backdrop = document.getElementById('modalx-backdrop');
+  const titleText = document.getElementById('modalx-title-text');
+  const body = document.getElementById('modalx-body');
+  const ok = document.getElementById('modalx-ok');
+  const closeBtn = document.getElementById('modalx-close');
+  const icon = document.getElementById('modalx-icon');
+
+  function setVariant(variant) {
+    const v = (variant || 'info').toLowerCase();
+    icon.classList.remove('success', 'warning', 'error', 'info');
+    icon.classList.add(v);
+    const iconHtml = {
+      success: '<i class="fas fa-check"></i>',
+      warning: '<i class="fas fa-exclamation"></i>',
+      error: '<i class="fas fa-times"></i>',
+      info: '<i class="fas fa-info"></i>'
+    };
+    icon.innerHTML = iconHtml[v] || iconHtml.info;
+  }
+
+  function open({ title, html, variant, okText } = {}) {
+    titleText.textContent = title || 'Mensaje';
+    setVariant(variant);
+    body.innerHTML = html || '';
+    ok.textContent = okText || 'Aceptar';
+    backdrop.classList.add('show');
+    backdrop.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    ok.focus();
+  }
+
+  function close() {
+    backdrop.classList.remove('show');
+    backdrop.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  ok.addEventListener('click', close);
+  closeBtn.addEventListener('click', close);
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) close();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && backdrop.classList.contains('show')) close();
+  });
+
+  return { open, close };
+})();
+
+// ------------------------
+// Validación + borrador local (anti-pérdida)
+// ------------------------
+const GuiaDraft = (() => {
+  const draftKey = `guiaRemisionDraft:v1:${location.pathname}`;
+  let saveTimer = null;
+
+  function getForm() {
+    return document.getElementById('form-guia-remision');
+  }
+
+  function extractEntries(form) {
+    const entries = [];
+    const elements = Array.from(form.elements || []);
+    for (const el of elements) {
+      if (!el || !el.name) continue;
+      if (el.name === 'csrfmiddlewaretoken') continue;
+      if (el.disabled) continue;
+
+      const tag = (el.tagName || '').toLowerCase();
+      const type = (el.type || '').toLowerCase();
+
+      if (type === 'checkbox') {
+        entries.push([el.name, el.checked ? (el.value || 'on') : '']);
+        continue;
+      }
+      if (type === 'radio') {
+        if (el.checked) entries.push([el.name, el.value]);
+        continue;
+      }
+      if (tag === 'select' && el.multiple) {
+        for (const opt of Array.from(el.options || [])) {
+          if (opt.selected) entries.push([el.name, opt.value]);
+        }
+        continue;
+      }
+      entries.push([el.name, el.value ?? '']);
+    }
+    return entries;
+  }
+
+  function saveNow() {
+    const form = getForm();
+    if (!form) return;
+    const payload = { at: Date.now(), entries: extractEntries(form) };
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(payload));
+    } catch (_) {
+      // Si el storage está lleno/bloqueado, no rompemos el flujo.
+    }
+  }
+
+  function scheduleSave() {
+    if (saveTimer) window.clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(saveNow, 450);
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function parseStructure(entries) {
+    // Detecta cuántos destinatarios/productos hay para recrear inputs dinámicos.
+    const destProducts = {};
+    let maxDest = 0;
+    for (const [name] of entries) {
+      const mDest = name.match(/^destinatarios\[(\d+)\]/);
+      if (!mDest) continue;
+      const d = Number(mDest[1] || 0);
+      if (!Number.isFinite(d) || d <= 0) continue;
+      maxDest = Math.max(maxDest, d);
+
+      const mProd = name.match(/^destinatarios\[(\d+)\]\[productos\]\[(\d+)\]/);
+      if (mProd) {
+        const p = Number(mProd[2] || 0);
+        if (!destProducts[d]) destProducts[d] = 0;
+        if (Number.isFinite(p) && p > 0) destProducts[d] = Math.max(destProducts[d], p);
+      }
+    }
+    return { maxDest, destProducts };
+  }
+
+  function restore() {
+    const form = getForm();
+    const draft = load();
+    if (!form || !draft || !Array.isArray(draft.entries)) return false;
+
+    // Si ya hay datos (por ejemplo, porque se cargó desde factura), no sobreescribir.
+    const tbody = document.getElementById('tabla-destinatarios');
+    const hasDest = tbody && tbody.children && tbody.children.length > 0;
+    const placa = document.getElementById('placa');
+    const hasBasic = placa && String(placa.value || '').trim().length > 0;
+    if (hasDest || hasBasic) return false;
+
+    const { maxDest, destProducts } = parseStructure(draft.entries);
+    // Recrear destinatarios/productos dinámicos si aplica
+    if (maxDest > 0) {
+      for (let i = 1; i <= maxDest; i++) {
+        agregarDestinatario();
+        const needProds = destProducts[i] || 0;
+        for (let p = 1; p < needProds; p++) {
+          agregarProducto(i);
+        }
+      }
+    }
+
+    // Aplicar valores
+    for (const [name, value] of draft.entries) {
+      const el = form.querySelector(`[name="${CSS.escape(name)}"]`);
+      if (!el) continue;
+      const type = (el.type || '').toLowerCase();
+      if (type === 'checkbox') {
+        el.checked = Boolean(value);
+      } else if (type === 'radio') {
+        const radio = form.querySelector(`[name="${CSS.escape(name)}"][value="${CSS.escape(value)}"]`);
+        if (radio) radio.checked = true;
+      } else {
+        el.value = value;
+      }
+    }
+
+    return true;
+  }
+
+  function bindAutosave() {
+    const form = getForm();
+    if (!form) return;
+    form.addEventListener('input', scheduleSave, true);
+    form.addEventListener('change', scheduleSave, true);
+  }
+
+  return { saveNow, scheduleSave, restore, bindAutosave };
+})();
+
+function validarFormularioGuia({ showModal = true } = {}) {
+  const form = document.getElementById('form-guia-remision');
+  if (!form) return true;
+
+  // Limpia marcas previas
+  form.querySelectorAll('[data-invalid="1"]').forEach((el) => {
+    el.removeAttribute('data-invalid');
+    el.style.borderColor = '';
+    el.style.boxShadow = '';
+  });
+
+  const required = Array.from(form.querySelectorAll('[required]'));
+  const missing = [];
+  let firstInvalid = null;
+
+  for (const el of required) {
+    if (!el || el.disabled) continue;
+    const tag = (el.tagName || '').toLowerCase();
+    const type = (el.type || '').toLowerCase();
+
+    let ok = true;
+    if (type === 'checkbox') ok = el.checked;
+    else if (tag === 'select') ok = String(el.value || '').trim().length > 0;
+    else ok = String(el.value || '').trim().length > 0;
+
+    if (!ok) {
+      if (!firstInvalid) firstInvalid = el;
+      el.setAttribute('data-invalid', '1');
+      el.style.borderColor = '#ef4444';
+      el.style.boxShadow = '0 0 0 2px rgba(239,68,68,0.12)';
+
+      // Intentar sacar un label humano
+      let labelText = '';
+      const group = el.closest('.form-group') || el.closest('td') || el.parentElement;
+      if (group) {
+        const lab = group.querySelector('label');
+        if (lab) labelText = (lab.textContent || '').trim();
+      }
+      if (!labelText) labelText = (el.getAttribute('aria-label') || el.name || el.id || 'Campo requerido');
+      missing.push(labelText.replace('*', '').trim());
+    }
+  }
+
+  if (missing.length > 0) {
+    GuiaDraft.saveNow();
+    if (showModal) {
+      ModalX.open({
+        title: 'Faltan campos obligatorios',
+        variant: 'error',
+        html: `<div>Completa los campos obligatorios antes de continuar:</div><ul>${missing.map((m) => `<li>${escapeHtml(m)}</li>`).join('')}</ul>`
+      });
+    }
+    if (firstInvalid && typeof firstInvalid.scrollIntoView === 'function') {
+      firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      firstInvalid.focus();
+    }
+    return false;
+  }
+
+  return true;
+}
+
 // Función para cargar datos desde una factura seleccionada
 function cargarDatosFactura() {
+  // Token para evitar que respuestas viejas pisen una selección nueva
+  window.__facturaLoadToken = (window.__facturaLoadToken || 0) + 1;
+  const myToken = window.__facturaLoadToken;
+
   const selectFactura = document.getElementById('factura_id');
   const facturaNumero = document.getElementById('factura_numero');
   const facturaClave = document.getElementById('factura_clave');
@@ -490,6 +868,16 @@ function cargarDatosFactura() {
     // No hay factura seleccionada, limpiar campos
     facturaNumero.value = '';
     facturaClave.value = '';
+
+    // También limpiar datos auto-cargados (destinatarios/productos) para que no quede “pegado”
+    try {
+      const tbody = document.getElementById('tabla-destinatarios');
+      if (tbody) tbody.innerHTML = '';
+      contadorDestinatarios = 0;
+      contadorProductos = {};
+      agregarDestinatario();
+    } catch (_) {}
+
     return;
   }
   
@@ -507,9 +895,15 @@ function cargarDatosFactura() {
   facturaClave.value = clave;
   
   // Ahora buscar los productos de la factura via AJAX
+  // Bloquear el select mientras carga para evitar cambios rápidos
+  selectFactura.disabled = true;
   fetch(`/inventario/obtener_datos_factura/${facturaId}/`)
     .then(r => r.json())
     .then(data => {
+      // Si el usuario ya cambió de factura mientras esto cargaba, ignorar
+      if (myToken !== window.__facturaLoadToken) return;
+
+      selectFactura.disabled = false;
       if (data.success) {
         console.log('Datos de factura:', data);
         
@@ -517,6 +911,7 @@ function cargarDatosFactura() {
         const tbody = document.getElementById('tabla-destinatarios');
         tbody.innerHTML = '';
         contadorDestinatarios = 0;
+        contadorProductos = {};
         
         // Crear UN destinatario automáticamente con los datos del cliente
         agregarDestinatario();
@@ -544,65 +939,127 @@ function cargarDatosFactura() {
               console.log('📋 Tabla encontrada:', tablaProductos);
               if (!tablaProductos) {
                 console.error('No se encontró la tabla de productos para el destinatario');
-                alert('⚠️ Datos cargados pero hubo un problema con la tabla de productos. Por favor, agrégalos manualmente.');
+                ModalX.open({
+                  title: 'Datos cargados (con advertencia)',
+                  variant: 'warning',
+                  html: '<div><b>Se cargaron los datos de la factura</b>, pero hubo un problema con la tabla de productos.</div><div class="muted" style="margin-top:6px;">Por favor, agrega los productos manualmente.</div>'
+                });
                 return;
               }
               tablaProductos.innerHTML = ''; // Limpiar productos existentes
+              // Resetear el contador para que “Agregar producto” no choque con índices existentes
+              contadorProductos[1] = 0;
             
               data.productos.forEach((prod, idx) => {
                 const productoIdx = idx + 1; // Índice empieza en 1
                 console.log(`  → Producto ${productoIdx}:`, prod);
                 const rowProd = document.createElement('tr');
                 rowProd.innerHTML = `
-                  <td style="border: 1px solid #d1d5db; padding: 2px;">
+                  <td class="p-1 border border-gray-200">
                     <input type="text" 
                            name="destinatarios[1][productos][${productoIdx}][codigo]" 
-                           value="${prod.codigo}" 
+                           value="${escapeHtml(prod.codigo)}" 
                            class="form-control" 
-                           style="font-size: 9px;" 
                            required>
                   </td>
-                  <td style="border: 1px solid #d1d5db; padding: 2px;">
+                  <td class="p-1 border border-gray-200">
                     <input type="text" 
                            name="destinatarios[1][productos][${productoIdx}][descripcion]" 
-                           value="${prod.descripcion}" 
+                           value="${escapeHtml(prod.descripcion)}" 
                            class="form-control" 
-                           style="font-size: 9px;" 
                            required>
                   </td>
-                  <td style="border: 1px solid #d1d5db; padding: 2px;">
+                  <td class="p-1 border border-gray-200">
                     <input type="number" 
                            name="destinatarios[1][productos][${productoIdx}][cantidad]" 
-                           value="${prod.cantidad}" 
+                           value="${escapeHtml(prod.cantidad)}" 
                            step="0.01" 
                            class="form-control" 
-                           style="font-size: 9px;" 
                            required>
                   </td>
-                  <td style="border: 1px solid #d1d5db; padding: 2px; text-align: center;">
-                    <button type="button" class="btn btn-danger" onclick="eliminarProducto(this)" style="padding: 2px 4px; height: 20px; font-size: 9px;">
+                  <td class="p-1 border border-gray-200 text-center">
+                    <button type="button" class="btnx btnx-danger" onclick="eliminarProducto(this)" style="padding: 4px 8px; border-radius: 8px;">
                       <i class="fas fa-trash"></i>
                     </button>
                   </td>
                 `;
                 tablaProductos.appendChild(rowProd);
               });
+
+              contadorProductos[1] = (data.productos || []).length;
             
-            alert(`✅ Datos cargados desde factura ${numero}:\n- Cliente: ${clienteNombre}\n- ${data.productos.length} producto(s) cargado(s)`);
+            ModalX.open({
+              title: 'Datos cargados desde factura',
+              variant: 'success',
+              html: `
+                <div><b>Factura:</b> ${escapeHtml(numero)} &nbsp;·&nbsp; <b>Productos:</b> ${escapeHtml(data.productos.length)}</div>
+                <div class="muted"><b>Cliente:</b> ${escapeHtml(clienteNombre)}</div>
+              `
+            });
           }
         }
         }, 100); // Esperar 100ms para que el DOM se actualice
       } else {
-        alert('Error al cargar datos de factura: ' + data.message);
+        ModalX.open({
+          title: 'No se pudo cargar la factura',
+          variant: 'error',
+          html: `<div>${escapeHtml(data.message || 'Error desconocido')}</div>`
+        });
       }
     })
     .catch(err => {
       console.error('Error:', err);
-      alert('Error al cargar datos de factura: ' + err.message);
+      try { if (myToken === window.__facturaLoadToken) selectFactura.disabled = false; } catch (_) {}
+      ModalX.open({
+        title: 'Error al cargar datos de factura',
+        variant: 'error',
+        html: `<div>${escapeHtml(err.message || String(err))}</div>`
+      });
     });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+  // Restaurar borrador SOLO si venimos de un submit reciente (evita “precargar” al entrar normal)
+  try {
+    const pendingAtRaw = sessionStorage.getItem('guiaRemision:pendingRestoreAt');
+    const pendingAt = pendingAtRaw ? Number(pendingAtRaw) : 0;
+    const withinWindow = Number.isFinite(pendingAt) && pendingAt > 0 && (Date.now() - pendingAt) <= (2 * 60 * 1000);
+    if (withinWindow) {
+      GuiaDraft.restore();
+    }
+    // Consumir la marca (así no restaura días después)
+    sessionStorage.removeItem('guiaRemision:pendingRestoreAt');
+  } catch (_) {}
+
+  GuiaDraft.bindAutosave();
+
+  // Validación centralizada para Guardar/Emitir
+  const form = document.getElementById('form-guia-remision');
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      if (!validarFormularioGuia({ showModal: true })) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      // Guardar borrador antes de enviar por si el servidor responde con error
+      GuiaDraft.saveNow();
+
+      // Marcar que si regresamos a esta pantalla pronto, restauremos el borrador
+      try {
+        sessionStorage.setItem('guiaRemision:pendingRestoreAt', String(Date.now()));
+      } catch (_) {}
+
+      // Feedback visual: evitar doble click y mostrar que se está procesando
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.dataset.originalHtml = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando…';
+      }
+    });
+  }
+
   // Verificar si viene factura_id en la URL
   const urlParams = new URLSearchParams(window.location.search);
   const facturaIdParam = urlParams.get('factura_id');
@@ -653,7 +1110,7 @@ document.addEventListener('DOMContentLoaded', function() {
             est.value = data.data.establecimiento || '001';
             pemi.value = data.data.punto_emision || '001';
             sec.value = data.data.secuencial || '000000001';
-            lblNumero.textContent = `${est.value}-${pemi.value}-${sec.value}`;
+            if (lblNumero) lblNumero.textContent = `${est.value}-${pemi.value}-${sec.value}`;
             console.log('Campos actualizados:', {est: est.value, pemi: pemi.value, sec: sec.value});
           } else {
             console.error('Error en respuesta:', data.message);
@@ -665,10 +1122,35 @@ document.addEventListener('DOMContentLoaded', function() {
           alert('Error al obtener datos de secuencia: ' + err.message);
         });
     });
+
+    // Si ya hay una secuencia seleccionada (por borrador/precarga), refrescar el número al cargar.
+    try {
+      if (selectSec.value) {
+        selectSec.dispatchEvent(new Event('change'));
+      }
+    } catch (_) {}
   } else {
     console.error('No se encontró el elemento secuencia_guia');
   }
 });
+
+// Si el backend devolvió mensajes y nos quedamos en esta página (error), mostrarlos en modal.
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    const msgs = window.__DJANGO_MESSAGES__;
+    if (!Array.isArray(msgs) || msgs.length === 0) return;
+    const items = msgs.map((m) => `<li>${escapeHtml(m.text)}</li>`).join('');
+    const last = msgs[msgs.length - 1];
+    ModalX.open({
+      title: 'Aviso',
+      variant: tagToVariant(last.tags),
+      html: `<ul>${items}</ul>`
+    });
+  } catch (_) {}
+});
+
+// Inyectado por Django (si hay mensajes)
+window.__DJANGO_MESSAGES__ = window.__DJANGO_MESSAGES__ || [];
 
 let contadorDestinatarios = 0;
 
@@ -679,40 +1161,45 @@ function agregarDestinatario() {
   const row = document.createElement('tr');
   row.setAttribute('data-destinatario-id', contadorDestinatarios);
   row.innerHTML = `
-    <td colspan="6" style="border: 1px solid #d1d5db; padding: 4px; background: #f9fafb;">
-      <div style="border: 2px solid #3b82f6; border-radius: 4px; padding: 6px; background: white;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-          <strong style="color: #1f2937; font-size: 10px;">Destinatario #${contadorDestinatarios}</strong>
-          <button type="button" class="btn btn-danger" onclick="eliminarDestinatario(this)" style="padding: 2px 6px; height: 20px; font-size: 9px;">
+    <td colspan="6" class="p-1 sm:p-2">
+      <div class="dest-card bg-white border border-blue-200 rounded-lg p-2 sm:p-3 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+          <div class="flex items-center gap-2">
+            <div class="h-7 w-7 rounded-md bg-blue-50 flex items-center justify-center">
+              <i class="fas fa-user text-blue-600"></i>
+            </div>
+            <strong class="text-gray-900">Destinatario #${contadorDestinatarios}</strong>
+          </div>
+          <button type="button" class="btnx btnx-danger" onclick="eliminarDestinatario(this)">
             <i class="fas fa-trash"></i> Eliminar
           </button>
         </div>
-        
+
         <!-- Datos del destinatario -->
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 4px;">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
           <div>
-            <label style="font-size: 9px; font-weight: 600; margin-bottom: 1px; display: block;">RUC/Cédula *</label>
-            <div style="display: flex; gap: 2px;">
-              <input type="text" name="destinatarios[${contadorDestinatarios}][ruc]" class="form-control destinatario-ruc" placeholder="RUC" maxlength="13" required style="flex: 1; font-size: 10px;">
-              <button type="button" class="btn btn-primary" onclick="buscarDestinatario(this)" style="padding: 2px 4px; height: 24px; font-size: 9px; min-width: 24px;" title="Buscar">
+            <label>RUC/Cédula *</label>
+            <div class="flex gap-2">
+              <input type="text" name="destinatarios[${contadorDestinatarios}][ruc]" class="form-control destinatario-ruc" placeholder="RUC" maxlength="13" required>
+              <button type="button" class="btnx btnx-outline" onclick="buscarDestinatario(this)" title="Buscar">
                 <i class="fas fa-search"></i>
               </button>
             </div>
           </div>
           <div>
-            <label style="font-size: 9px; font-weight: 600; margin-bottom: 1px; display: block;">Nombre/Razón Social *</label>
-            <input type="text" name="destinatarios[${contadorDestinatarios}][nombre]" class="form-control destinatario-nombre" placeholder="Nombre" required style="font-size: 10px;">
+            <label>Nombre/Razón Social *</label>
+            <input type="text" name="destinatarios[${contadorDestinatarios}][nombre]" class="form-control destinatario-nombre" placeholder="Nombre" required>
           </div>
           <div>
-            <label style="font-size: 9px; font-weight: 600; margin-bottom: 1px; display: block;">Dirección *</label>
-            <input type="text" name="destinatarios[${contadorDestinatarios}][direccion]" class="form-control destinatario-direccion" placeholder="Dirección" required style="font-size: 10px;">
+            <label>Dirección *</label>
+            <input type="text" name="destinatarios[${contadorDestinatarios}][direccion]" class="form-control destinatario-direccion" placeholder="Dirección" required>
           </div>
         </div>
-        
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 4px;">
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
           <div>
-            <label style="font-size: 9px; font-weight: 600; margin-bottom: 1px; display: block;">Motivo Traslado *</label>
-            <select name="destinatarios[${contadorDestinatarios}][motivo]" class="form-control" required style="font-size: 10px;">
+            <label>Motivo Traslado *</label>
+            <select name="destinatarios[${contadorDestinatarios}][motivo]" class="form-control" required>
               <option value="">Seleccione...</option>
               <option value="01">Venta</option>
               <option value="02">Transformación</option>
@@ -722,42 +1209,44 @@ function agregarDestinatario() {
             </select>
           </div>
           <div>
-            <label style="font-size: 9px; font-weight: 600; margin-bottom: 1px; display: block;">Doc. Aduanero</label>
-            <input type="text" name="destinatarios[${contadorDestinatarios}][documento]" class="form-control" placeholder="Documento" style="font-size: 10px;">
+            <label>Doc. Aduanero</label>
+            <input type="text" name="destinatarios[${contadorDestinatarios}][documento]" class="form-control" placeholder="Documento">
           </div>
           <div>
-            <label style="font-size: 9px; font-weight: 600; margin-bottom: 1px; display: block;">Cod. Estab. Destino</label>
-            <input type="text" name="destinatarios[${contadorDestinatarios}][cod_estab]" class="form-control" placeholder="001" maxlength="3" value="001" style="font-size: 10px;">
+            <label>Cod. Estab. Destino</label>
+            <input type="text" name="destinatarios[${contadorDestinatarios}][cod_estab]" class="form-control" placeholder="001" maxlength="3" value="001">
           </div>
         </div>
-        
+
         <!-- Campos ocultos para documento sustento (factura) -->
         <input type="hidden" name="destinatarios[${contadorDestinatarios}][cod_doc_sustento]" value="">
         <input type="hidden" name="destinatarios[${contadorDestinatarios}][num_doc_sustento]" value="">
         <input type="hidden" name="destinatarios[${contadorDestinatarios}][num_aut_doc_sustento]" value="">
         <input type="hidden" name="destinatarios[${contadorDestinatarios}][fecha_emision_doc_sustento]" value="">
-        
+
         <!-- Tabla de productos del destinatario -->
-        <div style="margin-top: 6px; border-top: 1px solid #e5e7eb; padding-top: 6px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
-            <label style="font-size: 9px; font-weight: 600; color: #374151;">Productos a Transportar:</label>
-            <button type="button" class="btn btn-primary" onclick="agregarProducto(${contadorDestinatarios})" style="padding: 2px 6px; height: 20px; font-size: 9px;">
-              <i class="fas fa-plus"></i> Agregar Producto
+        <div class="mt-3 pt-3 border-t border-gray-200">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+            <div class="font-semibold text-gray-900">Productos a transportar</div>
+            <button type="button" class="btnx btnx-primary" onclick="agregarProducto(${contadorDestinatarios})">
+              <i class="fas fa-plus"></i> Agregar producto
             </button>
           </div>
-          <table style="width: 100%; border-collapse: collapse; font-size: 9px;">
-            <thead>
-              <tr style="background: #f3f4f6;">
-                <th style="border: 1px solid #d1d5db; padding: 2px; text-align: left; width: 100px;">Código</th>
-                <th style="border: 1px solid #d1d5db; padding: 2px; text-align: left;">Descripción</th>
-                <th style="border: 1px solid #d1d5db; padding: 2px; text-align: left; width: 80px;">Cantidad</th>
-                <th style="border: 1px solid #d1d5db; padding: 2px; text-align: center; width: 40px;">Acción</th>
-              </tr>
-            </thead>
-            <tbody id="tabla-productos-${contadorDestinatarios}">
-              <!-- Productos dinámicos -->
-            </tbody>
-          </table>
+          <div class="table-wrap">
+            <table class="min-w-full text-xs">
+              <thead>
+                <tr class="bg-gray-50">
+                  <th class="p-1 border border-gray-200 text-left w-40">Código</th>
+                  <th class="p-1 border border-gray-200 text-left">Descripción</th>
+                  <th class="p-1 border border-gray-200 text-left w-32">Cantidad</th>
+                  <th class="p-1 border border-gray-200 text-center w-20">Acción</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-productos-${contadorDestinatarios}">
+                <!-- Productos dinámicos -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </td>
@@ -782,25 +1271,25 @@ function agregarProducto(destinatarioId) {
   
   const row = document.createElement('tr');
   row.innerHTML = `
-    <td style="border: 1px solid #d1d5db; padding: 2px;">
+    <td class="p-1 border border-gray-200">
       <input type="text" 
              name="destinatarios[${destinatarioId}][productos][${productoId}][codigo]" 
              class="form-control" 
              placeholder="PROD001" 
              maxlength="25" 
              required 
-             style="font-size: 9px;">
+             >
     </td>
-    <td style="border: 1px solid #d1d5db; padding: 2px;">
+    <td class="p-1 border border-gray-200">
       <input type="text" 
              name="destinatarios[${destinatarioId}][productos][${productoId}][descripcion]" 
              class="form-control" 
              placeholder="Descripción del producto" 
              maxlength="300" 
              required 
-             style="font-size: 9px;">
+             >
     </td>
-    <td style="border: 1px solid #d1d5db; padding: 2px;">
+    <td class="p-1 border border-gray-200">
       <input type="number" 
              name="destinatarios[${destinatarioId}][productos][${productoId}][cantidad]" 
              class="form-control" 
@@ -808,11 +1297,11 @@ function agregarProducto(destinatarioId) {
              step="0.000001" 
              min="0.000001" 
              required 
-             style="font-size: 9px;">
+             >
     </td>
-    <td style="border: 1px solid #d1d5db; padding: 2px; text-align: center;">
-      <button type="button" class="btn btn-danger" onclick="eliminarProducto(this)" style="padding: 1px 4px; height: 18px; font-size: 8px;">
-        <i class="fas fa-times"></i>
+    <td class="p-1 border border-gray-200 text-center">
+      <button type="button" class="btnx btnx-danger" onclick="eliminarProducto(this)" style="padding: 4px 8px; border-radius: 8px;">
+        <i class="fas fa-trash"></i>
       </button>
     </td>
   `;
@@ -830,10 +1319,9 @@ function eliminarDestinatario(btn) {
 }
 
 function eliminarGuia() { if (confirm('¿Eliminar esta guía?')) alert('Función en desarrollo'); }
-function guardarGuia() { if (confirm('¿Guardar esta guía?')) document.getElementById('form-guia-remision').submit(); }
 
 // Función para buscar transportista por RUC/Cédula
-function buscarTransportista() {
+function buscarTransportista(btnParam) {
   const rucInput = document.getElementById('transportista_ruc');
   const nombreInput = document.getElementById('transportista_nombre');
   const tipoIdInput = document.getElementById('tipo_identificacion_transportista');
@@ -854,12 +1342,27 @@ function buscarTransportista() {
     rucInput.focus();
     return;
   }
+
+  // Cache local (misma pestaña): evita consumir el API repetidamente
+  const cached = obtenerTransportistaDeCache(ruc);
+  if (cached) {
+    nombreInput.value = cached.nombre || '';
+    if (cached.tipo_identificacion && tipoIdInput) tipoIdInput.value = cached.tipo_identificacion;
+    if (cached.direccion && dirEstabInput) dirEstabInput.value = cached.direccion;
+    if (cached.rise && riseInput) riseInput.value = cached.rise;
+    if (cached.obligado_contabilidad && obligadoContInput) obligadoContInput.value = cached.obligado_contabilidad;
+    mostrarNotificacion('✓ Transportista cargado desde cache', 'success');
+    return;
+  }
   
   // Deshabilitar botón mientras se consulta
-  const btnBuscar = event.target;
-  const iconoOriginal = btnBuscar.innerHTML;
-  btnBuscar.disabled = true;
-  btnBuscar.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  const btnBuscar = btnParam || (typeof event !== 'undefined' ? (event.currentTarget || event.target) : null);
+  const btnEl = btnBuscar && btnBuscar.closest ? (btnBuscar.closest('button') || btnBuscar) : btnBuscar;
+  const iconoOriginal = btnEl ? btnEl.innerHTML : null;
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  }
   
   // Consultar API específica para transportistas
   fetch(`/inventario/api/buscar-transportista/?q=${ruc}`)
@@ -894,7 +1397,16 @@ function buscarTransportista() {
         }
         
         // Guardar transportista en el sistema (si no existe)
-        guardarTransportistaEnSistema(ruc, nombre, data.direccion || '', '', '');
+        guardarTransportistaEnSistema(
+          ruc,
+          nombre,
+          data.direccion || '',
+          data.telefono || '',
+          data.email || '',
+          data.tipo_identificacion || '',
+          data.rise || '',
+          data.obligado_contabilidad || ''
+        );
         
         // Mensaje de éxito
         const tipoDoc = ruc.length === 13 ? 'RUC' : 'Cédula';
@@ -911,13 +1423,15 @@ function buscarTransportista() {
     })
     .finally(() => {
       // Restaurar botón
-      btnBuscar.disabled = false;
-      btnBuscar.innerHTML = iconoOriginal;
+      if (btnEl) {
+        btnEl.disabled = false;
+        btnEl.innerHTML = iconoOriginal;
+      }
     });
 }
 
 // Función auxiliar para guardar transportista en el sistema
-function guardarTransportistaEnSistema(ruc, nombre, direccion, telefono, email) {
+function guardarTransportistaEnSistema(ruc, nombre, direccion, telefono, email, tipo_identificacion, rise, obligado_contabilidad) {
   // Esta función guarda el transportista para uso futuro
   // Se enviará al backend cuando se guarde la guía
   const transportista = {
@@ -925,11 +1439,26 @@ function guardarTransportistaEnSistema(ruc, nombre, direccion, telefono, email) 
     nombre: nombre,
     direccion: direccion || '',
     telefono: telefono || '',
-    email: email || ''
+    email: email || '',
+    tipo_identificacion: tipo_identificacion || '',
+    rise: rise || '',
+    obligado_contabilidad: obligado_contabilidad || ''
   };
   
   // Guardar en sessionStorage para reutilizar
   sessionStorage.setItem(`transportista_${ruc}`, JSON.stringify(transportista));
+}
+
+function obtenerTransportistaDeCache(ruc) {
+  try {
+    const raw = sessionStorage.getItem(`transportista_${ruc}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed;
+  } catch (e) {
+    return null;
+  }
 }
 
 // Función auxiliar para mostrar notificaciones

@@ -248,6 +248,51 @@ class SRIClient:
         try:
             # Log de la respuesta para debugging
             logger.debug(f"Respuesta recibida: {str(response)}")
+
+            def _get(obj, key, default=None):
+                if obj is None:
+                    return default
+                if isinstance(obj, dict):
+                    return obj.get(key, default)
+                return getattr(obj, key, default)
+
+            def _normalizar_comprobantes(comprobantes_node):
+                """Normaliza la estructura de zeep: response.comprobantes.comprobante -> lista."""
+                if comprobantes_node is None:
+                    return []
+
+                if isinstance(comprobantes_node, dict) and 'comprobante' in comprobantes_node:
+                    comprobantes_node = comprobantes_node.get('comprobante')
+
+                if hasattr(comprobantes_node, 'comprobante'):
+                    try:
+                        comprobantes_node = getattr(comprobantes_node, 'comprobante')
+                    except Exception:
+                        pass
+
+                if comprobantes_node is None:
+                    return []
+
+                return comprobantes_node if self._is_iterable_safe(comprobantes_node) else [comprobantes_node]
+
+            def _normalizar_mensajes(mensajes_node):
+                """Normaliza mensajes: comprobante.mensajes.mensaje -> lista de items."""
+                if mensajes_node is None:
+                    return []
+
+                if isinstance(mensajes_node, dict) and 'mensaje' in mensajes_node:
+                    mensajes_node = mensajes_node.get('mensaje')
+
+                if hasattr(mensajes_node, 'mensaje'):
+                    try:
+                        mensajes_node = getattr(mensajes_node, 'mensaje')
+                    except Exception:
+                        pass
+
+                if mensajes_node is None:
+                    return []
+
+                return mensajes_node if self._is_iterable_safe(mensajes_node) else [mensajes_node]
             
             # Manejar caso donde response es None
             if response is None:
@@ -262,25 +307,19 @@ class SRIClient:
                 }
             
             # Extraer información de la respuesta
-            estado = getattr(response, 'estado', 'ERROR')
+            estado = _get(response, 'estado', 'ERROR')
             mensajes = []
-            
-            if hasattr(response, 'comprobantes') and response.comprobantes:
-                # Asegurar que comprobantes sea iterable
-                comprobantes = response.comprobantes if self._is_iterable_safe(response.comprobantes) else [response.comprobantes]
-                
-                for comprobante in comprobantes:
-                    if hasattr(comprobante, 'mensajes') and comprobante.mensajes:
-                        # Asegurar que mensajes sea iterable
-                        mensajes_comprobante = comprobante.mensajes if self._is_iterable_safe(comprobante.mensajes) else [comprobante.mensajes]
-                        
-                        for msg in mensajes_comprobante:
-                            mensajes.append({
-                                'identificador': getattr(msg, 'identificador', ''),
-                                'mensaje': getattr(msg, 'mensaje', ''),
-                                'tipo': getattr(msg, 'tipo', ''),
-                                'informacionAdicional': getattr(msg, 'informacionAdicional', '')
-                            })
+
+            comprobantes_node = _get(response, 'comprobantes', None)
+            for comprobante in _normalizar_comprobantes(comprobantes_node):
+                mensajes_node = _get(comprobante, 'mensajes', None)
+                for msg in _normalizar_mensajes(mensajes_node):
+                    mensajes.append({
+                        'identificador': _get(msg, 'identificador', ''),
+                        'mensaje': _get(msg, 'mensaje', ''),
+                        'tipo': _get(msg, 'tipo', ''),
+                        'informacionAdicional': _get(msg, 'informacionAdicional', '')
+                    })
             
             return {
                 'estado': estado,

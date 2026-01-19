@@ -19,13 +19,13 @@
     {% endif %}
     
     <!-- Header -->
-    <div class="bg-gradient-to-r from-purple-600 to-purple-700 px-4 py-3 rounded-lg text-white mb-4">
+    <div class="bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 rounded-lg text-white mb-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
           <i class="fas fa-file-alt text-white text-lg mr-3"></i>
           <div>
             <h2 class="text-lg font-semibold">Guía de Remisión #{{ guia.numero_completo }}</h2>
-            <p class="text-purple-100 text-sm">{{ guia.fecha_inicio_traslado|date:"d/m/Y" }} - {{ guia.get_estado_display }}</p>
+            <p class="text-emerald-100 text-sm">{{ guia.fecha_inicio_traslado|date:"d/m/Y" }} - {{ guia.get_estado_display }}</p>
           </div>
         </div>
         <div class="flex space-x-2">
@@ -40,22 +40,26 @@
           {% endif %}
           {% if guia.estado == 'autorizada' %}
             <a href="{% url 'inventario:descargar_guia_pdf' guia.id %}" 
-               class="bg-white text-purple-700 px-3 py-1 rounded text-sm hover:bg-purple-50">
+               class="bg-white text-emerald-700 px-3 py-1 rounded text-sm hover:bg-emerald-50 no-underline hover:no-underline"
+               style="text-decoration: none !important;">
               <i class="fas fa-file-pdf mr-1"></i>PDF
             </a>
             <a href="{% url 'inventario:descargar_guia_xml' guia.id %}" 
-               class="bg-white text-purple-700 px-3 py-1 rounded text-sm hover:bg-purple-50">
+               class="bg-white text-emerald-700 px-3 py-1 rounded text-sm hover:bg-emerald-50 no-underline hover:no-underline"
+               style="text-decoration: none !important;">
               <i class="fas fa-file-code mr-1"></i>XML
             </a>
           {% endif %}
           {% if guia.estado == 'borrador' %}
             <a href="{% url 'inventario:editar_guia_remision' guia.id %}" 
-               class="bg-white text-purple-700 px-3 py-1 rounded text-sm hover:bg-purple-50">
+               class="bg-white text-emerald-700 px-3 py-1 rounded text-sm hover:bg-emerald-50 no-underline hover:no-underline"
+               style="text-decoration: none !important;">
               <i class="fas fa-edit mr-1"></i>Editar
             </a>
           {% endif %}
           <a href="{% url 'inventario:listar_guias_remision' %}" 
-             class="bg-white text-purple-700 px-3 py-1 rounded text-sm hover:bg-purple-50">
+             class="bg-white text-emerald-700 px-3 py-1 rounded text-sm hover:bg-emerald-50 no-underline hover:no-underline"
+             style="text-decoration: none !important;">
             <i class="fas fa-arrow-left mr-1"></i>Volver
           </a>
         </div>

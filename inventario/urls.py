@@ -201,6 +201,7 @@ urlpatterns = [
     path('guias-remision/<int:guia_id>/autorizar/', views.autorizar_guia_remision, name='autorizar_guia_remision'),
     path('guias-remision/<int:guia_id>/anular/', views.anular_guia_remision, name='anular_guia_remision'),
     path('guias-remision/<int:guia_id>/pdf/', views.descargar_guia_pdf, name='descargar_guia_pdf'),
+    path('guias-remision/<int:guia_id>/xml/', views.descargar_guia_xml, name='descargar_guia_xml'),
     path('api/buscar-transportista/', views.buscar_transportista, name='buscar_transportista'),
     path('api/buscar-cliente/', views.buscar_cliente_ajax, name='buscar_cliente_ajax'),
     path('api/clientes/buscar', views.buscar_cliente_api, name='buscar_cliente_api'),
