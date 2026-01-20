@@ -111,6 +111,11 @@ class EmpresaPlan(models.Model):
         verbose_name='Notificación Enviada',
         help_text='Se envió notificación al alcanzar el 80% del límite'
     )
+    notificacion_limite_enviada = models.BooleanField(
+        default=False,
+        verbose_name='Notificación Límite Enviada',
+        help_text='Se envió notificación al alcanzar el 100% del límite'
+    )
     activo = models.BooleanField(
         default=True,
         verbose_name='Plan Activo'
@@ -141,6 +146,7 @@ class EmpresaPlan(models.Model):
         """Resetea el contador (se ejecuta al inicio de cada periodo)"""
         self.documentos_autorizados = 0
         self.notificacion_enviada = False
+        self.notificacion_limite_enviada = False
         self.ultimo_reset = date.today()
         
         # Calcular nueva fecha_fin
@@ -149,7 +155,7 @@ class EmpresaPlan(models.Model):
         else:  # ANUAL
             self.fecha_fin = date.today() + timedelta(days=365)
         
-        self.save(update_fields=['documentos_autorizados', 'notificacion_enviada', 'ultimo_reset', 'fecha_fin'])
+        self.save(update_fields=['documentos_autorizados', 'notificacion_enviada', 'notificacion_limite_enviada', 'ultimo_reset', 'fecha_fin'])
     
     def verificar_limite(self):
         """

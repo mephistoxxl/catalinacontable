@@ -254,10 +254,13 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404
 import logging
 
+from ..utils_planes import verificar_limite_plan, incrementar_contador_documentos
+
 logger = logging.getLogger(__name__)
 
 
 @login_required
+@verificar_limite_plan
 def autorizar_liquidacion_compra(request, pk):
     """Vista para firmar y enviar una liquidación de compra al SRI"""
     empresa = get_empresa_activa(request)
@@ -266,6 +269,8 @@ def autorizar_liquidacion_compra(request, pk):
         return redirect('inventario:seleccionar_empresa')
     
     liquidacion = get_object_or_404(LiquidacionCompra, pk=pk, empresa=empresa)
+
+    ya_autorizada = bool(liquidacion.numero_autorizacion and liquidacion.fecha_autorizacion)
     
     if liquidacion.estado_sri and liquidacion.estado_sri not in ['BORRADOR', '']:
         messages.error(request, 'Solo se pueden autorizar liquidaciones en estado borrador.')
@@ -279,6 +284,10 @@ def autorizar_liquidacion_compra(request, pk):
         resultado = integrador.procesar_liquidacion_completa(liquidacion)
         
         if resultado.get('exito'):
+            liquidacion.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion', 'estado_sri', 'estado'])
+            ahora_autorizada = bool(liquidacion.numero_autorizacion and liquidacion.fecha_autorizacion)
+            if (not ya_autorizada) and ahora_autorizada:
+                incrementar_contador_documentos(empresa)
             messages.success(request, f'✅ Liquidación de compra {liquidacion.numero_completo} autorizada exitosamente por el SRI.')
         else:
             mensajes = resultado.get('mensajes', [])
@@ -309,6 +318,7 @@ def consultar_estado_liquidacion_compra(request, pk):
         return redirect('inventario:seleccionar_empresa')
     
     liquidacion = get_object_or_404(LiquidacionCompra, pk=pk, empresa=empresa)
+    ya_autorizada = bool(liquidacion.numero_autorizacion and liquidacion.fecha_autorizacion)
     
     if not liquidacion.clave_acceso:
         messages.error(request, 'Esta liquidación no tiene clave de acceso. No se puede consultar el estado en el SRI.')
@@ -320,6 +330,15 @@ def consultar_estado_liquidacion_compra(request, pk):
         
         integrador = IntegracionSRILiquidacion(empresa)
         resultado = integrador.consultar_estado_actual(liquidacion)
+
+        # Si el integrador actualizó autorización, contar solo una vez
+        try:
+            liquidacion.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion', 'estado_sri', 'estado'])
+        except Exception:
+            pass
+        ahora_autorizada = bool(liquidacion.numero_autorizacion and liquidacion.fecha_autorizacion)
+        if (not ya_autorizada) and ahora_autorizada:
+            incrementar_contador_documentos(empresa)
         
         if resultado.get('exito'):
             messages.success(request, f'✅ Liquidación consultada: {resultado.get("estado")}')

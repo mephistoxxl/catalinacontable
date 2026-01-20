@@ -23,6 +23,7 @@ from django.views import View
 
 from inventario.forms import EmitirFacturaFormulario
 from inventario.models import Almacen, Banco, Caja, Cliente, Empresa, Factura, FormaPago, Opciones, Secuencia
+from inventario.utils_planes import obtener_estado_plan_y_notificar, incrementar_contador_documentos
 from inventario.views import complementarContexto
 
 from .models import DetalleNotaDebito, NotaDebito, TotalImpuestoNotaDebito
@@ -552,6 +553,19 @@ class AutorizarNotaDebito(LoginRequiredMixin, View):
             messages.info(request, 'Esta nota de débito ya está autorizada.')
             return redirect('inventario:notas_debito_ver', pk=pk)
 
+        # Control de plan: bloquear autorización si se alcanzó límite
+        empresa = nota_debito.empresa
+        estado_plan = obtener_estado_plan_y_notificar(empresa)
+        if estado_plan.get('tiene_plan') and not estado_plan.get('puede_autorizar', True):
+            messages.error(
+                request,
+                f"🚫 Ha alcanzado el límite de {estado_plan.get('limite_documentos')} documentos de su plan. "
+                "No se puede autorizar una nueva Nota de Débito."
+            )
+            return redirect('inventario:notas_debito_ver', pk=pk)
+
+        ya_autorizada = bool(nota_debito.numero_autorizacion and nota_debito.fecha_autorizacion)
+
         try:
             from .integracion_sri_nd import IntegracionSRINotaDebito
 
@@ -559,6 +573,11 @@ class AutorizarNotaDebito(LoginRequiredMixin, View):
             resultado = integracion.procesar_completo()
 
             if resultado.get('success'):
+                # Incrementar contador SOLO si queda autorizada por primera vez
+                nota_debito.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion', 'estado_sri'])
+                ahora_autorizada = bool(nota_debito.numero_autorizacion and nota_debito.fecha_autorizacion)
+                if (not ya_autorizada) and ahora_autorizada:
+                    incrementar_contador_documentos(empresa)
                 messages.success(request, 'Nota de Débito procesada correctamente en SRI.')
             else:
                 messages.error(request, f"Error al autorizar: {resultado.get('mensaje', 'Error desconocido')}")
@@ -587,6 +606,7 @@ class ConsultarEstadoNotaDebito(LoginRequiredMixin, View):
             return redirect('inventario:panel')
 
         nota_debito = get_object_or_404(NotaDebito, id=pk, empresa_id=empresa_id)
+        ya_autorizada = bool(nota_debito.numero_autorizacion and nota_debito.fecha_autorizacion)
         if not nota_debito.clave_acceso:
             messages.error(request, 'Esta nota de débito no tiene clave de acceso. No se puede consultar el estado en el SRI.')
             return redirect('inventario:notas_debito_ver', pk=pk)
@@ -618,6 +638,12 @@ class ConsultarEstadoNotaDebito(LoginRequiredMixin, View):
                 nota_debito.estado_sri = estado
             nota_debito.mensaje_sri = (str(respuesta) or '')[:2000]
             nota_debito.save(update_fields=['estado_sri', 'mensaje_sri', 'numero_autorizacion', 'fecha_autorizacion'])
+
+            # Incrementar contador SOLO si se autorizó por primera vez vía consulta
+            nota_debito.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion', 'estado_sri'])
+            ahora_autorizada = bool(nota_debito.numero_autorizacion and nota_debito.fecha_autorizacion)
+            if (not ya_autorizada) and ahora_autorizada:
+                incrementar_contador_documentos(nota_debito.empresa)
 
             if nota_debito.estado_sri == 'AUTORIZADO':
                 messages.success(request, f'✅ Estado SRI: {nota_debito.estado_sri}. Autorización: {nota_debito.numero_autorizacion or ""}')

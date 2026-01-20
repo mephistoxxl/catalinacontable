@@ -12,9 +12,12 @@ from django.core.mail import send_mail
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
+from django.db.models import Q
+from datetime import date
 
 from .forms import LoginFormulario
 from .models import Usuario, Empresa, UsuarioEmpresa
+from .models_planes import Plan, EmpresaPlan, HistorialPlan
 
 
 class RootAdminSite(AdminSite):
@@ -174,6 +177,11 @@ class EmpresaAdminForm(forms.ModelForm):
     )
     email = forms.EmailField()
     password = forms.CharField(required=False, widget=forms.PasswordInput)
+    plan = forms.ModelChoiceField(
+        queryset=Plan.objects.filter(activo=True),
+        required=False,
+        help_text="Plan de facturación para esta empresa (define el límite de documentos).",
+    )
 
     class Meta:
         model = Empresa
@@ -181,6 +189,16 @@ class EmpresaAdminForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # En creación: exigir plan (si hay planes activos); en edición permitir dejar en blanco
+        if not getattr(self.instance, 'pk', None):
+            self.fields['plan'].required = Plan.objects.filter(activo=True).exists()
+        else:
+            self.fields['plan'].required = False
+            try:
+                self.fields['plan'].initial = self.instance.plan_activo.plan
+            except Exception:
+                pass
         
         # Si hay RUC en el formulario, prellenar el username automáticamente
         if 'ruc' in self.data:
@@ -198,6 +216,10 @@ class EmpresaAdminForm(forms.ModelForm):
     def clean_username(self):
         """Valida que el username sea único"""
         username = self.cleaned_data.get('username')
+
+        # En edición, este campo solo aplica a la creación de usuario; no validar ni autogenerar
+        if getattr(self.instance, 'pk', None):
+            return username
         
         # Si viene vacío, generar automáticamente desde RUC
         if not username:
@@ -220,6 +242,10 @@ class EmpresaAdminForm(forms.ModelForm):
     def clean_email(self):
         """Valida que el email sea único"""
         email = self.cleaned_data.get('email')
+
+        # En edición, este campo solo aplica a la creación de usuario; no validar unicidad
+        if getattr(self.instance, 'pk', None):
+            return email
         if email:
             User = get_user_model()
             if User.objects.filter(email=email).exists():
@@ -232,16 +258,87 @@ class EmpresaAdminForm(forms.ModelForm):
 class EmpresaAdmin(admin.ModelAdmin):
     form = EmpresaAdminForm
     readonly_fields = ("creada_en", "creada_por")
-    list_display = ("razon_social", "ruc", "tipo_ambiente", "creada_en", "total_facturas", "total_usuarios")
+    list_display = (
+        "razon_social",
+        "ruc",
+        "tipo_ambiente",
+        "plan_nombre",
+        "plan_uso",
+        "creada_en",
+        "documentos_emitidos",
+        "total_usuarios",
+    )
     list_filter = ("tipo_ambiente", "creada_en")
     search_fields = ("razon_social", "ruc")
     ordering = ("-creada_en",)
-    
-    def total_facturas(self, obj):
-        """Muestra el total de facturas de la empresa"""
-        from inventario.models import Factura
-        return Factura._unsafe_objects.filter(empresa=obj).count()
-    total_facturas.short_description = "Facturas"
+
+    def get_queryset(self, request):  # type: ignore[override]
+        qs = super().get_queryset(request)
+        return qs.select_related('plan_activo__plan')
+
+    def plan_nombre(self, obj):
+        ep = getattr(obj, 'plan_activo', None)
+        return ep.plan.nombre if ep and getattr(ep, 'plan', None) else '—'
+    plan_nombre.short_description = 'Plan'
+
+    def plan_uso(self, obj):
+        ep = getattr(obj, 'plan_activo', None)
+        if not ep or not getattr(ep, 'plan', None):
+            return '—'
+        return f"{ep.documentos_autorizados}/{ep.plan.limite_documentos}"
+    plan_uso.short_description = 'Uso'
+
+    def documentos_emitidos(self, obj):
+        """Muestra el total de DOCUMENTOS emitidos (autorizados).
+
+        Nota: esto cuenta autorizados reales (por flags/campos SRI), independientemente
+        de si la empresa tiene un plan asignado.
+        """
+        from inventario.models import Factura, GuiaRemision
+        from inventario.nota_credito.models import NotaCredito
+        from inventario.nota_debito.models import NotaDebito
+        from inventario.liquidacion_compra.models import LiquidacionCompra
+
+        def _mgr(model_cls):
+            return getattr(model_cls, '_unsafe_objects', model_cls.objects)
+
+        factura_count = _mgr(Factura).filter(
+            empresa=obj,
+        ).filter(
+            Q(numero_autorizacion__isnull=False, fecha_autorizacion__isnull=False)
+            | Q(estado_sri__in=['AUTORIZADA', 'AUTORIZADO'])
+        ).count()
+
+        nc_count = _mgr(NotaCredito).filter(
+            empresa=obj,
+        ).filter(
+            Q(numero_autorizacion__isnull=False, fecha_autorizacion__isnull=False)
+            | Q(estado_sri__in=['AUTORIZADA', 'AUTORIZADO'])
+        ).count()
+
+        nd_count = _mgr(NotaDebito).filter(
+            empresa=obj,
+        ).filter(
+            Q(numero_autorizacion__isnull=False, fecha_autorizacion__isnull=False)
+            | Q(estado_sri__in=['AUTORIZADA', 'AUTORIZADO'])
+        ).count()
+
+        guia_count = _mgr(GuiaRemision).filter(
+            empresa=obj,
+        ).filter(
+            Q(numero_autorizacion__isnull=False, fecha_autorizacion__isnull=False)
+            | Q(estado='autorizada')
+        ).count()
+
+        liq_count = _mgr(LiquidacionCompra).filter(
+            empresa=obj,
+        ).filter(
+            Q(numero_autorizacion__isnull=False, fecha_autorizacion__isnull=False)
+            | Q(estado_sri__in=['AUTORIZADA', 'AUTORIZADO'])
+        ).count()
+
+        return factura_count + nc_count + nd_count + guia_count + liq_count
+    documentos_emitidos.short_description = 'Documentos'
     
     def total_usuarios(self, obj):
         """Muestra el total de usuarios de la empresa"""
@@ -386,6 +483,11 @@ class EmpresaAdmin(admin.ModelAdmin):
         if creating and not obj.creada_por_id:
             obj.creada_por = request.user
         super().save_model(request, obj, form, change)
+
+        # Sincronizar plan seleccionado (creación y edición)
+        selected_plan = form.cleaned_data.get('plan')
+        if selected_plan:
+            self._sync_empresa_plan(obj, selected_plan, actor=request.user)
         if creating:
             User = get_user_model()
             
@@ -450,6 +552,45 @@ class EmpresaAdmin(admin.ModelAdmin):
                 f"Usuario {username} creado. {mensaje_login}\n"
                 f"Se envió un enlace a {email} para establecer la contraseña."
             )
+
+    def _sync_empresa_plan(self, empresa: Empresa, new_plan: Plan, actor=None) -> None:
+        """Crea o actualiza el plan activo de una empresa y registra historial al cambiar."""
+        empresa_plan, created = EmpresaPlan.objects.get_or_create(
+            empresa=empresa,
+            defaults={
+                'plan': new_plan,
+                'activo': True,
+            },
+        )
+
+        if created:
+            return
+
+        if empresa_plan.plan_id == new_plan.id:
+            return
+
+        # Registrar historial del plan previo
+        HistorialPlan.objects.create(
+            empresa=empresa,
+            plan=empresa_plan.plan,
+            fecha_inicio=empresa_plan.fecha_inicio,
+            fecha_fin=empresa_plan.fecha_fin or date.today(),
+            documentos_autorizados=empresa_plan.documentos_autorizados,
+            observaciones=(
+                f"Cambio de plan vía admin por {getattr(actor, 'username', 'sistema')}" if actor else None
+            ),
+        )
+
+        # Activar nuevo plan y resetear contador para el nuevo periodo
+        empresa_plan.plan = new_plan
+        empresa_plan.fecha_inicio = date.today()
+        empresa_plan.fecha_fin = None
+        empresa_plan.documentos_autorizados = 0
+        empresa_plan.ultimo_reset = date.today()
+        empresa_plan.notificacion_enviada = False
+        empresa_plan.notificacion_limite_enviada = False
+        empresa_plan.activo = True
+        empresa_plan.save()
 
     def _send_password_setup_email(self, request, usuario, email):
         if not email:

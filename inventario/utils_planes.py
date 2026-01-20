@@ -5,10 +5,90 @@ from functools import wraps
 from django.contrib import messages
 from django.shortcuts import redirect
 from django.http import JsonResponse
+from django.conf import settings
+from django.core.mail import send_mail
 from .models_planes import EmpresaPlan
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _get_email_destino_empresa(empresa):
+    """Obtiene el correo destino principal de la empresa (si existe)."""
+    try:
+        if getattr(empresa, 'opciones', None) is not None and empresa.opciones.exists():
+            correo = empresa.opciones.first().correo
+            if correo and correo != 'pendiente@empresa.com':
+                return correo
+    except Exception:
+        pass
+
+    correo = getattr(empresa, 'correo', None)
+    if correo and correo != 'pendiente@empresa.com':
+        return correo
+
+    return None
+
+
+def _enviar_email_notificacion_plan(empresa_plan: EmpresaPlan, estado: dict, tipo: str) -> bool:
+    """Envía un correo (best-effort) cuando se alcanza 80% o 100% del plan."""
+    empresa = empresa_plan.empresa
+    to_email = _get_email_destino_empresa(empresa)
+    if not to_email:
+        logger.warning(f"No se pudo notificar plan para {getattr(empresa, 'ruc', 'N/A')}: sin correo configurado")
+        return False
+
+    porcentaje = estado.get('porcentaje_usado', 0)
+    usados = estado.get('documentos_usados', empresa_plan.documentos_autorizados)
+    limite = estado.get('limite_documentos', empresa_plan.plan.limite_documentos)
+    restantes = estado.get('documentos_restantes', max(0, limite - usados))
+    dias = getattr(empresa_plan, 'dias_restantes', None)
+
+    if tipo == 'LIMITE':
+        subject = f"🚫 Límite de documentos alcanzado ({empresa_plan.plan.nombre})"
+        headline = "Ha alcanzado el 100% del límite de su plan."
+    else:
+        subject = f"⚠️ Aviso: consumo de plan al {porcentaje:.1f}% ({empresa_plan.plan.nombre})"
+        headline = "Está cerca de alcanzar el límite de su plan."
+
+    site_url = getattr(settings, 'SITE_URL', '')
+    body = (
+        f"Hola {getattr(empresa, 'razon_social', 'empresa')},\n\n"
+        f"{headline}\n\n"
+        f"Plan: {empresa_plan.plan.nombre} ({empresa_plan.plan.codigo})\n"
+        f"Uso: {usados}/{limite} documentos autorizados ({porcentaje:.1f}%)\n"
+        f"Restantes: {restantes}\n"
+        + (f"Días restantes del periodo: {dias}\n" if dias is not None else "")
+        + (f"\nPuedes revisar tu cuenta aquí: {site_url}\n" if site_url else "")
+        + "\nEste aviso se envía automáticamente.\n"
+    )
+
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@example.com'),
+            recipient_list=[to_email],
+            fail_silently=True,
+        )
+        logger.info(f"Notificación de plan enviada a {to_email} para empresa {getattr(empresa, 'ruc', 'N/A')}")
+        return True
+    except Exception as exc:
+        logger.warning(f"Error enviando notificación de plan para {getattr(empresa, 'ruc', 'N/A')}: {exc}")
+        return False
+
+
+def _notificar_si_corresponde(empresa_plan: EmpresaPlan, estado: dict) -> None:
+    """Marca flags y envía correo una sola vez por umbral en el periodo actual."""
+    if estado.get('alcanzado_limite') and not getattr(empresa_plan, 'notificacion_limite_enviada', False):
+        _enviar_email_notificacion_plan(empresa_plan, estado, tipo='LIMITE')
+        empresa_plan.notificacion_limite_enviada = True
+        empresa_plan.save(update_fields=['notificacion_limite_enviada'])
+
+    elif estado.get('alcanzado_80') and not empresa_plan.notificacion_enviada:
+        _enviar_email_notificacion_plan(empresa_plan, estado, tipo='AVISO_80')
+        empresa_plan.notificacion_enviada = True
+        empresa_plan.save(update_fields=['notificacion_enviada'])
 
 
 def verificar_limite_plan(view_func):
@@ -52,6 +132,9 @@ def verificar_limite_plan(view_func):
         
         # Verificar límite de documentos
         estado = empresa_plan.verificar_limite()
+
+        # Notificar (email) si corresponde
+        _notificar_si_corresponde(empresa_plan, estado)
         
         if estado['alcanzado_limite']:
             # Límite alcanzado - bloquear autorización
@@ -129,6 +212,35 @@ def obtener_estado_plan(empresa):
             'tiene_plan': False,
             'puede_autorizar': True,  # Permitir si no tiene plan (legacy)
         }
+
+
+def obtener_estado_plan_y_notificar(empresa):
+    """Igual que obtener_estado_plan, pero también dispara email/flags si corresponde."""
+    try:
+        empresa_plan = EmpresaPlan.objects.select_related('plan').get(empresa=empresa, activo=True)
+        estado = empresa_plan.verificar_limite()
+        _notificar_si_corresponde(empresa_plan, estado)
+    except EmpresaPlan.DoesNotExist:
+        return {
+            'tiene_plan': False,
+            'puede_autorizar': True,
+        }
+
+    return {
+        'tiene_plan': True,
+        'plan_nombre': empresa_plan.plan.nombre,
+        'plan_codigo': empresa_plan.plan.codigo,
+        'documentos_usados': estado['documentos_usados'],
+        'limite_documentos': estado['limite_documentos'],
+        'porcentaje_usado': estado['porcentaje_usado'],
+        'documentos_restantes': estado['documentos_restantes'],
+        'puede_autorizar': estado['puede_autorizar'],
+        'alcanzado_80': estado['alcanzado_80'],
+        'alcanzado_limite': estado['alcanzado_limite'],
+        'dias_restantes': empresa_plan.dias_restantes,
+        'periodo_vencido': empresa_plan.periodo_vencido,
+        'fecha_fin': empresa_plan.fecha_fin,
+    }
 
 
 def api_verificar_limite(request):

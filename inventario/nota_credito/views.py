@@ -30,6 +30,7 @@ from inventario.models import (
 from inventario.views import complementarContexto
 from inventario.forms import EmitirFacturaFormulario
 from django.db.models import Max
+from inventario.utils_planes import obtener_estado_plan_y_notificar, incrementar_contador_documentos
 
 logger = logging.getLogger(__name__)
 
@@ -643,6 +644,19 @@ class AutorizarNotaCredito(LoginRequiredMixin, View):
         if nota_credito.estado_sri == 'AUTORIZADO':
             messages.info(request, 'Esta nota de crédito ya está autorizada.')
             return redirect('inventario:notas_credito_ver', pk=pk)
+
+        # Control de plan: bloquear autorización si se alcanzó límite
+        empresa = nota_credito.empresa
+        estado_plan = obtener_estado_plan_y_notificar(empresa)
+        if estado_plan.get('tiene_plan') and not estado_plan.get('puede_autorizar', True):
+            messages.error(
+                request,
+                f"🚫 Ha alcanzado el límite de {estado_plan.get('limite_documentos')} documentos de su plan. "
+                "No se puede autorizar una nueva Nota de Crédito."
+            )
+            return redirect('inventario:notas_credito_ver', pk=pk)
+
+        ya_autorizada = bool(nota_credito.numero_autorizacion and nota_credito.fecha_autorizacion)
         
         try:
             from .integracion_sri_nc import IntegracionSRINotaCredito
@@ -651,6 +665,10 @@ class AutorizarNotaCredito(LoginRequiredMixin, View):
             resultado = integracion.procesar_completo()
             
             if resultado['success']:
+                nota_credito.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion', 'estado_sri'])
+                ahora_autorizada = bool(nota_credito.numero_autorizacion and nota_credito.fecha_autorizacion)
+                if (not ya_autorizada) and ahora_autorizada:
+                    incrementar_contador_documentos(empresa)
                 messages.success(request, f'Nota de Crédito autorizada correctamente. Autorización: {resultado.get("numero_autorizacion", "")}')
             else:
                 messages.error(request, f'Error al autorizar: {resultado.get("mensaje", "Error desconocido")}')
@@ -681,6 +699,8 @@ class ConsultarEstadoNotaCredito(LoginRequiredMixin, View):
             empresa_id=empresa_id
         )
 
+        ya_autorizada = bool(nota_credito.numero_autorizacion and nota_credito.fecha_autorizacion)
+
         if not nota_credito.clave_acceso:
             messages.error(request, 'Esta nota de crédito no tiene clave de acceso. No se puede consultar el estado en el SRI.')
             return redirect('inventario:notas_credito_ver', pk=pk)
@@ -701,6 +721,15 @@ class ConsultarEstadoNotaCredito(LoginRequiredMixin, View):
 
             integracion = IntegracionSRINotaCredito(nota_credito)
             estado = integracion.procesar_respuesta(respuesta)
+
+            # Contar solo una vez cuando pasa a AUTORIZADO
+            try:
+                nota_credito.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion', 'estado_sri'])
+            except Exception:
+                pass
+            ahora_autorizada = bool(nota_credito.numero_autorizacion and nota_credito.fecha_autorizacion)
+            if (not ya_autorizada) and ahora_autorizada:
+                incrementar_contador_documentos(nota_credito.empresa)
 
             if estado == 'AUTORIZADO':
                 messages.success(request, f'✅ Estado SRI: {estado}. Autorización: {nota_credito.numero_autorizacion or ""}')

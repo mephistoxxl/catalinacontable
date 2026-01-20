@@ -64,7 +64,7 @@ from sistema.aws_utils import build_storage_url_or_none
 from .proforma.ride_proformgenerator import ProformaRIDEGenerator
 from .utils.media_paths import build_factura_media_paths
 from .utils.storage_io import storage_read_text
-from .utils_planes import api_verificar_limite
+from .utils_planes import api_verificar_limite, verificar_limite_plan, incrementar_contador_documentos, obtener_estado_plan, obtener_estado_plan_y_notificar
 import os
 from pathlib import Path
 from django.conf import settings
@@ -1109,6 +1109,13 @@ class Panel(LoginRequiredMixin, View):
         except Empresa.DoesNotExist:
             return redirect('inventario:seleccionar_empresa')
 
+        # Estado del plan (para avisos de límite de DOCUMENTOS emitidos/autorizados)
+        try:
+            from .utils_planes import obtener_estado_plan
+            estado_plan = obtener_estado_plan(empresa)
+        except Exception:
+            estado_plan = {'tiene_plan': False, 'puede_autorizar': True}
+
         # Ventas por mes (año actual vs año anterior) para el gráfico
         hoy = date.today()
         year_cur = hoy.year
@@ -1351,6 +1358,9 @@ class Panel(LoginRequiredMixin, View):
             },
             # Datos para top productos vendidos
             'topProductosVendidos': DetalleFactura.topProductosVendidos(5, empresa_id),
+
+            # Plan (avisos en el panel)
+            'estado_plan': estado_plan,
         }
 
         return render(request, 'inventario/panel.html', contexto)
@@ -3473,9 +3483,33 @@ class EmitirFactura(LoginRequiredMixin, View):
 
                 integration = SRIIntegration(empresa=get_empresa_activa(request))
 
+                # Control de plan: bloquear emisión/autorización si excede el límite
+                empresa_plan_estado = obtener_estado_plan_y_notificar(get_empresa_activa(request))
+                if empresa_plan_estado.get('tiene_plan') and not empresa_plan_estado.get('puede_autorizar', True):
+                    messages.error(
+                        request,
+                        f"🚫 Ha alcanzado el límite de {empresa_plan_estado.get('limite_documentos')} documentos de su plan. "
+                        "No se puede autorizar una nueva factura."
+                    )
+                    return redirect('inventario:verFactura', p=factura.id)
+                if empresa_plan_estado.get('tiene_plan') and empresa_plan_estado.get('alcanzado_80'):
+                    messages.warning(
+                        request,
+                        f"⚠️ Atención: Ha utilizado {empresa_plan_estado.get('porcentaje_usado')}% de su plan. "
+                        f"Le quedan {empresa_plan_estado.get('documentos_restantes')} documentos."
+                    )
+
+                ya_autorizada = bool(factura.numero_autorizacion and factura.fecha_autorizacion)
+
                 resultado_proc = integration.procesar_factura(factura.id)
 
                 if resultado_proc.get('success'):
+                    # Incrementar contador SOLO si queda autorizada por primera vez
+                    factura.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion', 'estado_sri'])
+                    ahora_autorizada = bool(factura.numero_autorizacion and factura.fecha_autorizacion)
+                    if (not ya_autorizada) and ahora_autorizada:
+                        incrementar_contador_documentos(get_empresa_activa(request))
+
                     res = resultado_proc.get('resultado') if isinstance(resultado_proc.get('resultado'), dict) else {}
                     estado = (resultado_proc.get('estado') or res.get('estado') or factura.estado_sri or 'PROCESADA')
                     estado_norm = str(estado).strip().upper()
@@ -4493,6 +4527,7 @@ def consultar_estado_sri(request, factura_id):
         # Obtener la factura de la empresa activa
         empresa_id = request.session.get('empresa_activa')
         factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
+        ya_autorizada = bool(factura.numero_autorizacion and factura.fecha_autorizacion)
 
         def _normalizar_estado_sri(valor):
             """Normaliza el estado devuelto por el SRI a un valor válido en el modelo."""
@@ -4629,6 +4664,11 @@ def consultar_estado_sri(request, factura_id):
 
             if update_fields:
                 factura.save(update_fields=update_fields)
+
+            # Incrementar contador SOLO si pasa a autorizada por primera vez vía consulta
+            ahora_autorizada = bool(factura.numero_autorizacion and factura.fecha_autorizacion)
+            if (not ya_autorizada) and ahora_autorizada:
+                incrementar_contador_documentos(get_empresa_activa(request))
 
             # Ajustar fecha de autorización para mostrar (restar 5 horas)
             fecha_aut_respuesta = ''
@@ -8120,6 +8160,7 @@ def enviar_documento_sri(request, factura_id):
 
 @csrf_exempt
 @require_empresa_activa
+@verificar_limite_plan
 def autorizar_documento_sri(request, factura_id):
     """
     Vista para autorizar un documento electrónico en el SRI
@@ -8138,12 +8179,21 @@ def autorizar_documento_sri(request, factura_id):
         if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
             raise Http404("Empresa no válida")
         factura = get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
+        ya_autorizada = bool(factura.numero_autorizacion and factura.fecha_autorizacion)
         
         # Procesar factura en el SRI
         integration = SRIIntegration(empresa=get_empresa_activa(request))
         resultado = integration.procesar_factura(factura_id)
         
         if resultado['success']:
+            # Refrescar desde DB por si el integrador actualizó campos
+            factura.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion', 'estado_sri', 'clave_acceso'])
+
+            # Incrementar contador SOLO cuando pasa a autorizado por primera vez
+            ahora_autorizada = bool(factura.numero_autorizacion and factura.fecha_autorizacion)
+            if (not ya_autorizada) and ahora_autorizada:
+                incrementar_contador_documentos(get_empresa_activa(request))
+
             return JsonResponse({
                 'success': True,
                 'message': 'Documento procesado correctamente en el SRI',
@@ -9311,6 +9361,7 @@ def descargar_guia_xml(request, guia_id):
     return response
 
 @login_required
+@verificar_limite_plan
 def autorizar_guia_remision(request, guia_id):
     """Vista para firmar y enviar una guía de remisión al SRI"""
     empresa_id = request.session.get('empresa_activa')
@@ -9322,6 +9373,8 @@ def autorizar_guia_remision(request, guia_id):
         return redirect('inventario:seleccionar_empresa')
     
     guia = get_object_or_404(GuiaRemision, id=guia_id, empresa=empresa)
+
+    ya_autorizada = bool(guia.numero_autorizacion and guia.fecha_autorizacion)
     
     if guia.estado != 'borrador':
         messages.error(request, 'Solo se pueden autorizar guías en estado borrador.')
@@ -9335,6 +9388,10 @@ def autorizar_guia_remision(request, guia_id):
         resultado = integrador.procesar_guia_remision(guia.id)
         
         if resultado['success']:
+            guia.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion', 'estado'])
+            ahora_autorizada = bool(guia.numero_autorizacion and guia.fecha_autorizacion)
+            if (not ya_autorizada) and ahora_autorizada:
+                incrementar_contador_documentos(empresa)
             messages.success(request, f'✅ Guía de remisión {guia.numero_completo} autorizada exitosamente por el SRI.')
         else:
             messages.error(request, f'❌ Error: {resultado["message"]}')
