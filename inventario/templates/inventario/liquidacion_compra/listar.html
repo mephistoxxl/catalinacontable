@@ -5,33 +5,33 @@
 <style>
   .page-header {
     background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-    padding: 1.5rem 2rem;
+    padding: 0.75rem 1rem;
     border-radius: 12px;
-    margin-bottom: 1.5rem;
+    margin-bottom: 0.75rem;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   }
 
   .page-title {
     color: white;
-    font-size: 1.5rem;
+    font-size: 1.05rem;
     font-weight: 600;
     margin: 0;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
 
   .btn-nueva {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.625rem 1.25rem;
+    padding: 0.45rem 0.85rem;
     background: #10b981;
     color: white !important;
     text-decoration: none !important;
     border-radius: 8px;
     font-weight: 500;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     transition: all 0.2s ease;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
@@ -60,9 +60,9 @@
   }
 
   .modern-table thead th {
-    padding: 1rem 1.25rem;
+    padding: 0.55rem 0.75rem;
     text-align: left;
-    font-size: 0.75rem;
+    font-size: 0.68rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -79,8 +79,8 @@
   }
 
   .modern-table tbody td {
-    padding: 1rem 1.25rem;
-    font-size: 0.875rem;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.82rem;
     color: #1f2937;
   }
 
@@ -89,7 +89,7 @@
     align-items: center;
     padding: 0.25rem 0.75rem;
     border-radius: 9999px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 500;
     text-transform: uppercase;
   }
@@ -119,12 +119,29 @@
 
   .font-mono {
     font-family: ui-monospace, monospace;
-    font-size: 0.8125rem;
+    font-size: 0.78rem;
+  }
+
+  /* Dropdown overlay panel (Liquidaciones) */
+  .liquidacion-dropdown-wrapper .dropdown-panel {
+    position: fixed;
+    width: 11rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    z-index: 9999;
+    overflow: hidden;
+  }
+
+  .liquidacion-dropdown-wrapper .action-icon {
+    width: 14px;
+    text-align: center;
   }
 </style>
 
-<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
-  <div class="container mx-auto" style="max-width: 1400px;">
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-2">
+  <div class="container mx-auto" style="max-width: 1100px;">
     <div class="page-header">
       <div class="flex items-center justify-between flex-wrap gap-4">
         <h1 class="page-title">
@@ -164,8 +181,7 @@
               </td>
               <td>
                 <span class="font-mono">
-                  {{ liquidacion.establecimiento|stringformat:"03d" }}-{{ liquidacion.punto_emision|stringformat:"03d"
-                  }}
+                  {{ liquidacion.establecimiento|stringformat:"03d" }}-{{ liquidacion.punto_emision|stringformat:"03d" }}
                 </span>
               </td>
               <td>
@@ -180,7 +196,7 @@
                 </div>
               </td>
               <td class="text-right">
-                <strong style="color: #059669; font-size: 0.9375rem;">
+                <strong style="color: #059669; font-size: 0.875rem;">
                   ${{ liquidacion.importe_total|floatformat:2 }}
                 </strong>
               </td>
@@ -203,16 +219,33 @@
                 {% endif %}
               </td>
               <td class="text-right">
-                <div style="display: inline-flex; gap: 0.5rem;">
-                  <a href="{% url 'inventario:liquidaciones_compra_ver' liquidacion.id %}"
-                    title="{% trans 'Ver detalles' %}"
-                    style="display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; background: #3b82f6; color: white; border-radius: 6px; text-decoration: none;">
-                    <i class="fa fa-eye"></i>
-                  </a>
-                  <a href="#" title="{% trans 'Descargar PDF' %}"
-                    style="display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; background: #ef4444; color: white; border-radius: 6px; text-decoration: none;">
-                    <i class="fa fa-file-pdf-o"></i>
-                  </a>
+                <div class="relative inline-block text-left liquidacion-dropdown-wrapper">
+                  <button type="button" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-2 py-1 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="liquidacionesToggleDropdown(this,'{{ forloop.counter }}')">
+                    {% trans "Acciones" %}
+                    <i class="fa fa-chevron-down ml-1 -mr-0.5 h-3 w-3"></i>
+                  </button>
+                  <div class="dropdown-panel hidden" id="liquidaciones-dropdown-panel-{{ forloop.counter }}">
+                    <div class="py-1">
+                      <a href="{% url 'inventario:liquidaciones_compra_ver' liquidacion.id %}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900" style="text-decoration:none;">
+                        <i class="fa fa-eye mr-2 text-blue-500 action-icon"></i>
+                        <span>{% trans "Ver" %}</span>
+                      </a>
+                      {% if liquidacion.clave_acceso %}
+                      <form method="post" action="{% url 'inventario:consultar_estado_liquidacion_compra' liquidacion.id %}" class="m-0">
+                        {% csrf_token %}
+                        <button type="submit" class="flex items-center w-full text-left px-3 py-1.5 text-xs text-blue-700 hover:bg-blue-50 hover:text-blue-900 border-none bg-transparent cursor-pointer" style="text-decoration:none;">
+                          <i class="fa fa-refresh mr-2 text-blue-500 action-icon"></i>
+                          <span>{% trans "Consultar SRI" %}</span>
+                        </button>
+                      </form>
+                      <div class="border-t border-gray-100"></div>
+                      {% endif %}
+                      <a href="#" class="flex items-center px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 hover:text-red-700" style="text-decoration:none;">
+                        <i class="fa fa-file-pdf-o mr-2 text-red-500 action-icon"></i>
+                        <span>{% trans "PDF" %}</span>
+                      </a>
+                    </div>
+                  </div>
                 </div>
               </td>
             </tr>
@@ -231,4 +264,52 @@
     {% endif %}
   </div>
 </div>
+
+<script>
+  (function () {
+    'use strict';
+
+    function closeAll() {
+      document.querySelectorAll('[id^="liquidaciones-dropdown-panel-"]').forEach(function (panel) {
+        panel.classList.add('hidden');
+      });
+    }
+
+    window.liquidacionesToggleDropdown = function (btn, key) {
+      var panel = document.getElementById('liquidaciones-dropdown-panel-' + key);
+      if (!panel || !btn) return;
+
+      var isHidden = panel.classList.contains('hidden');
+      closeAll();
+      if (!isHidden) return;
+
+      var rect = btn.getBoundingClientRect();
+      var top = rect.bottom + 6;
+      var left = rect.left;
+      panel.style.top = top + 'px';
+      panel.style.left = left + 'px';
+
+      // Evitar que se salga de la pantalla
+      var panelRect = panel.getBoundingClientRect();
+      var overflowRight = panelRect.right - window.innerWidth;
+      if (overflowRight > 8) {
+        panel.style.left = Math.max(8, left - overflowRight - 8) + 'px';
+      }
+
+      panel.classList.remove('hidden');
+    };
+
+    document.addEventListener('click', function (event) {
+      var target = event.target;
+      if (target && target.closest && target.closest('.liquidacion-dropdown-wrapper')) {
+        return;
+      }
+      closeAll();
+    });
+
+    window.addEventListener('scroll', function () {
+      closeAll();
+    }, { passive: true });
+  })();
+</script>
 {% endblock %}
