@@ -206,10 +206,10 @@
                   <i class="fa fa-pencil" style="margin-right: 0.25rem;"></i>
                   Borrador
                 </span>
-                {% elif liquidacion.estado == 'AUTORIZADO' %}
+                {% elif liquidacion.estado == 'AUTORIZADO' or liquidacion.estado == 'AUTORIZADA' or liquidacion.estado_sri == 'AUTORIZADO' or liquidacion.estado_sri == 'AUTORIZADA' %}
                 <span class="badge-estado badge-autorizado">
                   <i class="fa fa-check-circle" style="margin-right: 0.25rem;"></i>
-                  Autorizado
+                  Autorizada
                 </span>
                 {% else %}
                 <span class="badge-estado badge-error">

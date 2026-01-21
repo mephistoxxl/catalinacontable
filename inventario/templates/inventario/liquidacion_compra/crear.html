@@ -426,7 +426,24 @@
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+    text-decoration: none !important;
     transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .form-action-bar .secondary-action.cancel-action {
+    padding: 0.6rem 1.1rem;
+    gap: 0.4rem;
+    border-radius: 10px;
+    border-color: rgba(220, 38, 38, 0.35);
+    background: rgba(220, 38, 38, 0.08);
+    color: #dc2626;
+    font-size: 0.72rem;
+    min-height: 40px;
+  }
+
+  .form-action-bar .secondary-action.cancel-action i {
+    font-size: 0.9rem;
+    line-height: 1;
   }
 
   .form-action-bar .secondary-action:hover {
@@ -434,6 +451,13 @@
     border-color: rgba(15, 23, 42, 0.2);
     color: #0f172a;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    text-decoration: none !important;
+  }
+
+  .form-action-bar .secondary-action.cancel-action:hover {
+    background: rgba(220, 38, 38, 0.14);
+    border-color: rgba(220, 38, 38, 0.55);
+    color: #b91c1c;
   }
 
   .form-action-bar .secondary-action:focus-visible {
@@ -918,10 +942,15 @@
             class="primary-action inline-flex items-center justify-center gap-2 px-5 py-2 text-white font-semibold uppercase transition-transform duration-200"
           >
             <i class="fa fa-save text-[14px]"></i>
-            <span>{% trans "Guardar liquidación" %}</span>
+            <span>{% trans "Emitir liquidación" %}</span>
           </button>
-          <a href="{% url 'inventario:liquidaciones_compra_listar' %}" class="secondary-action inline-flex items-center gap-1 px-3 py-1 transition-colors duration-200">
-            <i class="fa fa-arrow-left text-[8px]"></i>
+          <a
+            href="{% url 'inventario:liquidaciones_compra_listar' %}"
+            class="secondary-action cancel-action"
+            aria-label="{% trans 'Cancelar' %}"
+            title="{% trans 'Cancelar' %}"
+          >
+            <i class="fa fa-times" aria-hidden="true"></i>
             <span>{% trans "Cancelar" %}</span>
           </a>
         </div>

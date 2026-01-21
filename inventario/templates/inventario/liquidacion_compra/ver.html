@@ -51,26 +51,64 @@
     .lc-details summary::-webkit-details-marker { display: none; }
     .lc-summary { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
     .lc-summary small { color: #6b7280; font-weight: 600; }
+
+    /* Modal documento autorizado */
+    .lc-modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 16px; }
+    .lc-modal { width: 100%; max-width: 520px; background: #fff; border-radius: 14px; box-shadow: 0 24px 60px rgba(0,0,0,.25); overflow: hidden; }
+    .lc-modal-header { display:flex; align-items:center; justify-content: space-between; gap: 12px; padding: 14px 16px; background: linear-gradient(135deg, #16a34a, #22c55e); border-bottom: 1px solid rgba(0,0,0,.06); }
+    .lc-modal-title { display:flex; align-items:center; gap: 10px; font-size: 1rem; font-weight: 900; color: #ffffff; letter-spacing: 0.02em; }
+    .lc-modal-title i { color: #ffffff; }
+    .lc-modal-body { padding: 16px; color: #334155; font-size: 0.95rem; }
+    .lc-modal-footer { padding: 12px 16px; border-top: 1px solid #e5e7eb; display:flex; justify-content: flex-end; }
+    .lc-modal-close { border: 0; background: rgba(255,255,255,0.18); color: #ffffff; font-size: 22px; line-height: 1; padding: 4px 10px; border-radius: 10px; }
+    .lc-modal-close:hover { background: rgba(255,255,255,0.28); color: #ffffff; }
+    .lc-modal-btn { border: 1px solid rgba(22, 163, 74, 0.35); background: rgba(22, 163, 74, 0.10); color: #166534; font-weight: 900; padding: 9px 16px; border-radius: 12px; }
+    .lc-modal-btn:hover { background: rgba(22, 163, 74, 0.16); }
 </style>
 
 <div class="bg-gradient-to-br from-green-50 via-white to-gray-50 p-2">
     <div class="max-w-6xl mx-auto">
-        <!-- Mensajes -->
+        <!-- Modal: Documento autorizado (se muestra una sola vez) -->
+        <div id="lc-modal-autorizado-backdrop" class="lc-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="lc-modal-autorizado-title">
+            <div class="lc-modal">
+                <div class="lc-modal-header">
+                    <div class="lc-modal-title" id="lc-modal-autorizado-title">
+                        <i class="fas fa-check-circle text-green-600" aria-hidden="true"></i>
+                        <span>{% trans "LIQUIDACIÓN DE COMPRA AUTORIZADA" %}</span>
+                    </div>
+                    <button type="button" class="lc-modal-close" id="lc-modal-autorizado-x" aria-label="{% trans 'Cerrar' %}">&times;</button>
+                </div>
+                <div class="lc-modal-body">
+                    <p class="mb-2">{% trans "La liquidación de compra fue autorizada por el SRI." %}</p>
+                    <p class="text-sm text-slate-600">
+                        <strong>{% trans "Número" %}:</strong> {{ liquidacion.numero_completo }}
+                        {% if liquidacion.numero_autorizacion %}<br><strong>{% trans "Autorización" %}:</strong> {{ liquidacion.numero_autorizacion }}{% endif %}
+                    </p>
+                </div>
+                <div class="lc-modal-footer">
+                    <button type="button" class="lc-modal-btn" id="lc-modal-autorizado-cerrar">{% trans "OK" %}</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mensajes (solo errores/advertencias; éxitos se muestran con modal) -->
         {% if messages %}
             <div class="mb-2">
                 {% for message in messages %}
-                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-green-500 bg-green-50">
-                        <div class="flex items-center">
-                            <div class="flex-shrink-0">
-                                <i class="fas fa-check-circle text-green-500 text-xl"></i>
-                            </div>
-                            <div class="ml-3">
-                                <p class="text-sm font-medium text-green-800">
-                                    {{ message }}
-                                </p>
+                    {% if 'error' in message.tags or 'warning' in message.tags %}
+                        <div class="bg-white rounded-lg shadow-md p-4 border-l-4 {% if 'error' in message.tags %}border-red-500 bg-red-50{% else %}border-yellow-500 bg-yellow-50{% endif %}">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas {% if 'error' in message.tags %}fa-times-circle text-red-500{% else %}fa-exclamation-triangle text-yellow-500{% endif %} text-xl"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm font-medium {% if 'error' in message.tags %}text-red-800{% else %}text-yellow-800{% endif %}">
+                                        {{ message }}
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    {% endif %}
                 {% endfor %}
             </div>
         {% endif %}
@@ -183,9 +221,9 @@
                         <h6 class="lc-kv-title">Ambiente</h6>
                         <p class="lc-kv-value">
                             {% if ambiente == '1' %}
-                                <span class="text-yellow-600">🧪 Pruebas</span>
+                                <span class="text-yellow-600">Pruebas</span>
                             {% else %}
-                                <span class="text-green-600">✅ Producción</span>
+                                <span class="text-green-600">Producción</span>
                             {% endif %}
                         </p>
                     </div>
@@ -375,4 +413,34 @@
         </div>
     </div>
 </div>
+
+{% block extra_js %}
+<script>
+    (function () {
+        const shouldShow = {{ mostrar_modal_autorizado|yesno:"true,false" }};
+        if (!shouldShow) return;
+
+        const backdrop = document.getElementById('lc-modal-autorizado-backdrop');
+        const btnCerrar = document.getElementById('lc-modal-autorizado-cerrar');
+        const btnX = document.getElementById('lc-modal-autorizado-x');
+
+        function cerrar() {
+            if (backdrop) backdrop.style.display = 'none';
+        }
+
+        if (backdrop) {
+            backdrop.style.display = 'flex';
+            backdrop.addEventListener('click', function (e) {
+                if (e.target === backdrop) cerrar();
+            });
+        }
+        if (btnCerrar) btnCerrar.addEventListener('click', cerrar);
+        if (btnX) btnX.addEventListener('click', cerrar);
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') cerrar();
+        });
+    })();
+</script>
+{% endblock %}
 {% endblock %}

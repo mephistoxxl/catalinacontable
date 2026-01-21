@@ -29,7 +29,7 @@ class LiquidacionCompraListView(LoginRequiredMixin, RequireEmpresaActivaMixin, L
     model = LiquidacionCompra
     template_name = "inventario/liquidacion_compra/listar.html"
     context_object_name = "liquidaciones"
-    paginate_by = 25
+    paginate_by = 10
 
     def get_queryset(self):
         empresa = get_empresa_activa(self.request)
@@ -190,8 +190,7 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
                     liquidacion.sincronizar_formas_pago()
                     liquidacion.save()
 
-                messages.success(request, _("La liquidación se creó correctamente."))
-                return redirect(self.success_url)
+                return redirect("inventario:autorizar_liquidacion_compra", pk=liquidacion.pk)
             except Secuencia.DoesNotExist:
                 messages.error(
                     request,
@@ -246,6 +245,7 @@ class LiquidacionCompraDetailView(LoginRequiredMixin, RequireEmpresaActivaMixin,
             'liquidacion': liquidacion,
             'titulo': _('Detalles de Liquidación de Compra'),
             'ambiente': ambiente,
+            'mostrar_modal_autorizado': bool(request.session.pop('mostrar_modal_autorizado', False)),
         }
         return render(request, self.template_name, context)
 
@@ -288,7 +288,11 @@ def autorizar_liquidacion_compra(request, pk):
             ahora_autorizada = bool(liquidacion.numero_autorizacion and liquidacion.fecha_autorizacion)
             if (not ya_autorizada) and ahora_autorizada:
                 incrementar_contador_documentos(empresa)
-            messages.success(request, f'✅ Liquidación de compra {liquidacion.numero_completo} autorizada exitosamente por el SRI.')
+            # Modal de "DOCUMENTO AUTORIZADO" (sin banners verdes)
+            try:
+                request.session['mostrar_modal_autorizado'] = True
+            except Exception:
+                pass
         else:
             mensajes = resultado.get('mensajes', [])
             if mensajes:
@@ -339,11 +343,15 @@ def consultar_estado_liquidacion_compra(request, pk):
         ahora_autorizada = bool(liquidacion.numero_autorizacion and liquidacion.fecha_autorizacion)
         if (not ya_autorizada) and ahora_autorizada:
             incrementar_contador_documentos(empresa)
+            # Si al consultar pasó a autorizada, mostrar modal
+            try:
+                request.session['mostrar_modal_autorizado'] = True
+            except Exception:
+                pass
         
         if resultado.get('exito'):
-            messages.success(request, f'✅ Liquidación consultada: {resultado.get("estado")}')
-            if resultado.get('numero_autorizacion'):
-                messages.info(request, f'Número de autorización: {resultado.get("numero_autorizacion")}')
+            # No mostramos banners de éxito aquí; el detalle usa modal si aplica.
+            pass
         else:
             mensajes = resultado.get('mensajes', [])
             if mensajes:

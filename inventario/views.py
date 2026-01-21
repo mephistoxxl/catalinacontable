@@ -1373,6 +1373,22 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
     login_url = '/inventario/login'
     redirect_field_name = None
 
+    @staticmethod
+    def _safe_str(value):
+        return str(value).strip() if value is not None else ""
+
+    @staticmethod
+    def _extract_secuencia_int(numero: str):
+        """Extrae un entero comparable desde un número tipo 001-001-000000001 o similar."""
+        try:
+            s = ''.join([c for c in str(numero or '') if c.isdigit()])
+            if not s:
+                return 0
+            # Usar últimos 9 dígitos como secuencia primaria.
+            return int(s[-9:])
+        except Exception:
+            return 0
+
     def get(self, request):
         empresa = get_empresa_activa(request)
         from .models import Almacen, Facturador
@@ -1382,6 +1398,9 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
         hoy_str = datetime.now().date().strftime('%Y-%m-%d')
         desde_ui = (request.GET.get('desde') or hoy_str).strip()
         hasta_ui = (request.GET.get('hasta') or hoy_str).strip()
+        ambiente_sel_ui_list = [str(v).strip() for v in request.GET.getlist('ambiente')]
+        ambiente_sel_ui_list = [v for v in ambiente_sel_ui_list if v in ['1', '2']]
+        ambiente_ui = ambiente_sel_ui_list[0] if len(ambiente_sel_ui_list) == 1 else 'ambos'
 
         almacenes_disponibles = (
             Almacen.objects.filter(activo=True, empresa=empresa).order_by('descripcion')
@@ -1398,12 +1417,16 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
         accion = (request.GET.get('accion') or '').strip().lower()
         if accion == 'imprimir':
             from django.http import HttpResponse
-            from .models import Factura, Opciones
+            from django.db.models import Q
+            from django.db.models.functions import Substr
+            from .models import Factura, Opciones, GuiaRemision
             from inventario.reportes.pdf_facturacion import (
                 ReporteFacturacionFiltros,
                 generar_pdf_listado_facturacion,
                 generar_pdf_resumen_facturacion,
             )
+            from inventario.reportes.pdf_documentos import DocumentoReporteRow, generar_pdf_listado_documentos
+            from inventario.reportes.excel_documentos import generar_xlsx_listado_documentos
 
             if not empresa:
                 return redirect('inventario:seleccionar_empresa')
@@ -1424,6 +1447,11 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
             agrupado_por = (request.GET.get('agrupado_por') or 'ninguno').strip().lower()
             ci_ruc = (request.GET.get('ci_ruc') or '').strip()
             secuencia_inicia_raw = (request.GET.get('secuencia_inicia') or '').strip()
+
+            # Ambiente SRI (1=Pruebas, 2=Producción, ambos=sin filtro)
+            ambiente_sel_list = [str(v).strip() for v in request.GET.getlist('ambiente')]
+            ambiente_sel_list = [v for v in ambiente_sel_list if v in ['1', '2']]
+            ambiente_sel = ambiente_sel_list[0] if len(ambiente_sel_list) == 1 else 'ambos'
 
             informe_resumido = bool(request.GET.get('informe_resumido'))
             exportar_excel = bool(request.GET.get('exportar_excel'))
@@ -1477,12 +1505,32 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                 facturadores=facturadores_labels,
             )
 
+            def _filtrar_por_ambiente_clave(qs):
+                """Filtra por ambiente extraído desde clave_acceso (posición 24, 1 o 2).
+
+                - Si `ambiente_sel` es 'ambos' -> no filtra.
+                - Si el documento no tiene clave_acceso (borrador/no generado):
+                  se incluye solo si el ambiente seleccionado coincide con el ambiente actual de la empresa.
+                """
+                if ambiente_sel not in ['1', '2']:
+                    return qs
+
+                qs = qs.annotate(_ambiente_clave=Substr('clave_acceso', 24, 1))
+                cond = Q(_ambiente_clave=ambiente_sel)
+
+                empresa_amb = str(getattr(empresa, 'tipo_ambiente', '') or '')
+                if empresa_amb == ambiente_sel:
+                    cond = cond | Q(clave_acceso__isnull=True) | Q(clave_acceso__exact='')
+
+                return qs.filter(cond)
+
             # Query: Facturas de la empresa en rango de fechas
             qs = (
                 Factura.objects.filter(empresa_id=empresa.id, fecha_emision__gte=desde, fecha_emision__lte=hasta)
                 .select_related('cliente', 'almacen', 'facturador')
                 .prefetch_related('totales_impuestos', 'formas_pago')
             )
+            qs = _filtrar_por_ambiente_clave(qs)
             if ci_ruc:
                 qs = qs.filter(identificacion_cliente__icontains=ci_ruc)
 
@@ -1498,28 +1546,264 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                 qs = qs.filter(formas_pago__forma_pago__in=formas_pago_codigos).distinct()
 
             # Secuencias (por ahora este PDF lista Facturas; si seleccionan y no incluyen Facturas, no hay resultados)
-            if secuencias and 'facturas_electronicas' not in secuencias:
-                qs = qs.none()
+            include_all = not bool(secuencias)
+            include_facturas = include_all or ('facturas_electronicas' in secuencias)
+            include_nc = include_all or ('notas_credito_electronicas' in secuencias)
+            include_nd = include_all or ('notas_debito_electronicas' in secuencias)
+            include_lc = include_all or ('liquidaciones_compra_electronicas' in secuencias)
+            include_guias = include_all or ('guias_remision_electronicas' in secuencias)
 
-            # Secuencia inicia en: campo es CharField de 9 (cero a la izquierda)
-            if secuencia_inicia_raw:
-                sec = ''.join([c for c in secuencia_inicia_raw if c.isdigit()])
-                if sec:
-                    sec = sec[-9:].zfill(9)
-                    qs = qs.filter(secuencia__gte=sec)
+            # Si el usuario selecciona SOLO Facturas, mantener el reporte existente.
+            if include_facturas and not any([include_nc, include_nd, include_lc, include_guias]):
+                # Secuencia inicia en: campo es CharField de 9 (cero a la izquierda)
+                if secuencia_inicia_raw:
+                    sec = ''.join([c for c in secuencia_inicia_raw if c.isdigit()])
+                    if sec:
+                        sec = sec[-9:].zfill(9)
+                        qs = qs.filter(secuencia__gte=sec)
 
-            if ordenado_por == 'fecha':
-                if agrupado_por == 'clientes':
+                if ordenado_por == 'fecha':
+                    if agrupado_por == 'clientes':
+                        qs = qs.order_by('nombre_cliente', 'fecha_emision', 'establecimiento', 'punto_emision', 'secuencia')
+                    else:
+                        qs = qs.order_by('fecha_emision', 'establecimiento', 'punto_emision', 'secuencia')
+                elif ordenado_por == 'cliente':
                     qs = qs.order_by('nombre_cliente', 'fecha_emision', 'establecimiento', 'punto_emision', 'secuencia')
                 else:
-                    qs = qs.order_by('fecha_emision', 'establecimiento', 'punto_emision', 'secuencia')
-            elif ordenado_por == 'cliente':
-                qs = qs.order_by('nombre_cliente', 'fecha_emision', 'establecimiento', 'punto_emision', 'secuencia')
+                    if agrupado_por == 'clientes':
+                        qs = qs.order_by('nombre_cliente', 'establecimiento', 'punto_emision', 'secuencia')
+                    else:
+                        qs = qs.order_by('establecimiento', 'punto_emision', 'secuencia')
+
+                # Datos empresa (tomar de Opciones si existe)
+                opciones = None
+                try:
+                    opciones = Opciones.objects.filter(empresa_id=empresa.id).first()
+                except Exception:
+                    opciones = None
+
+                empresa_nombre = getattr(opciones, 'razon_social', None) or getattr(empresa, 'razon_social', '')
+                empresa_ruc = getattr(opciones, 'identificacion', None) or getattr(empresa, 'ruc', '')
+                empresa_telefonos = getattr(opciones, 'telefono', '') if opciones else ''
+                usuario_nombre = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+
+                pdf_bytes = generar_pdf_listado_facturacion(
+                    empresa_nombre=empresa_nombre,
+                    empresa_ruc=empresa_ruc,
+                    empresa_telefonos=empresa_telefonos,
+                    usuario_nombre=usuario_nombre,
+                    filtros=filtros,
+                    facturas=qs,
+                )
+
+                # Exportar a Excel tiene prioridad sobre PDF
+                if exportar_excel:
+                    from inventario.reportes.excel_facturacion import generar_xlsx_listado_facturacion
+
+                    xlsx_bytes = generar_xlsx_listado_facturacion(
+                        empresa_nombre=empresa_nombre,
+                        empresa_ruc=empresa_ruc,
+                        usuario_nombre=usuario_nombre,
+                        filtros=filtros,
+                        facturas=qs,
+                    )
+                    response = HttpResponse(
+                        xlsx_bytes,
+                        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    )
+                    response['Content-Disposition'] = 'attachment; filename="listado_facturacion_general.xlsx"'
+                    return response
+
+                # PDF resumido
+                if informe_resumido:
+                    pdf_bytes = generar_pdf_resumen_facturacion(
+                        empresa_nombre=empresa_nombre,
+                        empresa_ruc=empresa_ruc,
+                        empresa_telefonos=empresa_telefonos,
+                        usuario_nombre=usuario_nombre,
+                        filtros=filtros,
+                        facturas=qs,
+                    )
+                    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+                    response['Content-Disposition'] = 'inline; filename="listado_facturacion_general_resumido.pdf"'
+                    return response
+
+                # PDF detallado
+                response = HttpResponse(pdf_bytes, content_type='application/pdf')
+                response['Content-Disposition'] = 'inline; filename="listado_facturacion_general.pdf"'
+                return response
+
+            # Caso "completo": construir dataset unificado según checkboxes
+            filas: list[DocumentoReporteRow] = []
+
+            # Normalizar "secuencia inicia" a 9 dígitos (string) y a int cuando aplique.
+            sec9 = ''
+            sec_int = None
+            if secuencia_inicia_raw:
+                s = ''.join([c for c in secuencia_inicia_raw if c.isdigit()])
+                if s:
+                    sec9 = s[-9:].zfill(9)
+                    try:
+                        sec_int = int(sec9)
+                    except Exception:
+                        sec_int = None
+
+            if include_facturas:
+                qs_fac = (
+                    Factura.objects.filter(empresa_id=empresa.id, fecha_emision__gte=desde, fecha_emision__lte=hasta)
+                    .select_related('cliente', 'almacen', 'facturador')
+                )
+                qs_fac = _filtrar_por_ambiente_clave(qs_fac)
+                if ci_ruc:
+                    qs_fac = qs_fac.filter(identificacion_cliente__icontains=ci_ruc)
+                if almacenes_ids:
+                    qs_fac = qs_fac.filter(almacen_id__in=almacenes_ids)
+                if facturadores_ids:
+                    qs_fac = qs_fac.filter(facturador_id__in=facturadores_ids)
+                if formas_pago_codigos:
+                    qs_fac = qs_fac.filter(formas_pago__forma_pago__in=formas_pago_codigos).distinct()
+                if sec9:
+                    qs_fac = qs_fac.filter(secuencia__gte=sec9)
+
+                for fac in qs_fac:
+                    filas.append(
+                        DocumentoReporteRow(
+                            tipo='FACTURA',
+                            numero=getattr(fac, 'numero_completo', '') or getattr(fac, 'numero', ''),
+                            fecha=getattr(fac, 'fecha_emision', None),
+                            identificacion=getattr(fac, 'identificacion_cliente', ''),
+                            nombre=getattr(fac, 'nombre_cliente', ''),
+                            total=getattr(fac, 'monto_general', None),
+                            estado=(getattr(fac, 'estado_sri', '') or getattr(fac, 'estado', '') or '').upper(),
+                        )
+                    )
+
+            if include_nc:
+                try:
+                    from inventario.nota_credito.models import NotaCredito
+                except Exception:
+                    NotaCredito = None
+
+                if NotaCredito:
+                    qs_nc = NotaCredito.objects.filter(empresa=empresa, fecha_emision__gte=desde, fecha_emision__lte=hasta).select_related('factura_modificada')
+                    qs_nc = _filtrar_por_ambiente_clave(qs_nc)
+                    if ci_ruc:
+                        qs_nc = qs_nc.filter(factura_modificada__identificacion_cliente__icontains=ci_ruc)
+                    if sec9:
+                        qs_nc = qs_nc.filter(secuencial__gte=sec9)
+                    for nc in qs_nc:
+                        fac = getattr(nc, 'factura_modificada', None)
+                        filas.append(
+                            DocumentoReporteRow(
+                                tipo='NC',
+                                numero=getattr(nc, 'numero_completo', ''),
+                                fecha=getattr(nc, 'fecha_emision', None),
+                                identificacion=getattr(fac, 'identificacion_cliente', '') if fac else '',
+                                nombre=getattr(fac, 'nombre_cliente', '') if fac else '',
+                                total=getattr(nc, 'valor_modificacion', None),
+                                estado=(getattr(nc, 'estado_sri', '') or '').upper(),
+                            )
+                        )
+
+            if include_nd:
+                try:
+                    from inventario.nota_debito.models import NotaDebito
+                except Exception:
+                    NotaDebito = None
+
+                if NotaDebito:
+                    qs_nd = NotaDebito.objects.filter(empresa=empresa, fecha_emision__gte=desde, fecha_emision__lte=hasta).select_related('factura_modificada')
+                    qs_nd = _filtrar_por_ambiente_clave(qs_nd)
+                    if ci_ruc:
+                        qs_nd = qs_nd.filter(factura_modificada__identificacion_cliente__icontains=ci_ruc)
+                    if sec9:
+                        qs_nd = qs_nd.filter(secuencial__gte=sec9)
+                    for nd in qs_nd:
+                        fac = getattr(nd, 'factura_modificada', None)
+                        filas.append(
+                            DocumentoReporteRow(
+                                tipo='ND',
+                                numero=getattr(nd, 'numero_completo', ''),
+                                fecha=getattr(nd, 'fecha_emision', None),
+                                identificacion=getattr(fac, 'identificacion_cliente', '') if fac else '',
+                                nombre=getattr(fac, 'nombre_cliente', '') if fac else '',
+                                total=getattr(nd, 'valor_modificacion', None),
+                                estado=(getattr(nd, 'estado_sri', '') or '').upper(),
+                            )
+                        )
+
+            if include_lc:
+                try:
+                    from inventario.liquidacion_compra.models import LiquidacionCompra
+                except Exception:
+                    LiquidacionCompra = None
+
+                if LiquidacionCompra:
+                    qs_lc = LiquidacionCompra.objects.filter(empresa=empresa, fecha_emision__gte=desde, fecha_emision__lte=hasta).select_related('proveedor')
+                    qs_lc = _filtrar_por_ambiente_clave(qs_lc)
+                    if ci_ruc:
+                        qs_lc = qs_lc.filter(proveedor__identificacion_proveedor__icontains=ci_ruc)
+                    if almacenes_ids:
+                        qs_lc = qs_lc.filter(almacen_id__in=almacenes_ids)
+                    if sec_int is not None:
+                        qs_lc = qs_lc.filter(secuencia__gte=sec_int)
+                    for lc in qs_lc:
+                        prov = getattr(lc, 'proveedor', None)
+                        filas.append(
+                            DocumentoReporteRow(
+                                tipo='LIQ. COMPRA',
+                                numero=getattr(lc, 'numero_completo', ''),
+                                fecha=getattr(lc, 'fecha_emision', None),
+                                identificacion=getattr(prov, 'identificacion_proveedor', '') if prov else '',
+                                nombre=getattr(prov, 'razon_social_proveedor', '') if prov else '',
+                                total=getattr(lc, 'importe_total', None),
+                                estado=(getattr(lc, 'estado_sri', '') or getattr(lc, 'estado', '') or '').upper(),
+                            )
+                        )
+
+            if include_guias:
+                qs_g = GuiaRemision.objects.filter(empresa=empresa, fecha_inicio_traslado__gte=desde, fecha_inicio_traslado__lte=hasta).select_related('factura')
+                qs_g = _filtrar_por_ambiente_clave(qs_g)
+                if ci_ruc:
+                    qs_g = qs_g.filter(Q(transportista_ruc__icontains=ci_ruc) | Q(factura__identificacion_cliente__icontains=ci_ruc))
+                if sec9:
+                    qs_g = qs_g.filter(secuencial__gte=sec9)
+                for g in qs_g:
+                    estado = self._safe_str(getattr(g, 'estado', ''))
+                    if getattr(g, 'numero_autorizacion', None):
+                        estado = 'AUTORIZADA'
+                    filas.append(
+                        DocumentoReporteRow(
+                            tipo='GUÍA',
+                            numero=getattr(g, 'numero_completo', ''),
+                            fecha=getattr(g, 'fecha_inicio_traslado', None),
+                            identificacion=getattr(g, 'transportista_ruc', ''),
+                            nombre=getattr(g, 'transportista_nombre', ''),
+                            total=None,
+                            estado=estado.upper(),
+                        )
+                    )
+
+            # Orden
+            def _k_fecha(r: DocumentoReporteRow):
+                return (r.fecha or datetime.min.date(), r.tipo, r.numero)
+
+            def _k_cliente(r: DocumentoReporteRow):
+                return (self._safe_str(r.nombre).upper(), r.fecha or datetime.min.date(), r.tipo, r.numero)
+
+            def _k_secuencia(r: DocumentoReporteRow):
+                return (self._extract_secuencia_int(r.numero), r.fecha or datetime.min.date(), r.tipo)
+
+            # Agrupado por clientes: ordenar por nombre primero (y luego por criterio)
+            if agrupado_por == 'clientes':
+                filas.sort(key=_k_cliente)
             else:
-                if agrupado_por == 'clientes':
-                    qs = qs.order_by('nombre_cliente', 'establecimiento', 'punto_emision', 'secuencia')
+                if ordenado_por == 'fecha':
+                    filas.sort(key=_k_fecha)
+                elif ordenado_por == 'cliente':
+                    filas.sort(key=_k_cliente)
                 else:
-                    qs = qs.order_by('establecimiento', 'punto_emision', 'secuencia')
+                    filas.sort(key=_k_secuencia)
 
             # Datos empresa (tomar de Opciones si existe)
             opciones = None
@@ -1533,50 +1817,34 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
             empresa_telefonos = getattr(opciones, 'telefono', '') if opciones else ''
             usuario_nombre = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
 
-            pdf_bytes = generar_pdf_listado_facturacion(
-                empresa_nombre=empresa_nombre,
-                empresa_ruc=empresa_ruc,
-                empresa_telefonos=empresa_telefonos,
-                usuario_nombre=usuario_nombre,
-                filtros=filtros,
-                facturas=qs,
-            )
-
-            # Exportar a Excel tiene prioridad sobre PDF
+            # Excel tiene prioridad sobre PDF
             if exportar_excel:
-                from inventario.reportes.excel_facturacion import generar_xlsx_listado_facturacion
-
-                xlsx_bytes = generar_xlsx_listado_facturacion(
+                xlsx_bytes = generar_xlsx_listado_documentos(
                     empresa_nombre=empresa_nombre,
                     empresa_ruc=empresa_ruc,
                     usuario_nombre=usuario_nombre,
                     filtros=filtros,
-                    facturas=qs,
+                    filas=filas,
                 )
                 response = HttpResponse(
                     xlsx_bytes,
                     content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 )
-                response['Content-Disposition'] = 'attachment; filename="listado_facturacion_general.xlsx"'
+                response['Content-Disposition'] = 'attachment; filename="listado_documentos.xlsx"'
                 return response
 
-            # PDF resumido
-            if informe_resumido:
-                pdf_bytes = generar_pdf_resumen_facturacion(
-                    empresa_nombre=empresa_nombre,
-                    empresa_ruc=empresa_ruc,
-                    empresa_telefonos=empresa_telefonos,
-                    usuario_nombre=usuario_nombre,
-                    filtros=filtros,
-                    facturas=qs,
-                )
-                response = HttpResponse(pdf_bytes, content_type='application/pdf')
-                response['Content-Disposition'] = 'inline; filename="listado_facturacion_general_resumido.pdf"'
-                return response
+            pdf_bytes = generar_pdf_listado_documentos(
+                empresa_nombre=empresa_nombre,
+                empresa_ruc=empresa_ruc,
+                empresa_telefonos=empresa_telefonos,
+                usuario_nombre=usuario_nombre,
+                filtros=filtros,
+                filas=filas,
+                resumido=informe_resumido,
+            )
 
-            # PDF detallado
             response = HttpResponse(pdf_bytes, content_type='application/pdf')
-            response['Content-Disposition'] = 'inline; filename="listado_facturacion_general.pdf"'
+            response['Content-Disposition'] = 'inline; filename="listado_documentos.pdf"'
             return response
 
         return render(
@@ -1588,6 +1856,18 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                 'facturadores_disponibles': facturadores_disponibles,
                 'desde_ui': desde_ui,
                 'hasta_ui': hasta_ui,
+                'ambiente_ui': ambiente_ui,
+                # Mantener selección UI
+                'ordenado_por_ui': (request.GET.get('ordenado_por') or 'secuencia').strip().lower(),
+                'agrupado_por_ui': (request.GET.get('agrupado_por') or 'ninguno').strip().lower(),
+                'ci_ruc_ui': (request.GET.get('ci_ruc') or '').strip(),
+                'secuencia_inicia_ui': (request.GET.get('secuencia_inicia') or '').strip(),
+                'almacenes_sel': request.GET.getlist('almacenes'),
+                'secuencias_sel': request.GET.getlist('secuencias'),
+                'formas_pago_sel': request.GET.getlist('formas_pago'),
+                'facturadores_sel': request.GET.getlist('facturadores'),
+                'informe_resumido_ui': bool(request.GET.get('informe_resumido')),
+                'exportar_excel_ui': bool(request.GET.get('exportar_excel')),
             },
         )
 

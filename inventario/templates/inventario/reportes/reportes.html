@@ -39,15 +39,15 @@
               <div class="text-[11px] font-semibold text-gray-800 mb-1.5">Ordenado por:</div>
               <div class="space-y-0.5">
                 <label class="flex items-center gap-2 text-xs text-gray-800">
-                  <input type="radio" name="ordenado_por" value="secuencia" checked />
+                  <input type="radio" name="ordenado_por" value="secuencia" {% if ordenado_por_ui == 'secuencia' %}checked{% endif %} />
                   Secuencia
                 </label>
                 <label class="flex items-center gap-2 text-xs text-gray-800">
-                  <input type="radio" name="ordenado_por" value="fecha" />
+                  <input type="radio" name="ordenado_por" value="fecha" {% if ordenado_por_ui == 'fecha' %}checked{% endif %} />
                   Fecha
                 </label>
                 <label class="flex items-center gap-2 text-xs text-gray-800">
-                  <input type="radio" name="ordenado_por" value="cliente" />
+                  <input type="radio" name="ordenado_por" value="cliente" {% if ordenado_por_ui == 'cliente' %}checked{% endif %} />
                   Cliente
                 </label>
               </div>
@@ -59,11 +59,11 @@
               <div class="text-[11px] font-semibold text-gray-800 mb-1.5">Agrupado por:</div>
               <div class="space-y-0.5">
                 <label class="flex items-center gap-2 text-xs text-gray-800">
-                  <input type="radio" name="agrupado_por" value="ninguno" checked />
+                  <input type="radio" name="agrupado_por" value="ninguno" {% if agrupado_por_ui == 'ninguno' %}checked{% endif %} />
                   Ninguno
                 </label>
                 <label class="flex items-center gap-2 text-xs text-gray-800">
-                  <input type="radio" name="agrupado_por" value="clientes" />
+                  <input type="radio" name="agrupado_por" value="clientes" {% if agrupado_por_ui == 'clientes' %}checked{% endif %} />
                   Clientes
                 </label>
               </div>
@@ -81,11 +81,11 @@
 
               <div class="flex flex-col gap-1">
                 <label class="flex items-center gap-2 text-xs text-gray-800">
-                  <input type="checkbox" name="informe_resumido" />
+                  <input type="checkbox" name="informe_resumido" {% if informe_resumido_ui %}checked{% endif %} />
                   Informe Resumido
                 </label>
                 <label class="flex items-center gap-2 text-xs text-gray-800">
-                  <input type="checkbox" name="exportar_excel" />
+                  <input type="checkbox" name="exportar_excel" {% if exportar_excel_ui %}checked{% endif %} />
                   Exportar a Excel
                 </label>
               </div>
@@ -99,7 +99,7 @@
           <div class="lg:col-span-4">
             <div class="flex items-center gap-2">
               <label class="text-xs text-gray-800 whitespace-nowrap">C.I/RUC:</label>
-              <input type="text" name="ci_ruc" class="flex-1 border border-gray-300 rounded px-2 py-1 text-xs" />
+              <input type="text" name="ci_ruc" value="{{ ci_ruc_ui|default:'' }}" class="flex-1 border border-gray-300 rounded px-2 py-1 text-xs" />
               <button type="submit" name="accion" value="buscar" class="px-2 py-1 border border-gray-300 rounded bg-gray-100">
                 <i class="fa fa-search text-gray-700 text-xs"></i>
               </button>
@@ -123,10 +123,11 @@
           <div class="lg:col-span-6">
             <div class="flex items-center gap-2">
               <label class="text-xs text-gray-800 whitespace-nowrap">Secuencia inicia en:</label>
-              <input type="text" name="secuencia_inicia" class="w-full border border-gray-300 rounded px-2 py-1 text-xs" />
+              <input type="text" name="secuencia_inicia" value="{{ secuencia_inicia_ui|default:'' }}" class="w-full border border-gray-300 rounded px-2 py-1 text-xs" />
             </div>
           </div>
         </div>
+
 
         <!-- Grillas -->
         <div class="mt-2 grid grid-cols-1 lg:grid-cols-12 gap-2">
@@ -137,11 +138,15 @@
                 <div class="text-xs font-semibold text-gray-800">Almacenes</div>
                 <i class="fa fa-filter text-gray-600 text-xs"></i>
               </div>
-              <div class="p-1.5">
-                <label class="flex items-center gap-2 text-xs text-gray-800 px-1.5 py-0.5">
-                  <input type="checkbox" name="almacenes" value="almacen_general" />
-                  Almacén General
-                </label>
+              <div class="p-1.5 space-y-0.5">
+                {% for a in almacenes_disponibles %}
+                  <label class="flex items-center gap-2 text-xs text-gray-800 px-1.5 py-0.5">
+                    <input type="checkbox" name="almacenes" value="{{ a.id }}" {% if a.id|stringformat:'s' in almacenes_sel %}checked{% endif %} />
+                    {{ a.descripcion }}
+                  </label>
+                {% empty %}
+                  <div class="text-xs text-gray-500 px-1.5 py-0.5">Sin almacenes</div>
+                {% endfor %}
               </div>
             </div>
           </div>
@@ -154,16 +159,24 @@
               </div>
               <div class="p-1.5 space-y-0.5">
                 <label class="flex items-center gap-2 text-xs text-gray-800 px-1.5 py-0.5">
-                  <input type="checkbox" name="secuencias" value="facturas_electronicas" />
+                  <input type="checkbox" name="secuencias" value="facturas_electronicas" {% if 'facturas_electronicas' in secuencias_sel %}checked{% endif %} />
                   Facturas Electrónicas
                 </label>
                 <label class="flex items-center gap-2 text-xs text-gray-800 px-1.5 py-0.5">
-                  <input type="checkbox" name="secuencias" value="notas_credito_electronicas" />
+                  <input type="checkbox" name="secuencias" value="liquidaciones_compra_electronicas" {% if 'liquidaciones_compra_electronicas' in secuencias_sel %}checked{% endif %} />
+                  Liquidaciones de Compra Electrónicas
+                </label>
+                <label class="flex items-center gap-2 text-xs text-gray-800 px-1.5 py-0.5">
+                  <input type="checkbox" name="secuencias" value="notas_credito_electronicas" {% if 'notas_credito_electronicas' in secuencias_sel %}checked{% endif %} />
                   Notas de Crédito Electrónicas
                 </label>
                 <label class="flex items-center gap-2 text-xs text-gray-800 px-1.5 py-0.5">
-                  <input type="checkbox" name="secuencias" value="notas_debito_electronicas" />
+                  <input type="checkbox" name="secuencias" value="notas_debito_electronicas" {% if 'notas_debito_electronicas' in secuencias_sel %}checked{% endif %} />
                   Notas de Débito Electrónicas
+                </label>
+                <label class="flex items-center gap-2 text-xs text-gray-800 px-1.5 py-0.5">
+                  <input type="checkbox" name="secuencias" value="guias_remision_electronicas" {% if 'guias_remision_electronicas' in secuencias_sel %}checked{% endif %} />
+                  Guías de Remisión Electrónicas
                 </label>
               </div>
             </div>
@@ -177,23 +190,23 @@
               </div>
               <div class="p-1.5 space-y-0.5">
                 <label class="flex items-center gap-2 text-xs text-gray-800 px-1.5 py-0.5">
-                  <input type="checkbox" name="formas_pago" value="efectivo" />
+                  <input type="checkbox" name="formas_pago" value="efectivo" {% if 'efectivo' in formas_pago_sel %}checked{% endif %} />
                   Efectivo
                 </label>
                 <label class="flex items-center gap-2 text-xs text-gray-800 px-1.5 py-0.5">
-                  <input type="checkbox" name="formas_pago" value="credito" />
+                  <input type="checkbox" name="formas_pago" value="credito" {% if 'credito' in formas_pago_sel %}checked{% endif %} />
                   Crédito
                 </label>
                 <label class="flex items-center gap-2 text-xs text-gray-800 px-1.5 py-0.5">
-                  <input type="checkbox" name="formas_pago" value="cheque" />
+                  <input type="checkbox" name="formas_pago" value="cheque" {% if 'cheque' in formas_pago_sel %}checked{% endif %} />
                   Cheque
                 </label>
                 <label class="flex items-center gap-2 text-xs text-gray-800 px-1.5 py-0.5">
-                  <input type="checkbox" name="formas_pago" value="tarjeta_credito" />
+                  <input type="checkbox" name="formas_pago" value="tarjeta_credito" {% if 'tarjeta_credito' in formas_pago_sel %}checked{% endif %} />
                   Tarjeta de Crédito
                 </label>
                 <label class="flex items-center gap-2 text-xs text-gray-800 px-1.5 py-0.5">
-                  <input type="checkbox" name="formas_pago" value="deposito" />
+                  <input type="checkbox" name="formas_pago" value="deposito" {% if 'deposito' in formas_pago_sel %}checked{% endif %} />
                   Depósito
                 </label>
               </div>
@@ -207,14 +220,36 @@
                 <i class="fa fa-filter text-gray-600 text-xs"></i>
               </div>
               <div class="p-1.5 space-y-0.5">
+                {% for f in facturadores_disponibles %}
+                  <label class="flex items-center gap-2 text-xs text-gray-800 px-1.5 py-0.5">
+                    <input type="checkbox" name="facturadores" value="{{ f.id }}" {% if f.id|stringformat:'s' in facturadores_sel %}checked{% endif %} />
+                    {{ f.nombres }}
+                  </label>
+                {% empty %}
+                  <div class="text-xs text-gray-500 px-1.5 py-0.5">Sin facturadores</div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <div class="lg:col-span-4">
+            <div class="border border-gray-300 rounded">
+              <div class="flex items-center justify-between px-2 py-1.5 border-b border-gray-300">
+                <div class="text-xs font-semibold text-gray-800">Ambiente</div>
+                <i class="fa fa-filter text-gray-600 text-xs"></i>
+              </div>
+              <div class="p-1.5 space-y-0.5">
                 <label class="flex items-center gap-2 text-xs text-gray-800 px-1.5 py-0.5">
-                  <input type="checkbox" name="facturadores" value="vendedor" />
-                  Vendedor
+                  <input type="checkbox" name="ambiente" value="1" {% if ambiente_ui == '1' or ambiente_ui == 'ambos' %}checked{% endif %} />
+                  Pruebas
                 </label>
                 <label class="flex items-center gap-2 text-xs text-gray-800 px-1.5 py-0.5">
-                  <input type="checkbox" name="facturadores" value="adm" />
-                  ADM
+                  <input type="checkbox" name="ambiente" value="2" {% if ambiente_ui == '2' or ambiente_ui == 'ambos' %}checked{% endif %} />
+                  Producción
                 </label>
+                <div class="text-[11px] text-gray-500 px-1.5 pt-1">
+                  Ambos = marcar los dos (o ninguno)
+                </div>
               </div>
             </div>
           </div>
