@@ -4787,7 +4787,256 @@ class ListarFacturas(LoginRequiredMixin, View):
 
         return render(request, 'inventario/factura/listarFacturas.html', contexto)
 
-    #Fin de vista---------------------------------------------------------------------------------------#
+
+#Fin de vista---------------------------------------------------------------------------------------#
+
+
+# Imprimir factura en formato TICKET (tirilla 80mm) ----------------------------------------------#
+class ImprimirFacturaTicket(LoginRequiredMixin, View):
+    login_url = '/inventario/login'
+    redirect_field_name = None
+
+    def get(self, request, p):
+        try:
+            empresa_id = request.session.get('empresa_activa')
+            if not request.user.empresas.filter(id=empresa_id).exists():
+                raise Http404("Empresa no válida")
+
+            factura = get_object_or_404(Factura, id=p, empresa_id=empresa_id)
+            detalles = DetalleFactura.objects.filter(factura=factura).select_related('producto', 'servicio')
+
+            empresa = getattr(factura, 'empresa', None)
+            opciones = None
+            if empresa:
+                opciones = Opciones.objects.for_tenant(empresa).first()
+                if not opciones:
+                    opciones = Opciones.objects.create(empresa=empresa, identificacion=empresa.ruc)
+
+            from decimal import Decimal
+            from inventario.ticket_factura import (
+                TicketItem,
+                render_factura_ticket,
+            )
+
+            # Emisor
+            razon_social = getattr(opciones, 'razon_social', '') if opciones else ''
+            nombre_comercial = getattr(opciones, 'nombre_comercial', '') if opciones else ''
+            ruc_emisor = getattr(opciones, 'identificacion', '') if opciones else getattr(empresa, 'ruc', '')
+            direccion = getattr(opciones, 'direccion_establecimiento', '') if opciones else ''
+            telefono = getattr(opciones, 'telefono', '') if opciones else ''
+            correo = getattr(opciones, 'correo', '') if opciones else ''
+
+            # Ciudad (si está en campos adicionales)
+            ciudad = ''
+            try:
+                ciudad = (
+                    factura.campos_adicionales.filter(nombre__iexact='CIUDAD')
+                    .values_list('valor', flat=True)
+                    .first()
+                    or ''
+                )
+            except Exception:
+                ciudad = ''
+
+            # Cliente
+            cliente_obj = getattr(factura, 'cliente', None)
+            tipo_id = (getattr(cliente_obj, 'tipoIdentificacion', None) or '').strip()
+            if not tipo_id:
+                tipo_id = 'RUC'
+            # Normalizar consumidor final
+            tipo_id_upper = tipo_id.upper()
+            if 'CONSUMIDOR' in tipo_id_upper:
+                tipo_id = 'CONSUMIDOR_FINAL'
+
+            identificacion_cliente = getattr(factura, 'identificacion_cliente', '') or ''
+            nombre_cliente = getattr(factura, 'nombre_cliente', '') or ''
+
+            cliente_telf = (
+                getattr(cliente_obj, 'telefono', None)
+                or getattr(cliente_obj, 'celular', None)
+                or getattr(cliente_obj, 'movil', None)
+                or ''
+            )
+            cliente_direccion = getattr(cliente_obj, 'direccion', '') or ''
+            cliente_email = (
+                getattr(cliente_obj, 'correo', None)
+                or getattr(cliente_obj, 'email', None)
+                or ''
+            )
+
+            # Items
+            items = []
+            for d in detalles:
+                cantidad = int(getattr(d, 'cantidad', 0) or 0)
+                descripcion = (
+                    getattr(d, 'descripcion_reemplazo', None)
+                    or getattr(getattr(d, 'producto', None), 'descripcion', None)
+                    or getattr(getattr(d, 'servicio', None), 'nombre', None)
+                    or 'ITEM'
+                )
+                precio_unitario = getattr(d, 'precio_unitario', None)
+                try:
+                    if precio_unitario is None and cantidad:
+                        precio_unitario = (Decimal(str(getattr(d, 'sub_total', 0))) / Decimal(str(cantidad)))
+                    precio_unitario_dec = Decimal(str(precio_unitario or 0))
+                except Exception:
+                    precio_unitario_dec = Decimal('0')
+
+                try:
+                    descuento_dec = Decimal(str(getattr(d, 'descuento', 0) or 0))
+                except Exception:
+                    descuento_dec = Decimal('0')
+
+                try:
+                    subtotal_dec = Decimal(str(getattr(d, 'sub_total', 0) or 0))
+                except Exception:
+                    subtotal_dec = Decimal('0')
+
+                items.append(
+                    TicketItem(
+                        cantidad=cantidad,
+                        descripcion=descripcion,
+                        precio_unitario=precio_unitario_dec,
+                        descuento=descuento_dec,
+                        subtotal=subtotal_dec,
+                    )
+                )
+
+            # IVA + bases (desde totales_impuestos)
+            subtotal_15 = Decimal('0')
+            iva_5 = Decimal('0')
+            iva_15 = Decimal('0')
+            try:
+                for ti in factura.totales_impuestos.filter(codigo='2').order_by('tarifa'):
+                    try:
+                        tarifa = Decimal(str(getattr(ti, 'tarifa', 0) or 0))
+                        base = Decimal(str(getattr(ti, 'base_imponible', 0) or 0))
+                        valor = Decimal(str(getattr(ti, 'valor', 0) or 0))
+                        # Normalizar 5/15
+                        if tarifa == Decimal('15') or tarifa == Decimal('15.00'):
+                            subtotal_15 += base
+                            iva_15 += valor
+                        elif tarifa == Decimal('5') or tarifa == Decimal('5.00'):
+                            iva_5 += valor
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+
+            # Pagos (para forma_pago_texto)
+            forma_map = {
+                '01': 'EFECTIVO',
+                '16': 'TARJETA',
+                '19': 'TARJETA',
+                '18': 'TARJETA',
+                '17': 'OTRO',
+                '20': 'TRANSFERENCIA',
+                '15': 'OTRO',
+                '21': 'OTRO',
+            }
+            forma_pago_texto = ''
+            try:
+                fps = list(factura.formas_pago.all().order_by('id'))
+                if len(fps) == 1:
+                    code = getattr(fps[0], 'forma_pago', '') or ''
+                    forma_pago_texto = forma_map.get(code, 'OTRO')
+                elif len(fps) > 1:
+                    forma_pago_texto = 'VARIOS'
+            except Exception:
+                pass
+
+            # Régimen
+            regimen = ''
+            if opciones:
+                if getattr(opciones, 'tipo_regimen', '') == 'RIMPE':
+                    regimen = 'RIMPE'
+                else:
+                    regimen = 'REGIMEN GENERAL'
+
+            # Notas
+            notas = []
+            if getattr(factura, 'concepto', None):
+                notas.append(str(getattr(factura, 'concepto')))
+            try:
+                for ca in factura.campos_adicionales.filter(nombre__iregex=r'^(NOTA|NOTAS|OBSERVACIONES)$').order_by('id'):
+                    if getattr(ca, 'valor', None):
+                        notas.append(str(ca.valor))
+            except Exception:
+                pass
+
+            # Fecha/hora (usar autorizacion si existe)
+            fecha = ''
+            hora = '00:00:00'
+            dt_aut = getattr(factura, 'fecha_autorizacion', None)
+            if dt_aut:
+                try:
+                    fecha = dt_aut.strftime('%d/%m/%Y')
+                    hora = dt_aut.strftime('%H:%M:%S')
+                except Exception:
+                    pass
+            if not fecha:
+                fe = getattr(factura, 'fecha_emision', None)
+                if fe:
+                    try:
+                        fecha = fe.strftime('%d/%m/%Y')
+                    except Exception:
+                        fecha = ''
+
+            usuario = request.session.get('facturador_nombre') or request.session.get('facturador')
+            if not usuario:
+                usuario = getattr(request.user, 'get_full_name', lambda: '')() or getattr(request.user, 'username', '')
+
+            # Totales
+            subtotal = Decimal(str(getattr(factura, 'sub_monto', 0) or 0))
+            total_a_cancelar = Decimal(str(getattr(factura, 'monto_general', 0) or 0))
+
+            # Si no hay dato de pago recibido, asumir exacto
+            su_pago = total_a_cancelar
+            su_cambio = Decimal('0')
+
+            ticket = render_factura_ticket(
+                razon_social=razon_social,
+                nombre_comercial=nombre_comercial,
+                ruc_emisor=ruc_emisor,
+                direccion=direccion,
+                ciudad=ciudad,
+                telefono=telefono,
+                correo=correo,
+                regimen=regimen,
+                obligado_contabilidad=getattr(opciones, 'obligado', '') if opciones else '',
+                notas=notas,
+                leyenda='COPIA NO ES VALIDA COMO FACTURA',
+                establecimiento=getattr(factura, 'establecimiento', ''),
+                punto_emision=getattr(factura, 'punto_emision', ''),
+                secuencial=getattr(factura, 'secuencia', ''),
+                fecha=fecha,
+                hora=hora,
+                usuario=usuario,
+                forma_pago_texto=forma_pago_texto,
+                clave_acceso=getattr(factura, 'clave_acceso', '') or '',
+                num_autorizacion=getattr(factura, 'numero_autorizacion', '') or '',
+                cliente_nombre=nombre_cliente,
+                cliente_id=identificacion_cliente,
+                cliente_telf=cliente_telf,
+                cliente_direccion=cliente_direccion,
+                cliente_email=cliente_email,
+                items=items,
+                subtotal=subtotal,
+                subtotal_15=subtotal_15,
+                iva_5=iva_5,
+                iva_15=iva_15,
+                total_a_cancelar=total_a_cancelar,
+                su_pago=su_pago,
+                su_cambio=su_cambio,
+                url_consulta='https://srienlinea.sri.gob.ec/sri-en-linea/SriEnLinea',
+            )
+
+            return render(request, 'inventario/factura/ticket.html', {'ticket': ticket})
+
+        except Exception as e:
+            messages.error(request, f'Error al imprimir ticket: {str(e)}')
+            return redirect('inventario:verFactura', p=p)
+
 
 
 # Vista para autorizar documentos en el SRI - ELIMINADA (DUPLICADA)
