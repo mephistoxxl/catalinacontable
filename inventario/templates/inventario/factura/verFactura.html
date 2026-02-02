@@ -24,8 +24,8 @@
             </style>
             <div id="catalina-flash-backdrop" class="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 transition-opacity duration-200"></div>
             <div class="relative min-h-full flex items-center justify-center p-4">
-                <div id="catalina-flash-card" class="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-gray-200 ring-1 ring-gray-200 overflow-hidden transform opacity-0 translate-y-2 scale-[0.98] transition-all duration-200">
-                    <div id="catalina-flash-header" class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                <div id="catalina-flash-card" class="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-gray-200 ring-1 ring-gray-200 overflow-hidden transform opacity-0 translate-y-2 scale-[0.98] transition-all duration-200">
+                    <div id="catalina-flash-header" class="px-4 py-2 border-b border-gray-200 bg-gray-50">
                         <div class="flex items-center justify-end gap-3">
                             <button type="button" id="catalina-flash-close" class="w-9 h-9 rounded-lg bg-white/70 hover:bg-white text-gray-500 hover:text-gray-800 border border-gray-200" aria-label="Cerrar">
                                 <i class="fa fa-times"></i>
@@ -33,25 +33,23 @@
                         </div>
                     </div>
 
-                    <div class="px-5 py-5">
-                        <div class="flex flex-col items-center text-center gap-3">
-                            <div id="catalina-flash-bigIcon" class="w-16 h-16 rounded-3xl bg-gray-100 flex items-center justify-center">
+                    <div class="px-4 py-4">
+                        <div class="flex flex-col items-center text-center gap-2">
+                            <div id="catalina-flash-bigIcon" class="w-14 h-14 rounded-3xl bg-gray-100 flex items-center justify-center">
                                 <i id="catalina-flash-bigIconI" class="fas fa-check-circle text-gray-700 text-5xl"></i>
                             </div>
                             <div class="leading-tight">
-                                <h3 id="catalina-flash-title" class="text-base font-extrabold text-gray-900">Resultado</h3>
-                                <p id="catalina-flash-subtitle" class="text-xs text-gray-600">Resultado de la emisión</p>
+                                <h3 id="catalina-flash-title" class="text-sm font-extrabold text-gray-900">Resultado</h3>
+                                <p id="catalina-flash-subtitle" class="text-[11px] text-gray-600">Resultado de la emisión</p>
                             </div>
-                            <div class="text-sm text-gray-800 whitespace-pre-line leading-snug">
-                            {% for m in messages %}
-{{ m }}{% if not forloop.last %}
-{% endif %}{% endfor %}
+                            <div class="text-xs text-gray-800 leading-snug">
+{% for m in messages %}{{ m }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
                             </div>
                         </div>
                     </div>
 
-                    <div class="px-4 py-3 border-t border-gray-200 bg-white flex items-center justify-end gap-2">
-                        <button type="button" id="catalina-flash-ok" class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-gray-900 hover:bg-gray-800 text-sm font-bold text-white shadow-sm">
+                    <div class="px-4 py-2 border-t border-gray-200 bg-white flex items-center justify-end gap-2">
+                        <button type="button" id="catalina-flash-ok" class="inline-flex items-center justify-center px-3.5 py-1.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-xs font-bold text-white shadow-sm">
                             Entendido
                         </button>
                     </div>
@@ -161,11 +159,11 @@
                     bigI.classList.add(theme.iconText);
                     // Estado manda el ícono grande
                     if (estado === 'AUTORIZADO') {
-                        bigI.className = `fas fa-check-circle ${theme.iconText} text-5xl`;
+                        bigI.className = `fas fa-check-circle ${theme.iconText} text-4xl`;
                     } else if (estado === 'PENDIENTE') {
-                        bigI.className = `far fa-clock ${theme.iconText} text-5xl`;
+                        bigI.className = `far fa-clock ${theme.iconText} text-4xl`;
                     } else {
-                        bigI.className = `${theme.icon} ${theme.iconText} text-5xl`;
+                        bigI.className = `${theme.icon} ${theme.iconText} text-4xl`;
                     }
                 }
                 btnOk.classList.remove(...buttonBgClasses);
@@ -482,17 +480,37 @@
                             {% endif %}
                         </div>
                     </div>
-                    
-                    {% if factura.mensaje_sri_detalle %}
-                    <div class="mt-4">
-                        <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded">
-                            <h6 class="font-semibold text-yellow-800 mb-2">
-                                <i class="fas fa-list-ul mr-1"></i>Detalle de Errores del SRI:
-                            </h6>
-                            <pre class="text-sm text-yellow-700 whitespace-pre-wrap font-mono">{{ factura.mensaje_sri_detalle }}</pre>
+
+                    {% with sri_detalle=factura.mensaje_sri_detalle|default_if_none:"" %}
+                        {% if sri_detalle and sri_detalle != "[]" %}
+                        <div class="mt-4">
+                            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded">
+                                <h6 class="font-semibold text-yellow-800 mb-2">
+                                    <i class="fas fa-list-ul mr-1"></i>Detalle de Errores del SRI:
+                                </h6>
+                                <pre class="text-sm text-yellow-700 whitespace-pre-wrap font-mono">{{ sri_detalle }}</pre>
+                            </div>
                         </div>
-                    </div>
-                    {% endif %}
+                        {% elif factura.estado_sri == 'AUTORIZADA' or factura.estado_sri == 'AUTORIZADO' %}
+                        <div class="mt-4">
+                            <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                                <h6 class="font-semibold text-green-800 mb-1">
+                                    <i class="fas fa-check-circle mr-1"></i>Observaciones del SRI
+                                </h6>
+                                <p class="text-sm text-green-700">Todo correcto: el SRI no reportó observaciones para esta factura.</p>
+                            </div>
+                        </div>
+                        {% elif factura.estado_sri == 'RECIBIDA' %}
+                        <div class="mt-4">
+                            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                                <h6 class="font-semibold text-blue-800 mb-1">
+                                    <i class="fas fa-inbox mr-1"></i>Observaciones del SRI
+                                </h6>
+                                <p class="text-sm text-blue-700">Recibida sin novedades por ahora. Cuando el SRI la autorice, se actualizará automáticamente.</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endwith %}
                     
                     <!-- Código de errores comunes -->
                     {% if factura.estado_sri == 'RECHAZADA' or factura.estado_sri == 'ERROR' %}

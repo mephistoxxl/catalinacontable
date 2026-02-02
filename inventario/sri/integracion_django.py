@@ -890,7 +890,8 @@ class SRIIntegration:
         
         # 🔧 FIX: Guardar mensajes completos si el campo existe
         if hasattr(factura, 'mensaje_sri_detalle'):
-            factura.mensaje_sri_detalle = str(resultado.get('mensajes', []))
+            mensajes_detalle = resultado.get('mensajes') or []
+            factura.mensaje_sri_detalle = None if not mensajes_detalle else str(mensajes_detalle)
         
         # 🔧 FIX: SIEMPRE guardar los cambios
         logger.info(f"💾 Guardando factura {factura.id} en BD...")
