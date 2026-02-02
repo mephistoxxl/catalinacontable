@@ -344,22 +344,22 @@ input[type="number"][readonly] {
         <div class="bg-gray-50 p-3" style="min-height: auto; padding-top: 8px; padding-bottom: 12px;">
     <div class="max-w-5xl mx-auto">
         <!-- Header Section - Equilibrado -->
-        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 mb-1 rounded-lg mt-0">
+        <div class="bg-white px-3 py-2 mb-0 rounded-t-lg rounded-b-none mt-0 border border-gray-200 border-b-0">
             <div class="flex items-center justify-between">
                 <div class="flex items-center">
-                    <i class="fas fa-file-invoice text-white form-header-icon mr-2"></i>
+                    <i class="fas fa-file-invoice text-green-600 form-header-icon mr-2"></i>
                     <div>
-                        <h2 class="text-base font-semibold text-white">Emitir Factura</h2>
-                        <p class="text-gray-300 text-[11px] hidden sm:block">Complete los datos para generar la factura</p>
+                        <h2 class="text-base font-semibold text-gray-900">Emitir Factura</h2>
+                        <p class="text-gray-600 text-[11px] hidden sm:block">Complete los datos para generar la factura</p>
                     </div>
                 </div>
                 {% if facturador %}
                 <div class="text-right">
-                    <p class="text-gray-300 text-xs">
+                    <p class="text-gray-700 text-xs font-semibold">
                         <i class="fa fa-user-circle mr-1"></i>{{ facturador.nombres }}
                     </p>
-                    <a href="{% url 'inventario:login_facturador' %}" class="text-blue-300 hover:text-blue-200 text-xs">
-                        <i class="fa fa-sign-out mr-1"></i>Cambiar
+                    <a href="{% url 'inventario:login_facturador' %}" class="text-blue-600 hover:text-blue-700 text-xs font-bold" style="text-decoration: none !important;">
+                        <i class="fa fa-refresh mr-1"></i>Cambiar
                     </a>
                 </div>
                 {% endif %}
@@ -377,7 +377,7 @@ input[type="number"][readonly] {
         {% endif %}
 
     <!-- Main Content - Compacto -->
-        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+        <div class="bg-white rounded-b-lg rounded-t-none shadow-lg border border-gray-200 border-t-0 overflow-hidden">
             <div class="p-2">
                 <form method="POST" action="{% url 'inventario:emitirFactura' %}" class="space-y-2">
                     {% csrf_token %}
@@ -1319,7 +1319,7 @@ function limpiarCamposProducto() {
     document.getElementById('producto').dataset.codigo = "";
 }
 
-function agregarProducto() {
+async function agregarProducto() {
     const codigo = document.getElementById('codigo_producto').value.trim();
     const nombreProducto = document.getElementById('producto').value.trim();
     let precio = parseFloat(document.getElementById('producto').dataset.precio || "0");
@@ -1341,11 +1341,8 @@ function agregarProducto() {
         return;
     }
 
-    let cantidad = parseInt(prompt('Ingrese la cantidad:', '1'));
-    if (!cantidad || isNaN(cantidad) || cantidad <= 0) {
-        alert('Ingrese una cantidad válida.');
-        return;
-    }
+    const cantidad = await window.catalinaSolicitarCantidad({ title: 'Ingrese la cantidad:', defaultValue: 1, min: 1 });
+    if (cantidad === null) return;
 
     let subtotal = (cantidad * precio);
     let ivaPercent = parseFloat(document.getElementById('producto').dataset.ivaPercent || '0.12');

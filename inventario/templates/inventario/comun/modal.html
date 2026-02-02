@@ -1,2 +1,169 @@
+<!-- Modal global: selector de cantidad (reemplaza prompt del navegador) -->
+<div id="catalina-cantidad-modal" class="fixed inset-0 z-[9999] hidden" aria-hidden="true">
+	<div class="absolute inset-0 bg-black/50"></div>
+	<div class="relative min-h-full flex items-center justify-center p-4">
+		<div class="w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden">
+			<div class="px-5 py-4 border-b border-gray-200 bg-gray-50">
+				<div class="flex items-center justify-between">
+					<h3 id="catalina-cantidad-title" class="text-base font-bold text-gray-900">Ingrese la cantidad</h3>
+					<button type="button" id="catalina-cantidad-close" class="text-gray-500 hover:text-gray-800" aria-label="Cerrar">
+						<i class="fa fa-times"></i>
+					</button>
+				</div>
+			</div>
+
+			<div class="px-5 py-4">
+				<label for="catalina-cantidad-input" class="block text-sm font-semibold text-gray-800 mb-2">
+					Cantidad
+				</label>
+				<input id="catalina-cantidad-input" type="number" inputmode="numeric" min="1" step="1"
+							 class="w-full px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent text-base">
+				<p id="catalina-cantidad-error" class="mt-2 text-sm text-red-600 hidden"></p>
+			</div>
+
+			<div class="px-5 py-4 border-t border-gray-200 bg-white flex items-center justify-end gap-2">
+				<button type="button" id="catalina-cantidad-cancel"
+								class="inline-flex items-center justify-center px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-sm font-bold text-gray-800">
+					Cancelar
+				</button>
+				<button type="button" id="catalina-cantidad-accept"
+								class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-black hover:bg-gray-800 text-sm font-bold text-white">
+					Aceptar
+				</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+	(function () {
+		const modal = document.getElementById('catalina-cantidad-modal');
+		const titleEl = document.getElementById('catalina-cantidad-title');
+		const inputEl = document.getElementById('catalina-cantidad-input');
+		const errorEl = document.getElementById('catalina-cantidad-error');
+		const btnAccept = document.getElementById('catalina-cantidad-accept');
+		const btnCancel = document.getElementById('catalina-cantidad-cancel');
+		const btnClose = document.getElementById('catalina-cantidad-close');
+
+		if (!modal || !titleEl || !inputEl || !errorEl || !btnAccept || !btnCancel || !btnClose) {
+			return;
+		}
+
+		let activeResolve = null;
+		let activeOptions = null;
+
+		function showError(msg) {
+			if (!msg) {
+				errorEl.textContent = '';
+				errorEl.classList.add('hidden');
+				return;
+			}
+			errorEl.textContent = msg;
+			errorEl.classList.remove('hidden');
+		}
+
+		function closeModal(result) {
+			modal.classList.add('hidden');
+			modal.setAttribute('aria-hidden', 'true');
+			showError('');
+			const resolve = activeResolve;
+			activeResolve = null;
+			activeOptions = null;
+			if (typeof resolve === 'function') resolve(result);
+		}
+
+		function openModal(options) {
+			activeOptions = options;
+			titleEl.textContent = options.title || 'Ingrese la cantidad';
+
+			const allowDecimals = !!options.allowDecimals;
+			const min = typeof options.min === 'number' ? options.min : 1;
+			const step = options.step != null ? options.step : (allowDecimals ? '0.000001' : 1);
+
+			inputEl.min = String(min);
+			inputEl.step = String(step);
+			inputEl.inputMode = allowDecimals ? 'decimal' : 'numeric';
+			inputEl.value = String(options.defaultValue ?? 1);
+
+			modal.classList.remove('hidden');
+			modal.setAttribute('aria-hidden', 'false');
+			setTimeout(() => {
+				try {
+					inputEl.focus();
+					inputEl.select();
+				} catch (e) {}
+			}, 0);
+		}
+
+		function validateAndGetValue() {
+			const raw = String(inputEl.value ?? '').trim();
+			if (!raw) {
+				showError('Ingrese una cantidad.');
+				return null;
+			}
+
+			const allowDecimals = !!(activeOptions && activeOptions.allowDecimals);
+			const value = allowDecimals ? Number(raw) : parseInt(raw, 10);
+			if (!Number.isFinite(value)) {
+				showError('Ingrese una cantidad válida.');
+				return null;
+			}
+			const min = (activeOptions && typeof activeOptions.min === 'number') ? activeOptions.min : 1;
+			if (value < min) {
+				showError(`La cantidad mínima es ${min}.`);
+				return null;
+			}
+			showError('');
+			return value;
+		}
+
+		btnAccept.addEventListener('click', () => {
+			const value = validateAndGetValue();
+			if (value == null) return;
+			closeModal(value);
+		});
+
+		function cancel() {
+			closeModal(null);
+		}
+
+		btnCancel.addEventListener('click', cancel);
+		btnClose.addEventListener('click', cancel);
+
+		modal.addEventListener('click', (e) => {
+			// click outside card
+			if (e.target === modal || (e.target && e.target.classList && e.target.classList.contains('bg-black/50'))) {
+				cancel();
+			}
+		});
+
+		document.addEventListener('keydown', (e) => {
+			if (modal.classList.contains('hidden')) return;
+			if (e.key === 'Escape') {
+				e.preventDefault();
+				cancel();
+			}
+			if (e.key === 'Enter') {
+				// Enter to accept
+				const value = validateAndGetValue();
+				if (value == null) return;
+				e.preventDefault();
+				closeModal(value);
+			}
+		});
+
+		// API global
+		window.catalinaSolicitarCantidad = function (options) {
+			return new Promise((resolve) => {
+				// Si hay una solicitud activa, se cancela (evita colisiones)
+				if (activeResolve) {
+					try { activeResolve(null); } catch (e) {}
+				}
+				activeResolve = resolve;
+				openModal(options || {});
+			});
+		};
+	})();
+</script>
 
 

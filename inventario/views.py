@@ -3480,7 +3480,9 @@ class EmitirFactura(LoginRequiredMixin, View):
                 almacen = None
 
             # Convertir fechas
-            from datetime import datetime
+            from datetime import datetime, timedelta
+            from django.conf import settings
+            from django.utils import timezone
             fecha_emision_str = request.POST.get('fecha_emision')
             if not fecha_emision_str:
                 raise ValueError("La fecha de emisión es obligatoria.")
@@ -3490,6 +3492,18 @@ class EmitirFactura(LoginRequiredMixin, View):
             if not fecha_vencimiento_str:
                 raise ValueError("La fecha de vencimiento es obligatoria.")
             fecha_vencimiento = datetime.strptime(fecha_vencimiento_str, '%Y-%m-%d').date()
+
+            # ✅ Validación SRI: evitar fecha de emisión extemporánea
+            hoy_local = timezone.localdate()
+            max_dias_retro = getattr(settings, 'SRI_MAX_DIAS_EMISION_RETRO', 5)
+            max_dias_futuro = getattr(settings, 'SRI_MAX_DIAS_EMISION_FUTURO', 0)
+            limite_min = hoy_local - timedelta(days=max_dias_retro)
+            limite_max = hoy_local + timedelta(days=max_dias_futuro)
+            if fecha_emision < limite_min or fecha_emision > limite_max:
+                raise ValueError(
+                    f"La fecha de emisión está fuera del rango permitido por el SRI. "
+                    f"Debe estar entre {limite_min.strftime('%d/%m/%Y')} y {limite_max.strftime('%d/%m/%Y')}."
+                )
 
             # Recuperar datos de secuencia
             establecimiento = (request.POST.get('establecimiento') or '').strip()

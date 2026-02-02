@@ -1441,7 +1441,7 @@ function limpiarCamposProducto() {
     document.getElementById('producto').dataset.codigo = "";
 }
 
-function agregarProducto() {
+async function agregarProducto() {
     const codigo = document.getElementById('codigo_producto').value.trim();
     const nombreProducto = document.getElementById('producto').value.trim();
     let precio = parseFloat(document.getElementById('producto').dataset.precio || "0");
@@ -1463,11 +1463,8 @@ function agregarProducto() {
         return;
     }
 
-    let cantidad = parseInt(prompt('Ingrese la cantidad:', '1'));
-    if (!cantidad || isNaN(cantidad) || cantidad <= 0) {
-        alert('Ingrese una cantidad válida.');
-        return;
-    }
+    const cantidad = await window.catalinaSolicitarCantidad({ title: 'Ingrese la cantidad:', defaultValue: 1, min: 1 });
+    if (cantidad === null) return;
 
     let subtotal = (cantidad * precio);
     let ivaPercent = parseFloat(document.getElementById('producto').dataset.ivaPercent || '0.12');

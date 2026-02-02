@@ -161,6 +161,33 @@
                             </div>
                         </div>
 
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                            <div class="flex items-center justify-between flex-wrap gap-2">
+                                <div>
+                                    <div class="text-sm font-semibold text-gray-800">Cambiar contraseña (opcional)</div>
+                                    <div class="note">Deja ambos campos en blanco para mantener la contraseña actual.</div>
+                                </div>
+                            </div>
+
+                            <div class="grid-2 mt-2">
+                                <div>
+                                    <label for="password">Nueva contraseña</label>
+                                    {{ form.password }}
+                                    <div class="help">Mínimo 3 caracteres</div>
+                                    {% if form.password.errors %}
+                                        <ul class="errorlist">{% for e in form.password.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <label for="verificar_password">Confirmar contraseña</label>
+                                    {{ form.verificar_password }}
+                                    {% if form.verificar_password.errors %}
+                                        <ul class="errorlist">{% for e in form.verificar_password.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
                         <div>
                             <label for="activo" class="mb-1 block">Activo</label>
                             <div class="flex items-center">

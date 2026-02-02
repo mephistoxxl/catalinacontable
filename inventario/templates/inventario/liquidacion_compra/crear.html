@@ -1757,7 +1757,7 @@
       }
     }
 
-    function agregarProducto() {
+    async function agregarProducto() {
       const codigoInput = document.getElementById('codigo_producto');
       const productoInfo = document.getElementById('producto');
       if (!codigoInput || !productoInfo) return;
@@ -1785,11 +1785,17 @@
         return;
       }
 
-      const cantidadIngresada = prompt('{{ _("Ingrese la cantidad:")|escapejs }}', '1');
-      if (cantidadIngresada === null) {
+      const cantidadSolicitada = await window.catalinaSolicitarCantidad({
+        title: '{{ _("Ingrese la cantidad:")|escapejs }}',
+        defaultValue: 1,
+        min: 0.000001,
+        allowDecimals: true,
+        step: 0.000001,
+      });
+      if (cantidadSolicitada === null) {
         return;
       }
-      const cantidad = round6(toNumber(cantidadIngresada, 1));
+      const cantidad = round6(toNumber(cantidadSolicitada, 1));
       if (!cantidad || cantidad <= 0) {
         alert(MSG_CANTIDAD_INVALIDA);
         return;

@@ -35,6 +35,7 @@ class RIDEGenerator:
         # Sin colores - diseño limpio
         self.color_fondo = colors.white
         self.color_borde = colors.black
+        self._catalina_footer_logo_cache = None
         
     def setup_styles(self):
         """Configurar estilos para el PDF exactos al SRI"""
@@ -145,34 +146,57 @@ class RIDEGenerator:
     def _draw_catalinasoft_footer(self, canvas, doc):
         """Dibuja el pie de página centrado (solo logo) en cada página."""
         try:
-            logo_path = self._resolve_catalinasoft_logo_path()
-            logo_w = 0
-            logo_h = 0
+            # Cache (evita reprocesar imagen en cada página)
+            if self._catalina_footer_logo_cache is None:
+                logo_path = self._resolve_catalinasoft_logo_path()
+                logo_w = 0
+                logo_h = 0
 
-            # Logo (tamaño ajustado)
-            max_h = 22 * mm
-            if logo_path and os.path.exists(logo_path):
-                reader = ImageReader(logo_path)
-                orig_w, orig_h = reader.getSize()
-                if orig_w and orig_h:
-                    ratio = float(max_h) / float(orig_h)
-                    logo_h = max_h
-                    logo_w = float(orig_w) * ratio
-            else:
+                # Logo (un poco más grande + menos difuminado)
+                max_h = 15 * mm
+                blur_radius = 0.8
+                alpha_factor = 0.45
+
                 reader = None
+                if logo_path and os.path.exists(logo_path):
+                    try:
+                        from PIL import Image as PILImage, ImageFilter
+
+                        with PILImage.open(logo_path) as im:
+                            im = im.convert('RGBA')
+                            im = im.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+
+                            r, g, b, a = im.split()
+                            a = a.point(lambda p: int(p * alpha_factor))
+                            im = PILImage.merge('RGBA', (r, g, b, a))
+
+                            tmp = BytesIO()
+                            im.save(tmp, format='PNG')
+                            tmp.seek(0)
+                            reader = ImageReader(tmp)
+
+                    except Exception:
+                        # Fallback sin difuminado si Pillow falla
+                        reader = ImageReader(logo_path)
+
+                    if reader is not None:
+                        orig_w, orig_h = reader.getSize()
+                        if orig_w and orig_h:
+                            ratio = float(max_h) / float(orig_h)
+                            logo_h = max_h
+                            logo_w = float(orig_w) * ratio
+
+                self._catalina_footer_logo_cache = (reader, logo_w, logo_h)
+
+            reader, logo_w, logo_h = self._catalina_footer_logo_cache
 
             canvas.saveState()
 
             total_w = logo_w
             x_start = (doc.pagesize[0] - total_w) / 2.0 if total_w else doc.leftMargin
 
-            # Posición: dentro del margen inferior reservado (evitar invadir el cuerpo)
-            if logo_h:
-                y = doc.bottomMargin - logo_h - (2 * mm)
-            else:
-                y = doc.bottomMargin - (7 * mm)
-            if y < 6 * mm:
-                y = 6 * mm
+            # Posición: más abajo (siempre dentro del margen inferior reservado)
+            y = 8 * mm
 
             x = x_start
             if logo_w and logo_h and reader is not None:
