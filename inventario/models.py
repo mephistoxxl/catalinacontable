@@ -347,6 +347,13 @@ class Opciones(models.Model):
         default='[CONFIGURAR NOMBRE COMERCIAL]',
         help_text='Nombre comercial de su empresa (opcional)'
     )
+
+    mensaje_en_facturas = models.CharField(
+        max_length=300,
+        blank=True,
+        default='',
+        help_text='Mensaje opcional a imprimir en la factura/ticket (entre el nombre comercial y el RUC)'
+    )
     
     direccion_establecimiento = models.TextField(
         max_length=300, 

@@ -1300,6 +1300,17 @@ class OpcionesFormulario(forms.Form):
             'class': 'form-control'
         }),
     )
+
+    mensaje_en_facturas = forms.CharField(
+        label='Mensaje en facturas',
+        max_length=300,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'id': 'mensaje_en_facturas',
+            'class': 'form-control',
+            'placeholder': 'Ej: Gracias por su compra',
+        }),
+    )
     
     direccion_establecimiento = forms.CharField(
         label='Dirección',

@@ -108,6 +108,7 @@ def render_factura_ticket(
     # EMISOR
     razon_social: str,
     nombre_comercial: str,
+    mensaje_en_facturas: str = "",
     ruc_emisor: str,
     direccion: str,
     ciudad: str,
@@ -175,6 +176,9 @@ def render_factura_ticket(
     titulo = nombre_comercial or razon_social
     if titulo:
         emit_line(f"*** {titulo} ***")
+    if mensaje_en_facturas:
+        for ln in _wrap(mensaje_en_facturas, WIDTH):
+            lines.append(_center(ln[:WIDTH], WIDTH))
     if ruc_emisor:
         emit_line(f"RUC: {ruc_emisor}")
     if direccion:
@@ -288,17 +292,15 @@ def render_factura_ticket(
     # Pie
     lines.append("")
     lines.append(star_line())
-    emit_line("FACTURA ELECTRONICA, INGRESE A:")
-    if url_consulta:
-        for ln in _wrap(url_consulta, WIDTH):
-            lines.append(ln[:WIDTH])
-    if cliente_id:
-        emit_line(f"CI/RUC: '{cliente_id}'")
-    if clave_acceso:
-        emit_line(f"CLAVE: '{_u(clave_acceso)}'")
+    # Sitio web (sin el texto de "FACTURA ELECTRONICA")
+    emit_line("www.catalinasoft-ec.com")
     lines.append(star_line())
 
     lines.append("")
+    # Espacio y línea para firma del cliente
+    lines.append("")
+    lines.append("")
+    lines.append(("_" * WIDTH)[:WIDTH])
     lines.append("FIRMA CLIENTE"[:WIDTH])
 
     final_lines = [ln[:WIDTH] for ln in lines]

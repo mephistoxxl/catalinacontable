@@ -3769,7 +3769,14 @@ class EmitirFactura(LoginRequiredMixin, View):
                     factura.save()
 
             print(f"🎉 FACTURA COMPLETADA: {establecimiento}-{punto_emision}-{secuencia_formateada}")
-            messages.success(request, f'¡Factura {establecimiento}-{punto_emision}-{secuencia_formateada} creada exitosamente!')
+
+            # Unificar mensajes de emisión en un solo resultado (para mostrar un único modal)
+            resumen_lineas = [f"Factura {establecimiento}-{punto_emision}-{secuencia_formateada} creada correctamente."]
+            nivel_resumen = 'success'  # success|info|warning|error
+
+            def _subir_nivel(actual: str, nuevo: str) -> str:
+                orden = {'success': 0, 'info': 1, 'warning': 2, 'error': 3}
+                return nuevo if orden.get(nuevo, 0) > orden.get(actual, 0) else actual
 
             # ✅ NUEVA NORMATIVA: Al emitir, procesar automáticamente en SRI (recepción + autorización)
             try:
@@ -3780,18 +3787,20 @@ class EmitirFactura(LoginRequiredMixin, View):
                 # Control de plan: bloquear emisión/autorización si excede el límite
                 empresa_plan_estado = obtener_estado_plan_y_notificar(get_empresa_activa(request))
                 if empresa_plan_estado.get('tiene_plan') and not empresa_plan_estado.get('puede_autorizar', True):
-                    messages.error(
-                        request,
-                        f"🚫 Ha alcanzado el límite de {empresa_plan_estado.get('limite_documentos')} documentos de su plan. "
-                        "No se puede autorizar una nueva factura."
+                    resumen_lineas.append(
+                        f"No se pudo autorizar automáticamente porque alcanzaste el límite del plan "
+                        f"({empresa_plan_estado.get('limite_documentos')} documentos)."
                     )
+                    nivel_resumen = _subir_nivel(nivel_resumen, 'error')
+                    mensaje_final = "\n".join(resumen_lineas)
+                    messages.error(request, mensaje_final)
                     return redirect('inventario:verFactura', p=factura.id)
                 if empresa_plan_estado.get('tiene_plan') and empresa_plan_estado.get('alcanzado_80'):
-                    messages.warning(
-                        request,
-                        f"⚠️ Atención: Ha utilizado {empresa_plan_estado.get('porcentaje_usado')}% de su plan. "
-                        f"Le quedan {empresa_plan_estado.get('documentos_restantes')} documentos."
+                    resumen_lineas.append(
+                        f"Aviso: ya usaste {empresa_plan_estado.get('porcentaje_usado')}% del plan. "
+                        f"Te quedan {empresa_plan_estado.get('documentos_restantes')} documentos."
                     )
+                    nivel_resumen = _subir_nivel(nivel_resumen, 'warning')
 
                 ya_autorizada = bool(factura.numero_autorizacion and factura.fecha_autorizacion)
 
@@ -3808,30 +3817,51 @@ class EmitirFactura(LoginRequiredMixin, View):
                     estado = (resultado_proc.get('estado') or res.get('estado') or factura.estado_sri or 'PROCESADA')
                     estado_norm = str(estado).strip().upper()
                     if estado_norm in {'PENDIENTE', 'RECIBIDA'}:
-                        messages.info(request, f'⏳ Factura enviada al SRI. Estado: {estado_norm}. La autorización puede tardar unos minutos.')
+                        resumen_lineas.append(
+                            f"Factura enviada al SRI y quedó en {estado_norm}. La autorización puede tardar unos minutos."
+                        )
+                        nivel_resumen = _subir_nivel(nivel_resumen, 'info')
                     else:
-                        messages.success(request, f'✅ Factura procesada automáticamente en SRI. Estado: {estado}')
+                        if estado_norm in {'AUTORIZADO', 'AUTORIZADA'}:
+                            resumen_lineas.append("Factura autorizada correctamente en el SRI.")
+                        else:
+                            resumen_lineas.append(f"Factura procesada en el SRI. Estado: {estado}.")
 
                     email_res = resultado_proc.get('email') if isinstance(resultado_proc.get('email'), dict) else None
                     if email_res and email_res.get('success'):
-                        messages.success(request, '📧 Email enviado automáticamente al cliente.')
+                        resumen_lineas.append("Correo enviado correctamente al cliente.")
                     elif email_res and not email_res.get('success'):
-                        messages.warning(request, f"⚠️ Factura autorizada, pero NO se pudo enviar email automáticamente: {email_res.get('message','')}")
+                        resumen_lineas.append(
+                            f"No se pudo enviar el correo automáticamente. {email_res.get('message','')}".strip()
+                        )
+                        nivel_resumen = _subir_nivel(nivel_resumen, 'warning')
                 else:
                     estado = (resultado_proc.get('estado') or factura.estado_sri or '').strip().upper()
                     msg = (resultado_proc.get('message') or 'No se pudo procesar en SRI.').strip()
 
                     # Nota: PENDIENTE/RECIBIDA suele ser normal; la autorización puede tardar.
                     if estado in {'PENDIENTE', 'RECIBIDA'} or 'PENDIENTE' in msg.upper() or 'AÚN NO' in msg.upper() or 'AUN NO' in msg.upper():
-                        messages.info(
-                            request,
-                            f'⏳ Factura enviada al SRI y quedó pendiente de autorización. {msg} '
-                            'Puede tardar unos minutos; en la vista de la factura puedes consultar el estado.'
+                        resumen_lineas.append(
+                            f"Factura enviada al SRI y pendiente de autorización. {msg} "
+                            "Puede tardar unos minutos; vuelve a consultar el estado desde la factura."
                         )
+                        nivel_resumen = _subir_nivel(nivel_resumen, 'info')
                     else:
-                        messages.warning(request, f'⚠️ Factura creada, pero falló el procesamiento automático en SRI: {msg}')
+                        resumen_lineas.append(f"No se pudo procesar automáticamente en el SRI. {msg}")
+                        nivel_resumen = _subir_nivel(nivel_resumen, 'warning')
             except Exception as e:
-                messages.warning(request, f'⚠️ Factura creada, pero falló el procesamiento automático en SRI: {str(e)}')
+                resumen_lineas.append(f"Ocurrió un problema al procesar la factura en el SRI. {str(e)}")
+                nivel_resumen = _subir_nivel(nivel_resumen, 'warning')
+
+            mensaje_final = "\n".join([linea for linea in resumen_lineas if str(linea).strip()])
+            if nivel_resumen == 'error':
+                messages.error(request, mensaje_final)
+            elif nivel_resumen == 'warning':
+                messages.warning(request, mensaje_final)
+            elif nivel_resumen == 'info':
+                messages.info(request, mensaje_final)
+            else:
+                messages.success(request, mensaje_final)
 
             # Redirigir directamente a VER la factura (verFactura.html)
             return redirect('inventario:verFactura', p=factura.id)
@@ -4835,6 +4865,7 @@ class ImprimirFacturaTicket(LoginRequiredMixin, View):
             # Emisor
             razon_social = getattr(opciones, 'razon_social', '') if opciones else ''
             nombre_comercial = getattr(opciones, 'nombre_comercial', '') if opciones else ''
+            mensaje_en_facturas = getattr(opciones, 'mensaje_en_facturas', '') if opciones else ''
             ruc_emisor = getattr(opciones, 'identificacion', '') if opciones else getattr(empresa, 'ruc', '')
             direccion = getattr(opciones, 'direccion_establecimiento', '') if opciones else ''
             telefono = getattr(opciones, 'telefono', '') if opciones else ''
@@ -5011,6 +5042,7 @@ class ImprimirFacturaTicket(LoginRequiredMixin, View):
             ticket = render_factura_ticket(
                 razon_social=razon_social,
                 nombre_comercial=nombre_comercial,
+                mensaje_en_facturas=mensaje_en_facturas,
                 ruc_emisor=ruc_emisor,
                 direccion=direccion,
                 ciudad=ciudad,
@@ -6660,6 +6692,7 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
             'identificacion': identificacion,
             'razon_social': conf.razon_social,
             'nombre_comercial': conf.nombre_comercial,
+            'mensaje_en_facturas': getattr(conf, 'mensaje_en_facturas', '') or '',
             'correo': conf.correo,
             'telefono': conf.telefono,
             'moneda': conf.moneda,
@@ -6700,6 +6733,7 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
             conf.identificacion = form.cleaned_data['identificacion']
             conf.razon_social = form.cleaned_data['razon_social']
             conf.nombre_comercial = form.cleaned_data.get('nombre_comercial')
+            conf.mensaje_en_facturas = form.cleaned_data.get('mensaje_en_facturas', '') or ''
             conf.direccion_establecimiento = form.cleaned_data.get('direccion_establecimiento')
             conf.correo = form.cleaned_data.get('correo')
             conf.telefono = form.cleaned_data.get('telefono')

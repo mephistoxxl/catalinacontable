@@ -4,24 +4,217 @@
 {% block content %}
 <div class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 pt-0 pb-24">
     <div class="max-w-6xl mx-auto">
-        <!-- Mensajes -->
+        <!-- Mensajes (un solo modal) -->
         {% if messages %}
-            <div class="mb-6">
-                {% for message in messages %}
-                    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-green-500 bg-green-50">
-                        <div class="flex items-center">
-                            <div class="flex-shrink-0">
-                                <i class="fas fa-check-circle text-green-500 text-xl"></i>
+        {% for message in messages %}
+            {% if forloop.first %}
+        <div id="catalina-flash-modal" data-tone="{{ message.tags }}" class="fixed inset-0 z-[9999] hidden" aria-hidden="true">
+            <style>
+                @keyframes catalinaFlashPop {
+                    0% { transform: translateY(16px) scale(0.96); opacity: 0; }
+                    60% { transform: translateY(-2px) scale(1.01); opacity: 1; }
+                    100% { transform: translateY(0) scale(1); opacity: 1; }
+                }
+                @keyframes catalinaFlashFade {
+                    0% { opacity: 0; }
+                    100% { opacity: 1; }
+                }
+                .catalina-flash-open #catalina-flash-backdrop { animation: catalinaFlashFade 180ms ease-out both; }
+                .catalina-flash-open #catalina-flash-card { animation: catalinaFlashPop 260ms cubic-bezier(.2,.9,.2,1) both; }
+            </style>
+            <div id="catalina-flash-backdrop" class="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 transition-opacity duration-200"></div>
+            <div class="relative min-h-full flex items-center justify-center p-4">
+                <div id="catalina-flash-card" class="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-gray-200 ring-1 ring-gray-200 overflow-hidden transform opacity-0 translate-y-2 scale-[0.98] transition-all duration-200">
+                    <div id="catalina-flash-header" class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                        <div class="flex items-center justify-end gap-3">
+                            <button type="button" id="catalina-flash-close" class="w-9 h-9 rounded-lg bg-white/70 hover:bg-white text-gray-500 hover:text-gray-800 border border-gray-200" aria-label="Cerrar">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="px-5 py-5">
+                        <div class="flex flex-col items-center text-center gap-3">
+                            <div id="catalina-flash-bigIcon" class="w-16 h-16 rounded-3xl bg-gray-100 flex items-center justify-center">
+                                <i id="catalina-flash-bigIconI" class="fas fa-check-circle text-gray-700 text-5xl"></i>
                             </div>
-                            <div class="ml-3">
-                                <p class="text-sm font-medium text-green-800">
-                                    {{ message }}
-                                </p>
+                            <div class="leading-tight">
+                                <h3 id="catalina-flash-title" class="text-base font-extrabold text-gray-900">Resultado</h3>
+                                <p id="catalina-flash-subtitle" class="text-xs text-gray-600">Resultado de la emisión</p>
+                            </div>
+                            <div class="text-sm text-gray-800 whitespace-pre-line leading-snug">
+                            {% for m in messages %}
+{{ m }}{% if not forloop.last %}
+{% endif %}{% endfor %}
                             </div>
                         </div>
                     </div>
-                {% endfor %}
+
+                    <div class="px-4 py-3 border-t border-gray-200 bg-white flex items-center justify-end gap-2">
+                        <button type="button" id="catalina-flash-ok" class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-gray-900 hover:bg-gray-800 text-sm font-bold text-white shadow-sm">
+                            Entendido
+                        </button>
+                    </div>
+                </div>
             </div>
+        </div>
+
+        <script>
+            (function () {
+                const modal = document.getElementById('catalina-flash-modal');
+                const backdrop = document.getElementById('catalina-flash-backdrop');
+                const card = document.getElementById('catalina-flash-card');
+                const header = document.getElementById('catalina-flash-header');
+                const title = document.getElementById('catalina-flash-title');
+                const btnClose = document.getElementById('catalina-flash-close');
+                const btnOk = document.getElementById('catalina-flash-ok');
+                if (!modal || !backdrop || !card || !header || !title || !btnClose || !btnOk) return;
+
+                const toneRaw = String(modal.dataset.tone || '').toLowerCase();
+                const tone = toneRaw.includes('error') ? 'error'
+                    : toneRaw.includes('warning') ? 'warning'
+                    : toneRaw.includes('info') ? 'info'
+                    : 'success';
+
+                // Detectar estado principal desde el texto para título específico
+                const textAll = (card.innerText || '').toUpperCase();
+                const estado = textAll.includes('AUTORIZADO') || textAll.includes('AUTORIZADA')
+                    ? 'AUTORIZADO'
+                    : (textAll.includes('PENDIENTE') || textAll.includes('RECIBIDA'))
+                        ? 'PENDIENTE'
+                        : 'OTRO';
+
+                // Iconos compatibles con FontAwesome 4/5 (no FA6)
+                const themes = {
+                    success: {
+                        title: 'Listo',
+                        headerBg: 'bg-emerald-50',
+                        border: 'border-emerald-200',
+                        ring: 'ring-emerald-200',
+                        icon: 'fas fa-check-circle',
+                        iconBg: 'bg-emerald-100',
+                        iconText: 'text-emerald-700',
+                        button: 'bg-emerald-600 hover:bg-emerald-700'
+                    },
+                    info: {
+                        title: 'Información',
+                        headerBg: 'bg-blue-50',
+                        border: 'border-blue-200',
+                        ring: 'ring-blue-200',
+                        icon: 'fas fa-info-circle',
+                        iconBg: 'bg-blue-100',
+                        iconText: 'text-blue-700',
+                        button: 'bg-blue-600 hover:bg-blue-700'
+                    },
+                    warning: {
+                        title: 'Atención',
+                        headerBg: 'bg-amber-50',
+                        border: 'border-amber-200',
+                        ring: 'ring-amber-200',
+                        icon: 'fas fa-exclamation-triangle',
+                        iconBg: 'bg-amber-100',
+                        iconText: 'text-amber-700',
+                        button: 'bg-amber-600 hover:bg-amber-700'
+                    },
+                    error: {
+                        title: 'No se pudo completar',
+                        headerBg: 'bg-red-50',
+                        border: 'border-red-200',
+                        ring: 'ring-red-200',
+                        icon: 'fas fa-times-circle',
+                        iconBg: 'bg-red-100',
+                        iconText: 'text-red-700',
+                        button: 'bg-red-600 hover:bg-red-700'
+                    }
+                };
+
+                const theme = themes[tone] || themes.success;
+                // Título específico si está AUTORIZADO o PENDIENTE
+                if (estado === 'AUTORIZADO') {
+                    title.textContent = 'Factura autorizada';
+                } else if (estado === 'PENDIENTE') {
+                    title.textContent = 'Factura enviada al SRI';
+                } else {
+                    title.textContent = theme.title;
+                }
+
+                const borderClasses = ['border-gray-200', 'border-emerald-200', 'border-blue-200', 'border-amber-200', 'border-red-200'];
+                const ringClasses = ['ring-gray-200', 'ring-emerald-200', 'ring-blue-200', 'ring-amber-200', 'ring-red-200'];
+                const headerBgClasses = ['bg-gray-50', 'bg-emerald-50', 'bg-blue-50', 'bg-amber-50', 'bg-red-50'];
+                const iconBgClasses = ['bg-gray-100', 'bg-emerald-100', 'bg-blue-100', 'bg-amber-100', 'bg-red-100'];
+                const iconTextClasses = ['text-gray-700', 'text-emerald-700', 'text-blue-700', 'text-amber-700', 'text-red-700'];
+                const buttonBgClasses = ['bg-gray-900', 'hover:bg-gray-800', 'bg-emerald-600', 'hover:bg-emerald-700', 'bg-blue-600', 'hover:bg-blue-700', 'bg-amber-600', 'hover:bg-amber-700', 'bg-red-600', 'hover:bg-red-700'];
+
+                card.classList.remove(...borderClasses);
+                card.classList.add(theme.border);
+                card.classList.remove(...ringClasses);
+                card.classList.add(theme.ring);
+                header.classList.remove(...headerBgClasses);
+                header.classList.add(theme.headerBg);
+
+                const bigWrap = document.getElementById('catalina-flash-bigIcon');
+                const bigI = document.getElementById('catalina-flash-bigIconI');
+                if (bigWrap && bigI) {
+                    bigWrap.classList.remove(...iconBgClasses);
+                    bigWrap.classList.add(theme.iconBg);
+                    bigI.classList.remove(...iconTextClasses);
+                    bigI.classList.add(theme.iconText);
+                    // Estado manda el ícono grande
+                    if (estado === 'AUTORIZADO') {
+                        bigI.className = `fas fa-check-circle ${theme.iconText} text-5xl`;
+                    } else if (estado === 'PENDIENTE') {
+                        bigI.className = `far fa-clock ${theme.iconText} text-5xl`;
+                    } else {
+                        bigI.className = `${theme.icon} ${theme.iconText} text-5xl`;
+                    }
+                }
+                btnOk.classList.remove(...buttonBgClasses);
+                btnOk.classList.add(...theme.button.split(' '));
+
+                function closeModal() {
+                    modal.classList.remove('catalina-flash-open');
+                    backdrop.classList.remove('opacity-100');
+                    card.classList.remove('opacity-100', 'translate-y-0', 'scale-100');
+                    card.classList.add('opacity-0', 'translate-y-2', 'scale-[0.98]');
+                    setTimeout(() => {
+                        modal.classList.add('hidden');
+                        modal.setAttribute('aria-hidden', 'true');
+                    }, 180);
+                }
+
+                function openModal() {
+                    modal.classList.remove('hidden');
+                    modal.setAttribute('aria-hidden', 'false');
+                    modal.classList.add('catalina-flash-open');
+                    requestAnimationFrame(() => {
+                        backdrop.classList.add('opacity-100');
+                        card.classList.remove('opacity-0', 'translate-y-2', 'scale-[0.98]');
+                        card.classList.add('opacity-100', 'translate-y-0', 'scale-100');
+                    });
+                    setTimeout(() => { try { btnOk.focus(); } catch (e) {} }, 0);
+                }
+
+                btnClose.addEventListener('click', closeModal);
+                btnOk.addEventListener('click', closeModal);
+
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal || e.target === backdrop) closeModal();
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (modal.classList.contains('hidden')) return;
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        closeModal();
+                    }
+                });
+
+                document.addEventListener('DOMContentLoaded', openModal);
+            })();
+        </script>
+
+            {% endif %}
+        {% endfor %}
         {% endif %}
 
         <!-- Tarjeta principal de la factura -->

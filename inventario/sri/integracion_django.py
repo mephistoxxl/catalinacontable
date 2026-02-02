@@ -349,6 +349,27 @@ class SRIIntegration:
                 mensajes_recep = resultado.get('mensajes', [])
                 mensaje_detalle = mensajes_recep[0].get('mensaje', 'Error desconocido') if mensajes_recep else 'Error desconocido'
 
+                # Caso especial: SRI indica secuencial duplicado (código 45)
+                try:
+                    es_secuencial_registrado = any(
+                        str(m.get('identificador', '')).strip() == '45'
+                        or 'SECUENCIAL REGISTRADO' in str(m.get('mensaje', '')).upper()
+                        for m in (mensajes_recep or [])
+                    )
+                except Exception:
+                    es_secuencial_registrado = False
+
+                if es_secuencial_registrado:
+                    numero = f"{getattr(factura, 'establecimiento', '')}-{getattr(factura, 'punto_emision', '')}-{getattr(factura, 'secuencia', '')}".strip('-')
+                    mensaje_detalle = (
+                        f"El SRI reporta que el secuencial ya está registrado para esta serie. "
+                        f"Número: {numero}. "
+                        "Esto puede pasar si la secuencia local está desfasada (por ejemplo, se reinició, se migró desde otro sistema, "
+                        "o ya se emitieron documentos con esa serie en el portal SRI). "
+                        "Solución: en Configuración → Secuencias, ajuste el 'siguiente secuencial' a un número mayor al último emitido en el SRI "
+                        "para esa serie y vuelva a emitir una nueva factura."
+                    )
+
                 if estado_recep == 'PENDIENTE':
                     message = f"Recepción pendiente: {mensaje_detalle}. Intente nuevamente en unos minutos."
                 else:
