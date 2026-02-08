@@ -1,6 +1,7 @@
 import os
 import logging
 import random
+import time
 import traceback
 from datetime import datetime
 from django.conf import settings
@@ -294,59 +295,21 @@ class SRIIntegration:
             # Si fue recibido, solicitar autorización
             if estado_recep == 'RECIBIDA':
                 resultado_auth = self.cliente.consultar_autorizacion(clave_acceso)
-
-                # 🔧 FIX: SIEMPRE actualizar el estado tras consultar autorización
-                self._actualizar_factura_con_resultado(factura, resultado_auth, clave_acceso)
-
-                estado_auth = resultado_auth.get('estado', '').upper()
-                raw_response = resultado_auth.get('raw_response')
-                if estado_auth in ('AUTORIZADA', 'AUTORIZADO'):
-                    # Generar RIDE autorizado
-                    self._generar_ride_autorizado(factura, resultado_auth)
-
-                    email_res = None
-                    try:
-                        if hasattr(factura, 'email_enviado') and not factura.email_enviado:
-                            email_res = self.enviar_factura_email(factura)
-                    except Exception as e:
-                        logger.warning(f"Fallo envío automático de email (proceso) para factura {factura.id}: {e}")
-
-                    return {
-                        'success': True,
-                        'message': 'Factura autorizada exitosamente',
-                        'resultado': resultado_auth,
-                        'email': email_res,
-                    }
-                elif estado_auth == 'PENDIENTE':
-                    # Estado pendiente - no es un error, solo necesita más tiempo
-                    mensajes_auth = resultado_auth.get('mensajes', [])
-                    mensaje_detalle = mensajes_auth[0].get('mensaje', 'El comprobante está pendiente de autorización') if mensajes_auth else 'El comprobante está pendiente de autorización'
-                    logger.error(
-                        "Autorización pendiente - estado_recep=%s, estado_auth=%s, raw_response=%s",
-                        estado_recep, estado_auth, raw_response
-                    )
-                    return {
-                        'success': True,
-                        'message': f"Pendiente de autorización: {mensaje_detalle}. Intente nuevamente en unos minutos.",
-                        'estado': 'PENDIENTE',
-                        'resultado': resultado_auth
-                    }
-                else:
-                    # Otros estados (NO_AUTORIZADA, ERROR, etc.)
-                    mensajes_auth = resultado_auth.get('mensajes', [])
-                    mensaje_detalle = mensajes_auth[0].get('mensaje', 'Error desconocido') if mensajes_auth else 'Error desconocido'
-                    logger.error(
-                        "Error en autorización - estado_recep=%s, estado_auth=%s, raw_response=%s",
-                        estado_recep, estado_auth, raw_response
-                    )
-                    return {
-                        'success': False,
-                        'message': f"Error en autorización: {mensaje_detalle}",
-                        'resultado': resultado_auth
-                    }
+                _, respuesta_autorizacion = self._evaluar_resultado_autorizacion(
+                    factura,
+                    resultado_auth,
+                    clave_acceso,
+                    estado_recep='RECIBIDA',
+                    origen='recepcion_inmediata',
+                )
+                return respuesta_autorizacion
             else:
                 # El comprobante no fue recibido correctamente
                 mensajes_recep = resultado.get('mensajes', [])
+
+                if self._mensajes_indican_clave_en_procesamiento(mensajes_recep):
+                    return self._manejar_clave_en_procesamiento(factura, clave_acceso, mensajes_recep)
+
                 mensaje_detalle = mensajes_recep[0].get('mensaje', 'Error desconocido') if mensajes_recep else 'Error desconocido'
 
                 # Caso especial: SRI indica secuencial duplicado (código 45)
@@ -653,6 +616,214 @@ class SRIIntegration:
             return '1'
         else:
             return str(digito_verificador)
+
+    def _mensajes_indican_clave_en_procesamiento(self, mensajes):
+        """Detecta si la respuesta del SRI menciona clave en procesamiento."""
+        if not mensajes:
+            return False
+        for mensaje in mensajes:
+            if isinstance(mensaje, dict):
+                texto = " ".join([
+                    str(mensaje.get('mensaje', '') or ''),
+                    str(mensaje.get('informacionAdicional', '') or ''),
+                    str(mensaje.get('detalle', '') or '')
+                ])
+            else:
+                texto = str(mensaje or '')
+            texto_upper = texto.upper()
+            if 'CLAVE' in texto_upper and 'PROCESAMIENTO' in texto_upper:
+                return True
+        return False
+
+    def _evaluar_resultado_autorizacion(self, factura, resultado_auth, clave_acceso, estado_recep='RECIBIDA', origen='consulta', mensaje_pendiente=None):
+        """Normaliza la respuesta de autorización y arma la estructura final."""
+        self._actualizar_factura_con_resultado(factura, resultado_auth, clave_acceso)
+
+        estado_bruto = resultado_auth.get('estado', '')
+        estado_auth = str(estado_bruto or '').upper().strip()
+        if not estado_auth:
+            estado_auth = 'PENDIENTE'
+
+        raw_response = resultado_auth.get('raw_response')
+        logger.info(
+            "Evaluando autorización SRI | clave=%s | estado_recep=%s | estado_auth=%s | origen=%s",
+            clave_acceso,
+            estado_recep,
+            estado_auth,
+            origen,
+        )
+
+        estados_pendientes = {
+            'PENDIENTE',
+            'EN_PROCESO',
+            'EN_PROCESAMIENTO',
+            'PROCESANDO',
+            'PROCESAMIENTO',
+            'RECIBIDA',
+        }
+
+        if estado_auth in ('AUTORIZADA', 'AUTORIZADO'):
+            self._generar_ride_autorizado(factura, resultado_auth)
+
+            email_res = None
+            try:
+                if hasattr(factura, 'email_enviado') and not factura.email_enviado:
+                    email_res = self.enviar_factura_email(factura)
+            except Exception as exc:
+                logger.warning(
+                    "Fallo envío automático de email (%s) para factura %s: %s",
+                    origen,
+                    factura.id,
+                    exc,
+                )
+
+            return estado_auth, {
+                'success': True,
+                'message': 'Factura autorizada exitosamente',
+                'resultado': resultado_auth,
+                'estado': 'AUTORIZADA',
+                'email': email_res,
+            }
+
+        if estado_auth in estados_pendientes:
+            mensajes_auth = resultado_auth.get('mensajes', []) or []
+            if mensaje_pendiente:
+                mensaje_detalle = mensaje_pendiente
+            else:
+                mensaje_detalle = (
+                    mensajes_auth[0].get('mensaje', 'El comprobante está pendiente de autorización')
+                    if mensajes_auth and isinstance(mensajes_auth[0], dict)
+                    else 'El comprobante está pendiente de autorización'
+                )
+            logger.info(
+                "Autorización pendiente | clave=%s | mensaje=%s | raw=%s",
+                clave_acceso,
+                mensaje_detalle,
+                raw_response,
+            )
+            return 'PENDIENTE', {
+                'success': True,
+                'message': f"Pendiente de autorización: {mensaje_detalle}. Intente nuevamente en unos minutos.",
+                'estado': 'PENDIENTE',
+                'resultado': resultado_auth,
+            }
+
+        mensajes_auth = resultado_auth.get('mensajes', []) or []
+        if mensajes_auth and isinstance(mensajes_auth[0], dict):
+            mensaje_detalle = mensajes_auth[0].get('mensaje', 'Error desconocido')
+        else:
+            mensaje_detalle = str(mensajes_auth[0]) if mensajes_auth else 'Error desconocido'
+
+        logger.error(
+            "Error en autorización | clave=%s | estado_recep=%s | estado_auth=%s | raw=%s",
+            clave_acceso,
+            estado_recep,
+            estado_auth,
+            raw_response,
+        )
+
+        return estado_auth, {
+            'success': False,
+            'message': f"Error en autorización: {mensaje_detalle}",
+            'resultado': resultado_auth,
+            'estado': estado_auth,
+        }
+
+    def _manejar_clave_en_procesamiento(self, factura, clave_acceso, mensajes_recep):
+        """Reintenta la consulta cuando el SRI reporta clave en procesamiento."""
+        logger.info(
+            "Clave en procesamiento detectada | factura=%s | clave=%s",
+            factura.id,
+            clave_acceso,
+        )
+
+        esperas = [3, 6, 9]
+        ultimo_resultado = None
+
+        for intento, espera in enumerate(esperas, start=1):
+            logger.info(
+                "Reintento autorización %s/%s tras %ss | clave=%s",
+                intento,
+                len(esperas),
+                espera,
+                clave_acceso,
+            )
+            time.sleep(max(0, espera))
+            resultado_auth = self.cliente.consultar_autorizacion(clave_acceso)
+            estado_auth, respuesta = self._evaluar_resultado_autorizacion(
+                factura,
+                resultado_auth,
+                clave_acceso,
+                estado_recep='EN_PROCESAMIENTO',
+                origen=f'reintento_{intento}',
+                mensaje_pendiente='El SRI sigue procesando la clave de acceso',
+            )
+
+            if estado_auth in ('AUTORIZADA', 'AUTORIZADO'):
+                return respuesta
+
+            ultimo_resultado = respuesta
+
+            if estado_auth not in {
+                'PENDIENTE',
+                'EN_PROCESO',
+                'EN_PROCESAMIENTO',
+                'PROCESANDO',
+                'PROCESAMIENTO',
+                'RECIBIDA',
+            }:
+                return respuesta
+
+        # Mantener la factura marcada como pendiente para reintentos externos
+        try:
+            campos = []
+            if hasattr(factura, 'estado') and factura.estado != 'PENDIENTE':
+                factura.estado = 'PENDIENTE'
+                campos.append('estado')
+            if hasattr(factura, 'estado_sri') and factura.estado_sri != 'PENDIENTE':
+                factura.estado_sri = 'PENDIENTE'
+                campos.append('estado_sri')
+            if hasattr(factura, 'mensaje_sri'):
+                factura.mensaje_sri = 'Pendiente: Clave de acceso en procesamiento'
+                campos.append('mensaje_sri')
+            if hasattr(factura, 'mensaje_sri_detalle'):
+                factura.mensaje_sri_detalle = str(mensajes_recep or [])
+                campos.append('mensaje_sri_detalle')
+            if campos:
+                factura.save(update_fields=list(dict.fromkeys(campos)))
+        except Exception as exc:
+            logger.warning(
+                "No se pudo actualizar mensaje pendiente para factura %s: %s",
+                factura.id,
+                exc,
+            )
+
+        if ultimo_resultado and ultimo_resultado.get('resultado'):
+            resultado_base = ultimo_resultado.get('resultado')
+        else:
+            resultado_base = {
+                'estado': 'PENDIENTE',
+                'mensajes': mensajes_recep or [],
+            }
+
+        primer_mensaje = ''
+        if mensajes_recep:
+            msg0 = mensajes_recep[0]
+            if isinstance(msg0, dict):
+                primer_mensaje = msg0.get('mensaje') or msg0.get('informacionAdicional') or ''
+            else:
+                primer_mensaje = str(msg0)
+
+        mensaje_usuario = 'El SRI sigue procesando la clave de acceso. Verificaremos nuevamente automáticamente.'
+        if primer_mensaje:
+            mensaje_usuario += f" Mensaje SRI: {primer_mensaje}."
+
+        return {
+            'success': True,
+            'message': mensaje_usuario,
+            'estado': 'PENDIENTE',
+            'resultado': resultado_base,
+        }
     
     def _actualizar_factura_con_resultado(self, factura, resultado, clave_acceso):
         """
@@ -675,6 +846,15 @@ class SRIIntegration:
         estado = resultado.get('estado', 'ERROR')
         # 🔧 FIX: Normalizar variantes de estado que puede devolver el SRI
         estado_normalizado = estado.upper().replace(' ', '_') if isinstance(estado, str) else str(estado).upper()
+        mensajes_resultado = resultado.get('mensajes', []) or []
+
+        if estado_normalizado in ('DEVUELTA', 'ERROR') and self._mensajes_indican_clave_en_procesamiento(mensajes_resultado):
+            logger.info(
+                "Estado %s normalizado a PENDIENTE por reporte 'clave en procesamiento'",
+                estado_normalizado,
+            )
+            estado_normalizado = 'PENDIENTE'
+            estado = 'PENDIENTE'
         
         logger.info(f"Actualizando factura {factura.id} con estado SRI: '{estado}' (normalizado: '{estado_normalizado}')")
 
@@ -848,8 +1028,11 @@ class SRIIntegration:
             if hasattr(factura, 'estado_sri'):
                 factura.estado_sri = 'RECHAZADA'
             if hasattr(factura, 'mensaje_sri'):
-                mensajes = resultado.get('mensajes', [])
-                mensaje_detalle = mensajes[0].get('mensaje', 'Comprobante rechazado') if mensajes else 'Comprobante rechazado'
+                mensaje_detalle = (
+                    mensajes_resultado[0].get('mensaje', 'Comprobante rechazado')
+                    if mensajes_resultado and isinstance(mensajes_resultado[0], dict)
+                    else 'Comprobante rechazado'
+                )
                 factura.mensaje_sri = f"Rechazado: {mensaje_detalle}"
             
             logger.info(f"Factura {factura.id} marcada como RECHAZADA")
@@ -870,8 +1053,10 @@ class SRIIntegration:
             if hasattr(factura, 'estado_sri'):
                 factura.estado_sri = 'PENDIENTE'
             if hasattr(factura, 'mensaje_sri'):
-                mensajes = resultado.get('mensajes', [])
-                mensaje_detalle = mensajes[0].get('mensaje', 'Pendiente de autorización') if mensajes else 'Pendiente de autorización'
+                if mensajes_resultado and isinstance(mensajes_resultado[0], dict):
+                    mensaje_detalle = mensajes_resultado[0].get('mensaje', 'Pendiente de autorización')
+                else:
+                    mensaje_detalle = 'Pendiente de autorización'
                 factura.mensaje_sri = f"Pendiente: {mensaje_detalle}"
             
             logger.info(f"Factura {factura.id} marcada como PENDIENTE")
@@ -882,15 +1067,17 @@ class SRIIntegration:
             if hasattr(factura, 'estado_sri'):
                 factura.estado_sri = 'ERROR'
             if hasattr(factura, 'mensaje_sri'):
-                mensajes = resultado.get('mensajes', [])
-                mensaje_error = mensajes[0].get('mensaje', 'Error desconocido') if mensajes else 'Error desconocido'
+                if mensajes_resultado and isinstance(mensajes_resultado[0], dict):
+                    mensaje_error = mensajes_resultado[0].get('mensaje', 'Error desconocido')
+                else:
+                    mensaje_error = 'Error desconocido'
                 factura.mensaje_sri = f"Error: {mensaje_error}"
             
             logger.warning(f"Factura {factura.id} marcada como ERROR - Estado desconocido: {estado}")
         
         # 🔧 FIX: Guardar mensajes completos si el campo existe
         if hasattr(factura, 'mensaje_sri_detalle'):
-            mensajes_detalle = resultado.get('mensajes') or []
+            mensajes_detalle = mensajes_resultado
             factura.mensaje_sri_detalle = None if not mensajes_detalle else str(mensajes_detalle)
         
         # 🔧 FIX: SIEMPRE guardar los cambios

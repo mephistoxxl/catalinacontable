@@ -10056,7 +10056,9 @@ def buscar_cliente_api(request):
             'razon_social': c.razon_social,
             'nombre_comercial': c.nombre_comercial or '',
             'nombre_compuesto': (c.razon_social + (f" {c.nombre_comercial}" if c.nombre_comercial else "")).strip(),
-            'correo': c.correo or ''
+            'correo': c.correo or '',
+            'direccion': c.direccion or '',
+            'telefono': c.telefono or ''
         }
     data = {
         'success': True,
@@ -10154,7 +10156,8 @@ def crear_cliente_api(request):
                 'razon_social': cliente.razon_social,
                 'nombre_comercial': cliente.nombre_comercial or '',
                 'correo': cliente.correo or '',
-                'direccion': cliente.direccion or ''
+                'direccion': cliente.direccion or '',
+                'telefono': cliente.telefono or ''
             }
         }
         return JsonResponse(resp, status=201 if created else 200)

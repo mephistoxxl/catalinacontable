@@ -444,7 +444,7 @@ input[type="number"][readonly] {
                                     <div class="flex-1">
                                         {{ form.nombre_cliente }}
                                     </div>
-                                    <button type="button" id="btnInfoCliente" disabled class="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-400 bg-gray-50 cursor-not-allowed" style="display: none;" title="Bloqueado">
+                                    <button type="button" id="btnInfoCliente" disabled class="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-400 bg-gray-50 cursor-not-allowed" hidden title="Bloqueado">
                                         <i class="fas fa-lock"></i>
                                     </button>
                                 </div>
@@ -1210,7 +1210,10 @@ function completarClienteDesdeObjeto(obj){
             direccion: obj.direccion || '',
             telefono: obj.telefono || ''
         };
-        if (btnInfoCliente) btnInfoCliente.style.display = 'flex';
+        if (btnInfoCliente) {
+            btnInfoCliente.hidden = false;
+            btnInfoCliente.disabled = false;
+        }
     }
     
     // Intentar enriquecer si razon social == identificacion
@@ -1244,7 +1247,10 @@ function limpiarCamposCliente(){
     if (clienteId) clienteId.value = '';
     if (correoCliente) correoCliente.value = '';
     // ✅ Ocultar botón de editar y limpiar datos
-    if (btnInfoCliente) btnInfoCliente.style.display = 'none';
+    if (btnInfoCliente) {
+        btnInfoCliente.hidden = true;
+        btnInfoCliente.disabled = true;
+    }
     clienteActualData = null;
 }
 

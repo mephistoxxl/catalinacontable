@@ -426,7 +426,7 @@ input[type="number"][readonly] {
                                     <div class="flex-1">
                                         {{ form.nombre_cliente }}
                                     </div>
-                                    <button type="button" id="btnInfoCliente" onclick="abrirModalCliente()" class="inline-flex items-center px-2 py-1 border border-green-500 text-xs font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-1 focus:ring-green-500 transition-all duration-150" style="display: none;" title="Ver/Editar información del cliente">
+                                    <button type="button" id="btnInfoCliente" onclick="abrirModalCliente()" class="inline-flex items-center px-2 py-1 border border-green-500 text-xs font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-1 focus:ring-green-500 transition-all duration-150 opacity-50 cursor-not-allowed" disabled title="Ver/Editar información del cliente">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                 </div>
@@ -1081,7 +1081,10 @@ function completarClienteDesdeObjeto(obj){
             direccion: obj.direccion || '',
             telefono: obj.telefono || ''
         };
-        if (btnInfoCliente) btnInfoCliente.style.display = 'flex';
+        if (btnInfoCliente) {
+            btnInfoCliente.disabled = false;
+            btnInfoCliente.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
     }
     
     // Intentar enriquecer si razon social == identificacion
@@ -1115,7 +1118,10 @@ function limpiarCamposCliente(){
     if (clienteId) clienteId.value = '';
     if (correoCliente) correoCliente.value = '';
     // ✅ Ocultar botón de editar y limpiar datos
-    if (btnInfoCliente) btnInfoCliente.style.display = 'none';
+    if (btnInfoCliente) {
+        btnInfoCliente.disabled = true;
+        btnInfoCliente.classList.add('opacity-50', 'cursor-not-allowed');
+    }
     clienteActualData = null;
 }
 
@@ -2508,10 +2514,15 @@ function cerrarModalCliente() {
     document.getElementById('modalInfoCliente').classList.remove('active');
 }
 
-async function guardarClienteModal() {
+async function guardarClienteModal(opciones) {
+    const opts = opciones || {};
+    const silent = Boolean(opts.silent);
+    const closeModal = opts.close !== false;
     const clienteId = document.getElementById('modalClienteId').value;
     if (!clienteId) {
-        alert('Error: No hay cliente seleccionado');
+        if (!silent) {
+            alert('Error: No hay cliente seleccionado');
+        }
         return;
     }
     
@@ -2524,8 +2535,10 @@ async function guardarClienteModal() {
     };
     
     if (!datos.razon_social) {
-        alert('La razón social es obligatoria');
-        document.getElementById('modalClienteRazonSocial').focus();
+        if (!silent) {
+            alert('La razón social es obligatoria');
+            document.getElementById('modalClienteRazonSocial').focus();
+        }
         return;
     }
     
@@ -2552,22 +2565,46 @@ async function guardarClienteModal() {
                 telefono: result.cliente.telefono
             };
             
-            cerrarModalCliente();
+            if (closeModal) {
+                cerrarModalCliente();
+            }
             
-            // Mostrar notificación de éxito
-            const toast = document.createElement('div');
-            toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
-            toast.innerHTML = '<i class="fas fa-check mr-2"></i>Cliente actualizado correctamente';
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
+            if (!silent) {
+                // Mostrar notificación de éxito
+                const toast = document.createElement('div');
+                toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                toast.innerHTML = '<i class="fas fa-check mr-2"></i>Cliente actualizado correctamente';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            }
         } else {
-            alert('Error: ' + (result.message || 'No se pudo actualizar el cliente'));
+            if (!silent) {
+                alert('Error: ' + (result.message || 'No se pudo actualizar el cliente'));
+            }
         }
     } catch (error) {
         console.error('Error:', error);
-        alert('Error de conexión al guardar el cliente');
+        if (!silent) {
+            alert('Error de conexión al guardar el cliente');
+        }
     }
 }
+
+function configurarAutoGuardadoCliente() {
+    const direccion = document.getElementById('modalClienteDireccion');
+    const telefono = document.getElementById('modalClienteTelefono');
+    const correo = document.getElementById('modalClienteCorreo');
+    const inputs = [direccion, telefono, correo].filter(Boolean);
+    if (!inputs.length) return;
+
+    inputs.forEach((input) => {
+        input.addEventListener('blur', () => {
+            guardarClienteModal({ silent: true, close: false });
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', configurarAutoGuardadoCliente);
 </script>
 
 {% endblock %}
