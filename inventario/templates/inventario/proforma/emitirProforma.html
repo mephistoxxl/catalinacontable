@@ -96,38 +96,42 @@
 
 <div class="bg-gray-50 p-3" style="min-height: auto; padding-top: 8px; padding-bottom: 12px;">
   <div class="max-w-6xl mx-auto">
-    <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 mb-1 rounded-lg mt-0">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <i class="fas fa-file-alt text-white mr-2"></i>
-          <div>
-            <h2 class="text-base font-semibold text-white">Emitir Proforma</h2>
-            <p class="text-gray-300 text-[11px] hidden sm:block">Similar a la factura, sin pagos ni envío al SRI</p>
-          </div>
-        </div>
-        {% if facturador %}
-        <div class="text-right">
-          <p class="text-gray-300 text-xs">
-            <i class="fa fa-user-circle mr-1"></i>{{ facturador.nombres }}
-          </p>
-          <a href="{% url 'inventario:login_proformador' %}" class="text-blue-300 hover:text-blue-200 text-xs">
-            <i class="fa fa-sign-out mr-1"></i>Cambiar
-          </a>
-        </div>
-        {% endif %}
-      </div>
-    </div>
-
-    {% if messages %}
-      {% for message in messages %}
-        <div class="mb-2 flex items-center rounded bg-{% if message.tags == 'error' %}red{% else %}blue{% endif %}-100 px-3 py-1 text-{% if message.tags == 'error' %}red{% else %}blue{% endif %}-800 text-xs mt-2">
-          <i class="fa fa-{% if message.tags == 'error' %}exclamation-triangle{% else %}check{% endif %} mr-2 text-sm"></i>
-          {{ message }}
-        </div>
-      {% endfor %}
-    {% endif %}
-
     <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+      <!-- Header (unido al formulario, estilo Emitir Factura) -->
+      <div class="bg-white px-3 py-2 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center">
+            <i class="fas fa-file-alt text-green-600 mr-2"></i>
+            <div>
+              <h2 class="text-base font-semibold text-gray-900">Emitir Proforma</h2>
+              <p class="text-gray-600 text-[11px] hidden sm:block">Similar a la factura, sin pagos ni envío al SRI</p>
+            </div>
+          </div>
+          {% if facturador %}
+          <div class="text-right">
+            <p class="text-gray-700 text-xs font-semibold">
+              <i class="fa fa-user-circle mr-1"></i>{{ facturador.nombres }}
+            </p>
+            <a href="{% url 'inventario:login_proformador' %}" class="text-blue-600 hover:text-blue-700 text-xs font-bold" style="text-decoration: none !important;">
+              <i class="fa fa-refresh mr-1"></i>Cambiar
+            </a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Messages (pegados al header, sin separarse en otra “caja”) -->
+      {% if messages %}
+        <div class="border-b border-gray-200">
+          {% for message in messages %}
+            <div class="flex items-center px-3 py-2 text-{% if message.tags == 'error' %}red{% else %}blue{% endif %}-800 text-xs bg-{% if message.tags == 'error' %}red{% else %}blue{% endif %}-100">
+              <i class="fa fa-{% if message.tags == 'error' %}exclamation-triangle{% else %}check{% endif %} mr-2 text-sm"></i>
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
       <div class="p-2">
         <form method="POST" action="{% url 'inventario:emitirProforma' %}" class="space-y-2 pf-form" id="formProforma">
           {% csrf_token %}

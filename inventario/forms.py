@@ -760,6 +760,19 @@ class EmitirProformaFormulario(forms.Form):
         almacenes = kwargs.pop('almacenes', None)
         vendedores = kwargs.pop('vendedores', None)
         super().__init__(*args, **kwargs)
+
+        # Mostrar solo el nombre en el selector (evita mostrar correo u otros datos del __str__).
+        # No afecta el valor enviado (sigue siendo el ID del modelo).
+        def _vendedor_label(obj):
+            return (
+                getattr(obj, 'nombres', None)
+                or getattr(obj, 'nombre', None)
+                or getattr(obj, 'razon_social', None)
+                or str(obj)
+            )
+
+        if 'vendedor' in self.fields:
+            self.fields['vendedor'].label_from_instance = _vendedor_label
         
         # Poblar los querysets si se proporcionaron
         if almacenes is not None:

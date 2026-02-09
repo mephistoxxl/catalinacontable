@@ -51,27 +51,27 @@
 <div class="bg-gray-50 p-3" style="padding-top: 8px; padding-bottom: 12px;">
   <div class="max-w-5xl mx-auto">
 
-    <!-- Header -->
-    <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 rounded-lg">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <i class="fas fa-file-alt text-white text-base"></i>
-          <div class="ml-3">
-            <h2 class="text-base font-semibold text-white">Proforma {{ proforma.numero }}</h2>
-            <p class="text-gray-300 text-[11px]">Detalles completos de la proforma</p>
+    <!-- Card -->
+    <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+      <!-- Header (unificado en la tarjeta blanca) -->
+      <div class="px-3 py-3 border-b border-gray-200">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center">
+            <i class="fas fa-file-alt text-gray-700 text-base"></i>
+            <div class="ml-3">
+              <h2 class="text-base font-semibold text-gray-900">Proforma {{ proforma.numero }}</h2>
+              <p class="text-gray-500 text-[11px]">Detalles completos de la proforma</p>
+            </div>
+          </div>
+          <div class="shrink-0">
+            <a href="{% url 'inventario:ride_proforma' proforma.id %}" class="pf-top-btn" target="_blank" rel="noopener" title="Descargar PDF">
+              <span class="pf-top-ico"><i class="fas fa-download"></i></span>
+              <span>Descargar PDF</span>
+            </a>
           </div>
         </div>
-        <div class="space-x-2">
-          <a href="{% url 'inventario:ride_proforma' proforma.id %}" class="pf-top-btn" target="_blank" rel="noopener" title="Descargar PDF">
-            <span class="pf-top-ico"><i class="fas fa-download"></i></span>
-            <span>Descargar PDF</span>
-          </a>
-        </div>
       </div>
-    </div>
 
-    <!-- Card -->
-    <div class="bg-white rounded-lg shadow-lg border border-gray-200 mt-2">
       <div class="p-3 text-sm">
         <!-- Top info -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -107,7 +107,7 @@
               {% endwith %}
             </div>
             <div class="text-gray-600 mt-1">Proformador</div>
-            <div class="font-medium">{{ proforma.facturador.nombres }}{% if proforma.facturador.correo %} - {{ proforma.facturador.correo }}{% endif %}</div>
+            <div class="font-medium">{{ proforma.facturador.nombres }}</div>
             {% if proforma.almacen %}
               <div class="text-gray-600 mt-1">Almacén</div>
               <div class="font-medium">{{ proforma.almacen.descripcion }}</div>

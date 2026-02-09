@@ -30,6 +30,8 @@ class SRIIntegration:
         if empresa is None and tenant is not None:
             empresa = tenant
 
+        self.empresa = empresa
+
         try:
             ambiente = obtener_ambiente_sri(empresa)
             self.ambiente = 'produccion' if ambiente == '2' else 'pruebas'
@@ -37,6 +39,17 @@ class SRIIntegration:
             self.ambiente = 'pruebas'
 
         self.cliente = SRIClient(ambiente=self.ambiente)
+
+    def _get_factura(self, factura_id: int) -> Factura:
+        """Obtiene factura de forma segura en contexto multi-tenant.
+
+        - Si la integración fue inicializada con `empresa`, se fuerza el filtro por `empresa_id`
+          usando el manager inseguro del modelo para evitar depender del thread-local tenant.
+        - Si no hay `empresa`, mantiene el comportamiento anterior (puede depender del tenant actual).
+        """
+        if self.empresa is not None:
+            return Factura._unsafe_objects.get(id=factura_id, empresa_id=getattr(self.empresa, 'id', None))
+        return Factura.objects.get(id=factura_id)
 
     def enviar_factura(self, factura_id):
         """Genera, firma y envía la factura al SRI.
@@ -57,7 +70,7 @@ class SRIIntegration:
         raw_response = None
 
         try:
-            factura = Factura.objects.get(id=factura_id)
+            factura = self._get_factura(factura_id)
             # 🔐 Asegurar contexto tenant para managers multi-tenant
             try:
                 set_current_tenant(getattr(factura, 'empresa', None))
@@ -160,7 +173,7 @@ class SRIIntegration:
 
         try:
             # Obtener factura
-            factura = Factura.objects.get(id=factura_id)
+            factura = self._get_factura(factura_id)
             try:
                 set_current_tenant(getattr(factura, 'empresa', None))
             except Exception:
@@ -368,7 +381,7 @@ class SRIIntegration:
 
             # Intentar dejar trazabilidad en la factura (sin romper el handler por otro error)
             try:
-                factura = Factura.objects.get(id=factura_id)
+                factura = self._get_factura(factura_id)
                 campos = []
                 if hasattr(factura, 'estado_sri') and factura.estado_sri != 'ERROR':
                     factura.estado_sri = 'ERROR'
@@ -1350,7 +1363,7 @@ Saludos cordiales,
         raw_response = None
 
         try:
-            factura = Factura.objects.get(id=factura_id)
+            factura = self._get_factura(factura_id)
             
             if not factura.clave_acceso:
                 logger.error(
@@ -1450,7 +1463,7 @@ Saludos cordiales,
         raw_response = None
 
         try:
-            factura = Factura.objects.get(id=factura_id)
+            factura = self._get_factura(factura_id)
             
             # Verificar que pueda ser reenviada
             if hasattr(factura, 'estado') and factura.estado not in ['RECHAZADO', 'ERROR']:
