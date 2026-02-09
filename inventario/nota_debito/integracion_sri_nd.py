@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
+import time
+from datetime import datetime
 
 from django.conf import settings
 
@@ -18,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 class IntegracionSRINotaDebito:
     """Orquesta: generar XML, firmar, enviar y procesar respuesta SRI."""
+
+    MAX_WAIT_SECONDS = 20
+    RETRY_INTERVAL_SECONDS = 20
 
     def __init__(self, nota_debito: NotaDebito):
         self.nd = nota_debito
@@ -65,23 +70,101 @@ class IntegracionSRINotaDebito:
         xml_text = xml_firmado if isinstance(xml_firmado, str) else str(xml_firmado)
         return cliente.procesar_comprobante_completo(xml_text, clave_acceso)
 
+    def _es_clave_en_procesamiento(self, respuesta: dict) -> bool:
+        if not isinstance(respuesta, dict):
+            return False
+
+        mensajes = respuesta.get('mensajes') or []
+        texto = str(respuesta.get('raw_response') or respuesta)
+        for msg in mensajes:
+            if isinstance(msg, dict):
+                cuerpo = f"{msg.get('mensaje', '')} {msg.get('informacionAdicional', '')}"
+            else:
+                cuerpo = str(msg)
+            if 'EN PROCESAMIENTO' in cuerpo.upper():
+                return True
+
+        return 'EN PROCESAMIENTO' in texto.upper()
+
+    def _actualizar_con_respuesta(self, respuesta: dict) -> str:
+        estado = (respuesta or {}).get('estado')
+        self.nd.estado_sri = estado or self.nd.estado_sri
+
+        if estado == 'AUTORIZADO':
+            autorizaciones = respuesta.get('autorizaciones') or []
+            aut0 = autorizaciones[0] if isinstance(autorizaciones, list) and autorizaciones else {}
+
+            numero_aut = (
+                respuesta.get('numeroAutorizacion')
+                or aut0.get('numeroAutorizacion')
+                or self.nd.clave_acceso
+            )
+            self.nd.numero_autorizacion = numero_aut
+
+            fecha_aut_raw = aut0.get('fechaAutorizacion') or respuesta.get('fechaAutorizacion')
+            if fecha_aut_raw:
+                fecha_aut_raw = str(fecha_aut_raw).strip()
+                try:
+                    self.nd.fecha_autorizacion = datetime.fromisoformat(fecha_aut_raw.replace('Z', '+00:00'))
+                except Exception:
+                    try:
+                        self.nd.fecha_autorizacion = datetime.strptime(fecha_aut_raw, '%d/%m/%Y %H:%M:%S')
+                    except Exception:
+                        self.nd.fecha_autorizacion = None
+
+            self.nd.mensaje_sri = 'Autorizado correctamente'
+        else:
+            self.nd.mensaje_sri = str(respuesta)[:2000]
+
+        self.nd.save(update_fields=['estado_sri', 'mensaje_sri', 'numero_autorizacion', 'fecha_autorizacion'])
+        return self.nd.estado_sri
+
     def procesar_completo(self) -> dict:
-        """Flujo completo (placeholder)."""
+        """Flujo completo: generar XML, firmar, enviar y procesar respuesta."""
         try:
             xml = self.generar_xml()
             xml_firmado = self.firmar_xml(xml)
             respuesta = self.enviar_sri(xml_firmado)
 
             estado = (respuesta or {}).get('estado')
-            self.nd.estado_sri = estado or self.nd.estado_sri
-            self.nd.mensaje_sri = str(respuesta)[:2000]
-            self.nd.save(update_fields=['estado_sri', 'mensaje_sri'])
+            if estado == 'DEVUELTA' and self._es_clave_en_procesamiento(respuesta):
+                estado = 'PENDIENTE'
+            else:
+                estado = self._actualizar_con_respuesta(respuesta)
+
+            pendientes = {
+                'PENDIENTE',
+                'EN_PROCESO',
+                'EN_PROCESAMIENTO',
+                'PROCESANDO',
+                'PROCESAMIENTO',
+                'RECIBIDA',
+            }
+
+            if estado in pendientes:
+                from inventario.sri.sri_client import SRIClient
+
+                ambiente = 'pruebas' if self.opciones.tipo_ambiente == '1' else 'produccion'
+                cliente = SRIClient(ambiente=ambiente)
+
+                inicio = time.time()
+                while True:
+                    elapsed = time.time() - inicio
+                    if elapsed >= self.MAX_WAIT_SECONDS:
+                        break
+
+                    time.sleep(max(0, self.RETRY_INTERVAL_SECONDS))
+                    resultado_auth = cliente.consultar_autorizacion(self.nd.clave_acceso)
+                    estado = self._actualizar_con_respuesta(resultado_auth)
+                    if estado == 'AUTORIZADO':
+                        break
 
             return {
                 'success': estado == 'AUTORIZADO',
                 'estado': estado,
                 'mensaje': self.nd.mensaje_sri,
                 'clave_acceso': self.nd.clave_acceso,
+                'numero_autorizacion': self.nd.numero_autorizacion,
             }
         except Exception as e:
             logger.exception('Error procesando Nota de Débito')

@@ -627,12 +627,30 @@ class ConsultarEstadoNotaDebito(LoginRequiredMixin, View):
             estado = None
             if isinstance(respuesta, dict):
                 estado = respuesta.get('estado') or respuesta.get('estado_autorizacion')
-                autorizacion = respuesta.get('autorizacion')
-                if isinstance(autorizacion, dict) and not estado:
-                    estado = autorizacion.get('estado')
-                if autorizacion and isinstance(autorizacion, dict):
-                    nota_debito.numero_autorizacion = autorizacion.get('numeroAutorizacion') or autorizacion.get('numero_autorizacion')
-                    nota_debito.fecha_autorizacion = autorizacion.get('fechaAutorizacion') or autorizacion.get('fecha_autorizacion')
+
+                autorizaciones = respuesta.get('autorizaciones') or []
+                aut0 = autorizaciones[0] if isinstance(autorizaciones, list) and autorizaciones else {}
+                if isinstance(aut0, dict):
+                    if not estado:
+                        estado = aut0.get('estado')
+                    nota_debito.numero_autorizacion = aut0.get('numeroAutorizacion') or aut0.get('numero_autorizacion')
+
+                    fecha_aut_raw = aut0.get('fechaAutorizacion') or aut0.get('fecha_autorizacion')
+                    if fecha_aut_raw:
+                        from datetime import datetime
+
+                        fecha_aut_raw = str(fecha_aut_raw).strip()
+                        fecha_aut = None
+                        try:
+                            fecha_aut = datetime.fromisoformat(fecha_aut_raw.replace('Z', '+00:00'))
+                        except Exception:
+                            try:
+                                fecha_aut = datetime.strptime(fecha_aut_raw, '%d/%m/%Y %H:%M:%S')
+                            except Exception:
+                                fecha_aut = None
+
+                        if fecha_aut:
+                            nota_debito.fecha_autorizacion = fecha_aut
 
             if estado:
                 nota_debito.estado_sri = estado

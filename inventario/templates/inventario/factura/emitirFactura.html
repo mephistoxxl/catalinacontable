@@ -914,7 +914,16 @@ let totalPagado = 0;
 // ========== INICIALIZACIÓN ==========
 document.addEventListener('DOMContentLoaded', function() {
     // Configurar fechas por defecto
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoyServer = '{% now "Y-m-d" %}';
+    function getLocalDateInputValue() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    const hoy = hoyServer || getLocalDateInputValue();
     const fechaEmision = document.getElementById('id_fecha_emision');
     const fechaVencimiento = document.getElementById('id_fecha_vencimiento');
     

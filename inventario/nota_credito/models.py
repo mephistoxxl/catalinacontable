@@ -295,12 +295,20 @@ class NotaCredito(models.Model):
             
             # ========== VALIDACIÓN 4: Saldo disponible ==========
             if hasattr(factura, 'saldo_nota_credito'):
+                from decimal import ROUND_HALF_UP
+
                 saldo_disponible = factura.saldo_nota_credito
-                if self.valor_modificacion and self.valor_modificacion > saldo_disponible:
-                    errors['valor_modificacion'] = (
-                        f'El valor (${self.valor_modificacion}) excede el saldo disponible '
-                        f'de la factura (${saldo_disponible}).'
-                    )
+                valor_mod = self.valor_modificacion
+                if valor_mod is not None:
+                    saldo_q = Decimal(str(saldo_disponible)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    valor_q = Decimal(str(valor_mod)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    tolerancia = Decimal('0.01')
+
+                    if valor_q > (saldo_q + tolerancia):
+                        errors['valor_modificacion'] = (
+                            f'El valor (${valor_q}) excede el saldo disponible '
+                            f'de la factura (${saldo_q}).'
+                        )
             
             # ========== VALIDACIÓN 5: Fecha NC no anterior a fecha factura ==========
             if self.fecha_emision and factura.fecha_emision:

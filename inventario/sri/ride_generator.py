@@ -375,7 +375,10 @@ class RIDEGenerator:
             logger.info(f"   Es None?: {fecha_autorizacion_sri is None}")
             
             # Formatear fecha de autorización
-            if fecha_autorizacion_sri:
+            ride_fecha_aut_text = getattr(factura, 'ride_fecha_autorizacion_text', None)
+            if ride_fecha_aut_text:
+                fecha_aut_val = ride_fecha_aut_text
+            elif fecha_autorizacion_sri:
                 # Fecha autorizada por el SRI (ajustada -5 horas para despliegue)
                 fecha_aut_ajustada = fecha_autorizacion_sri - timedelta(hours=5)
                 fecha_aut_val = fecha_aut_ajustada.strftime('%d/%m/%Y %H:%M:%S')
@@ -390,7 +393,8 @@ class RIDEGenerator:
             identificacion_val = getattr(opciones, 'identificacion', '')
 
             # 1. ENCABEZADO "FACTURA" - LIMPIO
-            encabezado_factura = Paragraph('FACTURA', self.styles['EncabezadoLimpio'])
+            titulo_doc = getattr(factura, 'ride_titulo', None) or 'FACTURA'
+            encabezado_factura = Paragraph(str(titulo_doc), self.styles['EncabezadoLimpio'])
 
             # 2. DATOS ORGANIZADOS EN BLOQUE SIMPLE
             datos_info = [

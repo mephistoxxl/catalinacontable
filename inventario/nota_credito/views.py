@@ -390,6 +390,9 @@ class CrearNotaCredito(LoginRequiredMixin, View):
                     return redirect('inventario:notas_credito_crear_factura', factura_id=factura_id)
                 
                 # Calcular totales
+                from decimal import ROUND_HALF_UP
+                dos_decimales = Decimal('0.01')
+
                 subtotal = Decimal('0.00')
                 total_iva = Decimal('0.00')
                 subtotales_iva = {}
@@ -409,7 +412,8 @@ class CrearNotaCredito(LoginRequiredMixin, View):
                         prod['tarifa_iva'] = '15'
                     
                     subtotal_item = (cantidad * precio) - descuento
-                    iva_item = subtotal_item * (tarifa / Decimal('100'))
+                    subtotal_item = subtotal_item.quantize(dos_decimales, rounding=ROUND_HALF_UP)
+                    iva_item = (subtotal_item * (tarifa / Decimal('100'))).quantize(dos_decimales, rounding=ROUND_HALF_UP)
                     
                     subtotal += subtotal_item
                     total_iva += iva_item
@@ -420,7 +424,9 @@ class CrearNotaCredito(LoginRequiredMixin, View):
                         subtotales_iva[tarifa_key] = Decimal('0.00')
                     subtotales_iva[tarifa_key] += subtotal_item
                 
-                valor_total = subtotal + total_iva
+                subtotal = subtotal.quantize(dos_decimales, rounding=ROUND_HALF_UP)
+                total_iva = total_iva.quantize(dos_decimales, rounding=ROUND_HALF_UP)
+                valor_total = (subtotal + total_iva).quantize(dos_decimales, rounding=ROUND_HALF_UP)
                 
                 # 3. Validar que no exceda el saldo disponible
                 saldo_disponible = factura.saldo_nota_credito
@@ -492,7 +498,7 @@ class CrearNotaCredito(LoginRequiredMixin, View):
                     tarifa_dec = Decimal(tarifa)
                     if fecha_emision_dt >= date(2024, 4, 1) and tarifa_dec == Decimal('12'):
                         tarifa_dec = Decimal('15')
-                    valor_imp = base * (tarifa_dec / Decimal('100'))
+                    valor_imp = (base * (tarifa_dec / Decimal('100'))).quantize(dos_decimales, rounding=ROUND_HALF_UP)
                     TotalImpuestoNotaCredito.objects.create(
                         nota_credito=nota_credito,
                         empresa=empresa,
