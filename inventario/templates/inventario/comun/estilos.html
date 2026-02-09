@@ -22,6 +22,37 @@
                 background: rgba(250, 0, 0, 0,95);
                 text-shadow: -1px -1px 0 rgba(0, 0, 0, 0,5);
             }
+
+            /* Full-width content: remove max-width clamps inside the app */
+            #app main .max-w-4xl,
+            #app main .max-w-5xl,
+            #app main .max-w-6xl,
+            #app main .max-w-7xl {
+                max-width: 100% !important;
+            }
+            #app main .container {
+                max-width: 100% !important;
+            }
+
+            /* Sidebar spacing: sidebar is w-64 (16rem). Keep a minimal gutter so content never touches/overlaps. */
+            #app.app {
+                padding-left: calc(16rem + 0.75rem) !important;
+            }
+            @media (max-width: 991.98px) {
+                #app.app {
+                    padding-left: 0 !important;
+                }
+            }
+
+            /* Footer: avoid absolute positioning/overlaps; let flex layout place it naturally */
+            #app .footer {
+                position: static !important;
+                left: auto !important;
+                right: auto !important;
+                bottom: auto !important;
+                width: 100% !important;
+                margin-top: 0 !important;
+            }
         </style>
         
     </head>

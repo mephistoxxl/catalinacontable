@@ -12,28 +12,28 @@
     <div class="max-w-5xl mx-auto">
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <!-- Header -->
-            <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div class="px-3 py-3 border-b border-gray-200">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
-                            <i class="fa fa-cogs text-white form-header-icon"></i>
+                            <i class="fa fa-cogs text-gray-700 form-header-icon"></i>
                         </div>
                         <div class="ml-3">
-                            <h3 class="text-base font-semibold text-white mb-0">Configuración General</h3>
-                            <p class="text-gray-300 text-[11px]">Complete la información para facturación electrónica</p>
+                            <h3 class="text-base font-semibold text-gray-900 mb-0">Configuración General</h3>
+                            <p class="text-gray-500 text-[11px]">Complete la información para facturación electrónica</p>
                         </div>
                     </div>
-                    <div class="mt-2 sm:mt-0 sm:ml-4">
-                        <a href="{% url 'inventario:firma_electronica' %}" class="inline-flex items-center px-4 py-2 bg-white hover:bg-gray-100 text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg border border-gray-200" style="text-decoration: none; color: #000000;">
-                            <i class="fa fa-key mr-2 text-yellow-500"></i> 
-                            <span style="color: #000000;">Cargar Firma Electrónica</span>
+                    <div class="sm:ml-4">
+                        <a href="{% url 'inventario:firma_electronica' %}" class="inline-flex items-center px-4 py-2 bg-white hover:bg-gray-50 text-sm font-semibold text-black hover:text-black rounded-lg transition-all duration-200 shadow-sm border border-gray-200" style="text-decoration: none; color: #000 !important;">
+                            <i class="fa fa-key mr-2 text-yellow-500"></i>
+                            Cargar Firma Electrónica
                         </a>
                     </div>
                 </div>
             </div>
             
             <!-- Content -->
-            <div class="p-3 mt-2">
+            <div class="p-3">
                 <!-- Messages Section -->
                 {% if messages %}
                     <div class="mb-3">

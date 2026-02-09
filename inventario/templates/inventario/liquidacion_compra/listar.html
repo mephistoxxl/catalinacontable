@@ -141,22 +141,22 @@
 </style>
 
 <div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-2">
-  <div class="container mx-auto" style="max-width: 1100px;">
-    <div class="page-header">
-      <div class="flex items-center justify-between flex-wrap gap-4">
-        <h1 class="page-title">
-          <i class="fa fa-file-text-o"></i>
-          {% trans "Liquidaciones de Compra" %}
-        </h1>
-        <a href="{% url 'inventario:liquidaciones_compra_crear' %}" class="btn-nueva">
-          <i class="fa fa-plus"></i>
-          <span>{% trans "Nueva Liquidación" %}</span>
-        </a>
-      </div>
-    </div>
-
-    {% if liquidaciones %}
+  <div class="container mx-auto">
     <div class="table-container">
+      <div class="px-4 py-3 border-b border-gray-200">
+        <div class="flex items-center justify-between flex-wrap gap-4">
+          <div class="flex items-center gap-2">
+            <i class="fa fa-file-text-o text-gray-700"></i>
+            <h1 class="text-base font-semibold text-gray-900 m-0">{% trans "Liquidaciones de Compra" %}</h1>
+          </div>
+          <a href="{% url 'inventario:liquidaciones_compra_crear' %}" class="btn-nueva">
+            <i class="fa fa-plus"></i>
+            <span>{% trans "Nueva Liquidación" %}</span>
+          </a>
+        </div>
+      </div>
+
+      {% if liquidaciones %}
       <div style="overflow-x: auto;">
         <table class="modern-table">
           <thead>
@@ -253,15 +253,14 @@
           </tbody>
         </table>
       </div>
+      {% else %}
+      <div class="p-10 text-center">
+        <i class="fa fa-file-text-o" style="font-size: 4rem; color: #cbd5e1;"></i>
+        <h3 class="mt-4 text-lg font-semibold text-gray-700">{% trans "No hay liquidaciones de compra" %}</h3>
+        <p class="text-gray-500">{% trans "Haz clic en 'Nueva Liquidación' para comenzar." %}</p>
+      </div>
+      {% endif %}
     </div>
-    {% else %}
-    <div style="text-align: center; padding: 4rem; background: white; border-radius: 12px;">
-      <i class="fa fa-file-text-o" style="font-size: 4rem; color: #cbd5e1;"></i>
-      <h3 style="margin-top: 1rem; font-size: 1.25rem; color: #475569;">{% trans "No hay liquidaciones de compra" %}
-      </h3>
-      <p style="color: #64748b;">{% trans "Haz clic en 'Nueva Liquidación' para comenzar." %}</p>
-    </div>
-    {% endif %}
   </div>
 </div>
 

@@ -50,37 +50,34 @@ footer { margin-top: 0 !important; padding-top: 0 !important; }
             </div>
         {% endif %}
 
-        <!-- Header Section -->
-    <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 mb-0 rounded-lg mt-3">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <i class="fas fa-user-tie text-white text-xl"></i>
-                </div>
-                <div class="ml-3">
-                    <h2 class="text-lg font-semibold text-white">Listado de Facturadores</h2>
-                    <p class="text-gray-300 text-xs">Visualiza todos los facturadores registrados</p>
+        <!-- Main Content -->
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden mt-2">
+            <div class="px-4 py-3 border-b border-gray-200">
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-user-tie text-gray-700 text-xl"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h2 class="text-lg font-semibold text-gray-900">Listado de Facturadores</h2>
+                            <p class="text-gray-500 text-xs">Visualiza todos los facturadores registrados</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-gray-600">Total: {{ facturadores|length }} facturadores</span>
+                        <a href="{% url 'inventario:crear_facturador' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
+                           style="text-decoration: none !important;">
+                            <i class="fa fa-plus mr-2" style="color: white;"></i>
+                            <span style="color: white;">Agregar Nuevo Facturador</span>
+                        </a>
+                    </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Main Content -->
-        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
             <div class="p-0">
                 <div class="row">
                     <div class="col-lg-12">
                         <div class="overflow-x-auto">
-                            <div class="flex justify-between items-center mb-1">
-                                <h3 class="text-base font-semibold text-gray-800">Facturadores Registrados</h3>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-sm text-gray-600">Total: {{ facturadores|length }} facturadores</span>
-                                    <a href="{% url 'inventario:crear_facturador' %}" 
-                                       class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
-                                       style="text-decoration: none !important;">
-                                        <i class="fa fa-plus mr-2" style="color: white;"></i>
-                                        <span style="color: white;">Agregar Nuevo Facturador</span>
-                                    </a>
-                                </div>
-                            </div>
                             <table class="min-w-full divide-y divide-gray-200 compact-table">
                                 <thead class="bg-gray-50">
                                     <tr>

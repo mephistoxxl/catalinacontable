@@ -76,36 +76,31 @@ td {
             </div>
         {% endif %}
 
-        <!-- Header Section - Equilibrado -->
-        <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-1.5 mb-2 rounded-lg mt-2">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <i class="fas fa-users text-white text-sm"></i>
-                </div>
-                <div class="ml-2">
-                    <h2 class="text-sm font-semibold text-white">Listar usuarios</h2>
-                    <p class="text-gray-300 text-xs">Verifique los usuarios agregados actualmente en el sistema</p>
+        <!-- Main Content -->
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden mt-2">
+            <div class="px-3 py-3 border-b border-gray-200">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-users text-gray-700 text-sm"></i>
+                        </div>
+                        <div class="ml-2">
+                            <h2 class="text-sm font-semibold text-gray-900">Listar usuarios</h2>
+                            <p class="text-gray-500 text-xs">Verifique los usuarios agregados actualmente en el sistema</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-gray-600">Total: {{ tabla|length }} usuarios</span>
+                        <a href="/inventario/crearUsuario" class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md shadow-md text-white bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-900 hover:to-black focus:outline-none focus:ring-1 focus:ring-gray-500 transition-all duration-150">
+                            <i class="fa fa-plus mr-1 text-xs"></i> Agregar Usuario
+                        </a>
+                    </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Main Content -->
-        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
             <div class="p-2">
                 <div class="row">
                     <div class="col-lg-12">
                         <div class="overflow-x-auto">
-                            <div class="flex justify-between items-center mb-2 px-1">
-                                <h3 class="text-sm font-semibold text-gray-800">
-                                    <i class="fas fa-users text-blue-600 mr-1 text-xs"></i>Usuarios Registrados
-                                </h3>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xs text-gray-600">Total: {{ tabla|length }} usuarios</span>
-                                    <a href="/inventario/crearUsuario" class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md shadow-md text-white bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-900 hover:to-black focus:outline-none focus:ring-1 focus:ring-gray-500 transition-all duration-150">
-                                        <i class="fa fa-plus mr-1 text-xs"></i> Agregar Usuario
-                                    </a>
-                                </div>
-                            </div>
                             <table class="min-w-full divide-y divide-gray-200">
                                 <thead class="bg-gray-50">
                                     <tr>

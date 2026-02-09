@@ -102,24 +102,22 @@
       </div>
     {% endif %}
 
-    <!-- Header -->
-    <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-3 py-2 rounded-lg">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <i class="fas fa-file-alt text-white text-base"></i>
-          <div class="ml-3">
-            <h2 class="text-base font-semibold text-white">Listar Proformas</h2>
-            <p class="text-gray-300 text-[11px]">Revise las proformas registradas</p>
-          </div>
-        </div>
-        <a href="{% url 'inventario:emitirProforma' %}" style="text-decoration: none !important;" class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm">
-          <i class="fa fa-plus mr-2" style="color: white;"></i><span style="color: white;">Nueva</span>
-        </a>
-      </div>
-    </div>
-
     <!-- Card -->
-    <div class="bg-white rounded-lg shadow-lg border border-gray-200 mt-2">
+    <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden mt-2">
+      <div class="px-3 py-3 border-b border-gray-200">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center">
+            <i class="fas fa-file-alt text-gray-700 text-base"></i>
+            <div class="ml-3">
+              <h2 class="text-base font-semibold text-gray-900">Listar Proformas</h2>
+              <p class="text-gray-500 text-[11px]">Revise las proformas registradas</p>
+            </div>
+          </div>
+          <a href="{% url 'inventario:emitirProforma' %}" style="text-decoration: none !important;" class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm">
+            <i class="fa fa-plus mr-2" style="color: white;"></i><span style="color: white;">Nueva</span>
+          </a>
+        </div>
+      </div>
       <div class="p-3">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3">
           <h3 class="text-sm font-semibold text-gray-800">Proformas Registradas</h3>

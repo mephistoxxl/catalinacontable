@@ -5,19 +5,21 @@
   <div class="max-w-7xl mx-auto">
     
     <!-- Header -->
-    <div class="bg-gradient-to-r from-green-600 to-green-700 px-4 py-3 rounded-lg text-white mb-4">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <i class="fas fa-clipboard-list text-white text-lg mr-3"></i>
-          <div>
-            <h2 class="text-lg font-semibold">Listado de Guías de Remisión</h2>
-            <p class="text-green-100 text-sm">Gestión de documentos de traslado</p>
+    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden mb-4">
+      <div class="px-4 py-3 border-b border-gray-200">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div class="flex items-center">
+            <i class="fas fa-clipboard-list text-gray-700 text-lg mr-3"></i>
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Listado de Guías de Remisión</h2>
+              <p class="text-gray-500 text-sm">Gestión de documentos de traslado</p>
+            </div>
           </div>
-        </div>
-        <div>
-          <a href="{% url 'inventario:emitir_guia_remision' %}" class="bg-white text-green-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-50 transition-colors">
-            <i class="fas fa-plus mr-2"></i>Nueva Guía
-          </a>
+          <div>
+            <a href="{% url 'inventario:emitir_guia_remision' %}" class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors" style="text-decoration: none !important;">
+              <i class="fas fa-plus mr-2"></i>Nueva Guía
+            </a>
+          </div>
         </div>
       </div>
     </div>
