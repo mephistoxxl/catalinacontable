@@ -8,7 +8,7 @@
         {% if messages %}
         {% for message in messages %}
             {% if forloop.first %}
-        <div id="catalina-flash-modal" data-tone="{{ message.tags }}" class="fixed inset-0 z-[9999] hidden" aria-hidden="true">
+        <div id="catalina-flash-modal" data-tone="{{ message.tags }}" data-estado-sri="{{ factura.estado_sri|default:'' }}" data-factura-id="{{ factura.id }}" class="fixed inset-0 z-[9999] hidden" aria-hidden="true">
             <style>
                 @keyframes catalinaFlashPop {
                     0% { transform: translateY(16px) scale(0.96); opacity: 0; }
@@ -69,18 +69,22 @@
                 if (!modal || !backdrop || !card || !header || !title || !btnClose || !btnOk) return;
 
                 const toneRaw = String(modal.dataset.tone || '').toLowerCase();
+                const estadoSriRaw = String(modal.dataset.estadoSri || '').toUpperCase().trim();
                 const tone = toneRaw.includes('error') ? 'error'
                     : toneRaw.includes('warning') ? 'warning'
                     : toneRaw.includes('info') ? 'info'
                     : 'success';
 
-                // Detectar estado principal desde el texto para título específico
+                // Detectar estado principal desde el estado SRI (fallback al texto si no existe)
                 const textAll = (card.innerText || '').toUpperCase();
-                const estado = textAll.includes('AUTORIZADO') || textAll.includes('AUTORIZADA')
-                    ? 'AUTORIZADO'
-                    : (textAll.includes('PENDIENTE') || textAll.includes('RECIBIDA'))
-                        ? 'PENDIENTE'
-                        : 'OTRO';
+                const estado = estadoSriRaw
+                    ? (estadoSriRaw.includes('AUTORIZAD') ? 'AUTORIZADO'
+                        : (estadoSriRaw.includes('PENDIENTE') || estadoSriRaw.includes('RECIBIDA')) ? 'PENDIENTE' : 'OTRO')
+                    : (textAll.includes('AUTORIZADO') || textAll.includes('AUTORIZADA')
+                        ? 'AUTORIZADO'
+                        : (textAll.includes('PENDIENTE') || textAll.includes('RECIBIDA'))
+                            ? 'PENDIENTE'
+                            : 'OTRO');
 
                 // Iconos compatibles con FontAwesome 4/5 (no FA6)
                 const themes = {
@@ -208,6 +212,69 @@
                 });
 
                 document.addEventListener('DOMContentLoaded', openModal);
+            })();
+        </script>
+
+        <script>
+            (function () {
+                const modal = document.getElementById('catalina-flash-modal');
+                if (!modal) return;
+
+                const facturaId = modal.dataset.facturaId;
+                const estadoSri = String(modal.dataset.estadoSri || '').toUpperCase().trim();
+                if (!facturaId) return;
+
+                const estadosFinales = new Set(['AUTORIZADA', 'AUTORIZADO', 'RECHAZADA', 'NO_AUTORIZADA']);
+                if (estadosFinales.has(estadoSri) || estadoSri === 'RECIBIDA') {
+                    return;
+                }
+
+                function getCookie(name) {
+                    let cookieValue = null;
+                    if (document.cookie && document.cookie !== '') {
+                        const cookies = document.cookie.split(';');
+                        for (let i = 0; i < cookies.length; i++) {
+                            const cookie = cookies[i].trim();
+                            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                                break;
+                            }
+                        }
+                    }
+                    return cookieValue;
+                }
+
+                let intentos = 0;
+                const maxIntentos = 60;
+                const intervaloMs = 10000;
+
+                const timer = setInterval(() => {
+                    if (intentos >= maxIntentos) {
+                        clearInterval(timer);
+                        return;
+                    }
+                    intentos += 1;
+
+                    fetch(`/inventario/sri/enviar/${facturaId}/`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCookie('csrftoken'),
+                            'Content-Type': 'application/json',
+                        },
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data || !data.success) {
+                            return;
+                        }
+                        const estado = ((data.resultado && data.resultado.estado) || '').toUpperCase();
+                        if (estado === 'RECIBIDA' || estado === 'AUTORIZADA' || estado === 'AUTORIZADO') {
+                            clearInterval(timer);
+                            window.location.reload();
+                        }
+                    })
+                    .catch(() => {});
+                }, intervaloMs);
             })();
         </script>
 

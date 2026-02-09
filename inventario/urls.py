@@ -181,6 +181,7 @@ urlpatterns = [
 
     # ✅ NUEVAS URLs PARA INTEGRACIÓN SRI COMPLETA
     path('sri/enviar/<int:factura_id>/', views.enviar_documento_sri, name='enviar_documento_sri'),
+    path('sri/enviar-bg/<int:factura_id>/', views.enviar_documento_sri_background, name='enviar_documento_sri_background'),
     path('sri/autorizar/<int:factura_id>/', views.autorizar_documento_sri, name='autorizar_documento_sri'),
     path('sri/consultar/<int:factura_id>/', views.consultar_estado_sri, name='consultar_estado_sri'),
     path('sri/enviar-email/<int:factura_id>/', views.enviar_factura_email, name='enviar_factura_email'),

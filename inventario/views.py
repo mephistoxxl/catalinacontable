@@ -3853,6 +3853,19 @@ class EmitirFactura(LoginRequiredMixin, View):
                 resumen_lineas.append(f"Ocurrió un problema al procesar la factura en el SRI. {str(e)}")
                 nivel_resumen = _subir_nivel(nivel_resumen, 'warning')
 
+            # Si quedo pendiente/recibida, arrancar reintentos en background hasta RECIBIDA.
+            try:
+                from datetime import date
+                factura.refresh_from_db(fields=['estado_sri'])
+                estado_actual = (factura.estado_sri or '').strip().upper()
+                if estado_actual in {'', 'PENDIENTE'} and factura.fecha_emision >= date(2026, 1, 1):
+                    started = _start_envio_sri_background(factura.id, empresa.id)
+                    if started:
+                        resumen_lineas.append("Auto-envío al SRI en segundo plano iniciado.")
+                        nivel_resumen = _subir_nivel(nivel_resumen, 'info')
+            except Exception as e:
+                logger.warning("No se pudo iniciar auto-envío en background para factura %s: %s", factura.id, e)
+
             mensaje_final = "\n".join([linea for linea in resumen_lineas if str(linea).strip()])
             if nivel_resumen == 'error':
                 messages.error(request, mensaje_final)
@@ -4821,9 +4834,21 @@ class ListarFacturas(LoginRequiredMixin, View):
         # Obtener almacenes para el filtro (usar for_tenant para evitar problemas con TenantManager)
         almacenes = Almacen.objects.for_tenant(empresa)
         
-        # La sincronización automática con el SRI ha sido deshabilitada para mejorar el rendimiento
-        # Solo se ejecutará cuando el usuario haga clic en "Autorizar documento" o similar
-        # Si necesita verificar estados pendientes, use el botón de sincronización manual
+        # Auto-envio en background para pendientes/locales (sin depender del navegador).
+        try:
+            from datetime import date
+            from django.db.models import Q
+            pendientes_qs = (facturas
+                             .filter(fecha_emision__gte=date(2026, 1, 1))
+                             .filter(Q(estado_sri__isnull=True) | Q(estado_sri='') | Q(estado_sri='PENDIENTE'))
+                             .order_by('-id')[:10])
+            pendientes_ids = [f.id for f in pendientes_qs]
+            if pendientes_ids:
+                print(f"[SRI BG] ListarFacturas: iniciando jobs para {pendientes_ids}")
+            for factura in pendientes_qs:
+                _start_envio_sri_background(factura.id, empresa_id)
+        except Exception as e:
+            logger.warning("[SRI BG] Error iniciando jobs en ListarFacturas: %s", e)
         #Crea el paginador
 
         contexto = {'tabla': facturas, 'almacenes': almacenes}
@@ -8682,6 +8707,83 @@ def anular_factura(request, factura_id):
 
 
 # ✅ NUEVAS VISTAS PARA INTEGRACIÓN SRI COMPLETA
+_sri_envio_bg_jobs = {}
+_sri_envio_bg_lock = None
+
+
+def _get_sri_envio_bg_lock():
+    global _sri_envio_bg_lock
+    if _sri_envio_bg_lock is None:
+        import threading
+        _sri_envio_bg_lock = threading.Lock()
+    return _sri_envio_bg_lock
+
+
+def _run_envio_sri_background(factura_id, empresa_id, max_attempts=360, interval_seconds=10):
+    import time
+    from inventario.models import Empresa, Factura
+    from inventario.tenant.queryset import set_current_tenant
+    from inventario.sri.integracion_django import SRIIntegration
+
+    key = f"{empresa_id}:{factura_id}"
+    logger.info("[SRI BG] Inicio envio en background para factura %s (empresa %s)", factura_id, empresa_id)
+    try:
+        empresa = Empresa.objects.filter(id=empresa_id).first()
+        if empresa is None:
+            logger.warning("[SRI BG] Empresa %s no existe", empresa_id)
+            return
+
+        for _ in range(max_attempts):
+            try:
+                try:
+                    set_current_tenant(empresa)
+                except Exception:
+                    logger.warning("No se pudo establecer tenant en envio background para empresa %s", empresa_id)
+                factura = Factura.objects.get(id=factura_id, empresa_id=empresa_id)
+            except Factura.DoesNotExist:
+                logger.warning("[SRI BG] Factura %s no existe en empresa %s", factura_id, empresa_id)
+                break
+
+            if (factura.estado_sri or '').upper() in ('RECIBIDA', 'AUTORIZADA', 'AUTORIZADO'):
+                logger.info("[SRI BG] Factura %s ya en estado %s", factura_id, factura.estado_sri)
+                break
+
+            integration = SRIIntegration(empresa=factura.empresa)
+            resultado = integration.enviar_factura(factura_id)
+            estado = (resultado.get('estado') or '').upper()
+            logger.info("[SRI BG] Factura %s envio intento, estado=%s", factura_id, estado or 'SIN_ESTADO')
+            if estado in ('RECIBIDA', 'AUTORIZADA', 'AUTORIZADO'):
+                break
+
+            time.sleep(interval_seconds)
+    finally:
+        logger.info("[SRI BG] Fin envio en background para factura %s", factura_id)
+        lock = _get_sri_envio_bg_lock()
+        with lock:
+            _sri_envio_bg_jobs.pop(key, None)
+
+
+def _start_envio_sri_background(factura_id, empresa_id):
+    key = f"{empresa_id}:{factura_id}"
+    lock = _get_sri_envio_bg_lock()
+    with lock:
+        job = _sri_envio_bg_jobs.get(key)
+        if job and job.is_alive():
+            logger.info("[SRI BG] Job ya en ejecucion para %s", key)
+            return False
+
+        import threading
+        job = threading.Thread(
+            target=_run_envio_sri_background,
+            args=(factura_id, empresa_id),
+            daemon=True
+        )
+        _sri_envio_bg_jobs[key] = job
+        job.start()
+        logger.info("[SRI BG] Job iniciado para %s", key)
+        return True
+
+
 @csrf_exempt
 @require_empresa_activa
 def enviar_documento_sri(request, factura_id):
@@ -8730,6 +8832,54 @@ def enviar_documento_sri(request, factura_id):
         })
     except Exception as e:
         logger.error(f"Error en enviar_documento_sri: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'Error interno del servidor: {str(e)}'
+        })
+
+
+@csrf_exempt
+@require_empresa_activa
+def enviar_documento_sri_background(request, factura_id):
+    """Inicia el envio de factura al SRI en segundo plano hasta RECIBIDA."""
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False,
+            'message': 'Método no permitido'
+        }, status=405)
+
+    try:
+        print(f"[SRI BG] Request recibido para factura {factura_id}")
+        empresa_id = request.session.get('empresa_activa')
+        if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+            return JsonResponse({'success': False, 'message': 'Empresa no válida'}, status=403)
+
+        # Validar que la factura existe en la empresa activa
+        get_object_or_404(Factura, id=factura_id, empresa_id=empresa_id)
+
+        started = _start_envio_sri_background(factura_id, empresa_id)
+        if not started:
+            print(f"[SRI BG] Job ya en ejecucion para empresa {empresa_id}, factura {factura_id}")
+            return JsonResponse({
+                'success': True,
+                'message': 'Proceso ya en ejecución',
+                'running': True
+            })
+
+        print(f"[SRI BG] Job iniciado para empresa {empresa_id}, factura {factura_id}")
+        return JsonResponse({
+            'success': True,
+            'message': 'Proceso iniciado',
+            'running': True
+        })
+
+    except Http404:
+        return JsonResponse({
+            'success': False,
+            'message': f'No se encontró la factura con ID {factura_id}'
+        })
+    except Exception as e:
+        logger.error(f"Error en enviar_documento_sri_background: {str(e)}")
         return JsonResponse({
             'success': False,
             'message': f'Error interno del servidor: {str(e)}'
