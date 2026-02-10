@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 import requests
 from requests.exceptions import RequestException, Timeout, ConnectionError
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from django.conf import settings
 import zeep
 from zeep import Client
@@ -52,8 +54,24 @@ class SRIClient:
             self.wsdl_recepcion = self.WSDL_RECEPCION_PRUEBAS
             self.wsdl_autorizacion = self.WSDL_AUTORIZACION_PRUEBAS
         
-        # Configurar transporte con timeout
-        transport = Transport(timeout=self.timeout)
+        # Configurar transporte con timeout + reintentos (SRI suele resetear conexiones temporalmente)
+        session = requests.Session()
+        retries = int(getattr(settings, 'SRI_HTTP_RETRIES', 2) or 2)
+        retry = Retry(
+            total=retries,
+            connect=retries,
+            read=retries,
+            status=retries,
+            backoff_factor=float(getattr(settings, 'SRI_HTTP_BACKOFF', 0.6) or 0.6),
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=frozenset(['GET', 'POST']),
+            raise_on_status=False,
+            respect_retry_after_header=True,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        session.mount('https://', adapter)
+        session.mount('http://', adapter)
+        transport = Transport(session=session, timeout=self.timeout)
         
         # Crear clientes SOAP
         try:
@@ -82,7 +100,7 @@ class SRIClient:
             # Llamar al servicio de recepción
             try:
                 response = self.cliente_recepcion.service.validarComprobante(xml_base64)
-            except (Timeout, ConnectionError) as e:
+            except (Timeout, ConnectionError, TransportError, RequestException) as e:
                 logger.error(f"Error de conexión al enviar comprobante: {e}")
                 return {
                     'estado': 'ERROR',
@@ -137,7 +155,7 @@ class SRIClient:
             # Llamar al servicio de autorización
             try:
                 response = self.cliente_autorizacion.service.autorizacionComprobante(clave_acceso)
-            except (Timeout, ConnectionError) as e:
+            except (Timeout, ConnectionError, TransportError, RequestException) as e:
                 logger.error(f"Error de conexión al consultar autorización: {e}")
                 return {
                     'estado': 'ERROR',

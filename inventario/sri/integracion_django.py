@@ -847,6 +847,7 @@ class SRIIntegration:
             resultado: Dict con resultado del SRI
             clave_acceso: Clave de acceso (solo para verificación, no para sobrescribir)
         """
+        estado_sri_anterior = (getattr(factura, 'estado_sri', '') or '').upper().strip()
         # 🔧 FIX: Solo actualizar clave_acceso si no existe (evitar sobrescribir)
         if not factura.clave_acceso:
             factura.clave_acceso = clave_acceso
@@ -860,6 +861,34 @@ class SRIIntegration:
         # 🔧 FIX: Normalizar variantes de estado que puede devolver el SRI
         estado_normalizado = estado.upper().replace(' ', '_') if isinstance(estado, str) else str(estado).upper()
         mensajes_resultado = resultado.get('mensajes', []) or []
+
+        # ✅ IMPORTANTE: errores de conexión del SRI suelen ser temporales (p.ej. ConnectionResetError 10054)
+        # y NO deben marcar la factura como ERROR final porque cortaría el polling.
+        try:
+            es_error_conexion = any(
+                isinstance(m, dict) and str(m.get('identificador', '')).strip().upper() in {'CONNECTION_ERROR', 'TRANSPORT_ERROR'}
+                for m in (mensajes_resultado or [])
+            )
+        except Exception:
+            es_error_conexion = False
+
+        if estado_normalizado == 'ERROR' and es_error_conexion:
+            # Mantener el estado anterior si ya estaba en un estado temporal.
+            if estado_sri_anterior in ('RECIBIDA', 'PENDIENTE'):
+                logger.warning(
+                    "Error de conexión consultando SRI (factura %s). Se mantiene estado temporal %s.",
+                    getattr(factura, 'id', 'N/D'),
+                    estado_sri_anterior,
+                )
+                estado_normalizado = estado_sri_anterior
+                estado = estado_sri_anterior
+            else:
+                logger.warning(
+                    "Error de conexión consultando SRI (factura %s). Se normaliza a PENDIENTE para reintentar.",
+                    getattr(factura, 'id', 'N/D'),
+                )
+                estado_normalizado = 'PENDIENTE'
+                estado = 'PENDIENTE'
 
         if estado_normalizado in ('DEVUELTA', 'ERROR') and self._mensajes_indican_clave_en_procesamiento(mensajes_resultado):
             logger.info(
@@ -1105,6 +1134,25 @@ class SRIIntegration:
         logger.info(f"   📅 fecha_emision (desde BD): {factura.fecha_emision}")
         logger.info(f"   🔢 numero_autorizacion (desde BD): {factura.numero_autorizacion}")
         logger.info(f"   📊 estado_sri (desde BD): {factura.estado_sri}")
+
+        # ✅ NUEVO: si recién pasó a RECIBIDA, encolar polling cada 30s hasta AUTORIZADA/RECHAZADA
+        try:
+            estado_sri_actual = (getattr(factura, 'estado_sri', '') or '').upper().strip()
+            if estado_sri_anterior != 'RECIBIDA' and estado_sri_actual == 'RECIBIDA':
+                from inventario.sri.rq_jobs import enqueue_poll_autorizacion_factura
+
+                enqueue_poll_autorizacion_factura(
+                    factura_id=int(factura.id),
+                    empresa_id=int(getattr(factura, 'empresa_id', factura.empresa.id)),
+                    delay_seconds=30,
+                    attempt=1,
+                )
+        except Exception as exc:
+            logger.warning(
+                "No se pudo encolar polling de autorización para factura %s: %s",
+                getattr(factura, 'id', None),
+                exc,
+            )
     
     def _firmar_xml_xades_bes(self, xml_path, xml_firmado_path, empresa=None):
         """Firma un XML utilizando el esquema XAdES-BES."""

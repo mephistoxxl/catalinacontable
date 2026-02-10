@@ -190,6 +190,10 @@
                             {% for fila in tabla %}
                             <tr class="factura-row hover:bg-gray-50 transition-colors duration-150" 
                                 style="display: none"
+                                data-factura-id="{{ fila.id }}"
+                                data-estado-sri="{{ fila.estado_sri|default:'' }}"
+                                data-clave-acceso="{{ fila.clave_acceso|default:'' }}"
+                                data-fecha-emision="{{ fila.fecha_emision|date:'Y-m-d' }}"
                                 data-almacen-id="{{ fila.almacen.id|default:'' }}"
                                 data-ambiente="{% with amb=fila.clave_acceso|default:''|slice:'23:24' %}{% if amb == '1' %}pruebas{% else %}produccion{% endif %}{% endwith %}"
                                 data-anulada="{% if fila.estado_sri == 'ANULADA' or fila.estado == 'ANULADA' %}anuladas{% else %}activas{% endif %}"
@@ -204,7 +208,7 @@
                                 </td>
                                 <td class="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">{{ fila.cliente.identificacion }}</td>
                                 <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">{{ fila.fecha_emision|date:"d/m/Y" }}</td>
-                                <td class="px-3 py-2 whitespace-nowrap text-xs">
+                                <td class="px-3 py-2 whitespace-nowrap text-xs js-estado-sri-cell">
                                     {# Mostrar Anulada primero, luego Autorizada, Rechazada/No Autorizada, Recibida o Pendiente #}
                                     {% if fila.estado_sri == 'ANULADA' or fila.estado == 'ANULADA' %}
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
@@ -1204,6 +1208,194 @@
             </div>`;
         document.body.insertAdjacentHTML('beforeend', html);
     }
+
+    // ===== POLLING ESTADO SRI EN LISTA (cada 30s) =====
+    function _normalizarEstadoSRI(estado) {
+        return String(estado || '').trim().toUpperCase().replace(/\s+/g, '_');
+    }
+
+    function _truncate(texto, maxLen = 15) {
+        const t = String(texto || '');
+        if (!t) return '';
+        if (t.length <= maxLen) return t;
+        return t.slice(0, maxLen) + '...';
+    }
+
+    function _renderEstadoSriCellHtml({ estado, numeroAutorizacion, claveAcceso }) {
+        const estadoN = _normalizarEstadoSRI(estado);
+
+        if (estadoN === 'ANULADA') {
+            return `
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    <i class="fa fa-ban mr-1 text-xs"></i>🚫 Anulada
+                </span>
+                <div class="text-xs text-gray-500 mt-0.5">Documento anulado</div>
+            `;
+        }
+
+        if (estadoN === 'AUTORIZADA' || estadoN === 'AUTORIZADO') {
+            if (numeroAutorizacion) {
+                return `
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <i class="fa fa-check-circle mr-1 text-xs"></i>✅ Autorizada
+                    </span>
+                    <div class="text-xs text-gray-500 mt-0.5">${_truncate(numeroAutorizacion, 15)}</div>
+                `;
+            }
+            return `
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                    <i class="fa fa-exclamation-circle mr-1 text-xs"></i>⚠️ Inconsistente
+                </span>
+                <div class="text-xs text-red-500 mt-0.5">Sin autorización válida</div>
+            `;
+        }
+
+        if (estadoN === 'RECHAZADA' || estadoN === 'NO_AUTORIZADA' || estadoN === 'NO_AUTORIZADO' || estadoN === 'DEVUELTA') {
+            return `
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    <i class="fa fa-times-circle mr-1 text-xs"></i>❌ No Autorizada
+                </span>
+                <div class="text-xs text-gray-500 mt-0.5">${_truncate(claveAcceso, 15)}</div>
+            `;
+        }
+
+        if (estadoN === 'RECIBIDA') {
+            return `
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                    <i class="fa fa-clock mr-1 text-xs"></i>📨 Recibida
+                </span>
+                <div class="text-xs text-gray-500 mt-0.5">${_truncate(claveAcceso, 15)}</div>
+            `;
+        }
+
+        if (estadoN === 'PENDIENTE') {
+            return `
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                    <i class="fa fa-hourglass-half mr-1 text-xs"></i>⏳ Pendiente
+                </span>
+                <div class="text-xs text-gray-500 mt-0.5">${_truncate(claveAcceso, 15)}</div>
+            `;
+        }
+
+        if (estadoN === 'ERROR') {
+            return `
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    <i class="fa fa-exclamation-triangle mr-1 text-xs"></i>⚠️ Error SRI
+                </span>
+                <div class="text-xs text-gray-500 mt-0.5">${_truncate(claveAcceso, 15)}</div>
+            `;
+        }
+
+        if (estadoN) {
+            return `
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                    <i class="fa fa-info-circle mr-1 text-xs"></i>${estadoN}
+                </span>
+                <div class="text-xs text-gray-500 mt-0.5">${_truncate(claveAcceso, 15)}</div>
+            `;
+        }
+
+        if (claveAcceso) {
+            return `
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                    <i class="fa fa-clock mr-1 text-xs"></i>📝 Local
+                </span>
+                <div class="text-xs text-gray-500 mt-0.5">${_truncate(claveAcceso, 15)}</div>
+            `;
+        }
+
+        return `
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                <i class="fa fa-info-circle mr-1 text-xs"></i>SIN ESTADO
+            </span>
+        `;
+    }
+
+    async function _consultarEstadoSriFactura(row) {
+        const facturaId = row?.dataset?.facturaId;
+        if (!facturaId) return;
+
+        // Requerimiento: solo aplicar auto-consulta a facturas desde 01/01/2026
+        const fechaEmision = String(row?.dataset?.fechaEmision || '').trim();
+        if (!fechaEmision || fechaEmision < '2026-01-01') return;
+
+        const estadoActual = _normalizarEstadoSRI(row.dataset.estadoSri);
+        // Requerimiento: consultar únicamente después de que esté RECIBIDA
+        if (estadoActual !== 'RECIBIDA') return;
+
+        const cell = row.querySelector('.js-estado-sri-cell');
+        if (!cell) return;
+
+        // Construir URL del endpoint sin hardcodear rutas
+        const urlBase = '{% url "inventario:consultar_estado_sri" 0 %}';
+        const url = urlBase.replace('/0/', `/${facturaId}/`);
+
+        try {
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+
+            const data = await resp.json();
+
+            if (!data || data.success !== true) {
+                // Si falla, no rompemos la UI; volvemos a intentar en el siguiente tick.
+                return;
+            }
+
+            const nuevoEstado = _normalizarEstadoSRI(data.estado);
+            const numeroAut = data.numero_autorizacion || '';
+            const clave = row.dataset.claveAcceso || '';
+
+            cell.innerHTML = _renderEstadoSriCellHtml({
+                estado: nuevoEstado,
+                numeroAutorizacion: numeroAut,
+                claveAcceso: clave,
+            });
+
+            // Mantener dataset actualizado para que el polling pare y filtros se comporten mejor.
+            row.dataset.estadoSri = nuevoEstado;
+
+            if (nuevoEstado === 'AUTORIZADA' || nuevoEstado === 'AUTORIZADO') {
+                row.dataset.estado = 'autorizada';
+            } else if (nuevoEstado === 'RECHAZADA' || nuevoEstado === 'NO_AUTORIZADA' || nuevoEstado === 'NO_AUTORIZADO' || nuevoEstado === 'DEVUELTA' || nuevoEstado === 'ERROR') {
+                row.dataset.estado = 'rechazada';
+            } else if (nuevoEstado === 'RECIBIDA') {
+                row.dataset.estado = 'pendiente';
+            }
+        } catch (e) {
+            console.error('Error consultando estado SRI:', e);
+        }
+    }
+
+    function iniciarPollingEstadoSriListado() {
+        const rows = Array.from(document.querySelectorAll('tr.factura-row[data-factura-id]'));
+        const hayPendientes = rows.some(r => {
+            const fechaEmision = String(r.dataset.fechaEmision || '').trim();
+            if (!fechaEmision || fechaEmision < '2026-01-01') return false;
+            const st = _normalizarEstadoSRI(r.dataset.estadoSri);
+            return st === 'RECIBIDA';
+        });
+        if (!hayPendientes) return;
+
+        const tick = async () => {
+            const rowsNow = Array.from(document.querySelectorAll('tr.factura-row[data-factura-id]'));
+            for (const row of rowsNow) {
+                await _consultarEstadoSriFactura(row);
+            }
+        };
+
+        // Ejecutar una vez y luego cada 30s
+        tick();
+        setInterval(tick, 30000);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        iniciarPollingEstadoSriListado();
+    });
 </script>
 
 <!-- Modal de Autenticación del Facturador -->
