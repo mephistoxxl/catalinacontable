@@ -28,6 +28,32 @@
                 </div>
             </div>
             <div class="p-3">
+                {% if messages %}
+                    <div class="mb-3">
+                        {% for message in messages %}
+                            <div class="bg-white rounded-lg shadow-md p-3 border-l-4 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        {% if message.tags == 'success' %}
+                                            <i class="fa fa-check-circle text-green-600 text-sm"></i>
+                                        {% elif message.tags == 'error' %}
+                                            <i class="fa fa-exclamation-circle text-red-600 text-sm"></i>
+                                        {% elif message.tags == 'warning' %}
+                                            <i class="fa fa-exclamation-triangle text-yellow-600 text-sm"></i>
+                                        {% else %}
+                                            <i class="fa fa-info-circle text-blue-600 text-sm"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div class="ml-3">
+                                        <p class="text-xs font-medium {% if message.tags == 'success' %}text-green-800{% elif message.tags == 'error' %}text-red-800{% elif message.tags == 'warning' %}text-yellow-800{% else %}text-blue-800{% endif %}">
+                                            {{ message }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
                 <div class="row">
                     <div class="col-lg-12">
                         <div class="overflow-x-auto">

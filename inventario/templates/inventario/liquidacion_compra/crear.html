@@ -390,13 +390,13 @@
     max-width: 100%;
     border: none;
     border-radius: 10px;
-    background: linear-gradient(135deg, #047857 0%, #065f46 48%, #064e3b 100%);
+    background: linear-gradient(90deg, #1f2937 0%, #111827 100%);
     color: #fff;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     font-weight: 600;
-    padding: 9px 14px;
+    padding: 7px 12px;
     box-shadow: 0 18px 28px -18px rgba(17, 24, 39, 0.75);
     transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
   }
@@ -512,21 +512,21 @@
     </div>
     {% endif %}
 
-    <div class="bg-gradient-to-r from-emerald-800 to-emerald-950 px-4 py-2 mb-2 rounded-lg">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <i class="fa fa-file-text-o text-white text-sm mr-2"></i>
-          <h1 class="text-sm font-semibold text-white">{% trans "Nueva Liquidación de Compra" %}</h1>
-        </div>
-        <a href="{% url 'inventario:liquidaciones_compra_listar' %}" class="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-emerald-50 text-slate-900 hover:text-slate-950 text-sm font-semibold rounded-md shadow-sm ring-1 ring-white/30 transition-colors" style="text-decoration: none !important; color: #0f172a !important;">
-          <i class="fa fa-arrow-left text-[12px]"></i>
-          <span>{% trans "Volver" %}</span>
-        </a>
-      </div>
-    </div>
-
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-  <form method="post" novalidate class="p-2 sm:p-2 space-y-1.5" id="form_liquidacion" onsubmit="return prepararEnvioLiquidacion()">
+      <div class="px-3 py-2 border-b border-gray-200">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <i class="fa fa-file-text-o text-slate-700 text-sm"></i>
+            <h1 class="text-sm font-semibold text-gray-800">{% trans "Nueva Liquidación de Compra" %}</h1>
+          </div>
+          <a href="{% url 'inventario:liquidaciones_compra_listar' %}" class="inline-flex items-center gap-2 px-3 py-1.5 border border-gray-300 rounded bg-white hover:bg-gray-50 !text-black text-sm !font-bold !opacity-100" style="text-decoration: none !important;">
+            <i class="fa fa-arrow-left text-[12px] !text-black !opacity-100"></i>
+            <span>{% trans "Volver" %}</span>
+          </a>
+        </div>
+      </div>
+
+      <form method="post" novalidate class="p-2 sm:p-2 space-y-1.5" id="form_liquidacion" onsubmit="return prepararEnvioLiquidacion()">
         {% csrf_token %}
         {{ form.proveedor }}
         {{ form.secuencia_config_id }}
@@ -894,34 +894,48 @@
                   <i class="fa fa-list-alt" aria-hidden="true"></i>
                   <strong>{% trans "Seleccionar producto o servicio" %}</strong>
                 </div>
-                <button type="button" id="modal-btn-cerrar" class="btn btn-light"><i class="fa fa-times"></i></button>
+                <button type="button" id="modal-btn-cerrar" class="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                  <i class="fa fa-times"></i>
+                </button>
               </div>
               <div style="padding:10px 12px; border-bottom:1px solid #e5e7eb; display:flex; gap:8px; align-items:center;">
                 <label style="margin:0; font-size:.85rem;">{% trans "Buscar" %}:</label>
-                <input id="modal-buscar-input" type="text" placeholder="{% trans "Código (parcial o completo)" %}" style="flex:1; min-width:160px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px;">
-                <button type="button" id="modal-buscar-btn" class="btn btn-primary"><i class="fa fa-search"></i></button>
+                <input id="modal-buscar-input" type="text" placeholder="{% trans "Código o nombre (parcial o completo)" %}" style="flex:1; min-width:160px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px;">
+                <button type="button" id="modal-buscar-btn" class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                  <i class="fa fa-search mr-1"></i> {% trans "Buscar" %}
+                </button>
               </div>
               <div class="table-responsive" style="max-height:65vh; overflow:auto;">
-                <table class="table table-sm table-striped table-hover" style="margin:0;">
-                  <thead class="thead-light">
+                <table class="min-w-full divide-y divide-gray-200" style="margin:0;">
+                  <thead class="bg-gray-50">
                     <tr>
-                      <th style="width:40px;">✓</th>
-                      <th style="width:140px;">{% trans "Código" %}</th>
-                      <th>{% trans "Descripción" %}</th>
-                      <th style="width:110px;" class="text-right">{% trans "Precio" %}</th>
-                      <th style="width:110px;" class="text-right">{% trans "Precio c/IVA" %}</th>
+                      <th style="width:40px; padding: 8px; text-align: center; font-size: 11px;">✓</th>
+                      <th style="width:140px; padding: 8px; text-align: left; font-size: 11px;">{% trans "Código" %}</th>
+                      <th style="padding: 8px; text-align: left; font-size: 11px;">{% trans "Descripción" %}</th>
+                      <th style="width:110px; padding: 8px; text-align: right; font-size: 11px;">{% trans "Precio" %}</th>
+                      <th style="width:110px; padding: 8px; text-align: right; font-size: 11px;">{% trans "Precio c/IVA" %}</th>
                     </tr>
                   </thead>
-                  <tbody id="modal-lista-tbody"></tbody>
+                  <tbody id="modal-lista-tbody" class="bg-white divide-y divide-gray-200"></tbody>
                 </table>
               </div>
-              <div id="modal-lista-vacio" style="display:none; padding:16px; color:#64748b;">{% trans "Sin resultados." %}</div>
+              <div id="modal-lista-vacio" style="display:none; padding:16px; color:#64748b; text-align:center;">
+                <i class="fa fa-inbox" style="font-size: 48px; opacity: 0.3; display: block; margin-bottom: 10px;"></i>
+                {% trans "Sin resultados." %}
+              </div>
             </div>
             <!-- loader simple -->
-            <div id="modal-loader" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center;">
-              <div class="spinner-border" role="status"><span class="sr-only">{% trans "Cargando…" %}</span></div>
+            <div id="modal-loader" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; background: rgba(255,255,255,0.8);">
+              <div style="border: 4px solid #f3f4f6; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
             </div>
           </div>
+
+          <style>
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          </style>
         </section>
 
         {{ campo_adicional_formset.management_form }}
@@ -954,6 +968,7 @@
             <span>{% trans "Cancelar" %}</span>
           </a>
         </div>
+      </form>
       </form>
     </div>
   </div>
@@ -2044,7 +2059,7 @@
       const vacio = document.getElementById('modal-lista-vacio');
       if (!tbody) return;
       tbody.innerHTML = '';
-      if (!lista.length) {
+      if (!lista || lista.length === 0) {
         if (vacio) vacio.style.display = 'block';
         return;
       }
@@ -2052,39 +2067,23 @@
 
       lista.forEach((item) => {
         const tr = document.createElement('tr');
-        const tdAccion = document.createElement('td');
-        tdAccion.className = 'text-center';
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'btn btn-success btn-sm';
-        btn.innerHTML = '<i class="fa fa-check"></i>';
-        btn.addEventListener('click', () => seleccionarProductoDesdeModal(item));
-        tdAccion.appendChild(btn);
-
-        const tdCodigo = document.createElement('td');
-        tdCodigo.textContent = item.codigo || '';
-
-        const tdNombre = document.createElement('td');
-        tdNombre.textContent = item.nombre || '';
-
         const precio = Number(item.precio || 0);
         const iva = Number(item.iva_percent || 0);
         const precioConIva = Number(item.precio_con_iva || (precio * (1 + iva)));
+        const tipo = item.tipo === 'servicio' ? '🔧' : '📦';
 
-        const tdPrecio = document.createElement('td');
-        tdPrecio.className = 'text-right';
-        tdPrecio.textContent = precio.toFixed(2);
-
-        const tdPrecioIva = document.createElement('td');
-        tdPrecioIva.className = 'text-right';
-        tdPrecioIva.textContent = precioConIva.toFixed(2);
-
-        tr.appendChild(tdAccion);
-        tr.appendChild(tdCodigo);
-        tr.appendChild(tdNombre);
-        tr.appendChild(tdPrecio);
-        tr.appendChild(tdPrecioIva);
-
+        tr.innerHTML = `
+          <td style="text-align:center; padding: 6px;">
+            <button type="button" class="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+              <i class="fa fa-check"></i>
+            </button>
+          </td>
+          <td style="padding: 6px; font-size: 12px;">${item.codigo || ''}</td>
+          <td style="padding: 6px; font-size: 12px;">${tipo} ${(item.nombre || '').replace(/</g,'&lt;')}</td>
+          <td style="text-align:right; padding: 6px; font-size: 12px;">$${precio.toFixed(2)}</td>
+          <td style="text-align:right; padding: 6px; font-size: 12px;">$${precioConIva.toFixed(2)}</td>
+        `;
+        tr.querySelector('button').addEventListener('click', () => seleccionarProductoDesdeModal(item));
         tbody.appendChild(tr);
       });
     }

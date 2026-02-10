@@ -599,193 +599,14 @@ class VerProforma(LoginRequiredMixin, View):
 @require_empresa_activa
 def ride_proforma(request, p):
     """Descarga PDF de PROFORMA usando el generador dedicado (similar al RIDE)."""
-    empresa_id = request.session.get('empresa_activa')
+    inline = str(request.GET.get('inline', '')).strip() in ('1', 'true', 'True')
+    as_attachment = not inline
 
-    # Cargar proforma con relaciones
-    from decimal import Decimal, ROUND_HALF_UP
-    from django.db.models import Prefetch
+    contexto = _build_proforma_ride_context(request, p)
 
-    proforma = get_object_or_404(
-        Proforma.objects.select_related('empresa', 'cliente', 'facturador', 'almacen', 'creado_por')
-        .prefetch_related(Prefetch('detalles', queryset=ProformaDetalle.objects.select_related('producto', 'servicio'))),
-        pk=p,
-        empresa_id=empresa_id,
-    )
-
-    # Asegurar totales actualizados
-    try:
-        proforma.calcular_totales()
-    except Exception:
-        pass
-
-    # Obtener opciones/empresa para encabezado
-    try:
-        opciones = Opciones.objects.filter(empresa=proforma.empresa).first()
-    except Exception:
-        opciones = None
-
-    # Resolver logo: primero el configurado en Opciones (MEDIA), sino fallback estático
-    logo_url = None
-    if opciones and getattr(opciones, 'imagen', None):
-        logo_url = build_storage_url_or_none(opciones.imagen)
-
-    if not logo_url:
-        base_static = settings.STATIC_URL.rstrip('/')
-        logo_url = f"{base_static}/inventario/assets/logo/logo2.png"
-
-    # Construir contexto de empresa para el encabezado
-    empresa_ctx = {
-        'razon_social': (opciones.razon_social if opciones and getattr(opciones, 'razon_social', None) else proforma.empresa.razon_social),
-        'ruc': (opciones.identificacion if opciones and getattr(opciones, 'identificacion', None) else proforma.empresa.ruc),
-        'direccion': (opciones.direccion_establecimiento if opciones and getattr(opciones, 'direccion_establecimiento', None) else ''),
-        'telefono': (opciones.telefono if opciones and getattr(opciones, 'telefono', None) else ''),
-        'nombre_comercial': (opciones.nombre_comercial if opciones and getattr(opciones, 'nombre_comercial', None) else ''),
-        'correo': (opciones.correo if opciones and getattr(opciones, 'correo', None) else ''),
-    }
-
-    # Desglose de IVA por porcentaje y detalles enriquecidos para el PDF
-    MAPEO_IVA = {
-        '0': Decimal('0.00'),
-        '5': Decimal('5.00'),
-        '2': Decimal('12.00'),
-        '10': Decimal('13.00'),
-        '3': Decimal('14.00'),
-        '4': Decimal('15.00'),
-        '6': Decimal('0.00'),
-        '7': Decimal('0.00'),
-        '8': Decimal('8.00'),
-    }
-
-    def obtener_porcentaje_iva(det):
-        if det.producto:
-            try:
-                return Decimal(str(det.producto.get_porcentaje_iva_real()))
-            except Exception:
-                return Decimal('12.00')
-        if det.servicio:
-            try:
-                code = str(det.servicio.iva)
-                return MAPEO_IVA.get(code, Decimal('12.00'))
-            except Exception:
-                return Decimal('12.00')
-        return Decimal('0.00')
-
-    iva_breakdown = {}  # { porcentaje(Decimal): {'base': Decimal, 'iva': Decimal} }
-    detalles_pdf = []
-    for det in proforma.detalles.all():
-        pct = obtener_porcentaje_iva(det)
-        base = (det.subtotal - det.descuento).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        iva_val = (base * (pct / Decimal('100'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        total_linea = (base + iva_val).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-
-        if pct not in iva_breakdown:
-            iva_breakdown[pct] = {'base': Decimal('0.00'), 'iva': Decimal('0.00')}
-        iva_breakdown[pct]['base'] += base
-        iva_breakdown[pct]['iva'] += iva_val
-
-        detalles_pdf.append({
-            'codigo': det.codigo,
-            'descripcion': det.descripcion,
-            'cantidad': det.cantidad,
-            'precio_unitario': det.precio_unitario,
-            'porcentaje_iva': pct,
-            'porcentaje_iva_str': f"{pct.normalize()}%" if hasattr(pct, 'normalize') else f"{pct}%",
-            'descuento': det.descuento,
-            'subtotal': det.subtotal,
-            'base': base,
-            'iva_valor': iva_val,
-            'total_linea': total_linea,
-        })
-
-    # Limitar filas visibles para favorecer caber en una sola página (totales siguen completos)
-    MAX_ROWS = 10
-    if len(detalles_pdf) > MAX_ROWS:
-        detalles_pdf_display = detalles_pdf[:MAX_ROWS]
-        detalles_omitidos = len(detalles_pdf) - MAX_ROWS
-    else:
-        detalles_pdf_display = detalles_pdf
-        detalles_omitidos = 0
-
-    # Totales auxiliares
-    subtotal_neto = (proforma.subtotal - proforma.total_descuento).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-    subtotal_0 = iva_breakdown.get(Decimal('0.00'), {'base': Decimal('0.00')})['base'].quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-    subtotal_iva_base = (subtotal_neto - subtotal_0).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-
-    # Ordenar IVA breakdown por porcentaje ascendente
-    iva_items = sorted(
-        [(str(k).rstrip('0').rstrip('.') if '.' in str(k) else str(k), v) for k, v in iva_breakdown.items()],
-        key=lambda x: Decimal(x[0]),
-    )
-
-    # Metadata de generación
-    try:
-        from django.utils import timezone
-        generado_el = timezone.now()
-    except Exception:
-        import datetime as _dt
-        generado_el = _dt.datetime.now()
-    generado_por = getattr(request.user, 'get_full_name', lambda: '')() or getattr(request.user, 'username', '')
-
-    # Derivar forma de pago visual y nota
-    obs_text = proforma.observaciones or ''
-    forma_pago_text = None
-    try:
-        if 'forma de pago' in obs_text.lower():
-            for line in obs_text.splitlines():
-                if 'forma de pago' in line.lower():
-                    forma_pago_text = line.split(':', 1)[-1].strip() or None
-                    break
-    except Exception:
-        pass
-    if not forma_pago_text:
-        forma_pago_text = 'Contado'
-    nota_text = (proforma.observaciones or (getattr(opciones, 'mensaje_factura', '') if opciones else '')).strip()
-
-    # Extras de presentación
-    try:
-        vendedor_nombre = proforma.facturador.nombres if proforma.facturador else None
-    except Exception:
-        vendedor_nombre = None
-
-    # Validez (días) estimada con base en vencimiento si existe
-    try:
-        validez_dias = (proforma.fecha_vencimiento - proforma.fecha_emision).days if (proforma.fecha_vencimiento and proforma.fecha_emision) else None
-    except Exception:
-        validez_dias = None
-
-    # Posible cuenta bancaria si está configurada en Opciones (tolerante a distintos nombres)
-    cuenta_bancaria_text = None
-    try:
-        for _attr in ['cuenta_bancaria', 'bank_account', 'numero_cuenta', 'cuenta']:
-            if opciones and hasattr(opciones, _attr):
-                val = getattr(opciones, _attr)
-                if val:
-                    cuenta_bancaria_text = val
-                    break
-    except Exception:
-        cuenta_bancaria_text = None
-
-    contexto = {
-        'proforma': proforma,
-        'empresa': empresa_ctx,
-        'opciones': opciones,
-        'logo_url': logo_url,
-        'detalles_pdf': detalles_pdf,
-        'detalles_pdf_display': detalles_pdf_display,
-        'detalles_omitidos': detalles_omitidos,
-        'iva_items': iva_items,
-        'subtotal_neto': subtotal_neto,
-        'subtotal_0': subtotal_0,
-        'subtotal_iva_base': subtotal_iva_base,
-        'generado_por': generado_por,
-        'generado_el': generado_el,
-        'condiciones_text': (proforma.observaciones or (getattr(opciones, 'mensaje_factura', '') if opciones else '')),
-        'forma_pago_text': forma_pago_text,
-        'nota_text': nota_text,
-        'vendedor_nombre': vendedor_nombre,
-        'validez_dias': validez_dias,
-        'cuenta_bancaria_text': cuenta_bancaria_text,
-    }
+    # Variables locales usadas más abajo (compatibilidad con el flujo existente)
+    proforma = contexto.get('proforma')
+    empresa_ctx = contexto.get('empresa') or {}
 
     # Intentar usar el generador de archivo estilo RIDE para proforma
     try:
@@ -796,7 +617,15 @@ def ride_proforma(request, p):
             empresa_name = empresa_ctx.get('nombre_comercial') or empresa_ctx.get('razon_social') or 'empresa'
             filename_base = f"proforma_{proforma.numero or proforma.id}_{empresa_name}"
             safe_name = slugify(str(filename_base)) or f"proforma-{proforma.id}"
-            return FileResponse(default_storage.open(pdf_path, 'rb'), as_attachment=True, filename=f"{safe_name}.pdf")
+            response = FileResponse(
+                default_storage.open(pdf_path, 'rb'),
+                as_attachment=as_attachment,
+                filename=f"{safe_name}.pdf",
+            )
+            # Permitir iframe SAMEORIGIN solo para el flujo inline (imprimir).
+            if inline:
+                response['X-Frame-Options'] = 'SAMEORIGIN'
+            return response
     except Exception as e:
         logger.warning(f"Fallo generador de proforma RIDE: {e}. Se usará plantilla HTML.")
 
@@ -833,17 +662,209 @@ def ride_proforma(request, p):
         pisa_status = pisa.CreatePDF(html, dest=pdf_buffer, link_callback=link_callback)
 
         if pisa_status.err:
-            return render(request, 'inventario/PDF/proforma.html', contexto)
+            response = render(request, 'inventario/PDF/proforma.html', contexto)
+            if inline:
+                response['X-Frame-Options'] = 'SAMEORIGIN'
+            return response
 
         pdf_buffer.seek(0)
         empresa_name = empresa_ctx.get('nombre_comercial') or empresa_ctx.get('razon_social') or 'empresa'
         filename_base = f"proforma_{proforma.numero or proforma.id}_{empresa_name}"
         safe_name = slugify(str(filename_base)) or f"proforma-{proforma.id}"
         response = HttpResponse(pdf_buffer.read(), content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="{safe_name}.pdf"'
+        disp = 'inline' if inline else 'attachment'
+        response['Content-Disposition'] = f'{disp}; filename="{safe_name}.pdf"'
+        if inline:
+            response['X-Frame-Options'] = 'SAMEORIGIN'
         return response
     except Exception:
-        return render(request, 'inventario/PDF/proforma.html', contexto)
+        response = render(request, 'inventario/PDF/proforma.html', contexto)
+        if inline:
+            response['X-Frame-Options'] = 'SAMEORIGIN'
+        return response
+
+
+def _build_proforma_ride_context(request, p):
+    """Arma el contexto para RIDE/impresión de Proforma (PDF o HTML)."""
+    empresa_id = request.session.get('empresa_activa')
+
+    from decimal import Decimal, ROUND_HALF_UP
+    from django.db.models import Prefetch
+
+    proforma = get_object_or_404(
+        Proforma.objects.select_related('empresa', 'cliente', 'facturador', 'almacen', 'creado_por')
+        .prefetch_related(Prefetch('detalles', queryset=ProformaDetalle.objects.select_related('producto', 'servicio'))),
+        pk=p,
+        empresa_id=empresa_id,
+    )
+
+    try:
+        proforma.calcular_totales()
+    except Exception:
+        pass
+
+    try:
+        opciones = Opciones.objects.filter(empresa=proforma.empresa).first()
+    except Exception:
+        opciones = None
+
+    logo_url = None
+    if opciones and getattr(opciones, 'imagen', None):
+        logo_url = build_storage_url_or_none(opciones.imagen)
+    if not logo_url:
+        base_static = settings.STATIC_URL.rstrip('/')
+        logo_url = f"{base_static}/inventario/assets/logo/logo2.png"
+
+    empresa_ctx = {
+        'razon_social': (opciones.razon_social if opciones and getattr(opciones, 'razon_social', None) else proforma.empresa.razon_social),
+        'ruc': (opciones.identificacion if opciones and getattr(opciones, 'identificacion', None) else proforma.empresa.ruc),
+        'direccion': (opciones.direccion_establecimiento if opciones and getattr(opciones, 'direccion_establecimiento', None) else ''),
+        'telefono': (opciones.telefono if opciones and getattr(opciones, 'telefono', None) else ''),
+        'nombre_comercial': (opciones.nombre_comercial if opciones and getattr(opciones, 'nombre_comercial', None) else ''),
+        'correo': (opciones.correo if opciones and getattr(opciones, 'correo', None) else ''),
+    }
+
+    MAPEO_IVA = {
+        '0': Decimal('0.00'),
+        '5': Decimal('5.00'),
+        '2': Decimal('12.00'),
+        '10': Decimal('13.00'),
+        '3': Decimal('14.00'),
+        '4': Decimal('15.00'),
+        '6': Decimal('0.00'),
+        '7': Decimal('0.00'),
+        '8': Decimal('8.00'),
+    }
+
+    def obtener_porcentaje_iva(det):
+        if det.producto:
+            try:
+                return Decimal(str(det.producto.get_porcentaje_iva_real()))
+            except Exception:
+                return Decimal('12.00')
+        if det.servicio:
+            try:
+                code = str(det.servicio.iva)
+                return MAPEO_IVA.get(code, Decimal('12.00'))
+            except Exception:
+                return Decimal('12.00')
+        return Decimal('0.00')
+
+    iva_breakdown = {}
+    detalles_pdf = []
+    for det in proforma.detalles.all():
+        pct = obtener_porcentaje_iva(det)
+        base = (det.subtotal - det.descuento).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        iva_val = (base * (pct / Decimal('100'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        total_linea = (base + iva_val).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+        if pct not in iva_breakdown:
+            iva_breakdown[pct] = {'base': Decimal('0.00'), 'iva': Decimal('0.00')}
+        iva_breakdown[pct]['base'] += base
+        iva_breakdown[pct]['iva'] += iva_val
+
+        detalles_pdf.append({
+            'codigo': det.codigo,
+            'descripcion': det.descripcion,
+            'cantidad': det.cantidad,
+            'precio_unitario': det.precio_unitario,
+            'porcentaje_iva': pct,
+            'porcentaje_iva_str': f"{pct.normalize()}%" if hasattr(pct, 'normalize') else f"{pct}%",
+            'descuento': det.descuento,
+            'subtotal': det.subtotal,
+            'base': base,
+            'iva_valor': iva_val,
+            'total_linea': total_linea,
+        })
+
+    MAX_ROWS = 10
+    if len(detalles_pdf) > MAX_ROWS:
+        detalles_pdf_display = detalles_pdf[:MAX_ROWS]
+        detalles_omitidos = len(detalles_pdf) - MAX_ROWS
+    else:
+        detalles_pdf_display = detalles_pdf
+        detalles_omitidos = 0
+
+    subtotal_neto = (proforma.subtotal - proforma.total_descuento).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    subtotal_0 = iva_breakdown.get(Decimal('0.00'), {'base': Decimal('0.00')})['base'].quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    subtotal_iva_base = (subtotal_neto - subtotal_0).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    iva_items = sorted(
+        [(str(k).rstrip('0').rstrip('.') if '.' in str(k) else str(k), v) for k, v in iva_breakdown.items()],
+        key=lambda x: Decimal(x[0]),
+    )
+
+    try:
+        from django.utils import timezone
+        generado_el = timezone.now()
+    except Exception:
+        import datetime as _dt
+        generado_el = _dt.datetime.now()
+    generado_por = getattr(request.user, 'get_full_name', lambda: '')() or getattr(request.user, 'username', '')
+
+    obs_text = proforma.observaciones or ''
+    forma_pago_text = None
+    try:
+        if 'forma de pago' in obs_text.lower():
+            for line in obs_text.splitlines():
+                if 'forma de pago' in line.lower():
+                    forma_pago_text = line.split(':', 1)[-1].strip() or None
+                    break
+    except Exception:
+        pass
+    if not forma_pago_text:
+        forma_pago_text = 'Contado'
+    nota_text = (proforma.observaciones or (getattr(opciones, 'mensaje_factura', '') if opciones else '')).strip()
+
+    try:
+        vendedor_nombre = proforma.facturador.nombres if proforma.facturador else None
+    except Exception:
+        vendedor_nombre = None
+
+    try:
+        validez_dias = (proforma.fecha_vencimiento - proforma.fecha_emision).days if (proforma.fecha_vencimiento and proforma.fecha_emision) else None
+    except Exception:
+        validez_dias = None
+
+    cuenta_bancaria_text = None
+    try:
+        for _attr in ['cuenta_bancaria', 'bank_account', 'numero_cuenta', 'cuenta']:
+            if opciones and hasattr(opciones, _attr):
+                val = getattr(opciones, _attr)
+                if val:
+                    cuenta_bancaria_text = val
+                    break
+    except Exception:
+        cuenta_bancaria_text = None
+
+    return {
+        'proforma': proforma,
+        'empresa': empresa_ctx,
+        'opciones': opciones,
+        'logo_url': logo_url,
+        'detalles_pdf': detalles_pdf,
+        'detalles_pdf_display': detalles_pdf_display,
+        'detalles_omitidos': detalles_omitidos,
+        'iva_items': iva_items,
+        'subtotal_neto': subtotal_neto,
+        'subtotal_0': subtotal_0,
+        'subtotal_iva_base': subtotal_iva_base,
+        'generado_por': generado_por,
+        'generado_el': generado_el,
+        'condiciones_text': (proforma.observaciones or (getattr(opciones, 'mensaje_factura', '') if opciones else '')),
+        'forma_pago_text': forma_pago_text,
+        'nota_text': nota_text,
+        'vendedor_nombre': vendedor_nombre,
+        'validez_dias': validez_dias,
+        'cuenta_bancaria_text': cuenta_bancaria_text,
+    }
+
+
+@require_empresa_activa
+def imprimir_proforma(request, p):
+    """Abre un visor embebido del PDF (inline) y dispara imprimir."""
+    pdf_url = reverse('inventario:ride_proforma', args=[p]) + '?inline=1'
+    return render(request, 'inventario/proforma/imprimirProforma.html', {'pdf_url': pdf_url})
 
 # === Helper centralizado para obtener factura multi-tenant ===
 def get_factura_tenant(request, factura_id):
@@ -1392,6 +1413,7 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
     def get(self, request):
         empresa = get_empresa_activa(request)
         from .models import Almacen, Facturador
+        from .models import Cliente
         from datetime import datetime
 
         # Defaults para UI (mantener selección en GET)
@@ -1401,6 +1423,23 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
         ambiente_sel_ui_list = [str(v).strip() for v in request.GET.getlist('ambiente')]
         ambiente_sel_ui_list = [v for v in ambiente_sel_ui_list if v in ['1', '2']]
         ambiente_ui = ambiente_sel_ui_list[0] if len(ambiente_sel_ui_list) == 1 else 'ambos'
+
+        # Mostrar nombre del cliente si se ingresa CI/RUC
+        ci_ruc_ui = (request.GET.get('ci_ruc') or '').strip()
+        cliente_nombre_ui = ''
+        if empresa and ci_ruc_ui:
+            qs_cli = Cliente.objects.filter(empresa=empresa)
+            if ci_ruc_ui.isdigit():
+                qs_cli = qs_cli.filter(identificacion=ci_ruc_ui)
+            else:
+                qs_cli = qs_cli.filter(identificacion__icontains=ci_ruc_ui)
+            cli = qs_cli.order_by('razon_social').first()
+            if cli:
+                cliente_nombre_ui = (cli.razon_social or '').strip()
+                if getattr(cli, 'nombre_comercial', None):
+                    nc = str(cli.nombre_comercial).strip()
+                    if nc:
+                        cliente_nombre_ui = f"{cliente_nombre_ui} {nc}".strip()
 
         almacenes_disponibles = (
             Almacen.objects.filter(activo=True, empresa=empresa).order_by('descripcion')
@@ -1860,7 +1899,8 @@ class Reportes(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                 # Mantener selección UI
                 'ordenado_por_ui': (request.GET.get('ordenado_por') or 'secuencia').strip().lower(),
                 'agrupado_por_ui': (request.GET.get('agrupado_por') or 'ninguno').strip().lower(),
-                'ci_ruc_ui': (request.GET.get('ci_ruc') or '').strip(),
+                'ci_ruc_ui': ci_ruc_ui,
+                'cliente_nombre_ui': cliente_nombre_ui,
                 'secuencia_inicia_ui': (request.GET.get('secuencia_inicia') or '').strip(),
                 'almacenes_sel': request.GET.getlist('almacenes'),
                 'secuencias_sel': request.GET.getlist('secuencias'),

@@ -369,15 +369,6 @@
             
             <!-- Botones de acción derecha -->
             <div class="flex flex-wrap gap-2">
-              <button type="button" onclick="vistaPreviaProforma()" class="inline-flex items-center px-3 py-2 border border-blue-300 text-xs font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                <i class="fa fa-eye mr-1"></i> Vista Previa
-              </button>
-              <button type="button" onclick="imprimirProforma()" class="inline-flex items-center px-3 py-2 border border-purple-300 text-xs font-medium rounded-md text-purple-700 bg-purple-50 hover:bg-purple-100 focus:outline-none focus:ring-1 focus:ring-purple-500">
-                <i class="fa fa-print mr-1"></i> Imprimir
-              </button>
-              <button type="button" onclick="exportarPDF()" class="inline-flex items-center px-3 py-2 border border-red-300 text-xs font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-1 focus:ring-red-500">
-                <i class="fa fa-file-pdf mr-1"></i> PDF
-              </button>
               <button type="button" onclick="pf_guardarProforma()" class="inline-flex items-center px-4 py-2 text-xs font-medium rounded-md text-white bg-gray-800 hover:bg-black focus:outline-none focus:ring-2 focus:ring-gray-500">
                 <i class="fa fa-save mr-1"></i> Guardar Proforma
               </button>
@@ -476,6 +467,31 @@ document.addEventListener('DOMContentLoaded', function() {
   const codigoInput = document.getElementById('codigo_producto');
   if (codigoInput) {
     codigoInput.addEventListener('keypress', function(e){ if(e.key==='Enter'){ e.preventDefault(); pf_buscarProducto(); }});
+  }
+
+  // Listeners del modal de productos (mismo comportamiento que Emitir Factura)
+  const pfModal = document.getElementById('pf-modal-productos');
+  if (pfModal) {
+    pfModal.addEventListener('click', (e) => {
+      if (e.target === pfModal) pf_cerrarModalProductos();
+    });
+  }
+  const btnCerrarModal = document.getElementById('pf-modal-btn-cerrar');
+  if (btnCerrarModal) {
+    btnCerrarModal.addEventListener('click', pf_cerrarModalProductos);
+  }
+  const modalBuscarBtn = document.getElementById('pf-modal-buscar-btn');
+  const modalBuscarInput = document.getElementById('pf-modal-buscar-input');
+  if (modalBuscarBtn) {
+    modalBuscarBtn.addEventListener('click', () => pf_cargarProductosModal(modalBuscarInput?.value || ''));
+  }
+  if (modalBuscarInput) {
+    modalBuscarInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        pf_cargarProductosModal(modalBuscarInput.value);
+      }
+    });
   }
 
   // Enter en identificación cliente para buscar
@@ -784,49 +800,34 @@ function pf_renderProductosModal(lista){
   if (vacio) vacio.style.display = 'none';
   
   console.log('📦 Creando filas para', lista.length, 'productos');
-  
-  lista.forEach((item, index) => { 
-    const tr = document.createElement('tr'); 
-    const precio = Number(item.precio || 0); 
-    const iva = Number(item.iva_percent || 0); 
+
+  lista.forEach((item) => {
+    const tr = document.createElement('tr');
+    const precio = Number(item.precio || 0);
+    const iva = Number(item.iva_percent || 0);
     const pIva = Number(item.precio_con_iva || (precio * (1 + iva)));
-    
-    tr.style.cssText = 'border-bottom:1px solid #e5e7eb; transition:all 0.2s; cursor:pointer;';
-    tr.onmouseover = function() { this.style.background = '#f3f4f6'; };
-    tr.onmouseout = function() { this.style.background = '#fff'; };
-    
+    const tipo = item.tipo === 'servicio' ? '🔧' : '📦';
+
     tr.innerHTML = `
-      <td style="padding:12px 16px; text-align:center;">
-        <button type="button" 
-                title="Seleccionar ${item.nombre}" 
-                style="width:32px; height:32px; background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:#fff; border:none; border-radius:8px; cursor:pointer; transition:all 0.2s; box-shadow:0 2px 8px rgba(16,185,129,0.3); display:flex; align-items:center; justify-content:center;"
-                onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 4px 12px rgba(16,185,129,0.4)'"
-                onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 8px rgba(16,185,129,0.3)'">
+      <td style="text-align:center; padding: 6px;">
+        <button type="button" class="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
           <i class="fa fa-check"></i>
         </button>
       </td>
-      <td style="padding:12px 16px; font-size:13px; color:#374151; font-family:monospace;">${item.codigo || '-'}</td>
-      <td style="padding:12px 16px; font-size:13px; color:#1f2937; font-weight:500;">${(item.nombre || '').replace(/</g, '&lt;')}</td>
-      <td style="padding:12px 16px; text-align:right; font-size:13px; color:#10b981; font-weight:600;">$${precio.toFixed(2)}</td>
-      <td style="padding:12px 16px; text-align:right; font-size:13px; color:#1f2937; font-weight:600;">$${pIva.toFixed(2)}</td>
+      <td style="padding: 6px; font-size: 12px;">${item.codigo || ''}</td>
+      <td style="padding: 6px; font-size: 12px;">${tipo} ${(item.nombre || '').replace(/</g,'&lt;')}</td>
+      <td style="text-align:right; padding: 6px; font-size: 12px;">$${precio.toFixed(2)}</td>
+      <td style="text-align:right; padding: 6px; font-size: 12px;">$${pIva.toFixed(2)}</td>
     `;
-    
+
     const button = tr.querySelector('button');
     if (button) {
-      // Agregar event listener con verificación DIRECTA
-      button.onclick = function(e) {
-        console.log('🖱️ CLICK DETECTADO en producto #' + (index + 1), item);
+      button.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         pf_seleccionarDesdeModal(item);
-        return false;
-      };
-      
-      console.log('🎯 Event listener agregado para producto:', item.nombre);
-    } else {
-      console.error('❌ No se pudo crear el botón para el producto:', item.nombre);
+      });
     }
-    
     tbody.appendChild(tr);
   });
   
@@ -1560,59 +1561,54 @@ function pf_procederGuardado() {
 </script>
 
 <!-- Modal productos para Proforma -->
-<div id="pf-modal-productos" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1050; backdrop-filter: blur(2px);" onclick="if(event.target===this) pf_cerrarModalProductos()">
-  <div style="background:#fff; width:90%; max-width:900px; max-height:80vh; overflow:hidden; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.3); margin:60px auto; position:relative; z-index:1051;">
-    <!-- Header mejorado -->
-    <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:2px solid #e5e7eb; background:linear-gradient(135deg, #1f2937 0%, #111827 100%);">
-      <div style="display:flex; align-items:center; gap:12px;">
-        <div style="width:40px; height:40px; background:rgba(16,185,129,0.2); border-radius:10px; display:flex; align-items:center; justify-content:center;">
-          <i class="fa fa-shopping-cart" style="color:#10b981; font-size:18px;"></i>
-        </div>
-        <div>
-          <h3 style="margin:0; color:#fff; font-size:18px; font-weight:600;">Seleccionar Producto</h3>
-          <p style="margin:0; color:rgba(255,255,255,0.7); font-size:12px;">Busque y seleccione el producto o servicio</p>
-        </div>
+<div id="pf-modal-productos" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1050;">
+  <div style="background:#fff; width:95%; max-width:980px; max-height:85vh; overflow:hidden; border-radius:6px; box-shadow:0 10px 25px rgba(0,0,0,.2); margin:40px auto;">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid #e5e7eb;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <i class="fa fa-list-alt" aria-hidden="true"></i>
+        <strong>Seleccionar producto o servicio</strong>
       </div>
-      <button type="button" onclick="pf_cerrarModalProductos()" style="width:36px; height:36px; border-radius:8px; background:rgba(255,255,255,0.1); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'" title="Cerrar">
-        <i class="fa fa-times" style="color:#fff; font-size:18px;"></i>
+      <button type="button" id="pf-modal-btn-cerrar" class="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+        <i class="fa fa-times"></i>
       </button>
     </div>
-    
-    <!-- Búsqueda mejorada -->
-    <div style="padding:16px 20px; background:#f8f9fa; border-bottom:1px solid #e5e7eb;">
-      <div style="display:flex; gap:12px; align-items:center;">
-        <div style="flex:1; position:relative;">
-          <i class="fa fa-search" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#9ca3af; font-size:14px;"></i>
-          <input id="pf-modal-buscar-input" type="text" placeholder="Buscar por código o nombre del producto..." style="width:100%; padding:10px 12px 10px 40px; border:2px solid #e5e7eb; border-radius:8px; font-size:14px; transition:all 0.2s;" onfocus="this.style.borderColor='#10b981'" onblur="this.style.borderColor='#e5e7eb'">
-        </div>
-        <button type="button" onclick="pf_cargarProductosModal(document.getElementById('pf-modal-buscar-input').value)" style="padding:10px 24px; background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:#fff; border:none; border-radius:8px; font-weight:600; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 12px rgba(16,185,129,0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(16,185,129,0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(16,185,129,0.3)'">
-          <i class="fa fa-search mr-1"></i>Buscar
-        </button>
-      </div>
+    <div style="padding:10px 12px; border-bottom:1px solid #e5e7eb; display:flex; gap:8px; align-items:center;">
+      <label style="margin:0; font-size:.85rem;">Buscar:</label>
+      <input id="pf-modal-buscar-input" type="text" placeholder="Código o nombre (parcial o completo)" style="flex:1; min-width:160px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px;">
+      <button type="button" id="pf-modal-buscar-btn" class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+        <i class="fa fa-search mr-1"></i> Buscar
+      </button>
     </div>
-    
-    <!-- Tabla mejorada -->
-    <div style="max-height:50vh; overflow:auto; padding:0;">
-      <table style="width:100%; border-collapse:collapse; margin:0;">
-        <thead style="position:sticky; top:0; background:#fff; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
-          <tr style="border-bottom:2px solid #e5e7eb;">
-            <th style="padding:12px 16px; text-align:center; font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; width:60px;">Acción</th>
-            <th style="padding:12px 16px; text-align:left; font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; width:140px;">Código</th>
-            <th style="padding:12px 16px; text-align:left; font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px;">Descripción</th>
-            <th style="padding:12px 16px; text-align:right; font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; width:120px;">Precio</th>
-            <th style="padding:12px 16px; text-align:right; font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; width:120px;">Precio c/IVA</th>
+    <div class="table-responsive" style="max-height:65vh; overflow:auto;">
+      <table class="min-w-full divide-y divide-gray-200" style="margin:0;">
+        <thead class="bg-gray-50">
+          <tr>
+            <th style="width:40px; padding: 8px; text-align: center; font-size: 11px;">✓</th>
+            <th style="width:140px; padding: 8px; text-align: left; font-size: 11px;">Código</th>
+            <th style="padding: 8px; text-align: left; font-size: 11px;">Descripción</th>
+            <th style="width:110px; padding: 8px; text-align: right; font-size: 11px;">Precio</th>
+            <th style="width:110px; padding: 8px; text-align: right; font-size: 11px;">Precio c/IVA</th>
           </tr>
         </thead>
-        <tbody id="pf-modal-tbody"></tbody>
+        <tbody id="pf-modal-tbody" class="bg-white divide-y divide-gray-200"></tbody>
       </table>
     </div>
-    <div id="pf-modal-vacio" style="display:none; padding:40px 20px; text-align:center;">
-      <i class="fa fa-inbox" style="font-size:48px; color:#d1d5db; margin-bottom:12px;"></i>
-      <p style="color:#6b7280; font-size:14px; margin:0;">No se encontraron productos</p>
+    <div id="pf-modal-vacio" style="display:none; padding:16px; color:#64748b; text-align:center;">
+      <i class="fa fa-inbox" style="font-size: 48px; opacity: 0.3; display: block; margin-bottom: 10px;"></i>
+      Sin resultados.
     </div>
   </div>
-  <div id="pf-modal-loader" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; z-index:1052; background:rgba(255,255,255,0.9);"><div class="spinner-border" style="color:#10b981;" role="status"><span class="sr-only">Cargando…</span></div></div>
+  <div id="pf-modal-loader" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; background: rgba(255,255,255,0.8);">
+    <div style="border: 4px solid #f3f4f6; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
+  </div>
 </div>
+
+<style>
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+</style>
 
 <!-- Modal de confirmación de eliminación -->
 <div id="pf-modal-confirmar-eliminacion" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1060;">

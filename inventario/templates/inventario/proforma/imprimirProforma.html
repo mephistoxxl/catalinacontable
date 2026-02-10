@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Imprimir Proforma</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    iframe { width: 100%; height: 100%; border: 0; }
+  </style>
+</head>
+<body>
+  <iframe id="pdfFrame" src="{{ pdf_url }}" title="Proforma PDF"></iframe>
+  <script>
+    (function () {
+      const frame = document.getElementById('pdfFrame');
+      if (!frame) return;
+
+      const tryPrint = () => {
+        try {
+          frame.contentWindow.focus();
+          frame.contentWindow.print();
+        } catch (e) {
+          // Algunos navegadores/visores PDF pueden bloquear print() programático.
+          // En ese caso, el usuario puede imprimir manualmente desde el visor.
+        }
+      };
+
+      frame.addEventListener('load', function () {
+        // Espera breve para que el visor PDF termine de inicializar.
+        setTimeout(tryPrint, 350);
+        setTimeout(tryPrint, 1200);
+      });
+
+      window.addEventListener('afterprint', function () {
+        try { window.close(); } catch (e) {}
+      });
+    })();
+  </script>
+</body>
+</html>

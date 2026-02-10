@@ -1,3 +1,19 @@
+<style>
+    /* Evita subrayado en los links del dropdown de perfil (incluye hover) */
+    #profileDropdown a,
+    #profileDropdown a:hover,
+    #profileDropdown a:focus {
+        text-decoration: none !important;
+    }
+
+    /* Fuerza texto negro en el dropdown (algunos estilos globales lo dejan gris) */
+    #profileDropdown,
+    #profileDropdown a,
+    #profileDropdown i {
+        color: #000 !important;
+    }
+</style>
+
 <header class="bg-white shadow-md px-4 py-2 flex items-center justify-between">
     <!-- Mobile menu button -->
     <div class="lg:hidden">
@@ -18,24 +34,24 @@
 
                         <!-- NOMBRE DEL USUARIO ACTUAL -->
                             <li class="profile dropdown relative">
-                                <button class="flex items-center space-x-2 px-3 py-1 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" 
+                                <button class="flex items-center space-x-2 px-3 py-1 rounded-md text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" 
                                         onclick="toggleProfileDropdown()" 
                                         id="dropdownProfile">
-                                    <em class="fa fa-user text-gray-600"></em>
+                                    <em class="fa fa-user text-gray-900"></em>
                                     <div class="flex flex-col text-left leading-tight">
                                         <span class="text-sm font-medium">{{ user.first_name }} {{ user.last_name }}</span>
                                         <span class="text-xs text-gray-500">{{ user.username }}</span>
                                     </div>
-                                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-4 h-4 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </button>
                                 <div id="profileDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200">
-                                    <a class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" href="/inventario/perfil/ver/{{ user.id }}">
+                                    <a class="block px-4 py-2 text-sm text-gray-900 hover:bg-gray-100" href="/inventario/perfil/ver/{{ user.id }}">
                                         <i class="fa fa-user mr-2"></i>Perfil
                                     </a>
                                     <div class="border-t border-gray-200"></div>
-                                    <a class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" href="/inventario/salir">
+                                    <a class="block px-4 py-2 text-sm text-gray-900 hover:bg-gray-100" href="/inventario/salir">
                                         <i class="fa fa-power-off mr-2"></i>Cerrar sesión
                                     </a>
                                 </div>

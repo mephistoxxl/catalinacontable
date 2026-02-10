@@ -129,6 +129,19 @@ class IntegracionSRILiquidacion:
                     # Error en recepción
                     mensajes = resultado_envio.get('mensajes', [])
                     mensaje_error = self._formatear_mensajes_sri(mensajes)
+
+                    # Caso especial: SRI indica secuencial duplicado (código 45)
+                    if self._mensajes_indican_secuencial_registrado(mensajes):
+                        numero = f"{liquidacion.serie_formateada}-{liquidacion.secuencia_formateada}"
+                        mensaje_error = (
+                            "El SRI reporta que el secuencial ya está registrado para esta serie. "
+                            f"Número: {numero}. "
+                            "Esto suele ocurrir cuando la secuencia local está desfasada (por migración, reinicio, "
+                            "o porque ya se emitieron documentos con esa serie fuera del sistema). "
+                            "Solución: en Configuración → Secuencias, ajuste el 'siguiente secuencial' de "
+                            "Liquidación de Compra (03) a un número mayor al último emitido en el SRI para esa serie "
+                            "y vuelva a emitir una nueva liquidación."
+                        )
                     
                     liquidacion.estado = 'RECHAZADA'
                     liquidacion.estado_sri = 'RECHAZADA'
@@ -252,6 +265,17 @@ class IntegracionSRILiquidacion:
                     # Comprobante rechazado
                     mensajes = resultado.get('mensajes', [])
                     mensaje_error = self._formatear_mensajes_sri(mensajes)
+
+                    # Caso especial: SRI indica secuencial duplicado (código 45)
+                    if self._mensajes_indican_secuencial_registrado(mensajes):
+                        numero = f"{liquidacion.serie_formateada}-{liquidacion.secuencia_formateada}"
+                        mensaje_error = (
+                            "El SRI reporta que el secuencial ya está registrado para esta serie. "
+                            f"Número: {numero}. "
+                            "Solución: en Configuración → Secuencias, ajuste el 'siguiente secuencial' de "
+                            "Liquidación de Compra (03) a un número mayor al último emitido en el SRI para esa serie "
+                            "y vuelva a emitir una nueva liquidación."
+                        )
                     
                     liquidacion.estado = 'RECHAZADA'
                     liquidacion.estado_sri = 'NO AUTORIZADO'
@@ -335,6 +359,19 @@ class IntegracionSRILiquidacion:
                 lineas.append(str(msg))
         
         return '\n'.join(lineas)
+
+    def _mensajes_indican_secuencial_registrado(self, mensajes: list) -> bool:
+        try:
+            for msg in mensajes or []:
+                if not isinstance(msg, dict):
+                    continue
+                identificador = str(msg.get('identificador', '')).strip()
+                texto = str(msg.get('mensaje', '')).upper()
+                if identificador == '45' or 'SECUENCIAL REGISTRADO' in texto:
+                    return True
+        except Exception:
+            return False
+        return False
 
     def _registrar_log(self, liquidacion: LiquidacionCompra, estado: str, 
                       estado_sri: str, mensaje: str) -> None:

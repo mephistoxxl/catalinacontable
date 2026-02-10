@@ -59,11 +59,27 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
             punto_emision=secuencia.punto_emision,
         ).aggregate(m=Max("secuencia"))["m"] or 0
 
-        base = secuencia.secuencial or 0
-        if max_existente > 0:
-            siguiente = max_existente + 1
-        else:
-            siguiente = max(base, 1)
+        # Nota: en Secuencia.secuencial se configura el "siguiente secuencial" inicial;
+        # una vez que existen registros, el siguiente debe ser el mayor entre:
+        #   - (max usado en BD + 1)
+        #   - (valor configurado en Secuencia)
+        # Esto evita reutilizar números cuando la configuración fue adelantada por migración/ajuste manual.
+        try:
+            base = int(secuencia.secuencial or 0)
+        except (TypeError, ValueError):
+            base = 0
+
+        siguiente = max(max_existente + 1, base or 1)
+
+        # Robustez extra: si por alguna razón el número ya existe, avanzar hasta uno libre.
+        while LiquidacionCompra.objects.filter(
+            empresa=empresa,
+            establecimiento=secuencia.establecimiento,
+            punto_emision=secuencia.punto_emision,
+            secuencia=siguiente,
+        ).exists():
+            siguiente += 1
+
         if siguiente > 999_999_999:
             raise ValueError("El secuencial ha alcanzado el valor máximo permitido (999999999).")
 

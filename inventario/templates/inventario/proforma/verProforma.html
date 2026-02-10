@@ -63,10 +63,14 @@
               <p class="text-gray-500 text-[11px]">Detalles completos de la proforma</p>
             </div>
           </div>
-          <div class="shrink-0">
+          <div class="shrink-0 flex items-center gap-2">
             <a href="{% url 'inventario:ride_proforma' proforma.id %}" class="pf-top-btn" target="_blank" rel="noopener" title="Descargar PDF">
               <span class="pf-top-ico"><i class="fas fa-download"></i></span>
               <span>Descargar PDF</span>
+            </a>
+            <a href="{% url 'inventario:imprimir_proforma' proforma.id %}" class="pf-top-btn" target="_blank" rel="noopener" title="Imprimir">
+              <span class="pf-top-ico"><i class="fas fa-print"></i></span>
+              <span>Imprimir</span>
             </a>
           </div>
         </div>

@@ -81,6 +81,7 @@ urlpatterns = [
     path('proformas/emitir/', views.EmitirProforma.as_view(), name='emitirProforma'),
     path('proformas/ver/<int:p>/', views.VerProforma.as_view(), name='verProforma'),
     path('proformas/ride/<int:p>/', views.ride_proforma, name='ride_proforma'),
+    path('proformas/imprimir/<int:p>/', views.imprimir_proforma, name='imprimir_proforma'),
 
     # Usuarios
     path('crearUsuario', views.CrearUsuario.as_view(), name='crearUsuario'),

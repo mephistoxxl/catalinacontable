@@ -26,11 +26,11 @@
     .lc-btn-primary:hover { background-color: #72b22b; border-color: #6ba829; }
 
     .lc-btn-info {
-        background-color: #76D4F5;
-        border-color: #76D4F5;
-        color: #212529 !important;
+        background-color: #22c55e;
+        border-color: #22c55e;
+        color: #ffffff !important;
     }
-    .lc-btn-info:hover { background-color: #52c9f2; border-color: #46c5f2; }
+    .lc-btn-info:hover { background-color: #16a34a; border-color: #16a34a; }
 
     .lc-btn-secondary {
         background-color: #ffffff;
@@ -275,12 +275,12 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                         {% if liquidacion.clave_acceso %}
-                        <details class="lc-details bg-blue-50 rounded-lg p-2 border border-blue-200">
+                        <details class="lc-details bg-green-50 rounded-lg p-2 border border-green-200">
                             <summary class="lc-summary">
-                                <span class="text-blue-700 text-xs font-semibold uppercase">Clave de Acceso</span>
+                                <span class="text-green-700 text-xs font-semibold uppercase">Clave de Acceso</span>
                                 <small>ver</small>
                             </summary>
-                            <p class="mt-2 text-[11px] font-mono text-blue-900 break-all">{{ liquidacion.clave_acceso }}</p>
+                            <p class="mt-2 text-[11px] font-mono text-green-900 break-all">{{ liquidacion.clave_acceso }}</p>
                         </details>
                         {% endif %}
                         
