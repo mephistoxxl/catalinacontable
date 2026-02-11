@@ -170,7 +170,15 @@ class SRIClient:
             # Procesar respuesta
             resultado = self._procesar_respuesta_autorizacion(response)
 
-            logger.info(f"Consulta autorización - Clave: {clave_acceso} - Estado: {resultado.get('estado')}")
+            estado = str(resultado.get('estado') or '').upper().strip()
+            # Nota: El webservice de autorización no devuelve un estado "RECIBIDA".
+            # Cuando aún no hay autorizaciones (autorizaciones None/vacías), se considera
+            # que el comprobante está recibido y pendiente de autorización en el flujo.
+            estado_log = estado
+            if estado == 'PENDIENTE':
+                estado_log = 'RECIBIDA (pendiente autorización)'
+
+            logger.info(f"Consulta autorización - Clave: {clave_acceso} - Estado: {estado_log}")
             return resultado
 
         except Fault as e:
@@ -405,7 +413,8 @@ class SRIClient:
                 autorizaciones_data = getattr(response, 'autorizaciones', None)
 
             if autorizaciones_data is None:
-                # Caso específico: SRI responde con autorizaciones: None
+                # Caso específico: SRI responde con autorizaciones: None.
+                # En la práctica esto ocurre frecuentemente cuando aún no existe un resultado final.
                 mensajes.append({
                     'identificador': 'NO_AUTORIZADO',
                     'mensaje': 'El comprobante no ha sido autorizado aún o no existe',
