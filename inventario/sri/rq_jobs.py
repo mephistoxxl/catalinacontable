@@ -219,6 +219,13 @@ def procesar_liquidacion_compra_job(
 
         if estado_actual != "RECIBIDA":
             resultado = integracion.enviar_liquidacion(liquidacion)
+
+            # Si en este mismo intento ya quedó RECIBIDA, consultar autorización inmediatamente
+            # para actualizar a AUTORIZADO/NO AUTORIZADO sin esperar al siguiente job.
+            liquidacion.refresh_from_db(fields=["estado_sri", "estado", "numero_autorizacion", "fecha_autorizacion"])
+            estado_intermedio = _normalize_state(getattr(liquidacion, "estado_sri", None) or getattr(liquidacion, "estado", None))
+            if estado_intermedio == "RECIBIDA":
+                resultado = integracion.consultar_estado_actual(liquidacion)
         else:
             resultado = integracion.consultar_estado_actual(liquidacion)
 

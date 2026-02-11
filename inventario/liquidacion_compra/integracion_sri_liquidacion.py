@@ -123,6 +123,7 @@ class IntegracionSRILiquidacion:
                         clave_acceso=liquidacion.clave_acceso
                     )
                     estado_envio = (resultado_envio or {}).get('estado')
+                    mensajes_envio = (resultado_envio or {}).get('mensajes', [])
 
                     logger.info(
                         "Envio SRI LC intento %s/%s - clave=%s - estado=%s - mensajes=%s",
@@ -130,19 +131,22 @@ class IntegracionSRILiquidacion:
                         max_envio_intentos,
                         liquidacion.clave_acceso,
                         estado_envio,
-                        (resultado_envio or {}).get('mensajes', []),
+                        mensajes_envio,
                     )
 
                     if estado_envio == 'RECIBIDA':
                         break
 
                     if estado_envio == 'DEVUELTA':
-                        # DEVUELTA es rechazo en recepción, no reintentar
-                        break
+                        # Caso especial: clave en procesamiento (identificador 70).
+                        # Para este escenario se debe reintentar el envío hasta obtener RECIBIDA.
+                        if self._mensajes_indican_en_procesamiento(mensajes_envio):
+                            estado_envio = 'EN PROCESAMIENTO'
+                        else:
+                            # DEVUELTA con otros identificadores sí es rechazo en recepción
+                            break
 
-                    if estado_envio == 'ERROR' and self._mensajes_indican_en_procesamiento(
-                        (resultado_envio or {}).get('mensajes', [])
-                    ):
+                    if estado_envio == 'ERROR' and self._mensajes_indican_en_procesamiento(mensajes_envio):
                         estado_envio = 'EN PROCESAMIENTO'
 
                     if intento_envio < max_envio_intentos - 1:
@@ -178,7 +182,22 @@ class IntegracionSRILiquidacion:
                     
                 else:
                     # Error en recepción
-                    mensajes = resultado_envio.get('mensajes', [])
+                    mensajes = (resultado_envio or {}).get('mensajes', [])
+
+                    # Si la clave está en procesamiento (70), NO marcar como rechazada.
+                    # Se deja en pendiente para que el job o un reintento posterior lo vuelva a enviar.
+                    if self._mensajes_indican_en_procesamiento(mensajes):
+                        liquidacion.estado_sri = 'PENDIENTE'
+                        liquidacion.mensaje_sri = 'Pendiente: Clave de acceso en procesamiento (SRI)'
+                        liquidacion.save(update_fields=['estado_sri', 'mensaje_sri'])
+                        self._registrar_log(liquidacion, liquidacion.estado, 'PENDIENTE', liquidacion.mensaje_sri)
+                        return {
+                            'exito': True,
+                            'estado': 'PENDIENTE',
+                            'mensajes': mensajes or ['Clave de acceso en procesamiento. Se reintentará el envío.'],
+                            'xml_firmado': xml_firmado,
+                        }
+
                     mensaje_error = self._formatear_mensajes_sri(mensajes)
 
                     # Caso especial: SRI indica secuencial duplicado (código 45)
@@ -301,6 +320,19 @@ class IntegracionSRILiquidacion:
                 }
 
             if estado_envio == 'DEVUELTA':
+                # Caso especial: identificador 70 (clave en procesamiento).
+                # No se debe marcar como RECHAZADA; se deja en PENDIENTE para reintentar el envío.
+                if self._mensajes_indican_en_procesamiento(mensajes):
+                    liquidacion.estado_sri = 'PENDIENTE'
+                    liquidacion.mensaje_sri = 'Pendiente: Clave de acceso en procesamiento (SRI)'
+                    liquidacion.save(update_fields=['estado_sri', 'mensaje_sri'])
+                    self._registrar_log(liquidacion, liquidacion.estado, 'PENDIENTE', liquidacion.mensaje_sri)
+                    return {
+                        'exito': True,
+                        'estado': 'PENDIENTE',
+                        'mensajes': mensajes or ['Clave de acceso en procesamiento. Se reintentará el envío.'],
+                    }
+
                 mensaje_error = self._formatear_mensajes_sri(mensajes)
                 liquidacion.estado = 'RECHAZADA'
                 liquidacion.estado_sri = 'RECHAZADA'
