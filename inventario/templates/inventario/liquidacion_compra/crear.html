@@ -98,7 +98,7 @@
     font-weight: 500 !important;
   }
 
-  .text-xs {
+  .lc-text-xs {
     font-size: 8px !important;
   }
 
@@ -127,6 +127,82 @@
 
   .table-compact tbody tr:nth-child(even) {
     background: #fafbff;
+  }
+
+  /* Tabla de productos: espaciado y columnas mas legibles */
+  #tabla-productos th,
+  #tabla-productos td {
+    padding: 6px 6px;
+    vertical-align: top;
+    font-size: 11px;
+  }
+
+  #tabla-productos th {
+    font-size: 9px;
+    letter-spacing: 0.03em;
+  }
+
+  #tabla-productos th:nth-child(1),
+  #tabla-productos td:nth-child(1) {
+    width: 90px;
+  }
+
+  #tabla-productos th:nth-child(3),
+  #tabla-productos td:nth-child(3) {
+    width: 110px;
+  }
+
+  #tabla-productos th:nth-child(4),
+  #tabla-productos td:nth-child(4),
+  #tabla-productos th:nth-child(5),
+  #tabla-productos td:nth-child(5) {
+    width: 140px;
+  }
+
+  #tabla-productos th:nth-child(6),
+  #tabla-productos td:nth-child(6) {
+    width: 90px;
+  }
+
+  #tabla-productos td.precio div,
+  #tabla-productos td.subtotal div {
+    line-height: 1.15;
+  }
+
+  #tabla-productos td.precio .lc-text-xs,
+  #tabla-productos td.subtotal .lc-text-xs {
+    font-size: 8px !important;
+  }
+
+  #tabla-productos td.precio .font-bold,
+  #tabla-productos td.subtotal .font-bold {
+    display: block;
+    margin-top: 2px;
+  }
+
+  #tabla-productos td.accion .btn {
+    padding: 3px 6px;
+    font-size: 10px;
+    line-height: 1.1;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  #tabla-productos td.accion .btn i {
+    font-size: 11px;
+  }
+
+  .lc-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .qty-btn {
@@ -483,12 +559,12 @@
 </style>
 
 <div class="min-h-screen bg-slate-50" style="min-height: auto; padding: 6px 8px;">
-  <div class="mx-auto safe-bottom-spacing" style="max-width: 92%; padding-left: 0; padding-right: 0;">
+  <div class="mx-auto safe-bottom-spacing" style="max-width: 100%; padding-left: 0; padding-right: 0;">
 
     {% if messages %}
     <div class="mb-1">
       {% for message in messages %}
-      <div class="bg-white rounded shadow-sm p-1 border-l-2 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}">
+      <div class="bg-white rounded shadow-sm p-1 border-l-2 {% if message.tags == 'success' %}border-green-500 bg-green-50{% elif message.tags == 'error' %}border-red-500 bg-red-50{% elif message.tags == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}" data-message-tags="{{ message.tags }}">
         <div class="flex items-center">
           <div class="flex-shrink-0">
             {% if message.tags == 'success' %}
@@ -894,14 +970,14 @@
                   <i class="fa fa-list-alt" aria-hidden="true"></i>
                   <strong>{% trans "Seleccionar producto o servicio" %}</strong>
                 </div>
-                <button type="button" id="modal-btn-cerrar" class="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                <button type="button" id="modal-btn-cerrar" class="inline-flex items-center px-2 py-1 border border-gray-300 lc-text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                   <i class="fa fa-times"></i>
                 </button>
               </div>
               <div style="padding:10px 12px; border-bottom:1px solid #e5e7eb; display:flex; gap:8px; align-items:center;">
                 <label style="margin:0; font-size:.85rem;">{% trans "Buscar" %}:</label>
                 <input id="modal-buscar-input" type="text" placeholder="{% trans "Código o nombre (parcial o completo)" %}" style="flex:1; min-width:160px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px;">
-                <button type="button" id="modal-buscar-btn" class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                <button type="button" id="modal-buscar-btn" class="inline-flex items-center px-3 py-1 border border-transparent lc-text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
                   <i class="fa fa-search mr-1"></i> {% trans "Buscar" %}
                 </button>
               </div>
@@ -968,7 +1044,6 @@
             <span>{% trans "Cancelar" %}</span>
           </a>
         </div>
-      </form>
       </form>
     </div>
   </div>
@@ -1273,6 +1348,40 @@
       }
     })();
 
+    const PRODUCTOS_STORAGE_KEY = `liquidacion_compra_productos:${window.location.pathname}`;
+
+    function guardarProductosPersistidos() {
+      try {
+        if (!('localStorage' in window)) {
+          return;
+        }
+        if (productosAgregados.length) {
+          localStorage.setItem(PRODUCTOS_STORAGE_KEY, JSON.stringify(productosAgregados));
+        } else {
+          localStorage.removeItem(PRODUCTOS_STORAGE_KEY);
+        }
+      } catch (error) {
+        console.warn('No se pudo guardar productos en localStorage', error);
+      }
+    }
+
+    function cargarProductosPersistidos() {
+      try {
+        if (!('localStorage' in window)) {
+          return [];
+        }
+        const raw = localStorage.getItem(PRODUCTOS_STORAGE_KEY);
+        if (!raw) {
+          return [];
+        }
+        const data = JSON.parse(raw);
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.warn('No se pudo leer productos de localStorage', error);
+        return [];
+      }
+    }
+
     function toNumber(value, fallback = 0) {
       const num = parseFloat(value);
       return Number.isFinite(num) ? num : fallback;
@@ -1561,6 +1670,7 @@
       if (snapshot) {
         snapshot.value = JSON.stringify(productosAgregados);
       }
+      guardarProductosPersistidos();
     }
 
     function actualizarTotal() {
@@ -1584,7 +1694,7 @@
       const ivaPercent = Math.round(toNumber(item.ivaPercent, 0) * 100);
       return `
         <div>Base: $${round2(item.precio).toFixed(2)}</div>
-        <div class="text-xs text-gray-500">IVA ${ivaPercent}%: $${ivaValor.toFixed(2)}</div>
+        <div class="lc-text-xs text-gray-500">IVA ${ivaPercent}%: $${ivaValor.toFixed(2)}</div>
         <div class="font-bold">Total: $${round2(item.precioConIva).toFixed(2)}</div>
       `;
     }
@@ -1599,7 +1709,7 @@
       const total = round2(base + impuestos);
       return `
         <div>Base: $${base.toFixed(2)}</div>
-        <div class="text-xs text-gray-500">Impuestos: $${impuestos.toFixed(2)}</div>
+        <div class="lc-text-xs text-gray-500">Impuestos: $${impuestos.toFixed(2)}</div>
         <div class="font-bold">Total: $${total.toFixed(2)}</div>
       `;
     }
@@ -1623,7 +1733,10 @@
         <td class="precio">${construirPrecioHTML(producto)}</td>
         <td class="subtotal">${construirSubtotalHTML(producto)}</td>
         <td class="accion">
-          <button type="button" class="btn btn-danger btn-sm" data-action="delete">${TEXT_ELIMINAR}</button>
+          <button type="button" class="btn btn-danger btn-sm" data-action="delete" title="${TEXT_ELIMINAR}">
+            <i class="fa fa-trash"></i>
+            <span class="lc-sr-only">${TEXT_ELIMINAR}</span>
+          </button>
         </td>
       `;
 
@@ -1927,6 +2040,20 @@
         return false;
       }
       actualizarCamposOcultos();
+      try {
+        if ('sessionStorage' in window) {
+          sessionStorage.setItem('liquidacion_compra_clear_on_load', '1');
+        }
+      } catch (error) {
+        console.warn('No se pudo marcar limpieza diferida', error);
+      }
+      try {
+        if ('localStorage' in window) {
+          localStorage.removeItem(PRODUCTOS_STORAGE_KEY);
+        }
+      } catch (error) {
+        console.warn('No se pudo limpiar productos persistidos', error);
+      }
       return true;
     }
 
@@ -2074,7 +2201,7 @@
 
         tr.innerHTML = `
           <td style="text-align:center; padding: 6px;">
-            <button type="button" class="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+            <button type="button" class="inline-flex items-center px-2 py-1 border border-transparent lc-text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
               <i class="fa fa-check"></i>
             </button>
           </td>
@@ -2241,11 +2368,51 @@
     document.addEventListener('DOMContentLoaded', () => {
       inicializarEventos();
       inicializarBusquedaProveedor();
+      const hasSuccess = Boolean(document.querySelector('[data-message-tags~="success"]'));
+      const hasErrors = Boolean(document.querySelector('.form-error, [data-message-tags~="error"]'));
+      let navType = 'navigate';
+      try {
+        const navEntry = performance.getEntriesByType('navigation')[0];
+        if (navEntry && navEntry.type) {
+          navType = navEntry.type;
+        } else if (performance.navigation && performance.navigation.type === 1) {
+          navType = 'reload';
+        }
+      } catch (error) {
+        console.warn('No se pudo determinar el tipo de navegación', error);
+      }
+      const isReload = navType === 'reload';
+
+      let clearOnLoad = false;
+      try {
+        if ('sessionStorage' in window) {
+          clearOnLoad = sessionStorage.getItem('liquidacion_compra_clear_on_load') === '1';
+          sessionStorage.removeItem('liquidacion_compra_clear_on_load');
+        }
+      } catch (error) {
+        console.warn('No se pudo leer limpieza diferida', error);
+      }
+
+      if (hasSuccess || (clearOnLoad && !hasErrors) || (!isReload && !hasErrors)) {
+        try {
+          if ('localStorage' in window) {
+            localStorage.removeItem(PRODUCTOS_STORAGE_KEY);
+          }
+        } catch (error) {
+          console.warn('No se pudo limpiar productos persistidos', error);
+        }
+      }
       if (productosIniciales.length) {
         productosIniciales.forEach((item) => agregarProductoDesdeObjeto(item, { actualizar: false }));
         actualizarCamposOcultos();
         actualizarEstadoTabla();
       } else {
+        if (isReload && !hasErrors) {
+          const productosPersistidos = cargarProductosPersistidos();
+          if (productosPersistidos.length) {
+            productosPersistidos.forEach((item) => agregarProductoDesdeObjeto(item, { actualizar: false }));
+          }
+        }
         actualizarCamposOcultos();
         actualizarEstadoTabla();
       }

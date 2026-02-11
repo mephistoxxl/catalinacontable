@@ -113,6 +113,10 @@
             </div>
         {% endif %}
 
+        <div id="resultado-consulta" class="mb-2" style="display: none;">
+            <div class="p-3 rounded border-l-4" id="mensaje-resultado"></div>
+        </div>
+
         <!-- Encabezado -->
         <div class="lc-card p-3 mb-2">
             <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-2">
@@ -143,14 +147,10 @@
                         {% endif %}
                         
                         {% if liquidacion.clave_acceso %}
-                            <form method="POST" action="{% url 'inventario:consultar_estado_liquidacion_compra' liquidacion.id %}" class="inline">
-                                {% csrf_token %}
-                                <button type="submit" 
-                                        class="lc-btn lc-btn-info">
-                                    <i class="fas fa-search text-sm"></i>
-                                    Consultar Estado SRI
-                                </button>
-                            </form>
+                            <button type="button" class="lc-btn lc-btn-info" onclick="consultarEstadoSRI()">
+                                <i class="fas fa-search text-sm"></i>
+                                Consultar Estado SRI
+                            </button>
                         {% endif %}
                         
                         <a href="{% url 'inventario:liquidaciones_compra_listar' %}" class="lc-btn lc-btn-secondary">
@@ -413,6 +413,145 @@
         </div>
     </div>
 </div>
+
+<script>
+const SRI_CONSULTA_URL = '{% url "inventario:consultar_estado_liquidacion_compra" liquidacion.id %}?json=1';
+const SRI_ESTADO_ACTUAL = '{{ liquidacion.estado_sri|default:"" }}'.trim().toUpperCase();
+const SRI_TIENE_CLAVE = '{{ liquidacion.clave_acceso|default:"" }}'.trim().length > 0;
+
+function consultarEstadoSRI(opciones = {}) {
+    const fromAuto = opciones.fromAuto === true;
+    const intento = Number.isFinite(opciones.intento) ? opciones.intento : null;
+    const maxIntentos = Number.isFinite(opciones.maxIntentos) ? opciones.maxIntentos : null;
+
+    const btn = document.querySelector('button[onclick="consultarEstadoSRI()"]');
+    const resultado = document.getElementById('resultado-consulta');
+    const mensaje = document.getElementById('mensaje-resultado');
+
+    if (!fromAuto && btn) {
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin text-sm"></i> Consultando...';
+        btn.disabled = true;
+    }
+
+    fetch(SRI_CONSULTA_URL)
+        .then(response => response.json())
+        .then(data => {
+            if (!resultado || !mensaje) return;
+            resultado.style.display = 'block';
+
+            if (data.success) {
+                const estado = String(data.estado || '').trim().toUpperCase();
+                const esAutorizada = (estado === 'AUTORIZADA' || estado === 'AUTORIZADO');
+                const esPendiente = (estado === 'PENDIENTE' || estado === 'RECIBIDA' || estado === 'EN PROCESAMIENTO');
+
+                const colorBorder = esAutorizada ? 'border-green-500' : (esPendiente ? 'border-blue-500' : 'border-red-500');
+                const colorBg = esAutorizada ? 'bg-green-50' : (esPendiente ? 'bg-blue-50' : 'bg-red-50');
+                const colorText = esAutorizada ? 'text-green-800' : (esPendiente ? 'text-blue-800' : 'text-red-800');
+                const colorText2 = esAutorizada ? 'text-green-700' : (esPendiente ? 'text-blue-700' : 'text-red-700');
+                const icon = esAutorizada ? 'fa-check-circle' : (esPendiente ? 'fa-clock' : 'fa-times-circle');
+                const titulo = esAutorizada ? 'Autorizada' : (esPendiente ? 'Pendiente' : 'No autorizada');
+
+                const autoInfo = (fromAuto && intento && maxIntentos)
+                    ? `<p class="text-xs text-gray-600 mt-1">Auto-consulta: intento ${intento}/${maxIntentos}</p>`
+                    : '';
+
+                mensaje.className = `p-3 rounded border-l-4 ${colorBorder} ${colorBg}`;
+                mensaje.innerHTML = `
+                    <h6 class="font-semibold ${colorText} mb-1">
+                        <i class="fas ${icon} mr-1"></i>${titulo}
+                    </h6>
+                    <p class="text-sm ${colorText2}"><strong>Estado:</strong> ${data.estado || estado}</p>
+                    <p class="text-sm ${colorText2}"><strong>Mensaje:</strong> ${data.mensaje || 'Consulta exitosa'}</p>
+                    ${data.detalle ? `<p class="text-sm ${colorText2}"><strong>Detalle:</strong> ${data.detalle}</p>` : ''}
+                    ${data.numero_autorizacion ? `<p class="text-sm ${colorText2}"><strong>Autorización:</strong> ${data.numero_autorizacion}</p>` : ''}
+                    ${data.fecha_autorizacion ? `<p class="text-sm ${colorText2}"><strong>Fecha:</strong> ${data.fecha_autorizacion}</p>` : ''}
+                    ${autoInfo}
+                `;
+
+                if (data.estado_cambio || esAutorizada) {
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1500);
+                }
+            } else {
+                mensaje.className = 'p-3 rounded border-l-4 border-red-500 bg-red-50';
+                mensaje.innerHTML = `
+                    <h6 class="font-semibold text-red-800 mb-1">
+                        <i class="fas fa-times-circle mr-1"></i>Error en consulta
+                    </h6>
+                    <p class="text-sm text-red-700">${data.message || data.mensaje || 'No se pudo consultar el estado.'}</p>
+                `;
+            }
+        })
+        .catch(error => {
+            if (!resultado || !mensaje) return;
+            resultado.style.display = 'block';
+            mensaje.className = 'p-3 rounded border-l-4 border-red-500 bg-red-50';
+            mensaje.innerHTML = `
+                <h6 class="font-semibold text-red-800 mb-1">
+                    <i class="fas fa-times-circle mr-1"></i>Error de conexión
+                </h6>
+                <p class="text-sm text-red-700">No se pudo consultar el estado: ${error.message}</p>
+            `;
+        })
+        .finally(() => {
+            if (!fromAuto && btn) {
+                btn.innerHTML = '<i class="fas fa-search text-sm"></i> Consultar Estado SRI';
+                btn.disabled = false;
+            }
+        });
+}
+
+function iniciarAutoConsultaSRI() {
+    if (!SRI_TIENE_CLAVE) return;
+    if (!(SRI_ESTADO_ACTUAL === 'PENDIENTE' || SRI_ESTADO_ACTUAL === 'RECIBIDA')) return;
+
+    const resultado = document.getElementById('resultado-consulta');
+    const mensaje = document.getElementById('mensaje-resultado');
+
+    const maxIntentos = 8;
+    const intervaloMs = 10000;
+    let intento = 0;
+    let timer = null;
+
+    if (resultado && mensaje) {
+        resultado.style.display = 'block';
+        mensaje.className = 'p-3 rounded border-l-4 border-blue-500 bg-blue-50';
+        mensaje.innerHTML = `
+            <h6 class="font-semibold text-blue-800 mb-1">
+                <i class="fas fa-clock mr-1"></i>Pendiente de autorización
+            </h6>
+            <p class="text-sm text-blue-700">El SRI puede tardar unos minutos. Se consultará automáticamente por un corto tiempo.</p>
+        `;
+    }
+
+    const tick = () => {
+        intento += 1;
+        consultarEstadoSRI({ fromAuto: true, intento, maxIntentos });
+
+        if (intento >= maxIntentos && timer) {
+            clearInterval(timer);
+            timer = null;
+            if (resultado && mensaje) {
+                mensaje.className = 'p-3 rounded border-l-4 border-blue-500 bg-blue-50';
+                mensaje.innerHTML = `
+                    <h6 class="font-semibold text-blue-800 mb-1">
+                        <i class="fas fa-info-circle mr-1"></i>Sigue pendiente
+                    </h6>
+                    <p class="text-sm text-blue-700">Aún no autoriza. Puedes presionar “Consultar Estado SRI” en unos minutos.</p>
+                `;
+            }
+        }
+    };
+
+    setTimeout(tick, 700);
+    timer = setInterval(tick, intervaloMs);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    iniciarAutoConsultaSRI();
+});
+</script>
 
 {% block extra_js %}
 <script>

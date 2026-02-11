@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.db.models import Max
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
@@ -29,7 +30,7 @@ class LiquidacionCompraListView(LoginRequiredMixin, RequireEmpresaActivaMixin, L
     model = LiquidacionCompra
     template_name = "inventario/liquidacion_compra/listar.html"
     context_object_name = "liquidaciones"
-    paginate_by = 10
+    paginate_by = 7
 
     def get_queryset(self):
         empresa = get_empresa_activa(self.request)
@@ -293,33 +294,48 @@ def autorizar_liquidacion_compra(request, pk):
         return redirect('inventario:liquidaciones_compra_ver', pk=liquidacion.pk)
     
     try:
-        # Usar integrador SRI para liquidaciones
-        from .integracion_sri_liquidacion import IntegracionSRILiquidacion
-        
-        integrador = IntegracionSRILiquidacion(empresa)
-        resultado = integrador.procesar_liquidacion_completa(liquidacion)
-        
-        if resultado.get('exito'):
-            liquidacion.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion', 'estado_sri', 'estado'])
-            ahora_autorizada = bool(liquidacion.numero_autorizacion and liquidacion.fecha_autorizacion)
-            if (not ya_autorizada) and ahora_autorizada:
-                incrementar_contador_documentos(empresa)
-            # Modal de "DOCUMENTO AUTORIZADO" (sin banners verdes)
-            try:
-                request.session['mostrar_modal_autorizado'] = True
-            except Exception:
-                pass
+        from inventario.sri.rq_jobs import enqueue_procesar_liquidacion_compra
+
+        encolado = enqueue_procesar_liquidacion_compra(
+            liquidacion_id=liquidacion.pk,
+            empresa_id=empresa.id,
+            delay_seconds=0,
+            attempt=1,
+            max_attempts=720,
+        )
+
+        if encolado:
+            messages.info(
+                request,
+                'Envío en proceso. Se reintentará automáticamente hasta quedar RECIBIDA y luego AUTORIZADA/NO AUTORIZADA.'
+            )
         else:
-            mensajes = resultado.get('mensajes', [])
-            if mensajes:
-                for msg in mensajes:
-                    if isinstance(msg, dict):
-                        messages.error(request, f"❌ Error: [{msg.get('identificador')}] {msg.get('mensaje')}")
-                    else:
-                        messages.error(request, f'❌ Error: {msg}')
+            # Fallback: ejecutar inline si no hay cola
+            from .integracion_sri_liquidacion import IntegracionSRILiquidacion
+
+            integrador = IntegracionSRILiquidacion(empresa)
+            resultado = integrador.procesar_liquidacion_completa(liquidacion)
+
+            if resultado.get('exito'):
+                liquidacion.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion', 'estado_sri', 'estado'])
+                ahora_autorizada = bool(liquidacion.numero_autorizacion and liquidacion.fecha_autorizacion)
+                if (not ya_autorizada) and ahora_autorizada:
+                    incrementar_contador_documentos(empresa)
+                try:
+                    request.session['mostrar_modal_autorizado'] = True
+                except Exception:
+                    pass
             else:
-                messages.error(request, f'❌ Error: {resultado.get("estado", "Error desconocido")}')
-        
+                mensajes = resultado.get('mensajes', [])
+                if mensajes:
+                    for msg in mensajes:
+                        if isinstance(msg, dict):
+                            messages.error(request, f"❌ Error: [{msg.get('identificador')}] {msg.get('mensaje')}")
+                        else:
+                            messages.error(request, f'❌ Error: {msg}')
+                else:
+                    messages.error(request, f'❌ Error: {resultado.get("estado", "Error desconocido")}')
+
     except Exception as e:
         logger.error(f"Error al autorizar liquidación {pk}: {str(e)}")
         import traceback
@@ -332,6 +348,9 @@ def autorizar_liquidacion_compra(request, pk):
 @login_required
 def consultar_estado_liquidacion_compra(request, pk):
     """Vista para consultar el estado de una liquidación de compra en el SRI"""
+    if request.GET.get('json') == '1' or request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return consultar_estado_liquidacion_compra_json(request, pk)
+
     empresa = get_empresa_activa(request)
     if not empresa:
         messages.error(request, 'Seleccione una empresa válida.')
@@ -386,3 +405,143 @@ def consultar_estado_liquidacion_compra(request, pk):
         messages.error(request, f'Error inesperado: {str(e)}')
     
     return redirect('inventario:liquidaciones_compra_ver', pk=liquidacion.pk)
+
+
+@login_required
+def consultar_estado_liquidacion_compra_json(request, pk):
+    """Consulta estado SRI para liquidaciones de compra (respuesta JSON)."""
+    empresa = get_empresa_activa(request)
+    if not empresa:
+        return JsonResponse({'success': False, 'message': 'Seleccione una empresa válida.'}, status=400)
+
+    liquidacion = get_object_or_404(LiquidacionCompra, pk=pk, empresa=empresa)
+
+    def _normalizar_estado(valor):
+        if not valor:
+            return ''
+        estado = str(valor).strip().upper()
+        mapeo = {
+            'AUTORIZADO': 'AUTORIZADA',
+            'NO AUTORIZADO': 'NO_AUTORIZADA',
+            'NO_AUTORIZADO': 'NO_AUTORIZADA',
+            'NO AUTORIZADA': 'NO_AUTORIZADA',
+            'NO_AUTORIZADA': 'NO_AUTORIZADA',
+            'RECHAZADO': 'RECHAZADA',
+        }
+        return mapeo.get(estado, estado)
+
+    if liquidacion.numero_autorizacion and liquidacion.fecha_autorizacion:
+        fecha_aut = ''
+        try:
+            fecha_aut = liquidacion.fecha_autorizacion.strftime('%d/%m/%Y %H:%M:%S')
+        except Exception:
+            fecha_aut = str(liquidacion.fecha_autorizacion)
+        return JsonResponse({
+            'success': True,
+            'estado': _normalizar_estado(liquidacion.estado_sri) or 'AUTORIZADA',
+            'mensaje': 'Esta liquidación ya se encuentra autorizada.',
+            'detalle': '',
+            'numero_autorizacion': liquidacion.numero_autorizacion,
+            'fecha_autorizacion': fecha_aut,
+            'estado_cambio': False,
+        })
+    estado_anterior = _normalizar_estado(liquidacion.estado_sri)
+
+    estado_doc = str(liquidacion.estado or '').strip().upper()
+    if not estado_anterior or estado_anterior == 'BORRADOR':
+        if estado_doc in {'BORRADOR', 'LISTA'}:
+            try:
+                from inventario.sri.rq_jobs import enqueue_procesar_liquidacion_compra
+
+                encolado = enqueue_procesar_liquidacion_compra(
+                    liquidacion_id=liquidacion.pk,
+                    empresa_id=empresa.id,
+                    delay_seconds=0,
+                    attempt=1,
+                    max_attempts=720,
+                )
+
+                if encolado:
+                    return JsonResponse({
+                        'success': True,
+                        'estado': 'EN_PROCESO',
+                        'mensaje': 'Envío iniciado. Se reintentará hasta quedar RECIBIDA y luego AUTORIZADA/NO AUTORIZADA.',
+                        'message': 'Envío iniciado. Se reintentará hasta quedar RECIBIDA y luego AUTORIZADA/NO AUTORIZADA.',
+                        'detalle': '',
+                        'numero_autorizacion': '',
+                        'fecha_autorizacion': '',
+                        'estado_cambio': False,
+                    })
+            except Exception as exc:
+                logger.warning('No se pudo encolar envío para liquidación %s: %s', pk, exc)
+
+    if not liquidacion.clave_acceso:
+        return JsonResponse({'success': False, 'message': 'La liquidación no tiene clave de acceso.'}, status=400)
+
+    try:
+        from .integracion_sri_liquidacion import IntegracionSRILiquidacion
+
+        integrador = IntegracionSRILiquidacion(empresa)
+        resultado = integrador.consultar_estado_actual(liquidacion)
+
+        try:
+            liquidacion.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion', 'estado_sri', 'estado'])
+        except Exception:
+            pass
+
+        estado_actual = _normalizar_estado(liquidacion.estado_sri) or _normalizar_estado(resultado.get('estado'))
+        estado_cambio = bool(estado_actual and estado_actual != estado_anterior)
+
+        mensajes = resultado.get('mensajes') or []
+        mensaje_detalle = ''
+        mensaje_principal = ''
+        if mensajes:
+            primero = mensajes[0]
+            if isinstance(primero, dict):
+                mensaje_principal = primero.get('mensaje') or str(primero)
+                mensaje_detalle = primero.get('informacionAdicional') or primero.get('informacion_adicional') or ''
+            else:
+                mensaje_principal = str(primero)
+        if not mensaje_principal:
+            mensaje_principal = 'Consulta realizada exitosamente.'
+
+        update_fields = []
+        if estado_actual and liquidacion.estado_sri != estado_actual:
+            liquidacion.estado_sri = estado_actual
+            update_fields.append('estado_sri')
+        if mensaje_principal and getattr(liquidacion, 'mensaje_sri', None) != mensaje_principal:
+            liquidacion.mensaje_sri = mensaje_principal
+            update_fields.append('mensaje_sri')
+        if mensaje_detalle and hasattr(liquidacion, 'mensaje_sri_detalle') and getattr(liquidacion, 'mensaje_sri_detalle', None) != mensaje_detalle:
+            liquidacion.mensaje_sri_detalle = mensaje_detalle
+            update_fields.append('mensaje_sri_detalle')
+
+        if update_fields:
+            liquidacion.save(update_fields=update_fields)
+
+        fecha_aut = ''
+        if liquidacion.fecha_autorizacion:
+            try:
+                fecha_aut = liquidacion.fecha_autorizacion.strftime('%d/%m/%Y %H:%M:%S')
+            except Exception:
+                fecha_aut = str(liquidacion.fecha_autorizacion)
+
+        estado_respuesta = estado_actual or 'PENDIENTE'
+        success = bool(resultado.get('exito'))
+
+        if not success and estado_respuesta in {'PENDIENTE', 'RECIBIDA', 'EN_PROCESAMIENTO', 'EN PROCESAMIENTO'}:
+            success = True
+
+        return JsonResponse({
+            'success': success,
+            'estado': estado_respuesta,
+            'mensaje': mensaje_principal,
+            'message': mensaje_principal,
+            'detalle': mensaje_detalle,
+            'numero_autorizacion': liquidacion.numero_autorizacion or '',
+            'fecha_autorizacion': fecha_aut,
+            'estado_cambio': estado_cambio,
+        })
+    except Exception as exc:
+        logger.error("Error consultando estado JSON liquidacion %s: %s", pk, exc)
+        return JsonResponse({'success': False, 'message': f'Error al consultar estado: {exc}'}, status=500)

@@ -911,6 +911,61 @@ let contadorProductos = 0;
 let pagosEfectivo = [];
 let totalPagado = 0;
 
+const PRODUCTOS_STORAGE_KEY = `emitir_factura_productos:${window.location.pathname}`;
+
+function guardarProductosPersistidos() {
+    try {
+        if (!('localStorage' in window)) {
+            return;
+        }
+        if (productosAgregados.length) {
+            localStorage.setItem(PRODUCTOS_STORAGE_KEY, JSON.stringify(productosAgregados));
+        } else {
+            localStorage.removeItem(PRODUCTOS_STORAGE_KEY);
+        }
+    } catch (error) {
+        console.warn('No se pudo guardar productos en localStorage', error);
+    }
+}
+
+function cargarProductosPersistidos() {
+    try {
+        if (!('localStorage' in window)) {
+            return [];
+        }
+        const raw = localStorage.getItem(PRODUCTOS_STORAGE_KEY);
+        if (!raw) {
+            return [];
+        }
+        const data = JSON.parse(raw);
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        console.warn('No se pudo leer productos de localStorage', error);
+        return [];
+    }
+}
+
+function restaurarProductosPersistidos() {
+    if (productosAgregados.length) {
+        return;
+    }
+    const persistidos = cargarProductosPersistidos();
+    if (!persistidos.length) {
+        return;
+    }
+    persistidos.forEach((producto) => {
+        const productoData = {
+            ...producto,
+            id: typeof producto.id === 'number' ? producto.id : contadorProductos++,
+        };
+        contadorProductos = Math.max(contadorProductos, productoData.id + 1);
+        productosAgregados.push(productoData);
+        agregarFilaTabla(productoData);
+    });
+    actualizarCamposOcultos();
+    actualizarTotal();
+}
+
 // ========== INICIALIZACIÓN ==========
 document.addEventListener('DOMContentLoaded', function() {
     // Configurar fechas por defecto
@@ -956,6 +1011,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault();
                 return false;
             }
+            try {
+                if ('localStorage' in window) {
+                    localStorage.removeItem(PRODUCTOS_STORAGE_KEY);
+                }
+            } catch (error) {
+                console.warn('No se pudo limpiar productos persistidos', error);
+            }
         });
     }
     
@@ -996,6 +1058,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    restaurarProductosPersistidos();
 });
 
 // ========== MANEJO DE SECUENCIA ==========
@@ -1785,6 +1849,8 @@ function actualizarCamposOcultos() {
         inputInfoAdicional.value = producto.infoAdicional || '';
         container.appendChild(inputInfoAdicional);
     });
+
+    guardarProductosPersistidos();
 }
 
 function actualizarTotal() {

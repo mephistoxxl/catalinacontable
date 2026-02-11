@@ -139,3 +139,130 @@ def poll_autorizacion_factura(factura_id: int, empresa_id: int, attempt: int = 1
                 attempt=attempt + 1,
                 max_attempts=max_attempts,
             )
+
+
+def enqueue_procesar_liquidacion_compra(
+    *,
+    liquidacion_id: int,
+    empresa_id: int,
+    delay_seconds: int = 5,
+    attempt: int = 1,
+    max_attempts: int = 720,
+) -> bool:
+    """Encola (o re-encola) el procesamiento SRI de una liquidación de compra en la cola `sri`.
+
+    Reintenta agresivamente hasta estado final o max_attempts.
+    """
+    try:
+        import django_rq
+        from rq.exceptions import JobAlreadyExists
+
+        queue = django_rq.get_queue("sri")
+        job_id = f"sri:procesar_liquidacion:{empresa_id}:{liquidacion_id}"
+
+        try:
+            queue.enqueue_in(
+                timedelta(seconds=max(0, int(delay_seconds))),
+                procesar_liquidacion_compra_job,
+                liquidacion_id,
+                empresa_id,
+                attempt,
+                max_attempts,
+                job_id=job_id,
+                result_ttl=0,
+                failure_ttl=86400,
+            )
+            logger.info(
+                "[SRI LC] Encolado job %s (attempt=%s/%s, delay=%ss)",
+                job_id,
+                attempt,
+                max_attempts,
+                delay_seconds,
+            )
+            return True
+        except JobAlreadyExists:
+            logger.info("[SRI LC] Job ya existe: %s", job_id)
+            return True
+    except Exception as exc:
+        logger.warning("[SRI LC] No se pudo encolar liquidacion %s: %s", liquidacion_id, exc)
+        return False
+
+
+def procesar_liquidacion_compra_job(
+    liquidacion_id: int,
+    empresa_id: int,
+    attempt: int = 1,
+    max_attempts: int = 720,
+) -> None:
+    """Procesa liquidación y re-encola mientras esté pendiente/recibida/en procesamiento."""
+    from inventario.models import Empresa
+    from inventario.liquidacion_compra.models import LiquidacionCompra
+    from inventario.liquidacion_compra.integracion_sri_liquidacion import IntegracionSRILiquidacion
+
+    try:
+        empresa = Empresa.objects.filter(id=empresa_id).first()
+        if empresa is None:
+            logger.warning("[SRI LC] Empresa %s no existe", empresa_id)
+            return
+
+        try:
+            from inventario.tenant.queryset import set_current_tenant
+
+            try:
+                set_current_tenant(empresa)
+            except Exception as exc:
+                logger.warning("[SRI LC] No se pudo establecer tenant (empresa %s): %s", empresa_id, exc)
+        except Exception:
+            pass
+
+        liquidacion = LiquidacionCompra.objects.filter(id=liquidacion_id, empresa_id=empresa_id).first()
+        if liquidacion is None:
+            logger.warning("[SRI LC] Liquidacion %s no existe en empresa %s", liquidacion_id, empresa_id)
+            return
+
+        estado_actual = _normalize_state(getattr(liquidacion, "estado_sri", None) or getattr(liquidacion, "estado", None))
+        if estado_actual in FINAL_OK_STATES or estado_actual in {s.replace(" ", "_") for s in FINAL_FAIL_STATES}:
+            logger.info("[SRI LC] Liquidacion %s ya final (%s)", liquidacion_id, estado_actual)
+            return
+
+        integracion = IntegracionSRILiquidacion(empresa)
+        resultado = integracion.procesar_liquidacion_completa(liquidacion)
+
+        liquidacion.refresh_from_db(fields=["estado_sri", "estado", "numero_autorizacion", "fecha_autorizacion"])
+        estado_nuevo = _normalize_state(getattr(liquidacion, "estado_sri", None) or getattr(liquidacion, "estado", None))
+
+        if estado_nuevo in FINAL_OK_STATES:
+            logger.info("[SRI LC] Liquidacion %s autorizada (%s)", liquidacion_id, estado_nuevo)
+            return
+
+        if estado_nuevo in {s.replace(" ", "_") for s in FINAL_FAIL_STATES}:
+            logger.info("[SRI LC] Liquidacion %s no autorizada/rechazada (%s)", liquidacion_id, estado_nuevo)
+            return
+
+        if attempt >= max_attempts:
+            logger.warning(
+                "[SRI LC] Liquidacion %s sigue pendiente (%s) y alcanzó max_attempts=%s",
+                liquidacion_id,
+                estado_nuevo,
+                max_attempts,
+            )
+            return
+
+        enqueue_procesar_liquidacion_compra(
+            liquidacion_id=liquidacion_id,
+            empresa_id=empresa_id,
+            delay_seconds=5,
+            attempt=attempt + 1,
+            max_attempts=max_attempts,
+        )
+
+    except Exception as exc:
+        logger.exception("[SRI LC] Error procesando liquidacion %s (attempt=%s/%s): %s", liquidacion_id, attempt, max_attempts, exc)
+        if attempt < max_attempts:
+            enqueue_procesar_liquidacion_compra(
+                liquidacion_id=liquidacion_id,
+                empresa_id=empresa_id,
+                delay_seconds=5,
+                attempt=attempt + 1,
+                max_attempts=max_attempts,
+            )

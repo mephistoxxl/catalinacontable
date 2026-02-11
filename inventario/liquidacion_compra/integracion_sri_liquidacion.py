@@ -3,6 +3,7 @@ Integración con el SRI para Liquidaciones de Compra (codDoc 03)
 Reutiliza el cliente SRI existente sin modificar la integración de facturas.
 """
 import logging
+import time
 from datetime import datetime
 from decimal import Decimal
 from typing import Dict, Optional, Tuple
@@ -105,14 +106,42 @@ class IntegracionSRILiquidacion:
                 liquidacion.save(update_fields=['estado', 'xml_firmado'])
                 self._registrar_log(liquidacion, 'FIRMADA', '', 'XML firmado correctamente')
                 
-                # 5. Enviar al SRI
+                # 5. Enviar al SRI (reintentar hasta RECIBIDA)
                 logger.info(f"Enviando liquidación {liquidacion.clave_acceso} al SRI")
-                resultado_envio = self.cliente_sri.enviar_comprobante(
-                    xml_content=xml_firmado,
-                    clave_acceso=liquidacion.clave_acceso
-                )
-                
-                if resultado_envio.get('estado') == 'RECIBIDA':
+                max_envio_intentos = 8
+                espera_envio_seg = 2
+                resultado_envio = None
+
+                for intento_envio in range(max_envio_intentos):
+                    resultado_envio = self.cliente_sri.enviar_comprobante(
+                        xml_content=xml_firmado,
+                        clave_acceso=liquidacion.clave_acceso
+                    )
+                    estado_envio = (resultado_envio or {}).get('estado')
+
+                    if estado_envio == 'RECIBIDA':
+                        break
+
+                    if estado_envio == 'DEVUELTA':
+                        # DEVUELTA es rechazo en recepción, no reintentar
+                        break
+
+                    if estado_envio == 'ERROR' and self._mensajes_indican_en_procesamiento(
+                        (resultado_envio or {}).get('mensajes', [])
+                    ):
+                        estado_envio = 'EN PROCESAMIENTO'
+
+                    if intento_envio < max_envio_intentos - 1:
+                        logger.info(
+                            "Liquidación %s no recibida (estado=%s), reintento %s/%s",
+                            liquidacion.clave_acceso,
+                            estado_envio,
+                            intento_envio + 1,
+                            max_envio_intentos,
+                        )
+                        time.sleep(espera_envio_seg)
+
+                if (resultado_envio or {}).get('estado') == 'RECIBIDA':
                     liquidacion.estado = 'ENVIADA'
                     liquidacion.estado_sri = 'RECIBIDA'
                     liquidacion.save(update_fields=['estado', 'estado_sri'])
@@ -216,7 +245,7 @@ class IntegracionSRILiquidacion:
                 'mensaje': f'Error al firmar XML: {str(e)}'
             }
 
-    def _consultar_autorizacion(self, liquidacion: LiquidacionCompra, reintentos: int = 5) -> Dict:
+    def _consultar_autorizacion(self, liquidacion: LiquidacionCompra, reintentos: int = 8) -> Dict:
         """
         Consulta la autorización de una liquidación en el SRI.
         
@@ -291,7 +320,7 @@ class IntegracionSRILiquidacion:
                         'xml_firmado': liquidacion.xml_firmado
                     }
                     
-                elif estado in ['EN PROCESAMIENTO', 'PENDIENTE']:
+                elif estado in ['EN PROCESAMIENTO', 'PENDIENTE'] or self._mensajes_indican_en_procesamiento(resultado.get('mensajes', [])):
                     # Esperar y reintentar
                     if intento < reintentos - 1:
                         logger.info(f"Liquidación {liquidacion.clave_acceso} en procesamiento, reintento {intento + 1}/{reintentos}")
@@ -368,6 +397,19 @@ class IntegracionSRILiquidacion:
                 identificador = str(msg.get('identificador', '')).strip()
                 texto = str(msg.get('mensaje', '')).upper()
                 if identificador == '45' or 'SECUENCIAL REGISTRADO' in texto:
+                    return True
+        except Exception:
+            return False
+        return False
+
+    def _mensajes_indican_en_procesamiento(self, mensajes: list) -> bool:
+        try:
+            for msg in mensajes or []:
+                if not isinstance(msg, dict):
+                    continue
+                identificador = str(msg.get('identificador', '')).strip()
+                texto = str(msg.get('mensaje', '')).upper()
+                if identificador == '70' or 'CLAVE DE ACCESO EN PROCESAMIENTO' in texto:
                     return True
         except Exception:
             return False
