@@ -289,8 +289,23 @@ def autorizar_liquidacion_compra(request, pk):
 
     ya_autorizada = bool(liquidacion.numero_autorizacion and liquidacion.fecha_autorizacion)
     
-    if liquidacion.estado_sri and liquidacion.estado_sri not in ['BORRADOR', '']:
-        messages.error(request, 'Solo se pueden autorizar liquidaciones en estado borrador.')
+    estado_sri_norm = (liquidacion.estado_sri or '').strip().upper()
+    estado_norm = (liquidacion.estado or '').strip().upper()
+    if estado_sri_norm in {'AUTORIZADA', 'AUTORIZADO', 'RECHAZADA', 'NO_AUTORIZADA', 'NO AUTORIZADA', 'NO_AUTORIZADO', 'NO AUTORIZADO'} or estado_norm == 'RECHAZADA':
+        if estado_sri_norm == 'RECHAZADA' or estado_norm == 'RECHAZADA':
+            detalle = (liquidacion.mensaje_sri or '').strip()
+            if not detalle:
+                try:
+                    ultimo = liquidacion.historial_estados.first()
+                    detalle = (getattr(ultimo, 'mensaje', '') or '').strip()
+                except Exception:
+                    detalle = ''
+            if detalle:
+                messages.error(request, f'Esta liquidación fue RECHAZADA por el SRI: {detalle}')
+            else:
+                messages.error(request, 'Esta liquidación fue RECHAZADA por el SRI.')
+        else:
+            messages.error(request, 'Esta liquidación ya tiene un estado final en el SRI.')
         return redirect('inventario:liquidaciones_compra_ver', pk=liquidacion.pk)
     
     try:
@@ -361,6 +376,27 @@ def consultar_estado_liquidacion_compra(request, pk):
     
     if not liquidacion.clave_acceso:
         messages.error(request, 'Esta liquidación no tiene clave de acceso. No se puede consultar el estado en el SRI.')
+        return redirect('inventario:liquidaciones_compra_ver', pk=liquidacion.pk)
+
+    estado_actual = (liquidacion.estado_sri or '').strip().upper()
+    if estado_actual not in {'RECIBIDA', 'AUTORIZADA', 'AUTORIZADO', 'RECHAZADA', 'NO_AUTORIZADA', 'NO AUTORIZADA', 'NO_AUTORIZADO', 'NO AUTORIZADO'}:
+        try:
+            from inventario.sri.rq_jobs import enqueue_procesar_liquidacion_compra
+
+            encolado = enqueue_procesar_liquidacion_compra(
+                liquidacion_id=liquidacion.pk,
+                empresa_id=empresa.id,
+                delay_seconds=0,
+                attempt=1,
+                max_attempts=720,
+            )
+            if encolado:
+                messages.info(request, 'Envío en proceso. Se reintentará hasta quedar RECIBIDA.')
+            else:
+                messages.error(request, 'No se pudo encolar el envío al SRI. Revise la cola/worker.')
+        except Exception as exc:
+            logger.warning('No se pudo encolar envío para liquidación %s: %s', pk, exc)
+            messages.error(request, f'No se pudo encolar el envío al SRI: {exc}')
         return redirect('inventario:liquidaciones_compra_ver', pk=liquidacion.pk)
     
     try:
@@ -448,32 +484,44 @@ def consultar_estado_liquidacion_compra_json(request, pk):
     estado_anterior = _normalizar_estado(liquidacion.estado_sri)
 
     estado_doc = str(liquidacion.estado or '').strip().upper()
-    if not estado_anterior or estado_anterior == 'BORRADOR':
-        if estado_doc in {'BORRADOR', 'LISTA'}:
-            try:
-                from inventario.sri.rq_jobs import enqueue_procesar_liquidacion_compra
+    if estado_anterior not in {'RECIBIDA', 'AUTORIZADA', 'AUTORIZADO', 'RECHAZADA', 'NO_AUTORIZADA', 'NO AUTORIZADA', 'NO_AUTORIZADO', 'NO AUTORIZADO'}:
+        try:
+            from inventario.sri.rq_jobs import enqueue_procesar_liquidacion_compra
 
-                encolado = enqueue_procesar_liquidacion_compra(
-                    liquidacion_id=liquidacion.pk,
-                    empresa_id=empresa.id,
-                    delay_seconds=0,
-                    attempt=1,
-                    max_attempts=720,
-                )
+            encolado = enqueue_procesar_liquidacion_compra(
+                liquidacion_id=liquidacion.pk,
+                empresa_id=empresa.id,
+                delay_seconds=0,
+                attempt=1,
+                max_attempts=720,
+            )
 
-                if encolado:
-                    return JsonResponse({
-                        'success': True,
-                        'estado': 'EN_PROCESO',
-                        'mensaje': 'Envío iniciado. Se reintentará hasta quedar RECIBIDA y luego AUTORIZADA/NO AUTORIZADA.',
-                        'message': 'Envío iniciado. Se reintentará hasta quedar RECIBIDA y luego AUTORIZADA/NO AUTORIZADA.',
-                        'detalle': '',
-                        'numero_autorizacion': '',
-                        'fecha_autorizacion': '',
-                        'estado_cambio': False,
-                    })
-            except Exception as exc:
-                logger.warning('No se pudo encolar envío para liquidación %s: %s', pk, exc)
+            if encolado:
+                return JsonResponse({
+                    'success': True,
+                    'estado': 'PENDIENTE',
+                    'mensaje': 'Envío en proceso. Se reintentará hasta quedar RECIBIDA.',
+                    'message': 'Envío en proceso. Se reintentará hasta quedar RECIBIDA.',
+                    'detalle': '',
+                    'numero_autorizacion': '',
+                    'fecha_autorizacion': '',
+                    'estado_cambio': False,
+                })
+        except Exception as exc:
+            logger.warning('No se pudo encolar envío para liquidación %s: %s', pk, exc)
+            return JsonResponse(
+                {
+                    'success': False,
+                    'estado': 'ERROR',
+                    'mensaje': 'No se pudo encolar el envío al SRI. Revise la cola/worker.',
+                    'message': 'No se pudo encolar el envío al SRI. Revise la cola/worker.',
+                    'detalle': str(exc),
+                    'numero_autorizacion': '',
+                    'fecha_autorizacion': '',
+                    'estado_cambio': False,
+                },
+                status=500,
+            )
 
     if not liquidacion.clave_acceso:
         return JsonResponse({'success': False, 'message': 'La liquidación no tiene clave de acceso.'}, status=400)

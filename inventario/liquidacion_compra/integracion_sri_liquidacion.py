@@ -47,7 +47,14 @@ class IntegracionSRILiquidacion:
         
         logger.info(f"Integración SRI Liquidación inicializada - Empresa: {empresa.ruc} - Ambiente: {ambiente_sri}")
 
-    def procesar_liquidacion_completa(self, liquidacion: LiquidacionCompra) -> Dict:
+    def procesar_liquidacion_completa(
+        self,
+        liquidacion: LiquidacionCompra,
+        *,
+        enviar_solo: bool = False,
+        max_envio_intentos: int = 8,
+        espera_envio_seg: int = 2,
+    ) -> Dict:
         """
         Procesa el flujo completo de una liquidación: generar XML, firmar, enviar y autorizar.
         
@@ -108,8 +115,6 @@ class IntegracionSRILiquidacion:
                 
                 # 5. Enviar al SRI (reintentar hasta RECIBIDA)
                 logger.info(f"Enviando liquidación {liquidacion.clave_acceso} al SRI")
-                max_envio_intentos = 8
-                espera_envio_seg = 2
                 resultado_envio = None
 
                 for intento_envio in range(max_envio_intentos):
@@ -118,6 +123,15 @@ class IntegracionSRILiquidacion:
                         clave_acceso=liquidacion.clave_acceso
                     )
                     estado_envio = (resultado_envio or {}).get('estado')
+
+                    logger.info(
+                        "Envio SRI LC intento %s/%s - clave=%s - estado=%s - mensajes=%s",
+                        intento_envio + 1,
+                        max_envio_intentos,
+                        liquidacion.clave_acceso,
+                        estado_envio,
+                        (resultado_envio or {}).get('mensajes', []),
+                    )
 
                     if estado_envio == 'RECIBIDA':
                         break
@@ -147,6 +161,14 @@ class IntegracionSRILiquidacion:
                     liquidacion.save(update_fields=['estado', 'estado_sri'])
                     self._registrar_log(liquidacion, 'ENVIADA', 'RECIBIDA', 
                                        'Comprobante recibido por el SRI')
+
+                    if enviar_solo:
+                        return {
+                            'exito': True,
+                            'estado': 'RECIBIDA',
+                            'mensajes': ['Comprobante recibido por el SRI'],
+                            'xml_firmado': xml_firmado,
+                        }
                     
                     # 6. Consultar autorización
                     logger.info(f"Consultando autorización para liquidación {liquidacion.clave_acceso}")
@@ -172,12 +194,38 @@ class IntegracionSRILiquidacion:
                             "y vuelva a emitir una nueva liquidación."
                         )
                     
+                    if enviar_solo:
+                        estado_envio = (resultado_envio or {}).get('estado') or ''
+                        if estado_envio == 'DEVUELTA':
+                            liquidacion.estado = 'RECHAZADA'
+                            liquidacion.estado_sri = 'RECHAZADA'
+                            liquidacion.mensaje_sri = mensaje_error
+                            liquidacion.save(update_fields=['estado', 'estado_sri', 'mensaje_sri'])
+                            self._registrar_log(liquidacion, 'RECHAZADA', 'RECHAZADA', mensaje_error)
+                            return {
+                                'exito': False,
+                                'estado': 'RECHAZADA',
+                                'mensajes': mensajes,
+                                'xml_firmado': xml_firmado,
+                            }
+
+                        liquidacion.estado_sri = 'PENDIENTE'
+                        liquidacion.mensaje_sri = mensaje_error or 'Envío en procesamiento en el SRI'
+                        liquidacion.save(update_fields=['estado_sri', 'mensaje_sri'])
+                        self._registrar_log(liquidacion, 'FIRMADA', 'PENDIENTE', liquidacion.mensaje_sri)
+                        return {
+                            'exito': False,
+                            'estado': 'PENDIENTE',
+                            'mensajes': mensajes or ['Envío en procesamiento. Se reintentará.'],
+                            'xml_firmado': xml_firmado,
+                        }
+
                     liquidacion.estado = 'RECHAZADA'
                     liquidacion.estado_sri = 'RECHAZADA'
                     liquidacion.mensaje_sri = mensaje_error
                     liquidacion.save(update_fields=['estado', 'estado_sri', 'mensaje_sri'])
                     self._registrar_log(liquidacion, 'RECHAZADA', 'RECHAZADA', mensaje_error)
-                    
+
                     return {
                         'exito': False,
                         'estado': 'RECHAZADA',
@@ -192,6 +240,97 @@ class IntegracionSRILiquidacion:
                 'exito': False,
                 'estado': 'ERROR',
                 'mensajes': [str(e)]
+            }
+
+    def enviar_liquidacion(self, liquidacion: LiquidacionCompra) -> Dict:
+        """Genera, firma y envia la liquidacion al SRI (solo recepcion)."""
+        try:
+            estado_sri = (liquidacion.estado_sri or '').strip().upper()
+            if estado_sri in {'AUTORIZADA', 'AUTORIZADO', 'RECHAZADA', 'NO_AUTORIZADA', 'NO AUTORIZADO', 'NO_AUTORIZADA'}:
+                return {
+                    'exito': True,
+                    'estado': estado_sri,
+                    'mensajes': [f'La liquidacion ya esta {estado_sri} en el SRI'],
+                }
+
+            estado_doc = (liquidacion.estado or '').strip().upper()
+            if estado_doc not in {'BORRADOR', 'LISTA', 'FIRMADA', 'ENVIADA'}:
+                return {
+                    'exito': False,
+                    'estado': 'ERROR',
+                    'mensajes': [f'Estado invalido para envio: {liquidacion.estado}'],
+                }
+
+            if not liquidacion.clave_acceso:
+                liquidacion.generar_clave_acceso()
+                liquidacion.save(update_fields=['clave_acceso'])
+
+            if not liquidacion.xml_firmado:
+                xml_sin_firmar = self.generador_xml.generar_xml_liquidacion(liquidacion)
+                resultado_firma = self._firmar_xml(xml_sin_firmar)
+                if not resultado_firma['exito']:
+                    self._registrar_log(liquidacion, 'ERROR', '', f"Error al firmar: {resultado_firma.get('mensaje')}")
+                    return {
+                        'exito': False,
+                        'estado': 'ERROR',
+                        'mensajes': [resultado_firma.get('mensaje', 'Error desconocido al firmar')],
+                    }
+
+                liquidacion.estado = 'FIRMADA'
+                liquidacion.xml_firmado = resultado_firma['xml_firmado']
+                liquidacion.save(update_fields=['estado', 'xml_firmado'])
+                self._registrar_log(liquidacion, 'FIRMADA', '', 'XML firmado correctamente')
+
+            xml_firmado = liquidacion.xml_firmado
+            resultado_envio = self.cliente_sri.enviar_comprobante(
+                xml_content=xml_firmado,
+                clave_acceso=liquidacion.clave_acceso,
+            )
+            estado_envio = (resultado_envio or {}).get('estado') or 'ERROR'
+            mensajes = (resultado_envio or {}).get('mensajes', [])
+
+            if estado_envio == 'RECIBIDA':
+                liquidacion.estado = 'ENVIADA'
+                liquidacion.estado_sri = 'RECIBIDA'
+                liquidacion.save(update_fields=['estado', 'estado_sri'])
+                self._registrar_log(liquidacion, 'ENVIADA', 'RECIBIDA', 'Comprobante recibido por el SRI')
+                return {
+                    'exito': True,
+                    'estado': 'RECIBIDA',
+                    'mensajes': ['Comprobante recibido por el SRI'],
+                }
+
+            if estado_envio == 'DEVUELTA':
+                mensaje_error = self._formatear_mensajes_sri(mensajes)
+                liquidacion.estado = 'RECHAZADA'
+                liquidacion.estado_sri = 'RECHAZADA'
+                liquidacion.mensaje_sri = mensaje_error
+                liquidacion.save(update_fields=['estado', 'estado_sri', 'mensaje_sri'])
+                self._registrar_log(liquidacion, 'RECHAZADA', 'RECHAZADA', mensaje_error)
+                return {
+                    'exito': False,
+                    'estado': 'RECHAZADA',
+                    'mensajes': mensajes,
+                }
+
+            liquidacion.estado_sri = 'PENDIENTE'
+            if mensajes:
+                liquidacion.mensaje_sri = self._formatear_mensajes_sri(mensajes)
+            liquidacion.save(update_fields=['estado_sri', 'mensaje_sri'])
+            self._registrar_log(liquidacion, 'FIRMADA', 'PENDIENTE', liquidacion.mensaje_sri or 'En envio')
+            return {
+                'exito': False,
+                'estado': 'PENDIENTE',
+                'mensajes': mensajes or ['En envio. Se reintentara.'],
+            }
+
+        except Exception as e:
+            logger.error(f"Error enviando liquidacion {liquidacion.id}: {e}", exc_info=True)
+            self._registrar_log(liquidacion, 'ERROR', 'ERROR', str(e))
+            return {
+                'exito': False,
+                'estado': 'ERROR',
+                'mensajes': [str(e)],
             }
 
     def _firmar_xml(self, xml_content: str) -> Dict:

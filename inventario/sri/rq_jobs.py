@@ -28,34 +28,29 @@ def enqueue_poll_autorizacion_factura(
     try:
         import django_rq
         from rq.exceptions import NoSuchJobError  # noqa: F401
-        from rq.exceptions import JobAlreadyExists
 
         queue = django_rq.get_queue("sri")
-        job_id = f"sri:poll_autorizacion:{empresa_id}:{factura_id}"
+        job_id = f"sri_poll_autorizacion_{empresa_id}_{factura_id}"
 
-        try:
-            queue.enqueue_in(
-                timedelta(seconds=max(0, int(delay_seconds))),
-                poll_autorizacion_factura,
-                factura_id,
-                empresa_id,
-                attempt,
-                max_attempts,
-                job_id=job_id,
-                result_ttl=0,
-                failure_ttl=86400,
-            )
-            logger.info(
-                "[SRI POLL] Encolado job %s (attempt=%s/%s, delay=%ss)",
-                job_id,
-                attempt,
-                max_attempts,
-                delay_seconds,
-            )
-            return True
-        except JobAlreadyExists:
-            logger.info("[SRI POLL] Job ya existe: %s", job_id)
-            return True
+        queue.enqueue_in(
+            timedelta(seconds=max(0, int(delay_seconds))),
+            poll_autorizacion_factura,
+            factura_id,
+            empresa_id,
+            attempt,
+            max_attempts,
+            job_id=job_id,
+            result_ttl=0,
+            failure_ttl=86400,
+        )
+        logger.info(
+            "[SRI POLL] Encolado job %s (attempt=%s/%s, delay=%ss)",
+            job_id,
+            attempt,
+            max_attempts,
+            delay_seconds,
+        )
+        return True
     except Exception as exc:
         logger.warning("[SRI POLL] No se pudo encolar poll para factura %s: %s", factura_id, exc)
         return False
@@ -155,34 +150,29 @@ def enqueue_procesar_liquidacion_compra(
     """
     try:
         import django_rq
-        from rq.exceptions import JobAlreadyExists
 
         queue = django_rq.get_queue("sri")
-        job_id = f"sri:procesar_liquidacion:{empresa_id}:{liquidacion_id}"
+        job_id = f"sri_procesar_liquidacion_{empresa_id}_{liquidacion_id}"
 
-        try:
-            queue.enqueue_in(
-                timedelta(seconds=max(0, int(delay_seconds))),
-                procesar_liquidacion_compra_job,
-                liquidacion_id,
-                empresa_id,
-                attempt,
-                max_attempts,
-                job_id=job_id,
-                result_ttl=0,
-                failure_ttl=86400,
-            )
-            logger.info(
-                "[SRI LC] Encolado job %s (attempt=%s/%s, delay=%ss)",
-                job_id,
-                attempt,
-                max_attempts,
-                delay_seconds,
-            )
-            return True
-        except JobAlreadyExists:
-            logger.info("[SRI LC] Job ya existe: %s", job_id)
-            return True
+        queue.enqueue_in(
+            timedelta(seconds=max(0, int(delay_seconds))),
+            procesar_liquidacion_compra_job,
+            liquidacion_id,
+            empresa_id,
+            attempt,
+            max_attempts,
+            job_id=job_id,
+            result_ttl=0,
+            failure_ttl=86400,
+        )
+        logger.info(
+            "[SRI LC] Encolado job %s (attempt=%s/%s, delay=%ss)",
+            job_id,
+            attempt,
+            max_attempts,
+            delay_seconds,
+        )
+        return True
     except Exception as exc:
         logger.warning("[SRI LC] No se pudo encolar liquidacion %s: %s", liquidacion_id, exc)
         return False
@@ -226,7 +216,11 @@ def procesar_liquidacion_compra_job(
             return
 
         integracion = IntegracionSRILiquidacion(empresa)
-        resultado = integracion.procesar_liquidacion_completa(liquidacion)
+
+        if estado_actual != "RECIBIDA":
+            resultado = integracion.enviar_liquidacion(liquidacion)
+        else:
+            resultado = integracion.consultar_estado_actual(liquidacion)
 
         liquidacion.refresh_from_db(fields=["estado_sri", "estado", "numero_autorizacion", "fecha_autorizacion"])
         estado_nuevo = _normalize_state(getattr(liquidacion, "estado_sri", None) or getattr(liquidacion, "estado", None))

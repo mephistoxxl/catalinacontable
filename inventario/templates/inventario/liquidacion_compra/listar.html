@@ -236,6 +236,15 @@
                         <i class="fa fa-eye mr-2 text-blue-500 action-icon"></i>
                         <span>{% trans "Ver" %}</span>
                       </a>
+                      {% if liquidacion.estado_sri != 'AUTORIZADA' and liquidacion.estado_sri != 'AUTORIZADO' %}
+                      <form method="post" action="{% url 'inventario:autorizar_liquidacion_compra' liquidacion.id %}" class="m-0">
+                        {% csrf_token %}
+                        <button type="submit" class="flex items-center w-full text-left px-3 py-1.5 text-xs text-green-700 hover:bg-green-50 hover:text-green-900 border-none bg-transparent cursor-pointer" style="text-decoration:none;">
+                          <i class="fa fa-paper-plane mr-2 text-green-500 action-icon"></i>
+                          <span>{% trans "Enviar SRI" %}</span>
+                        </button>
+                      </form>
+                      {% endif %}
                       {% if liquidacion.clave_acceso %}
                       <form method="post" action="{% url 'inventario:consultar_estado_liquidacion_compra' liquidacion.id %}" class="m-0">
                         {% csrf_token %}
