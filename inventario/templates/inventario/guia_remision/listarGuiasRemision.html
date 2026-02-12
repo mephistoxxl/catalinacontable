@@ -1,23 +1,24 @@
 {% extends "inventario/comun/base.html" %}
 {% block content %}
 
-<div class="bg-gray-50 p-4">
+<div class="bg-gray-50 p-3">
   <div class="max-w-7xl mx-auto">
     
     <!-- Header -->
-    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden mb-4">
-      <div class="px-4 py-3 border-b border-gray-200">
+    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden mb-2">
+      <div class="px-4 py-2 border-b border-gray-200">
         <div class="flex items-center justify-between gap-3 flex-wrap">
           <div class="flex items-center">
-            <i class="fas fa-clipboard-list text-gray-700 text-lg mr-3"></i>
+            <i class="fas fa-clipboard-list text-gray-700 text-base mr-3"></i>
             <div>
-              <h2 class="text-lg font-semibold text-gray-900">Listado de Guías de Remisión</h2>
-              <p class="text-gray-500 text-sm">Gestión de documentos de traslado</p>
+              <h2 class="text-sm font-semibold text-gray-900">Listado de Guías de Remisión</h2>
+              <p class="text-gray-500 text-xs">Gestión de documentos de traslado</p>
             </div>
           </div>
           <div>
-            <a href="{% url 'inventario:emitir_guia_remision' %}" class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors" style="text-decoration: none !important;">
-              <i class="fas fa-plus mr-2"></i>Nueva Guía
+            <a href="{% url 'inventario:emitir_guia_remision' %}" class="inline-flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap" style="text-decoration: none !important; color: #fff !important;">
+              <i class="fas fa-plus"></i>
+              <span style="color: #fff !important;">Nueva Guía</span>
             </a>
           </div>
         </div>
@@ -25,19 +26,19 @@
     </div>
 
     <!-- Filtros -->
-    <div class="bg-white rounded-lg border p-4 mb-4">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="bg-white rounded-lg border p-3 mb-2">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Número</label>
-          <input type="text" id="filtro-numero" class="w-full p-2 border border-gray-300 rounded-lg text-sm" placeholder="001-001-000000001">
+          <label class="block text-xs font-medium text-gray-700 mb-1">Número</label>
+          <input type="text" id="filtro-numero" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs" placeholder="001-001-000000001">
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
-          <input type="text" id="filtro-cliente" class="w-full p-2 border border-gray-300 rounded-lg text-sm" placeholder="Buscar por nombre o RUC">
+          <label class="block text-xs font-medium text-gray-700 mb-1">Cliente</label>
+          <input type="text" id="filtro-cliente" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs" placeholder="Buscar por nombre o RUC">
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-          <select id="filtro-estado" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+          <label class="block text-xs font-medium text-gray-700 mb-1">Estado</label>
+          <select id="filtro-estado" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs">
             <option value="">Todos los estados</option>
             <option value="borrador">Borrador</option>
             <option value="autorizada">Autorizada</option>
@@ -45,12 +46,12 @@
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
-          <input type="date" id="filtro-fecha" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+          <label class="block text-xs font-medium text-gray-700 mb-1">Fecha</label>
+          <input type="date" id="filtro-fecha" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs">
         </div>
       </div>
-      <div class="mt-3 flex justify-end">
-        <button type="button" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors" onclick="aplicarFiltros()">
+      <div class="mt-2 flex justify-end">
+        <button type="button" class="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs hover:bg-blue-700 transition-colors" onclick="aplicarFiltros()">
           <i class="fas fa-search mr-2"></i>Buscar
         </button>
       </div>
@@ -62,33 +63,33 @@
         <table class="min-w-full">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Destinatario</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transportista</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-              <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+              <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número</th>
+              <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+              <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Destinatario</th>
+              <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transportista</th>
+              <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+              <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200" id="tabla-guias-body">
             {% for guia in guias %}
             <tr class="hover:bg-gray-50">
-              <td class="px-4 py-3 text-sm">
-                <div class="font-mono text-blue-600">{{ guia.numero_completo }}</div>
+              <td class="px-3 py-1.5 text-xs">
+                <div class="font-mono text-green-600">{{ guia.numero_completo }}</div>
                 <div class="text-xs text-gray-500">{{ guia.clave_acceso|default:"Sin autorizar" }}</div>
               </td>
-              <td class="px-4 py-3 text-sm text-gray-900">
+              <td class="px-3 py-1.5 text-xs text-gray-900">
                 {{ guia.fecha_inicio_traslado|date:"d/m/Y" }}
               </td>
-              <td class="px-4 py-3 text-sm">
+              <td class="px-3 py-1.5 text-xs">
                 <div class="font-medium text-gray-900">{{ guia.destinatario_nombre|truncatechars:30 }}</div>
                 <div class="text-gray-500">{{ guia.destinatario_identificacion }}</div>
               </td>
-              <td class="px-4 py-3 text-sm">
+              <td class="px-3 py-1.5 text-xs">
                 <div class="text-gray-900">{{ guia.transportista_nombre|truncatechars:25 }}</div>
                 <div class="text-gray-500">{{ guia.placa }}</div>
               </td>
-              <td class="px-4 py-3 text-sm">
+              <td class="px-3 py-1.5 text-xs">
                 {% if guia.estado == 'autorizada' %}
                   <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                     Autorizada
@@ -107,7 +108,7 @@
                   </span>
                 {% endif %}
               </td>
-              <td class="px-4 py-3 text-sm text-center">
+              <td class="px-3 py-1.5 text-xs text-center">
                 <div class="flex items-center justify-center space-x-2">
                   <a href="{% url 'inventario:ver_guia_remision' guia.id %}" 
                      class="text-blue-600 hover:text-blue-800" title="Ver detalles">
@@ -155,23 +156,23 @@
 
       <!-- Paginación -->
       {% if is_paginated %}
-      <div class="bg-gray-50 px-4 py-3 border-t border-gray-200 sm:px-6">
+      <div class="bg-gray-50 px-4 py-2 border-t border-gray-200 sm:px-6">
         <div class="flex items-center justify-between">
           <div class="flex justify-between flex-1 sm:hidden">
             {% if page_obj.has_previous %}
-              <a href="?page={{ page_obj.previous_page_number }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+              <a href="?page={{ page_obj.previous_page_number }}" class="relative inline-flex items-center px-4 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                 Anterior
               </a>
             {% endif %}
             {% if page_obj.has_next %}
-              <a href="?page={{ page_obj.next_page_number }}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+              <a href="?page={{ page_obj.next_page_number }}" class="ml-3 relative inline-flex items-center px-4 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                 Siguiente
               </a>
             {% endif %}
           </div>
           <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
-              <p class="text-sm text-gray-700">
+              <p class="text-xs text-gray-700">
                 Mostrando
                 <span class="font-medium">{{ page_obj.start_index }}</span>
                 a
@@ -185,11 +186,11 @@
               <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
                 {% for num in page_obj.paginator.page_range %}
                   {% if page_obj.number == num %}
-                    <span class="z-10 bg-blue-50 border-blue-500 text-blue-600 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                    <span class="z-10 bg-blue-50 border-blue-500 text-blue-600 relative inline-flex items-center px-3 py-1.5 border text-xs font-medium">
                       {{ num }}
                     </span>
                   {% else %}
-                    <a href="?page={{ num }}" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                    <a href="?page={{ num }}" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-3 py-1.5 border text-xs font-medium">
                       {{ num }}
                     </a>
                   {% endif %}

@@ -9440,8 +9440,8 @@ def listar_guias_remision(request):
     # Ordenar por fecha y secuencial
     guias = guias.order_by('-fecha_inicio_traslado', '-secuencial')
     
-    # Paginación
-    paginator = Paginator(guias, 20)
+    # Paginación (máximo por página)
+    paginator = Paginator(guias, 6)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
