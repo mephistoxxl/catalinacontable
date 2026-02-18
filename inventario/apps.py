@@ -19,3 +19,4 @@ class InventarioConfig(AppConfig):
         # para evitar conflictos con la facturación existente y con el registro
         # anticipado de logging.
         from .liquidacion_compra import models as _liquidacion_models  # noqa: F401
+        from .retenciones import models as _retenciones_models  # noqa: F401

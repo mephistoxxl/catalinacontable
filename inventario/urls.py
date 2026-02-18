@@ -2,6 +2,7 @@ from django.urls import path, include, reverse_lazy
 from . import views
 from .views import FirmaElectronicaView, ConfiguracionGeneral
 from .liquidacion_compra import views as liquidacion_views
+from .retenciones import views as retencion_views
 from .nota_credito import views as nota_credito_views
 from .nota_debito import views as nota_debito_views
 # TEMPORAL: Deshabilitado password reset por error en producción
@@ -126,6 +127,14 @@ urlpatterns = [
     path('liquidaciones-compra/autorizar/<int:pk>/', liquidacion_views.autorizar_liquidacion_compra, name='autorizar_liquidacion_compra'),
     path('liquidaciones-compra/consultar-estado/<int:pk>/', liquidacion_views.consultar_estado_liquidacion_compra, name='consultar_estado_liquidacion_compra'),
     path('liquidaciones-compra/consultar-estado-json/<int:pk>/', liquidacion_views.consultar_estado_liquidacion_compra_json, name='consultar_estado_liquidacion_compra_json'),
+
+    # Retenciones en compras (codDoc 07)
+    path('retenciones-compra/', retencion_views.RetencionCompraListView.as_view(), name='retenciones_compra_listar'),
+    path('retenciones-compra/crear/', retencion_views.RetencionCompraCreateView.as_view(), name='retenciones_compra_crear'),
+    path('retenciones-compra/ver/<int:pk>/', retencion_views.RetencionCompraDetailView.as_view(), name='retenciones_compra_ver'),
+    path('retenciones-compra/autorizar/<int:pk>/', retencion_views.autorizar_retencion_compra, name='autorizar_retencion_compra'),
+    path('retenciones-compra/consultar-estado/<int:pk>/', retencion_views.consultar_estado_retencion_compra, name='consultar_estado_retencion_compra'),
+    path('retenciones-compra/consultar-estado-json/<int:pk>/', retencion_views.consultar_estado_retencion_compra_json, name='consultar_estado_retencion_compra_json'),
 
     # Notas de Crédito (codDoc 04)
     path('notas-credito/', nota_credito_views.ListarNotasCredito.as_view(), name='notas_credito_listar'),
