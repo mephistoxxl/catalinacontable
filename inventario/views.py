@@ -2183,7 +2183,23 @@ class Eliminar(LoginRequiredMixin, View):
         if modo != 'usuario':
             return HttpResponseNotAllowed(['GET'])
 
-        if not request.user.is_superuser:
+        empresa = Empresa.objects.filter(id=empresa_id).first()
+        is_company_owner = bool(
+            empresa
+            and (
+                empresa.creada_por_id == request.user.id
+                or (
+                    empresa.creada_por_id is None
+                    and str(request.user.username).strip() == str(empresa.ruc).strip()
+                )
+            )
+        )
+        is_owner_admin = (
+            getattr(request.user, 'nivel', Usuario.USER) == Usuario.ADMIN
+            and is_company_owner
+        )
+
+        if not (request.user.nivel == Usuario.ROOT or request.user.is_superuser or is_owner_admin):
             messages.error(request, 'No tienes permisos suficientes para borrar usuarios')
             return HttpResponseRedirect('/inventario/listarUsuarios')
 
@@ -2196,10 +2212,14 @@ class Eliminar(LoginRequiredMixin, View):
             return HttpResponseRedirect('/inventario/listarUsuarios')
 
         usuario_obj = get_object_or_404(Usuario, id=p)
+
+        if usuario_obj.nivel == Usuario.ROOT:
+            messages.error(request, 'No puedes eliminar un usuario raíz.')
+            return HttpResponseRedirect('/inventario/listarUsuarios')
         
-        # ✅ ADMIN no puede eliminar a otro ADMIN
-        if request.user.nivel == Usuario.ADMIN and usuario_obj.nivel == Usuario.ADMIN:
-            messages.error(request, 'No puedes eliminar a otro administrador.')
+        # Solo ROOT o ADMIN propietario de la empresa puede eliminar ADMIN
+        if usuario_obj.nivel == Usuario.ADMIN and not (request.user.nivel == Usuario.ROOT or is_owner_admin):
+            messages.error(request, 'No tienes permisos para eliminar a este administrador.')
             return HttpResponseRedirect('/inventario/listarUsuarios')
         
         # Si Usuario tiene relación M2M con empresas, validar pertenencia
@@ -2208,7 +2228,7 @@ class Eliminar(LoginRequiredMixin, View):
             return HttpResponseRedirect('/inventario/listarUsuarios')
 
         usuario_obj.delete()
-        messages.success(request, f'Usuario de ID {p} borrado exitosamente.')
+        messages.success(request, f'Usuario {usuario_obj.username} borrado exitosamente.')
         return HttpResponseRedirect("/inventario/listarUsuarios")
 
         #Fin de vista-------------------------------------------------------------------
@@ -6611,7 +6631,27 @@ class ListarUsuarios(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
         # técnicos de Django que pueden venir heredados de migraciones antiguas.
         if getattr(request.user, 'nivel', Usuario.USER) != Usuario.ROOT:
             usuarios = usuarios.exclude(nivel=Usuario.ROOT)
-        contexto = {'tabla': usuarios}
+        is_company_owner = bool(
+            empresa
+            and (
+                empresa.creada_por_id == request.user.id
+                or (
+                    empresa.creada_por_id is None
+                    and str(request.user.username).strip() == str(empresa.ruc).strip()
+                )
+            )
+        )
+        can_delete_admins = (
+            getattr(request.user, 'nivel', Usuario.USER) == Usuario.ROOT
+            or (
+                getattr(request.user, 'nivel', Usuario.USER) == Usuario.ADMIN
+                and is_company_owner
+            )
+        )
+        contexto = {
+            'tabla': usuarios,
+            'can_delete_admins': can_delete_admins,
+        }
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/usuario/listarUsuarios.html', contexto)
 
