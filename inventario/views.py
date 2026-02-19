@@ -6607,8 +6607,10 @@ class ListarUsuarios(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
     def get(self, request):
         empresa = get_empresa_activa(request)
         usuarios = Usuario.objects.filter(empresas=empresa)
-        if not request.user.is_superuser:
-            usuarios = usuarios.filter(is_superuser=False)
+        # Mostrar por nivel funcional de negocio (multi-empresa), no por flags
+        # técnicos de Django que pueden venir heredados de migraciones antiguas.
+        if getattr(request.user, 'nivel', Usuario.USER) != Usuario.ROOT:
+            usuarios = usuarios.exclude(nivel=Usuario.ROOT)
         contexto = {'tabla': usuarios}
         contexto = complementarContexto(contexto, request.user)
         return render(request, 'inventario/usuario/listarUsuarios.html', contexto)
