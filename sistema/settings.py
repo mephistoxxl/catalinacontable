@@ -584,12 +584,6 @@ EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() == 'true'
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'emailapikey')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 
-# DEBUG: Verificar que la contraseña se está cargando correctamente
-if EMAIL_HOST_PASSWORD:
-    print(f"✅ EMAIL_HOST_PASSWORD cargado: {EMAIL_HOST_PASSWORD[:20]}... ({len(EMAIL_HOST_PASSWORD)} caracteres)")
-else:
-    print("❌ WARNING: EMAIL_HOST_PASSWORD está vacío!")
-
 # Asegurar remitente por defecto acorde a Zeptomail
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@catalinasoft-ec.com')
 SERVER_EMAIL = os.environ.get('SERVER_EMAIL', DEFAULT_FROM_EMAIL)

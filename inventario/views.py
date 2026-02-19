@@ -8434,9 +8434,6 @@ def buscar_empresa(request):
         from services import consultar_identificacion as servicio_consultar_identificacion
         resultado = servicio_consultar_identificacion(ruc)
         
-        # Registrar los datos recibidos para depuración
-        logger.info(f"Datos recibidos de la API: {resultado}")
-        
         # Extraer los campos básicos
         razon_social = resultado.get('razon_social', '')
         nombre_comercial = resultado.get('nombre_comercial', '')
@@ -8445,17 +8442,6 @@ def buscar_empresa(request):
         # Usar directamente los campos ya mapeados en services.py
         tipo_regimen = resultado.get('tipo_regimen')
         obligado_contabilidad = resultado.get('obligado_contabilidad', 'NO')
-        
-        # Registrar los valores que se enviarán al frontend
-        logger.info(f"Valores que se enviarán al frontend:")
-        logger.info(f"  razon_social: {razon_social}")
-        logger.info(f"  nombre_comercial: {nombre_comercial}")
-        logger.info(f"  direccion: {direccion}")
-        logger.info(f"  correo: {resultado.get('email', '')}")
-        logger.info(f"  telefono: {resultado.get('telefono', '')}")
-        logger.info(f"  obligado_contabilidad: {obligado_contabilidad}")
-        logger.info(f"  tipo_regimen: {tipo_regimen}")
-        logger.info(f"  actividad_economica: {resultado.get('actividad_economica', '')}")
         
         # Construir y devolver la respuesta JSON
         respuesta = {
@@ -8470,8 +8456,8 @@ def buscar_empresa(request):
         }
         if tipo_regimen:
             respuesta['tipo_regimen'] = tipo_regimen
-        
-        logger.info(f"Respuesta JSON completa: {respuesta}")
+
+        logger.info("Consulta de empresa completada correctamente")
         return JsonResponse(respuesta)
     except Exception as e:
         logger.error(f"Error en buscar_empresa: {e}")
@@ -8699,7 +8685,6 @@ def validar_facturador(request):
     return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
 
 
-@csrf_exempt
 @require_empresa_activa
 def anular_factura(request, factura_id):
     """Anula una factura autorizada cambiando su estado"""
@@ -8824,7 +8809,6 @@ def _start_envio_sri_background(factura_id, empresa_id):
         return True
 
 
-@csrf_exempt
 @require_empresa_activa
 def enviar_documento_sri(request, factura_id):
     """Envía una factura al SRI y devuelve el estado de recepción."""
@@ -8925,7 +8909,6 @@ def enviar_documento_sri_background(request, factura_id):
             'message': f'Error interno del servidor: {str(e)}'
         })
 
-@csrf_exempt
 @require_empresa_activa
 @verificar_limite_plan
 def autorizar_documento_sri(request, factura_id):
@@ -10172,7 +10155,6 @@ def autorizar_guia_remision(request, guia_id):
     return redirect('inventario:ver_guia_remision', guia_id=guia.id)
 
 @login_required
-@csrf_exempt
 def buscar_cliente_ajax(request):
     """Vista AJAX para buscar un cliente exacto por identificación (CI/RUC).
     Espera POST { identificacion: '...' }
@@ -10259,7 +10241,6 @@ def buscar_cliente_api(request):
     return JsonResponse(data)
 
 @login_required
-@csrf_exempt
 def crear_cliente_api(request):
     """Crea rápidamente un cliente minimo si no existe.
     POST JSON o form:
@@ -10356,7 +10337,6 @@ def crear_cliente_api(request):
         return JsonResponse({'success': False, 'message': 'Error interno creando cliente'}, status=500)
 
 @login_required
-@csrf_exempt
 def actualizar_cliente_api(request):
     """Actualiza los datos de un cliente existente.
     POST JSON:

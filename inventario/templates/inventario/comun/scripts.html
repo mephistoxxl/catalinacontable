@@ -1,4 +1,49 @@
 {% load static %}
+    <script>
+      (function() {
+        function getCookie(name) {
+          const cookieValue = document.cookie
+            .split('; ')
+            .find(row => row.startsWith(name + '='));
+          return cookieValue ? decodeURIComponent(cookieValue.split('=')[1]) : '';
+        }
+
+        function getCsrfToken() {
+          const cookieToken = getCookie('csrftoken');
+          if (cookieToken) {
+            return cookieToken;
+          }
+          const input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+          return input ? input.value : '';
+        }
+
+        const originalFetch = window.fetch;
+        window.fetch = function(resource, options) {
+          const opts = options ? { ...options } : {};
+          const method = (opts.method || 'GET').toUpperCase();
+          const isSameOrigin = typeof resource === 'string'
+            ? !/^https?:\/\//i.test(resource) || resource.startsWith(window.location.origin)
+            : true;
+
+          if (isSameOrigin && !['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method)) {
+            const headers = new Headers(opts.headers || {});
+            const csrfToken = getCsrfToken();
+            if (csrfToken && !headers.has('X-CSRFToken')) {
+              headers.set('X-CSRFToken', csrfToken);
+            }
+            if (!headers.has('X-Requested-With')) {
+              headers.set('X-Requested-With', 'XMLHttpRequest');
+            }
+            opts.headers = headers;
+            if (!opts.credentials) {
+              opts.credentials = 'same-origin';
+            }
+          }
+
+          return originalFetch(resource, opts);
+        };
+      })();
+    </script>
         <script src='{% static "inventario/js/alertify.js" %}'></script>
         <script src='{% static "inventario/js/vendor.js" %}'></script>
         <script src='{% static "inventario/js/app.js" %}'></script>
