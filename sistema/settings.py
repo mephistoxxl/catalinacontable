@@ -31,10 +31,10 @@ IS_PRODUCTION = ENVIRONMENT in {'production', 'prod'} and not IS_TEST_ENV
 
 # Seguridad y configuración sensible desde .env
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
-# Temporalmente deshabilitado para debugging en producción
-# if IS_PRODUCTION and DEBUG:
-#     warnings.warn('DEBUG está activo en producción; se forzará a False.', RuntimeWarning)
-#     DEBUG = False
+# Forzar DEBUG a False en producción para evitar exposición de datos sensibles
+if IS_PRODUCTION and DEBUG:
+    warnings.warn('DEBUG está activo en producción; se forzará a False.', RuntimeWarning)
+    DEBUG = False
 # Tiempo de espera por defecto para los servicios del SRI (en segundos)
 SRI_TIMEOUT = int(os.environ.get('SRI_TIMEOUT', 30))
 
