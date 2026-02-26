@@ -449,6 +449,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'inventario.context_processors.plan_lock_context',
             ],
         },
     },
@@ -630,3 +631,7 @@ _rq_handlers = [handler.strip() for handler in os.environ.get(
 ).split(',') if handler.strip()]
 if _rq_handlers:
     RQ_EXCEPTION_HANDLERS = _rq_handlers
+
+# ✅ Configuración de Sesión
+# El usuario estará logueado por un máximo de 8 horas (28800 segundos)
+SESSION_COOKIE_AGE = 28800

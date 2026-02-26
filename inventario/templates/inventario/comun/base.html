@@ -2,12 +2,39 @@
 <html class="no-js" lang="en">
 {% include "inventario/comun/estilos.html" %}
 <body>
+    <style>
+        .plan-locked {
+            pointer-events: none;
+            opacity: 0.45;
+            user-select: none;
+        }
+        .plan-lock-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(17, 24, 39, 0.7);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .plan-lock-card {
+            width: 100%;
+            max-width: 36rem;
+            background: #fff;
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+        }
+    </style>
 	<!-- Aca se incluiran las plantillas por separado para facilitar su edicion -->
         <div class="main-wrapper">
             <div class="app header-fixed sidebar-fixed flex flex-col min-h-screen" id="app">
 			{% include "inventario/comun/header.html" %}
-			{% include "inventario/comun/sidebar.html" %}
-			<main class="flex-1">
+            <div id="sidebar-lock-container" class="{% if plan_lock.is_locked %}plan-locked{% endif %}">
+                {% include "inventario/comun/sidebar.html" %}
+            </div>
+            <main id="main-lock-container" class="flex-1 {% if plan_lock.is_locked %}plan-locked{% endif %}">
 			{% block content %}
 			{% endblock %}
 			</main>
@@ -15,6 +42,30 @@
 			{% include "inventario/comun/modal.html" %}
             </div>
         </div> <!-- Fin de la pantalla -->
+
+        {% if plan_lock.is_locked %}
+        <div id="plan-lock-modal" class="plan-lock-modal" role="dialog" aria-modal="true" aria-labelledby="plan-lock-title">
+            <div class="plan-lock-card">
+                <h3 id="plan-lock-title" class="text-lg font-bold text-red-700 mb-2">Acceso temporalmente bloqueado</h3>
+                <p class="text-sm text-gray-700 mb-3">{{ plan_lock.message }}</p>
+                {% if plan_lock.estado_plan %}
+                <div class="bg-gray-100 rounded p-3 text-sm text-gray-700">
+                    <p><b>Plan:</b> {{ plan_lock.estado_plan.plan_nombre }}</p>
+                    <p><b>Uso:</b> {{ plan_lock.estado_plan.documentos_usados }} / {{ plan_lock.estado_plan.limite_documentos }}</p>
+                    <p><b>Restantes:</b> {{ plan_lock.estado_plan.documentos_restantes }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <script>
+            (function () {
+                const sidebar = document.getElementById('sidebar-lock-container');
+                const main = document.getElementById('main-lock-container');
+                if (sidebar) sidebar.classList.add('plan-locked');
+                if (main) main.classList.add('plan-locked');
+            })();
+        </script>
+        {% endif %}
 
 
 	<!-- Controla lo de los colores aparentemente-->
