@@ -1,0 +1,102 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+<div class="bg-gray-50 p-4" style="padding-bottom: 64px;">
+  <div class="max-w-6xl mx-auto">
+    <div class="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden mb-3">
+      <div class="px-4 py-3 border-b border-gray-200">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div class="flex items-center">
+            <i class="fas fa-file-invoice-dollar text-gray-700 mr-2"></i>
+            <div>
+              <h2 class="text-base font-semibold text-gray-900">{{ titulo|default:"Retenciones" }}</h2>
+              <p class="text-gray-500 text-xs">Listado de comprobantes de retención</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <a href="{% url 'inventario:retenciones_crear' %}" class="px-3 py-2 rounded bg-gray-700 text-white text-xs hover:bg-gray-600 no-underline" style="text-decoration: none; color: #ffffff;">
+              <i class="fas fa-plus mr-1"></i>Nueva Retención
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="p-4">
+        <form method="get" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Buscar</label>
+            <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="w-full border rounded px-3 py-2 text-sm" placeholder="Proveedor o secuencial" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Estado SRI</label>
+            <select name="estado" class="w-full border rounded px-3 py-2 text-sm">
+              <option value="">Todos</option>
+              <option value="BORRADOR" {% if request.GET.estado == 'BORRADOR' %}selected{% endif %}>BORRADOR</option>
+              <option value="AUTORIZADO" {% if request.GET.estado == 'AUTORIZADO' %}selected{% endif %}>AUTORIZADO</option>
+            </select>
+          </div>
+          <div class="flex gap-2">
+            <button class="px-3 py-2 rounded bg-blue-600 text-white text-xs hover:bg-blue-700" type="submit">
+              <i class="fas fa-search mr-1"></i>Filtrar
+            </button>
+            <a class="px-3 py-2 rounded bg-gray-200 text-gray-800 text-xs hover:bg-gray-300" href="{% url 'inventario:retenciones_listar' %}">
+              Limpiar
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    {% if messages %}
+      {% for message in messages %}
+        <div class="mb-3 flex items-center rounded px-4 py-2 text-sm {% if message.tags == 'error' %}bg-red-100 text-red-800{% elif message.tags == 'success' %}bg-green-100 text-green-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+          <i class="fa {% if message.tags == 'error' %}fa-exclamation-triangle{% else %}fa-check{% endif %} mr-2"></i>
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+              <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
+              <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Proveedor</th>
+              <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total Retenido</th>
+              <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Estado SRI</th>
+              <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            {% for retencion in retenciones %}
+            <tr>
+              <td class="px-3 py-2 text-sm text-gray-800">{{ retencion.fecha_emision|date:"d/m/Y" }}</td>
+              <td class="px-3 py-2 text-sm text-gray-800 font-mono">{{ retencion.numero_completo }}</td>
+              <td class="px-3 py-2 text-sm text-gray-800">{{ retencion.razon_social_sujeto|default:"—" }}</td>
+              <td class="px-3 py-2 text-sm text-gray-800 text-right font-semibold">${{ retencion.total_retenido|floatformat:2 }}</td>
+              <td class="px-3 py-2 text-sm text-gray-800">{{ retencion.get_estado_sri_display|default:'No enviada' }}</td>
+              <td class="px-3 py-2 text-right">
+                <a href="#" class="inline-flex items-center justify-center px-3 py-2 rounded bg-blue-600 text-white text-xs hover:bg-blue-700">
+                  <i class="fas fa-eye mr-1"></i>Ver
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="px-6 py-10 text-center text-sm text-gray-500">
+                <div class="flex flex-col items-center justify-center">
+                  <i class="fas fa-file-invoice-dollar text-4xl text-gray-300 mb-3"></i>
+                  <p class="text-base font-medium text-gray-900">No hay retenciones registradas</p>
+                  <p class="text-gray-500 mt-1">Todavía no has creado ningún comprobante de retención.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

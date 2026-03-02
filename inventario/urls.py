@@ -4,6 +4,7 @@ from .views import FirmaElectronicaView, ConfiguracionGeneral
 from .liquidacion_compra import views as liquidacion_views
 from .nota_credito import views as nota_credito_views
 from .nota_debito import views as nota_debito_views
+from .retenciones import views as retencion_views
 # TEMPORAL: Deshabilitado password reset por error en producción
 # from .views_password_reset import SolicitarResetPassword, ResetPassword
 from django.conf import settings
@@ -126,6 +127,10 @@ urlpatterns = [
     path('liquidaciones-compra/autorizar/<int:pk>/', liquidacion_views.autorizar_liquidacion_compra, name='autorizar_liquidacion_compra'),
     path('liquidaciones-compra/consultar-estado/<int:pk>/', liquidacion_views.consultar_estado_liquidacion_compra, name='consultar_estado_liquidacion_compra'),
     path('liquidaciones-compra/consultar-estado-json/<int:pk>/', liquidacion_views.consultar_estado_liquidacion_compra_json, name='consultar_estado_liquidacion_compra_json'),
+
+    # Retenciones (codDoc 07)
+    path('retenciones/', retencion_views.ListarRetenciones.as_view(), name='retenciones_listar'),
+    path('retenciones/crear/', retencion_views.CrearRetencion.as_view(), name='retenciones_crear'),
 
     # Notas de Crédito (codDoc 04)
     path('notas-credito/', nota_credito_views.ListarNotasCredito.as_view(), name='notas_credito_listar'),
