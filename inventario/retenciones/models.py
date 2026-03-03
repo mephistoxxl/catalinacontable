@@ -116,6 +116,9 @@ class ComprobanteRetencion(models.Model):
     estado_sri = models.CharField(max_length=15, choices=ESTADOS_SRI, default="")
     numero_autorizacion = models.CharField(max_length=49, blank=True, default="")
     clave_acceso = models.CharField(max_length=49, blank=True, default="")
+    xml_generado = models.TextField(blank=True, default="")
+    xml_validado = models.BooleanField(default=False)
+    xml_validacion_error = models.TextField(blank=True, default="")
 
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
@@ -143,6 +146,10 @@ class ComprobanteRetencion(models.Model):
     def numero_completo(self) -> str:
         return f"{self.establecimiento_retencion}-{self.punto_emision_retencion}-{self.secuencia_retencion}"
 
+    @property
+    def numero_doc_sustento(self) -> str:
+        return f"{self.establecimiento_doc}-{self.punto_emision_doc}-{self.secuencia_doc}"
+
     def recalcular_totales(self) -> None:
         agregados = self.detalles.aggregate(
             renta=Sum("valor_retenido", filter=models.Q(tipo_impuesto="RENTA")),
@@ -151,6 +158,11 @@ class ComprobanteRetencion(models.Model):
         self.total_retencion_renta = (agregados.get("renta") or Decimal("0.00")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         self.total_retencion_iva = (agregados.get("iva") or Decimal("0.00")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         self.total_retenido = (self.total_retencion_renta + self.total_retencion_iva).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    def limpiar_estado_xml(self) -> None:
+        self.xml_generado = ""
+        self.xml_validado = False
+        self.xml_validacion_error = ""
 
 
 class RetencionDetalle(models.Model):

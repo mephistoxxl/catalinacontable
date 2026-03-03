@@ -4,9 +4,11 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import HttpResponse
 from django.db import transaction
 from django.db.models import Max, Q
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views import View
 from django.views.generic import ListView
 
@@ -14,6 +16,12 @@ from ..mixins import RequireEmpresaActivaMixin, get_empresa_activa
 from ..models import Secuencia
 from .forms import ComprobanteRetencionForm
 from .models import ComprobanteRetencion, RetencionDetalle
+from .services import (
+    calcular_valor_retenido,
+    porcentaje_iva_por_codigo,
+    porcentaje_renta_sugerido,
+)
+from .xml_generator_retencion import RetencionXMLGenerator
 
 
 class ListarRetenciones(LoginRequiredMixin, RequireEmpresaActivaMixin, ListView):
@@ -141,36 +149,60 @@ class CrearRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
             retencion = form.save(commit=False)
             retencion.empresa = empresa
             retencion.usuario_creacion = request.user
+            retencion.limpiar_estado_xml()
             retencion.save()
 
             renta_base = form.cleaned_data.get('renta_base') or Decimal('0.00')
+            renta_codigo = (form.cleaned_data.get('codigo_renta') or '304B').strip()
             renta_porcentaje = form.cleaned_data.get('renta_porcentaje') or Decimal('0.00')
+            if renta_porcentaje <= 0:
+                renta_porcentaje = porcentaje_renta_sugerido(renta_codigo)
             if renta_base > 0 and renta_porcentaje > 0:
                 RetencionDetalle.objects.create(
                     comprobante=retencion,
                     tipo_impuesto='RENTA',
-                    codigo_retencion=(form.cleaned_data.get('codigo_renta') or '304B').strip(),
+                    codigo_retencion=renta_codigo,
                     descripcion_retencion='Retención Renta',
                     base_imponible=renta_base,
                     porcentaje_retener=renta_porcentaje,
-                    valor_retenido=form.valor_renta_retenido(),
+                    valor_retenido=calcular_valor_retenido(renta_base, renta_porcentaje),
                 )
 
             iva_base = form.cleaned_data.get('iva_base') or Decimal('0.00')
-            iva_porcentaje = form.cleaned_data.get('iva_porcentaje') or Decimal('0.00')
+            iva_codigo = (form.cleaned_data.get('codigo_iva') or '721').strip()
+            iva_porcentaje = porcentaje_iva_por_codigo(iva_codigo)
             if iva_base > 0 and iva_porcentaje > 0:
                 RetencionDetalle.objects.create(
                     comprobante=retencion,
                     tipo_impuesto='IVA',
-                    codigo_retencion=(form.cleaned_data.get('codigo_iva') or '721').strip(),
+                    codigo_retencion=iva_codigo,
                     descripcion_retencion='Retención IVA',
                     base_imponible=iva_base,
                     porcentaje_retener=iva_porcentaje,
-                    valor_retenido=form.valor_iva_retenido(),
+                    valor_retenido=calcular_valor_retenido(iva_base, iva_porcentaje),
                 )
 
             retencion.recalcular_totales()
-            retencion.save(update_fields=['total_retencion_renta', 'total_retencion_iva', 'total_retenido', 'actualizado_en'])
+
+            xml_gen = RetencionXMLGenerator(retencion)
+            retencion.clave_acceso = xml_gen.generar_clave_acceso()
+            retencion.xml_generado = xml_gen.generar_xml()
+            validacion = xml_gen.validar_xml(retencion.xml_generado)
+            retencion.xml_validado = validacion.valido
+            retencion.xml_validacion_error = '' if validacion.valido else (validacion.errores or validacion.mensaje)
+
+            retencion.save(
+                update_fields=[
+                    'total_retencion_renta',
+                    'total_retencion_iva',
+                    'total_retenido',
+                    'clave_acceso',
+                    'xml_generado',
+                    'xml_validado',
+                    'xml_validacion_error',
+                    'actualizado_en',
+                ]
+            )
 
             secuencia_cfg = (
                 Secuencia.objects.filter(
@@ -194,5 +226,33 @@ class CrearRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                     secuencia_cfg.secuencial = secuencia_guardada
                     secuencia_cfg.save(update_fields=['secuencial'])
 
-        messages.success(request, f'Retención {retencion.numero_completo} guardada correctamente.')
+        if retencion.xml_validado:
+            messages.success(request, f'Retención {retencion.numero_completo} guardada. XML ATS 2.0.0 válido.')
+        else:
+            messages.warning(request, f'Retención {retencion.numero_completo} guardada, pero el XML tiene observaciones de validación XSD.')
         return redirect('inventario:retenciones_listar')
+
+
+class DescargarXMLRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
+    login_url = '/inventario/login'
+
+    def get(self, request, pk, *args, **kwargs):
+        empresa = get_empresa_activa(request)
+        retencion = ComprobanteRetencion.objects.filter(empresa=empresa, pk=pk).first()
+        if not retencion:
+            messages.error(request, 'Retención no encontrada.')
+            return redirect('inventario:retenciones_listar')
+
+        if not retencion.xml_generado:
+            xml_gen = RetencionXMLGenerator(retencion)
+            retencion.clave_acceso = xml_gen.generar_clave_acceso()
+            retencion.xml_generado = xml_gen.generar_xml()
+            validacion = xml_gen.validar_xml(retencion.xml_generado)
+            retencion.xml_validado = validacion.valido
+            retencion.xml_validacion_error = '' if validacion.valido else (validacion.errores or validacion.mensaje)
+            retencion.save(update_fields=['clave_acceso', 'xml_generado', 'xml_validado', 'xml_validacion_error', 'actualizado_en'])
+
+        nombre = f"retencion_{retencion.numero_completo.replace('-', '_')}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xml"
+        response = HttpResponse(retencion.xml_generado, content_type='application/xml; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="{nombre}"'
+        return response

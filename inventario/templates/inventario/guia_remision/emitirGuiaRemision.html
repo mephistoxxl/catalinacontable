@@ -764,8 +764,22 @@ const GuiaDraft = (() => {
       }
     }
 
+    // Campos de transportista que NO deben restaurarse automáticamente
+    // para evitar reutilizar datos al crear una nueva guía.
+    const transportistaNoRestaurar = new Set([
+      'transportista_ruc',
+      'transportista_nombre',
+      'tipo_identificacion_transportista',
+      'placa',
+      'rise',
+      'obligado_contabilidad',
+      'contribuyente_especial',
+      'dir_establecimiento',
+    ]);
+
     // Aplicar valores
     for (const [name, value] of draft.entries) {
+      if (transportistaNoRestaurar.has(name)) continue;
       const el = form.querySelector(`[name="${CSS.escape(name)}"]`);
       if (!el) continue;
       const type = (el.type || '').toLowerCase();
