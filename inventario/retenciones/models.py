@@ -117,6 +117,8 @@ class ComprobanteRetencion(models.Model):
     numero_autorizacion = models.CharField(max_length=49, blank=True, default="")
     clave_acceso = models.CharField(max_length=49, blank=True, default="")
     xml_generado = models.TextField(blank=True, default="")
+    xml_firmado = models.TextField(blank=True, default="")
+    xml_firmado_en = models.DateTimeField(null=True, blank=True)
     xml_validado = models.BooleanField(default=False)
     xml_validacion_error = models.TextField(blank=True, default="")
 
@@ -161,6 +163,8 @@ class ComprobanteRetencion(models.Model):
 
     def limpiar_estado_xml(self) -> None:
         self.xml_generado = ""
+        self.xml_firmado = ""
+        self.xml_firmado_en = None
         self.xml_validado = False
         self.xml_validacion_error = ""
 

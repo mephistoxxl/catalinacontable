@@ -132,6 +132,9 @@ urlpatterns = [
     path('retenciones/', retencion_views.ListarRetenciones.as_view(), name='retenciones_listar'),
     path('retenciones/crear/', retencion_views.CrearRetencion.as_view(), name='retenciones_crear'),
     path('retenciones/<int:pk>/xml/', retencion_views.DescargarXMLRetencion.as_view(), name='retenciones_xml'),
+    path('retenciones/<int:pk>/xml-firmado/', retencion_views.DescargarXMLFirmadoRetencion.as_view(), name='retenciones_xml_firmado'),
+    path('retenciones/<int:pk>/autorizar/', retencion_views.AutorizarRetencion.as_view(), name='retenciones_autorizar'),
+    path('retenciones/<int:pk>/consultar-estado/', retencion_views.ConsultarEstadoRetencion.as_view(), name='retenciones_consultar_estado'),
 
     # Notas de Crédito (codDoc 04)
     path('notas-credito/', nota_credito_views.ListarNotasCredito.as_view(), name='notas_credito_listar'),
