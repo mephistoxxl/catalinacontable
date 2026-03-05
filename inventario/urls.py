@@ -5,6 +5,7 @@ from .liquidacion_compra import views as liquidacion_views
 from .nota_credito import views as nota_credito_views
 from .nota_debito import views as nota_debito_views
 from .retenciones import views as retencion_views
+from .documentos_email import views as documentos_email_views
 # TEMPORAL: Deshabilitado password reset por error en producción
 # from .views_password_reset import SolicitarResetPassword, ResetPassword
 from django.conf import settings
@@ -127,14 +128,17 @@ urlpatterns = [
     path('liquidaciones-compra/autorizar/<int:pk>/', liquidacion_views.autorizar_liquidacion_compra, name='autorizar_liquidacion_compra'),
     path('liquidaciones-compra/consultar-estado/<int:pk>/', liquidacion_views.consultar_estado_liquidacion_compra, name='consultar_estado_liquidacion_compra'),
     path('liquidaciones-compra/consultar-estado-json/<int:pk>/', liquidacion_views.consultar_estado_liquidacion_compra_json, name='consultar_estado_liquidacion_compra_json'),
+    path('liquidaciones-compra/enviar-email/<int:pk>/', documentos_email_views.enviar_email_liquidacion, name='liquidaciones_compra_enviar_email'),
 
     # Retenciones (codDoc 07)
     path('retenciones/', retencion_views.ListarRetenciones.as_view(), name='retenciones_listar'),
     path('retenciones/crear/', retencion_views.CrearRetencion.as_view(), name='retenciones_crear'),
+    path('retenciones/<int:pk>/editar/', retencion_views.EditarRetencion.as_view(), name='retenciones_editar'),
     path('retenciones/<int:pk>/xml/', retencion_views.DescargarXMLRetencion.as_view(), name='retenciones_xml'),
     path('retenciones/<int:pk>/xml-firmado/', retencion_views.DescargarXMLFirmadoRetencion.as_view(), name='retenciones_xml_firmado'),
     path('retenciones/<int:pk>/autorizar/', retencion_views.AutorizarRetencion.as_view(), name='retenciones_autorizar'),
     path('retenciones/<int:pk>/consultar-estado/', retencion_views.ConsultarEstadoRetencion.as_view(), name='retenciones_consultar_estado'),
+    path('retenciones/<int:pk>/enviar-email/', documentos_email_views.enviar_email_retencion, name='retenciones_enviar_email'),
 
     # Notas de Crédito (codDoc 04)
     path('notas-credito/', nota_credito_views.ListarNotasCredito.as_view(), name='notas_credito_listar'),
@@ -144,6 +148,7 @@ urlpatterns = [
     path('notas-credito/autorizar/<int:pk>/', nota_credito_views.AutorizarNotaCredito.as_view(), name='notas_credito_autorizar'),
     path('notas-credito/consultar-estado/<int:pk>/', nota_credito_views.ConsultarEstadoNotaCredito.as_view(), name='notas_credito_consultar_estado'),
     path('notas-credito/pdf/<int:pk>/', nota_credito_views.DescargarPDF.as_view(), name='notas_credito_pdf'),
+    path('notas-credito/enviar-email/<int:pk>/', documentos_email_views.enviar_email_nota_credito, name='notas_credito_enviar_email'),
 
     # Notas de Débito (codDoc 05)
     path('notas-debito/', nota_debito_views.ListarNotasDebito.as_view(), name='notas_debito_listar'),
@@ -153,6 +158,7 @@ urlpatterns = [
     path('notas-debito/autorizar/<int:pk>/', nota_debito_views.AutorizarNotaDebito.as_view(), name='notas_debito_autorizar'),
     path('notas-debito/consultar-estado/<int:pk>/', nota_debito_views.ConsultarEstadoNotaDebito.as_view(), name='notas_debito_consultar_estado'),
     path('notas-debito/pdf/<int:pk>/', nota_debito_views.DescargarPDFNotaDebito.as_view(), name='notas_debito_pdf'),
+    path('notas-debito/enviar-email/<int:pk>/', documentos_email_views.enviar_email_nota_debito, name='notas_debito_enviar_email'),
 
     # Bancos
     path('bancos/', views.ListarBancos.as_view(), name='listar_bancos'),
@@ -215,6 +221,7 @@ urlpatterns = [
     path('guias-remision/<int:guia_id>/anular/', views.anular_guia_remision, name='anular_guia_remision'),
     path('guias-remision/<int:guia_id>/pdf/', views.descargar_guia_pdf, name='descargar_guia_pdf'),
     path('guias-remision/<int:guia_id>/xml/', views.descargar_guia_xml, name='descargar_guia_xml'),
+    path('guias-remision/<int:guia_id>/enviar-email/', documentos_email_views.enviar_email_guia, name='guias_remision_enviar_email'),
     path('api/buscar-transportista/', views.buscar_transportista, name='buscar_transportista'),
     path('api/buscar-cliente/', views.buscar_cliente_ajax, name='buscar_cliente_ajax'),
     path('api/clientes/buscar', views.buscar_cliente_api, name='buscar_cliente_api'),

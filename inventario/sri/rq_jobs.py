@@ -267,3 +267,122 @@ def procesar_liquidacion_compra_job(
                 attempt=attempt + 1,
                 max_attempts=max_attempts,
             )
+
+
+def enqueue_poll_autorizacion_retencion(
+    *,
+    retencion_id: int,
+    empresa_id: int,
+    delay_seconds: int = 30,
+    attempt: int = 1,
+    max_attempts: int = 240,
+) -> bool:
+    try:
+        import django_rq
+
+        queue = django_rq.get_queue("sri")
+        job_id = f"sri_poll_autorizacion_retencion_{empresa_id}_{retencion_id}"
+
+        queue.enqueue_in(
+            timedelta(seconds=max(0, int(delay_seconds))),
+            poll_autorizacion_retencion,
+            retencion_id,
+            empresa_id,
+            attempt,
+            max_attempts,
+            job_id=job_id,
+            result_ttl=0,
+            failure_ttl=86400,
+        )
+        logger.info(
+            "[SRI RET] Encolado job %s (attempt=%s/%s, delay=%ss)",
+            job_id,
+            attempt,
+            max_attempts,
+            delay_seconds,
+        )
+        return True
+    except Exception as exc:
+        logger.warning("[SRI RET] No se pudo encolar poll para retencion %s: %s", retencion_id, exc)
+        return False
+
+
+def poll_autorizacion_retencion(retencion_id: int, empresa_id: int, attempt: int = 1, max_attempts: int = 240) -> None:
+    from inventario.models import Empresa
+    from inventario.retenciones.models import ComprobanteRetencion
+    from inventario.sri.ambiente import obtener_ambiente_sri
+    from inventario.sri.sri_client import SRIClient
+
+    def _norm_estado(valor: str | None) -> str:
+        estado = str(valor or '').upper().strip()
+        mapa = {
+            'AUTORIZADO': 'AUTORIZADA',
+            'NO AUTORIZADO': 'RECHAZADA',
+            'NO_AUTORIZADO': 'RECHAZADA',
+            'DEVUELTA': 'RECHAZADA',
+        }
+        return mapa.get(estado, estado)
+
+    try:
+        empresa = Empresa.objects.filter(id=empresa_id).first()
+        if empresa is None:
+            logger.warning("[SRI RET] Empresa %s no existe", empresa_id)
+            return
+
+        retencion = ComprobanteRetencion.objects.filter(id=retencion_id, empresa_id=empresa_id).first()
+        if retencion is None:
+            logger.warning("[SRI RET] Retencion %s no existe en empresa %s", retencion_id, empresa_id)
+            return
+
+        estado_actual = _norm_estado(retencion.estado_sri)
+        if estado_actual in {'AUTORIZADA', 'RECHAZADA', 'ERROR'}:
+            logger.info("[SRI RET] Retencion %s ya final (%s)", retencion_id, estado_actual)
+            return
+
+        if not (retencion.clave_acceso or '').strip():
+            logger.warning("[SRI RET] Retencion %s sin clave de acceso", retencion_id)
+            return
+
+        ambiente = obtener_ambiente_sri(empresa)
+        cliente = SRIClient(ambiente='produccion' if ambiente == '2' else 'pruebas')
+        resultado = cliente.consultar_autorizacion(retencion.clave_acceso)
+
+        estado = _norm_estado(resultado.get('estado'))
+        if estado:
+            retencion.estado_sri = estado
+
+        autorizaciones = resultado.get('autorizaciones') or []
+        if autorizaciones and isinstance(autorizaciones, list) and isinstance(autorizaciones[0], dict):
+            numero = (autorizaciones[0].get('numeroAutorizacion') or '').strip()
+            if numero:
+                retencion.numero_autorizacion = numero
+                retencion.autorizacion_retencion = numero
+
+        retencion.save(update_fields=['estado_sri', 'numero_autorizacion', 'autorizacion_retencion', 'actualizado_en'])
+
+        if retencion.estado_sri in {'AUTORIZADA', 'RECHAZADA', 'ERROR'}:
+            logger.info("[SRI RET] Retencion %s finalizó en estado %s", retencion_id, retencion.estado_sri)
+            return
+
+        if attempt >= max_attempts:
+            logger.warning("[SRI RET] Retencion %s sigue pendiente y alcanzó max_attempts=%s", retencion_id, max_attempts)
+            return
+
+        enqueue_poll_autorizacion_retencion(
+            retencion_id=retencion_id,
+            empresa_id=empresa_id,
+            delay_seconds=30,
+            attempt=attempt + 1,
+            max_attempts=max_attempts,
+        )
+
+    except Exception as exc:
+        logger.exception("[SRI RET] Error en poll retencion %s (attempt=%s/%s): %s", retencion_id, attempt, max_attempts, exc)
+        if attempt < max_attempts:
+            enqueue_poll_autorizacion_retencion(
+                retencion_id=retencion_id,
+                empresa_id=empresa_id,
+                delay_seconds=30,
+                attempt=attempt + 1,
+                max_attempts=max_attempts,
+            )

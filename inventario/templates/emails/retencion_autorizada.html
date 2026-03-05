@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ document_title }}</title>
+</head>
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="background: #ffffff; padding: 40px 30px; text-align: center; border-bottom: 4px solid #10b981;">
+            <h1 style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: 2px; color: #1f2937;">CATALINA</h1>
+            <p style="margin: 10px 0 0 0; font-size: 16px; letter-spacing: 0.5px; color: #10b981; font-weight: 600;">{{ document_title }} Autorizado</p>
+        </div>
+        <div style="padding: 30px; text-align: center;">
+            <div style="font-size: 18px; color: #333; margin-bottom: 15px;">Estimado/a {{ nombre_cliente }}</div>
+            <div style="font-size: 14px; color: #555; line-height: 1.6; margin-bottom: 20px;">{{ intro_text }} Este comprobante respalda legalmente las retenciones realizadas en la transaccion.</div>
+            <table width="100%" cellpadding="8" cellspacing="0" style="background-color: #f8f9fa; border-left: 4px solid #2c3e50; margin: 20px 0; border-radius: 4px;">
+                <tr><td style="font-weight: 600; color: #333; text-align: left;">Emisor:</td><td style="color: #555; text-align: right;">{{ razon_social }}</td></tr>
+                <tr><td style="font-weight: 600; color: #333; text-align: left;">RUC:</td><td style="color: #555; text-align: right;">{{ ruc }}</td></tr>
+                <tr><td style="font-weight: 600; color: #333; text-align: left;">{{ number_label }}:</td><td style="color: #555; text-align: right;">{{ document_number }}</td></tr>
+                <tr><td style="font-weight: 600; color: #333; text-align: left;">Fecha de Emision:</td><td style="color: #555; text-align: right;">{{ fecha_emision }}</td></tr>
+            </table>
+            <div style="background-color: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 4px; margin: 20px 0; text-align: center;">
+                <div style="font-size: 12px; color: #856404; font-weight: 600; margin-bottom: 5px;">CLAVE DE ACCESO:</div>
+                <div style="font-family: 'Courier New', monospace; font-size: 12px; color: #333; word-break: break-all;">{{ clave_acceso }}</div>
+            </div>
+            <div style="background-color: #e3f2fd; border: 1px solid #2196f3; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                <div style="font-weight: 600; color: #1976d2; margin-bottom: 10px; font-size: 14px;">Archivos Adjuntos:</div>
+                {% for item in attachments %}<span style="display: inline-block; background-color: white; border: 1px solid #90caf9; padding: 8px 15px; border-radius: 20px; margin: 5px; font-size: 13px; color: #1976d2;">{{ item }}</span>{% endfor %}
+            </div>
+        </div>
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; font-size: 12px;">
+            <p style="margin: 15px 0 5px 0; color: white; font-weight: 600;">{{ year }} CATALINA FACT - Todos los derechos reservados</p>
+            <p style="margin: 5px 0; color: white;">Santo Domingo - Ecuador</p>
+        </div>
+    </div>
+</body>
+</html>

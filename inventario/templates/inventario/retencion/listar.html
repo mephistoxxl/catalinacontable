@@ -81,6 +81,9 @@
               <td class="px-3 py-2 text-sm text-gray-800">{{ retencion.get_estado_sri_display|default:'No enviada' }}</td>
               <td class="px-3 py-2 text-right">
                 <div class="inline-flex items-center gap-1 flex-wrap justify-end">
+                  <a href="{% url 'inventario:retenciones_editar' retencion.id %}" class="inline-flex items-center justify-center px-3 py-2 rounded bg-gray-600 text-white text-xs hover:bg-gray-700">
+                    <i class="fas fa-edit mr-1"></i>Editar
+                  </a>
                   <a href="{% url 'inventario:retenciones_xml' retencion.id %}" class="inline-flex items-center justify-center px-3 py-2 rounded bg-blue-600 text-white text-xs hover:bg-blue-700">
                     <i class="fas fa-file-code mr-1"></i>XML
                   </a>

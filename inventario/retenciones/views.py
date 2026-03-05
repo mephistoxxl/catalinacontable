@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import logging
 import os
 import tempfile
 from decimal import Decimal
@@ -29,6 +31,142 @@ from ..sri.ambiente import obtener_ambiente_sri
 from ..sri.firmador_xades_sri import XAdESError, firmar_xml_xades_bes
 from ..sri.sri_client import SRIClient
 
+logger = logging.getLogger(__name__)
+
+
+def _to_decimal(value, default: str = '0.00') -> Decimal:
+    try:
+        return Decimal(str(value or default))
+    except Exception:
+        return Decimal(default)
+
+
+def _cargar_detalles_json(request) -> tuple[list[dict], list[dict]]:
+    def _cargar(raw: str) -> list[dict]:
+        if not raw:
+            return []
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                return [d for d in data if isinstance(d, dict)]
+        except Exception:
+            return []
+        return []
+
+    renta = _cargar((request.POST.get('renta_detalles_json') or '').strip())
+    iva = _cargar((request.POST.get('iva_detalles_json') or '').strip())
+    return renta, iva
+
+
+def _normalizar_detalles_payload(renta_rows: list[dict], iva_rows: list[dict], form: ComprobanteRetencionForm) -> list[dict]:
+    detalles: list[dict] = []
+
+    for row in renta_rows:
+        codigo = (row.get('codigo') or '304B').strip()
+        base = _to_decimal(row.get('base'))
+        porcentaje = _to_decimal(row.get('porcentaje'))
+        if porcentaje <= 0:
+            porcentaje = porcentaje_renta_sugerido(codigo)
+        if base > 0 and porcentaje > 0:
+            detalles.append(
+                {
+                    'tipo_impuesto': 'RENTA',
+                    'codigo_retencion': codigo,
+                    'descripcion_retencion': (row.get('descripcion') or 'Retención Renta').strip(),
+                    'base_imponible': base,
+                    'porcentaje_retener': porcentaje,
+                    'valor_retenido': calcular_valor_retenido(base, porcentaje),
+                }
+            )
+
+    for row in iva_rows:
+        codigo = (row.get('codigo') or '721').strip()
+        base = _to_decimal(row.get('base'))
+        porcentaje = _to_decimal(row.get('porcentaje'))
+        if porcentaje <= 0:
+            porcentaje = porcentaje_iva_por_codigo(codigo)
+        if base > 0 and porcentaje > 0:
+            detalles.append(
+                {
+                    'tipo_impuesto': 'IVA',
+                    'codigo_retencion': codigo,
+                    'descripcion_retencion': (row.get('descripcion') or 'Retención IVA').strip(),
+                    'base_imponible': base,
+                    'porcentaje_retener': porcentaje,
+                    'valor_retenido': calcular_valor_retenido(base, porcentaje),
+                }
+            )
+
+    if detalles:
+        return detalles
+
+    renta_base = form.cleaned_data.get('renta_base') or Decimal('0.00')
+    renta_codigo = (form.cleaned_data.get('codigo_renta') or '304B').strip()
+    renta_porcentaje = form.cleaned_data.get('renta_porcentaje') or Decimal('0.00')
+    if renta_porcentaje <= 0:
+        renta_porcentaje = porcentaje_renta_sugerido(renta_codigo)
+    if renta_base > 0 and renta_porcentaje > 0:
+        detalles.append(
+            {
+                'tipo_impuesto': 'RENTA',
+                'codigo_retencion': renta_codigo,
+                'descripcion_retencion': 'Retención Renta',
+                'base_imponible': renta_base,
+                'porcentaje_retener': renta_porcentaje,
+                'valor_retenido': calcular_valor_retenido(renta_base, renta_porcentaje),
+            }
+        )
+
+    iva_base = form.cleaned_data.get('iva_base') or Decimal('0.00')
+    iva_codigo = (form.cleaned_data.get('codigo_iva') or '721').strip()
+    iva_porcentaje = porcentaje_iva_por_codigo(iva_codigo)
+    if iva_base > 0 and iva_porcentaje > 0:
+        detalles.append(
+            {
+                'tipo_impuesto': 'IVA',
+                'codigo_retencion': iva_codigo,
+                'descripcion_retencion': 'Retención IVA',
+                'base_imponible': iva_base,
+                'porcentaje_retener': iva_porcentaje,
+                'valor_retenido': calcular_valor_retenido(iva_base, iva_porcentaje),
+            }
+        )
+
+    return detalles
+
+
+def _serializar_detalles(retencion: ComprobanteRetencion) -> tuple[str, str]:
+    renta = []
+    iva = []
+    for d in retencion.detalles.all().order_by('id'):
+        row = {
+            'codigo': d.codigo_retencion,
+            'descripcion': d.descripcion_retencion,
+            'base': f'{d.base_imponible:.2f}',
+            'porcentaje': f'{d.porcentaje_retener:.4f}',
+        }
+        if d.tipo_impuesto == 'RENTA':
+            renta.append(row)
+        elif d.tipo_impuesto == 'IVA':
+            iva.append(row)
+    return json.dumps(renta), json.dumps(iva)
+
+
+def _encolar_reintentos_retencion(retencion: ComprobanteRetencion) -> bool:
+    try:
+        from inventario.sri.rq_jobs import enqueue_poll_autorizacion_retencion
+
+        return enqueue_poll_autorizacion_retencion(
+            retencion_id=retencion.id,
+            empresa_id=retencion.empresa_id,
+            delay_seconds=30,
+            attempt=1,
+            max_attempts=240,
+        )
+    except Exception as exc:
+        logger.warning('No se pudo encolar reintento SRI para retención %s: %s', retencion.id, exc)
+        return False
+
 
 class ListarRetenciones(LoginRequiredMixin, RequireEmpresaActivaMixin, ListView):
     login_url = '/inventario/login'
@@ -54,6 +192,17 @@ class ListarRetenciones(LoginRequiredMixin, RequireEmpresaActivaMixin, ListView)
         estado = (self.request.GET.get('estado') or '').strip()
         if estado:
             queryset = queryset.filter(estado_sri=estado)
+
+        try:
+            pendientes = (
+                ComprobanteRetencion.objects.filter(empresa=empresa, estado_sri__in=['PENDIENTE', 'RECIBIDA'])
+                .exclude(clave_acceso='')
+                .order_by('-actualizado_en')[:10]
+            )
+            for ret in pendientes:
+                _encolar_reintentos_retencion(ret)
+        except Exception as exc:
+            logger.warning('No se pudo iniciar auto-reintentos SRI de retenciones: %s', exc)
 
         return queryset
 
@@ -158,35 +307,10 @@ class CrearRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
             retencion.limpiar_estado_xml()
             retencion.save()
 
-            renta_base = form.cleaned_data.get('renta_base') or Decimal('0.00')
-            renta_codigo = (form.cleaned_data.get('codigo_renta') or '304B').strip()
-            renta_porcentaje = form.cleaned_data.get('renta_porcentaje') or Decimal('0.00')
-            if renta_porcentaje <= 0:
-                renta_porcentaje = porcentaje_renta_sugerido(renta_codigo)
-            if renta_base > 0 and renta_porcentaje > 0:
-                RetencionDetalle.objects.create(
-                    comprobante=retencion,
-                    tipo_impuesto='RENTA',
-                    codigo_retencion=renta_codigo,
-                    descripcion_retencion='Retención Renta',
-                    base_imponible=renta_base,
-                    porcentaje_retener=renta_porcentaje,
-                    valor_retenido=calcular_valor_retenido(renta_base, renta_porcentaje),
-                )
-
-            iva_base = form.cleaned_data.get('iva_base') or Decimal('0.00')
-            iva_codigo = (form.cleaned_data.get('codigo_iva') or '721').strip()
-            iva_porcentaje = porcentaje_iva_por_codigo(iva_codigo)
-            if iva_base > 0 and iva_porcentaje > 0:
-                RetencionDetalle.objects.create(
-                    comprobante=retencion,
-                    tipo_impuesto='IVA',
-                    codigo_retencion=iva_codigo,
-                    descripcion_retencion='Retención IVA',
-                    base_imponible=iva_base,
-                    porcentaje_retener=iva_porcentaje,
-                    valor_retenido=calcular_valor_retenido(iva_base, iva_porcentaje),
-                )
+            renta_rows, iva_rows = _cargar_detalles_json(request)
+            detalles = _normalizar_detalles_payload(renta_rows, iva_rows, form)
+            for det in detalles:
+                RetencionDetalle.objects.create(comprobante=retencion, **det)
 
             retencion.recalcular_totales()
 
@@ -236,6 +360,86 @@ class CrearRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
             messages.success(request, f'Retención {retencion.numero_completo} guardada. XML ATS 2.0.0 válido.')
         else:
             messages.warning(request, f'Retención {retencion.numero_completo} guardada, pero el XML tiene observaciones de validación XSD.')
+        return redirect('inventario:retenciones_listar')
+
+
+class EditarRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
+    login_url = '/inventario/login'
+    template_name = 'inventario/retencion/crear.html'
+
+    def _contexto(self, form, retencion: ComprobanteRetencion):
+        renta_json, iva_json = _serializar_detalles(retencion)
+        return {
+            'form': form,
+            'titulo': 'Editar Retención',
+            'menu_actual': 'compras',
+            'opcion_actual': 'listar_retenciones',
+            'modo_edicion': True,
+            'retencion': retencion,
+            'renta_detalles_iniciales': renta_json,
+            'iva_detalles_iniciales': iva_json,
+        }
+
+    def get(self, request, pk, *args, **kwargs):
+        empresa = get_empresa_activa(request)
+        retencion = ComprobanteRetencion.objects.filter(empresa=empresa, pk=pk).first()
+        if not retencion:
+            messages.error(request, 'Retención no encontrada.')
+            return redirect('inventario:retenciones_listar')
+
+        renta = retencion.detalles.filter(tipo_impuesto='RENTA').order_by('id').first()
+        iva = retencion.detalles.filter(tipo_impuesto='IVA').order_by('id').first()
+        initial = {}
+        if renta:
+            initial.update({'renta_base': renta.base_imponible, 'renta_porcentaje': renta.porcentaje_retener, 'codigo_renta': renta.codigo_retencion})
+        if iva:
+            initial.update({'iva_base': iva.base_imponible, 'iva_porcentaje': iva.porcentaje_retener, 'codigo_iva': iva.codigo_retencion})
+
+        form = ComprobanteRetencionForm(instance=retencion, initial=initial)
+        return render(request, self.template_name, self._contexto(form, retencion))
+
+    def post(self, request, pk, *args, **kwargs):
+        empresa = get_empresa_activa(request)
+        retencion = ComprobanteRetencion.objects.filter(empresa=empresa, pk=pk).first()
+        if not retencion:
+            messages.error(request, 'Retención no encontrada.')
+            return redirect('inventario:retenciones_listar')
+
+        if retencion.estado_sri == 'AUTORIZADA':
+            messages.error(request, 'No se puede editar una retención ya autorizada por SRI.')
+            return redirect('inventario:retenciones_listar')
+
+        form = ComprobanteRetencionForm(request.POST, instance=retencion)
+        if not form.is_valid():
+            messages.error(request, 'Por favor corrige los campos del formulario de retención.')
+            return render(request, self.template_name, self._contexto(form, retencion))
+
+        with transaction.atomic():
+            retencion = form.save(commit=False)
+            retencion.empresa = empresa
+            retencion.estado_sri = ''
+            retencion.numero_autorizacion = ''
+            retencion.autorizacion_retencion = ''
+            retencion.clave_acceso = ''
+            retencion.limpiar_estado_xml()
+            retencion.save()
+
+            retencion.detalles.all().delete()
+            renta_rows, iva_rows = _cargar_detalles_json(request)
+            detalles = _normalizar_detalles_payload(renta_rows, iva_rows, form)
+            for det in detalles:
+                RetencionDetalle.objects.create(comprobante=retencion, **det)
+
+            retencion.recalcular_totales()
+            xml_gen = RetencionXMLGenerator(retencion)
+            retencion.clave_acceso = xml_gen.generar_clave_acceso()
+            retencion.xml_generado = xml_gen.generar_xml()
+            validacion = xml_gen.validar_xml(retencion.xml_generado)
+            retencion.xml_validado = validacion.valido
+            retencion.xml_validacion_error = '' if validacion.valido else (validacion.errores or validacion.mensaje)
+            retencion.save(update_fields=['total_retencion_renta', 'total_retencion_iva', 'total_retenido', 'clave_acceso', 'xml_generado', 'xml_firmado', 'xml_firmado_en', 'xml_validado', 'xml_validacion_error', 'estado_sri', 'numero_autorizacion', 'autorizacion_retencion', 'actualizado_en'])
+
+        messages.success(request, f'Retención {retencion.numero_completo} actualizada correctamente.')
         return redirect('inventario:retenciones_listar')
 
 
@@ -397,6 +601,7 @@ class AutorizarRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                             messages.success(request, f'Retención {retencion.numero_completo} autorizada en SRI.')
                     elif retencion.estado_sri in {'PENDIENTE', 'RECIBIDA'}:
                         messages.warning(request, 'Retención enviada al SRI y pendiente de autorización. Consulta nuevamente en unos minutos.')
+                        _encolar_reintentos_retencion(retencion)
                     else:
                         mensajes = resultado_auth.get('mensajes') or []
                         mensaje = mensajes[0].get('mensaje') if mensajes and isinstance(mensajes[0], dict) else 'No autorizada por el SRI.'
@@ -405,6 +610,8 @@ class AutorizarRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                     mensajes = resultado_envio.get('mensajes') or []
                     mensaje = mensajes[0].get('mensaje') if mensajes and isinstance(mensajes[0], dict) else 'No fue recibida por SRI.'
                     messages.error(request, f'Error en recepción SRI: {mensaje}')
+                    if retencion.estado_sri in {'PENDIENTE', 'RECIBIDA'}:
+                        _encolar_reintentos_retencion(retencion)
             finally:
                 for p in (path_xml, path_firmado):
                     try:
