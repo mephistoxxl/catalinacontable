@@ -2310,6 +2310,49 @@ class Secuencia(models.Model):
         """Retorna el secuencial formateado con 9 dígitos (000000001, etc.)"""
         return f"{self.secuencial:09d}"
 
+
+DEFAULT_SECUENCIAS_EMPRESA = (
+    ('01', 'Facturas Electrónicas'),
+    ('03', 'Liquidación de Compra Electrónica'),
+    ('04', 'Notas de Crédito Electrónicas'),
+    ('05', 'Notas de Débito Electrónicas'),
+    ('06', 'Guía de Remisión Electrónica'),
+    ('07', 'Retención Electrónica'),
+)
+
+
+def ensure_default_secuencias_for_empresa(empresa):
+    """Crea las secuencias base de documentos electrónicos para una empresa.
+
+    Deja listas las series en formato 001-901-000000001 para que el cliente
+    solo entre a editarlas si lo necesita.
+    """
+    if not empresa or not getattr(empresa, 'pk', None):
+        return
+
+    for tipo_documento, descripcion in DEFAULT_SECUENCIAS_EMPRESA:
+        Secuencia._unsafe_objects.get_or_create(
+            empresa=empresa,
+            tipo_documento=tipo_documento,
+            establecimiento=1,
+            punto_emision=901,
+            defaults={
+                'descripcion': descripcion,
+                'secuencial': 1,
+                'activo': True,
+                'iva': True,
+                'fiscal': True,
+                'documento_electronico': True,
+            },
+        )
+
+
+@receiver(post_save, sender=Empresa)
+def create_default_secuencias_for_new_empresa(sender, instance, created, **kwargs):
+    if not created:
+        return
+    ensure_default_secuencias_for_empresa(instance)
+
 class FacturadorManager(BaseUserManager):
     def create_facturador(self, nombres, telefono, correo, password=None, **extra_fields):
         """Crea y guarda un nuevo facturador"""
