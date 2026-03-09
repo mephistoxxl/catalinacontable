@@ -128,6 +128,37 @@ function restoreVentasChartGeometry(svg) {
     });
 }
 
+let ventasChartSizingFrame = null;
+let ventasChartSizingTimeout = null;
+
+function scheduleTabletPanelChartSizing(delay = 0) {
+    if (ventasChartSizingFrame !== null) {
+        window.cancelAnimationFrame(ventasChartSizingFrame);
+        ventasChartSizingFrame = null;
+    }
+    if (ventasChartSizingTimeout !== null) {
+        window.clearTimeout(ventasChartSizingTimeout);
+        ventasChartSizingTimeout = null;
+    }
+
+    const run = () => {
+        ventasChartSizingFrame = window.requestAnimationFrame(() => {
+            ventasChartSizingFrame = null;
+            applyTabletPanelChartSizing();
+        });
+    };
+
+    if (delay > 0) {
+        ventasChartSizingTimeout = window.setTimeout(() => {
+            ventasChartSizingTimeout = null;
+            run();
+        }, delay);
+        return;
+    }
+
+    run();
+}
+
 function applyTabletPanelChartSizing() {
     const isTablet = isTabletPanelDevice();
     const root = document.documentElement;
@@ -141,6 +172,7 @@ function applyTabletPanelChartSizing() {
     }
 
     if (!chartWrap || !chartSvg) {
+        scheduleTabletPanelChartSizing(120);
         return;
     }
 
@@ -161,9 +193,12 @@ function applyTabletPanelChartSizing() {
     }
 }
 
-applyTabletPanelChartSizing();
-document.addEventListener('DOMContentLoaded', applyTabletPanelChartSizing);
-window.addEventListener('resize', applyTabletPanelChartSizing);
+scheduleTabletPanelChartSizing();
+document.addEventListener('DOMContentLoaded', () => scheduleTabletPanelChartSizing());
+window.addEventListener('load', () => scheduleTabletPanelChartSizing(30));
+window.addEventListener('pageshow', () => scheduleTabletPanelChartSizing(30));
+window.addEventListener('resize', () => scheduleTabletPanelChartSizing());
+window.addEventListener('orientationchange', () => scheduleTabletPanelChartSizing(60));
 </script>
 <style>
     .form-header-icon { font-size: 14px !important; }
