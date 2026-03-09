@@ -1170,12 +1170,11 @@ class Panel(LoginRequiredMixin, View):
 
         # Puntos para SVG (sin dependencias externas)
         chart_width = 900
-        # Un poco más alto para mejorar legibilidad del comparativo anual.
         chart_height = 150
         padding_left = 72
         padding_right = 18
         padding_top = 11
-        # Más espacio inferior para etiquetas de meses y título del eje.
+        # Mas espacio inferior para etiquetas de meses y titulo del eje.
         padding_bottom = 48
 
         inner_w = chart_width - padding_left - padding_right
@@ -1186,10 +1185,14 @@ class Panel(LoginRequiredMixin, View):
         x_end = float(chart_width - padding_right)
         y_bottom = float(chart_height - padding_bottom)
 
-        max_val = max([0.0] + ventas_ytd_prev + ventas_ytd_cur)
-        has_data = max_val > 0
-        if max_val <= 0:
-            max_val = 1.0
+        raw_max_val = max([0.0] + ventas_ytd_prev + ventas_ytd_cur)
+        has_data = raw_max_val > 0
+        if raw_max_val <= 0:
+            raw_max_val = 1.0
+
+        # Escala minima legible para el panel: 0, 1500, 3000.
+        # Si en algun periodo se supera ese valor, la grafica conserva el maximo real.
+        max_val = max(3000.0, float(raw_max_val))
 
         def _x(i: int) -> float:
             if i <= 0:

@@ -1,10 +1,85 @@
 <style>
     /* Quitar subrayado feo del footer */
+    .footer {
+        position: static !important;
+        left: auto !important;
+        right: auto !important;
+        bottom: auto !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 50px;
+        padding: 12px 18px !important;
+        display: flex !important;
+        justify-content: flex-start !important;
+        align-items: center !important;
+        flex-wrap: wrap;
+        row-gap: 6px;
+        column-gap: 12px;
+        box-sizing: border-box;
+    }
+    .footer .footer-block {
+        margin: 0 !important;
+    }
+    .footer .author > ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 6px 10px;
+    }
+    .footer .author > ul li {
+        display: inline-flex !important;
+        align-items: center;
+        line-height: 1.4 !important;
+        white-space: normal;
+        text-align: center !important;
+    }
+    .footer .author > ul li:after {
+        content: "|";
+        margin-left: 10px;
+        color: #9ca3af;
+    }
+    .footer .author > ul li:last-child:after {
+        content: "";
+        margin-left: 0;
+    }
     .footer a,
     .footer a:hover,
     .footer a:focus {
         text-decoration: none !important;
         color: #85CE36 !important;
+    }
+
+    @media (max-width: 1024px) {
+        .footer {
+            padding: 10px 14px !important;
+        }
+        .footer .author > ul {
+            gap: 4px 8px;
+        }
+        .footer .author > ul li,
+        .footer .author > ul li a {
+            font-size: 12px !important;
+            line-height: 1.35 !important;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .footer {
+            padding: 10px 12px !important;
+        }
+        .footer .author > ul {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+        }
+        .footer .author > ul li:after {
+            content: "";
+            margin-left: 0;
+        }
     }
 </style>
 

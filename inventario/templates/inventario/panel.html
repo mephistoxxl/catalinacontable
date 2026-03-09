@@ -4,6 +4,166 @@
 <script>
 let numeroAdministradores = '{{ administradores }}'
 let numeroUsuarios = '{{ usuarios }}'
+function isTabletPanelDevice() {
+    const ua = navigator.userAgent || '';
+    const viewportMinSide = Math.min(window.innerWidth || 0, window.innerHeight || 0);
+    const viewportMaxSide = Math.max(window.innerWidth || 0, window.innerHeight || 0);
+    const maxTouchPoints = navigator.maxTouchPoints || 0;
+    const isIPad = /iPad/i.test(ua) || (navigator.platform === 'MacIntel' && maxTouchPoints > 1);
+    const isAndroidTablet = /Android/i.test(ua) && !/Mobile/i.test(ua);
+    const tabletViewportSize = viewportMinSide >= 744 && viewportMaxSide <= 1400;
+
+    return (isIPad && tabletViewportSize) || (isAndroidTablet && tabletViewportSize);
+}
+
+function cacheVentasChartGeometry(svg) {
+    if (!svg || svg.dataset.geometryCached === '1') {
+        return;
+    }
+
+    svg.dataset.geometryCached = '1';
+    svg.dataset.originalViewBox = svg.getAttribute('viewBox') || '0 0 900 150';
+
+    svg.querySelectorAll('line, text, circle, polyline').forEach((el) => {
+        ['y', 'cy', 'y1', 'y2', 'r', 'stroke-width', 'points', 'style'].forEach((attr) => {
+            const value = el.getAttribute(attr);
+            if (value !== null) {
+                el.setAttribute(`data-orig-${attr}`, value);
+            }
+        });
+    });
+}
+
+function scaleStyleFontSize(styleValue, factor) {
+    if (!styleValue || !/font-size\s*:/i.test(styleValue)) {
+        return styleValue;
+    }
+
+    return styleValue.replace(/font-size\s*:\s*([\d.]+)px/gi, (_, size) => {
+        const scaled = Math.max(8, parseFloat(size) * factor);
+        return `font-size:${scaled.toFixed(2)}px`;
+    });
+}
+
+function applyTabletVentasChartGeometry(svg, targetHeight) {
+    cacheVentasChartGeometry(svg);
+
+    const originalViewBox = svg.dataset.originalViewBox || '0 0 900 150';
+    const parts = originalViewBox.split(/\s+/).map(Number);
+    if (parts.length !== 4 || Number.isNaN(parts[2]) || Number.isNaN(parts[3]) || !parts[3]) {
+        return;
+    }
+
+    const originalWidth = parts[2];
+    const originalHeight = parts[3];
+    const factor = targetHeight / originalHeight;
+
+    svg.setAttribute('viewBox', `0 0 ${originalWidth} ${targetHeight}`);
+    svg.style.aspectRatio = `${originalWidth} / ${targetHeight}`;
+
+    svg.querySelectorAll('line').forEach((el) => {
+        const y1 = el.getAttribute('data-orig-y1');
+        const y2 = el.getAttribute('data-orig-y2');
+        const strokeWidth = el.getAttribute('data-orig-stroke-width');
+        if (y1 !== null) el.setAttribute('y1', (parseFloat(y1) * factor).toFixed(2));
+        if (y2 !== null) el.setAttribute('y2', (parseFloat(y2) * factor).toFixed(2));
+        if (strokeWidth !== null) el.setAttribute('stroke-width', Math.max(1, parseFloat(strokeWidth) * 1.15).toFixed(2));
+    });
+
+    svg.querySelectorAll('text').forEach((el) => {
+        const y = el.getAttribute('data-orig-y');
+        const style = el.getAttribute('data-orig-style');
+        if (y !== null) el.setAttribute('y', (parseFloat(y) * factor).toFixed(2));
+        if (style !== null) el.setAttribute('style', scaleStyleFontSize(style, 1.18));
+    });
+
+    svg.querySelectorAll('circle').forEach((el) => {
+        const cy = el.getAttribute('data-orig-cy');
+        const radius = el.getAttribute('data-orig-r');
+        if (cy !== null) el.setAttribute('cy', (parseFloat(cy) * factor).toFixed(2));
+        if (radius !== null) {
+            const radiusFactor = parseFloat(radius) <= 2 ? 1.6 : 1.18;
+            el.setAttribute('r', Math.max(2, parseFloat(radius) * radiusFactor).toFixed(2));
+        }
+    });
+
+    svg.querySelectorAll('polyline').forEach((el) => {
+        const points = el.getAttribute('data-orig-points');
+        const strokeWidth = el.getAttribute('data-orig-stroke-width');
+        if (points) {
+            const scaledPoints = points
+                .trim()
+                .split(/\s+/)
+                .map((pair) => {
+                    const [x, y] = pair.split(',').map(Number);
+                    if (Number.isNaN(x) || Number.isNaN(y)) {
+                        return pair;
+                    }
+                    return `${x.toFixed(2)},${(y * factor).toFixed(2)}`;
+                })
+                .join(' ');
+            el.setAttribute('points', scaledPoints);
+        }
+        if (strokeWidth !== null) el.setAttribute('stroke-width', Math.max(2, parseFloat(strokeWidth) * 1.25).toFixed(2));
+    });
+}
+
+function restoreVentasChartGeometry(svg) {
+    if (!svg || svg.dataset.geometryCached !== '1') {
+        return;
+    }
+
+    if (svg.dataset.originalViewBox) {
+        svg.setAttribute('viewBox', svg.dataset.originalViewBox);
+    }
+    svg.style.aspectRatio = '';
+
+    svg.querySelectorAll('line, text, circle, polyline').forEach((el) => {
+        ['y', 'cy', 'y1', 'y2', 'r', 'stroke-width', 'points', 'style'].forEach((attr) => {
+            const original = el.getAttribute(`data-orig-${attr}`);
+            if (original !== null) {
+                el.setAttribute(attr, original);
+            }
+        });
+    });
+}
+
+function applyTabletPanelChartSizing() {
+    const isTablet = isTabletPanelDevice();
+    const root = document.documentElement;
+    const body = document.body;
+    const chartWrap = document.querySelector('.panel-chart-section .ventas-chart-wrap');
+    const chartSvg = document.getElementById('ventas-chart-svg');
+
+    root.classList.toggle('tablet-panel-svg', isTablet);
+    if (body) {
+        body.classList.toggle('tablet-panel-svg', isTablet);
+    }
+
+    if (!chartWrap || !chartSvg) {
+        return;
+    }
+
+    if (isTablet) {
+        chartWrap.style.minHeight = '0';
+        chartSvg.style.width = '100%';
+        chartSvg.style.height = 'auto';
+        chartSvg.style.minHeight = '';
+        chartSvg.style.maxHeight = '';
+        applyTabletVentasChartGeometry(chartSvg, 300);
+    } else {
+        chartWrap.style.minHeight = '';
+        chartSvg.style.width = '';
+        chartSvg.style.height = '';
+        chartSvg.style.minHeight = '';
+        chartSvg.style.maxHeight = '';
+        restoreVentasChartGeometry(chartSvg);
+    }
+}
+
+applyTabletPanelChartSizing();
+document.addEventListener('DOMContentLoaded', applyTabletPanelChartSizing);
+window.addEventListener('resize', applyTabletPanelChartSizing);
 </script>
 <style>
     .form-header-icon { font-size: 14px !important; }
@@ -44,6 +204,116 @@ let numeroUsuarios = '{{ usuarios }}'
     .panel-compact .w-8 { width: 1.6rem !important; }
     .panel-compact .h-8 { height: 1.6rem !important; }
     .panel-compact .text-2xl.mb-2 { margin-bottom: 0.25rem !important; }
+
+    .ventas-chart-area {
+        position: relative;
+        width: 100%;
+    }
+
+    .ventas-chart-legend {
+        position: absolute;
+        top: 0.25rem;
+        right: 0.25rem;
+        z-index: 2;
+        background: rgba(255, 255, 255, 0.96);
+    }
+
+    .tablet-panel-svg #app > main {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+    }
+
+    .tablet-panel-svg .panel-compact {
+        min-height: calc(100dvh - 110px);
+        display: flex;
+        flex-direction: column;
+        padding-bottom: 0.5rem !important;
+    }
+
+    .tablet-panel-svg .panel-compact > .w-full {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .tablet-panel-svg .panel-compact .text-2xl {
+        font-size: 1.125rem !important;
+        line-height: 1.4rem !important;
+    }
+
+    .tablet-panel-svg .panel-compact .text-lg,
+    .tablet-panel-svg .panel-compact .text-base {
+        line-height: 1.35rem !important;
+    }
+
+    .tablet-panel-svg .panel-compact .text-sm {
+        font-size: 0.875rem !important;
+        line-height: 1.25rem !important;
+    }
+
+    .tablet-panel-svg .panel-chart-section {
+        margin-bottom: 0.5rem !important;
+    }
+
+    .tablet-panel-svg .panel-chart-shell {
+        padding-left: 0.125rem !important;
+        padding-right: 0.125rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+
+    .tablet-panel-svg .panel-chart-shell > .border {
+        padding-left: 0.125rem !important;
+        padding-right: 0.125rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+
+    .tablet-panel-svg .panel-chart-section .ventas-chart-wrap {
+        min-height: 0;
+    }
+
+    .tablet-panel-svg .panel-chart-section .ventas-chart-svg {
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        display: block !important;
+    }
+
+    .tablet-panel-svg .panel-chart-section .ventas-chart-svg polyline {
+        stroke-width: 2.6 !important;
+    }
+
+    .tablet-panel-svg .panel-chart-section .ventas-chart-svg .chart-point {
+        r: 4;
+    }
+
+    .tablet-panel-svg .panel-bottom-grid {
+        flex: 1 1 auto;
+        align-items: stretch;
+    }
+
+    .tablet-panel-svg .panel-bottom-card {
+        min-height: 300px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .tablet-panel-svg .panel-bottom-card > .relative {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .tablet-panel-svg .panel-bottom-card .space-y-2 {
+        flex: 1 1 auto;
+    }
+
+    .tablet-panel-svg .panel-bottom-card .mt-2.flex.items-center.justify-between,
+    .tablet-panel-svg .panel-bottom-card .mt-2.pt-2.border-t {
+        margin-top: auto !important;
+    }
 
     /* Tooltip del gráfico (solo panel) */
     .ventas-chart-wrap { position: relative; }
@@ -205,15 +475,26 @@ let numeroUsuarios = '{{ usuarios }}'
     </section>
 
     <!-- Gráfico ancho: Ventas por Mes (Comparativo anual) -->
-    <section class="mb-2">
-        <div class="bg-white border border-gray-300 rounded-lg p-2">
+    <section class="mb-2 panel-chart-section">
+        <div class="bg-white border border-gray-300 rounded-lg p-2 panel-chart-shell">
             <div class="border border-gray-200 rounded-lg p-1">
                 {% if ventasLineSvg.has_data %}
-                    <div class="flex items-start">
-                        <div class="flex-1">
+                    <div class="ventas-chart-area">
+                        <div class="ventas-chart-legend border border-gray-200 rounded-lg p-1">
+                            <div class="flex items-center space-x-2 mb-2">
+                                <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
+                                <span class="text-xs text-gray-700">{{ ventasChartLabelPrev }}</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                                <span class="text-xs text-gray-700">{{ ventasChartLabelCur }}</span>
+                            </div>
+                        </div>
+
+                        <div class="w-full">
                             <div class="ventas-chart-wrap">
                                 <div id="ventas-tooltip"></div>
-                                <svg viewBox="0 0 {{ ventasLineSvg.width }} {{ ventasLineSvg.height }}" class="w-full block" id="ventas-chart-svg">
+                                <svg viewBox="0 0 {{ ventasLineSvg.width }} {{ ventasLineSvg.height }}" class="w-full block ventas-chart-svg" id="ventas-chart-svg">
                                 <!-- Grid lines -->
                                 <line x1="{{ ventasLineSvg.x_start }}" y1="{{ ventasLineSvg.y100 }}" x2="{{ ventasLineSvg.x_end }}" y2="{{ ventasLineSvg.y100 }}" class="text-gray-200" stroke="currentColor" />
                                 <line x1="{{ ventasLineSvg.x_start }}" y1="{{ ventasLineSvg.y50 }}" x2="{{ ventasLineSvg.x_end }}" y2="{{ ventasLineSvg.y50 }}" class="text-gray-200" stroke="currentColor" />
@@ -296,19 +577,6 @@ let numeroUsuarios = '{{ usuarios }}'
                                 <!-- Chart title -->
                                 <text x="{{ ventasLineSvg.x_mid }}" y="12" text-anchor="middle" class="text-gray-800" style="font-size:12px; font-weight:700;" fill="currentColor">Ventas por Mes</text>
                                 </svg>
-                            </div>
-                        </div>
-
-                        <div class="ml-2">
-                            <div class="border border-gray-200 rounded-lg p-1">
-                                <div class="flex items-center space-x-2 mb-2">
-                                    <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
-                                    <span class="text-xs text-gray-700">{{ ventasChartLabelPrev }}</span>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <span class="w-2 h-2 bg-green-500 rounded-full"></span>
-                                    <span class="text-xs text-gray-700">{{ ventasChartLabelCur }}</span>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -431,9 +699,9 @@ let numeroUsuarios = '{{ usuarios }}'
         })();
     </script>
 
-    <section class="grid grid-cols-1 lg:grid-cols-2 gap-2">
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-2 panel-bottom-grid">
         <!-- Panel de Top Productos Vendidos -->
-        <div class="bg-white border border-gray-300 rounded-lg p-3">
+        <div class="bg-white border border-gray-300 rounded-lg p-3 panel-bottom-card">
             <div class="relative">
                 <div class="flex items-center justify-between mb-2 pb-2 border-b border-gray-200">
                     <h3 class="text-base font-bold text-gray-800">Top Productos Vendidos</h3>
@@ -487,7 +755,7 @@ let numeroUsuarios = '{{ usuarios }}'
         </div>
 
         <!-- Panel de Ventas por Mes -->
-        <div class="bg-white border border-gray-300 rounded-lg p-3">
+        <div class="bg-white border border-gray-300 rounded-lg p-3 panel-bottom-card">
             <div class="relative">
                 <div class="flex items-center justify-between mb-2 pb-2 border-b border-gray-200">
                     <h3 class="text-base font-bold text-gray-800">Ventas por Mes</h3>
