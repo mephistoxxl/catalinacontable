@@ -8854,6 +8854,108 @@ def _start_envio_sri_background(factura_id, empresa_id):
         return True
 
 
+_guia_sri_envio_bg_jobs = {}
+_guia_sri_envio_bg_lock = None
+
+
+def _get_guia_sri_envio_bg_lock():
+    global _guia_sri_envio_bg_lock
+    if _guia_sri_envio_bg_lock is None:
+        import threading
+        _guia_sri_envio_bg_lock = threading.Lock()
+    return _guia_sri_envio_bg_lock
+
+
+def _run_guia_sri_background(guia_id, empresa_id, max_attempts=360, interval_seconds=10):
+    import time
+    from inventario.models import Empresa, GuiaRemision
+    from inventario.tenant.queryset import set_current_tenant
+    from inventario.guia_remision.integracion_sri_guia import IntegracionGuiaRemisionSRI
+
+    key = f"{empresa_id}:{guia_id}"
+    logger.info("[GUIA SRI BG] Inicio envio en background para guia %s (empresa %s)", guia_id, empresa_id)
+    try:
+        empresa = Empresa.objects.filter(id=empresa_id).first()
+        if empresa is None:
+            logger.warning("[GUIA SRI BG] Empresa %s no existe", empresa_id)
+            return
+
+        ya_contabilizada = False
+
+        for _ in range(max_attempts):
+            try:
+                try:
+                    set_current_tenant(empresa)
+                except Exception:
+                    logger.warning("No se pudo establecer tenant en envio background de guia para empresa %s", empresa_id)
+                guia = GuiaRemision.objects.get(id=guia_id, empresa_id=empresa_id)
+            except GuiaRemision.DoesNotExist:
+                logger.warning("[GUIA SRI BG] Guia %s no existe en empresa %s", guia_id, empresa_id)
+                break
+
+            if guia.numero_autorizacion and guia.fecha_autorizacion:
+                logger.info("[GUIA SRI BG] Guia %s ya autorizada", guia_id)
+                if not ya_contabilizada:
+                    try:
+                        incrementar_contador_documentos(empresa)
+                    except Exception as exc:
+                        logger.warning("[GUIA SRI BG] No se pudo incrementar contador para guia %s: %s", guia_id, exc)
+                    ya_contabilizada = True
+                _enviar_email_automatico_guia(guia, empresa)
+                break
+
+            integrador = IntegracionGuiaRemisionSRI(empresa)
+            resultado = integrador.procesar_guia_remision(guia.id)
+            estado = (resultado.get('estado') or '').upper().strip().replace(' ', '_')
+            logger.info("[GUIA SRI BG] Guia %s intento, estado=%s success=%s", guia_id, estado or 'SIN_ESTADO', resultado.get('success'))
+
+            if resultado.get('success'):
+                try:
+                    guia.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion'])
+                except Exception:
+                    pass
+                if guia.numero_autorizacion and guia.fecha_autorizacion and not ya_contabilizada:
+                    try:
+                        incrementar_contador_documentos(empresa)
+                    except Exception as exc:
+                        logger.warning("[GUIA SRI BG] No se pudo incrementar contador para guia %s: %s", guia_id, exc)
+                    ya_contabilizada = True
+                if guia.numero_autorizacion and guia.fecha_autorizacion:
+                    _enviar_email_automatico_guia(guia, empresa)
+                break
+
+            if estado in ('RECIBIDA', 'AUTORIZADA', 'AUTORIZADO'):
+                break
+
+            time.sleep(interval_seconds)
+    finally:
+        logger.info("[GUIA SRI BG] Fin envio en background para guia %s", guia_id)
+        lock = _get_guia_sri_envio_bg_lock()
+        with lock:
+            _guia_sri_envio_bg_jobs.pop(key, None)
+
+
+def _start_guia_sri_background(guia_id, empresa_id):
+    key = f"{empresa_id}:{guia_id}"
+    lock = _get_guia_sri_envio_bg_lock()
+    with lock:
+        job = _guia_sri_envio_bg_jobs.get(key)
+        if job and job.is_alive():
+            logger.info("[GUIA SRI BG] Job ya en ejecucion para %s", key)
+            return False
+
+        import threading
+        job = threading.Thread(
+            target=_run_guia_sri_background,
+            args=(guia_id, empresa_id),
+            daemon=True
+        )
+        _guia_sri_envio_bg_jobs[key] = job
+        job.start()
+        logger.info("[GUIA SRI BG] Job iniciado para %s", key)
+        return True
+
+
 @require_empresa_activa
 def enviar_documento_sri(request, factura_id):
     """Envía una factura al SRI y devuelve el estado de recepción."""
@@ -9717,9 +9819,19 @@ def emitir_guia_remision(request):
                     guia.save()
                     messages.warning(request, f"⚠️ Clave temporal asignada. Error: {e}")
                 
-                # Nuevo flujo: emitir al momento (firma + envío SRI) y luego ir al resumen
-                messages.info(request, f'Procesando emisión de la guía {guia.numero_completo}...')
-                return redirect('inventario:autorizar_guia_remision', guia_id=guia.id)
+                # Nuevo flujo: al emitir, iniciar auto-envío en background hasta que el SRI la reciba.
+                started = _start_guia_sri_background(guia.id, empresa.id)
+                if started:
+                    messages.info(
+                        request,
+                        f'Guía {guia.numero_completo} emitida. Se iniciaron reintentos automáticos de envío al SRI hasta que quede RECIBIDA.'
+                    )
+                else:
+                    messages.info(
+                        request,
+                        f'Guía {guia.numero_completo} emitida. El auto-envío al SRI ya estaba en proceso.'
+                    )
+                return redirect('inventario:ver_guia_remision', guia_id=guia.id)
                 
         except Exception as e:
             logger.error(f"Error al crear guia de remision: {str(e)}")
@@ -9861,15 +9973,216 @@ def ver_guia_remision(request, guia_id):
         messages.error(request, 'Seleccione una empresa válida.')
         return redirect('inventario:seleccionar_empresa')
     guia = get_object_or_404(GuiaRemision, id=guia_id, empresa=empresa)
+
+    estado_visual = 'BORRADOR'
+    estado_visual_label = 'Borrador'
+    mensaje_visual = 'La guía está pendiente de envío al SRI.'
+
+    if guia.estado == 'anulada':
+        estado_visual = 'ANULADA'
+        estado_visual_label = 'Anulada'
+        mensaje_visual = 'La guía fue anulada.'
+    elif (guia.numero_autorizacion and guia.fecha_autorizacion) or guia.estado == 'autorizada':
+        estado_visual = 'AUTORIZADA'
+        estado_visual_label = 'Autorizada'
+        mensaje_visual = 'Guía autorizada por el SRI.'
+    elif guia.clave_acceso:
+        estado_visual = 'PENDIENTE'
+        estado_visual_label = 'En proceso'
+        mensaje_visual = 'Envío/consulta al SRI en proceso. Esta pantalla se actualiza automáticamente.'
     
     context = {
         'guia': guia,
+        'guia_estado_visual': estado_visual,
+        'guia_estado_visual_label': estado_visual_label,
+        'guia_mensaje_visual': mensaje_visual,
     }
     
     # Agregar datos del usuario para el header
     context = complementarContexto(context, request.user)
     
     return render(request, 'inventario/guia_remision/verGuiaRemision.html', context)
+
+
+def _normalizar_estado_guia_sri(valor):
+    estado = str(valor or '').strip().upper().replace(' ', '_')
+    mapa = {
+        'AUTORIZADO': 'AUTORIZADA',
+        'NO_AUTORIZADO': 'RECHAZADA',
+        'NO_AUTORIZADA': 'RECHAZADA',
+        'RECHAZADO': 'RECHAZADA',
+        'DEVUELTA': 'RECHAZADA',
+        'EN_PROCESAMIENTO': 'RECIBIDA',
+        'PROCESANDO': 'RECIBIDA',
+        'PROCESAMIENTO': 'RECIBIDA',
+    }
+    return mapa.get(estado, estado)
+
+
+def _extraer_mensaje_guia_sri(resultado):
+    mensajes = (resultado or {}).get('mensajes') or []
+    errores = []
+    for msg in mensajes:
+        if isinstance(msg, dict):
+            identificador = (msg.get('identificador') or '').strip()
+            mensaje = (msg.get('mensaje') or '').strip()
+            info = (msg.get('informacionAdicional') or '').strip()
+            partes = [parte for parte in [identificador, mensaje, info] if parte]
+            if partes:
+                errores.append(': '.join(partes[:2]) if len(partes) <= 2 else f"{partes[0]}: {partes[1]} | {partes[2]}")
+        elif str(msg).strip():
+            errores.append(str(msg).strip())
+
+    if errores:
+        return ' | '.join(errores)
+
+    return (resultado or {}).get('mensaje') or 'Consulta exitosa.'
+
+
+def _enviar_email_automatico_guia(guia, empresa):
+    if not guia.numero_autorizacion or not guia.fecha_autorizacion:
+        return False
+
+    if guia.email_enviado:
+        return False
+
+    from inventario.documentos_email.services import DocumentEmailService
+
+    servicio = DocumentEmailService(empresa)
+    guia.email_envio_intentos = (guia.email_envio_intentos or 0) + 1
+    try:
+        resultado = servicio.send_guia(guia)
+        if not resultado.success:
+            guia.email_ultimo_error = resultado.message
+            guia.save(update_fields=['email_envio_intentos', 'email_ultimo_error'])
+            logger.warning('[GUIA EMAIL] No se envió guía %s: %s', guia.id, resultado.message)
+            return False
+
+        guia.email_enviado = True
+        guia.email_enviado_at = timezone.now()
+        guia.email_ultimo_error = None
+        guia.save(update_fields=['email_enviado', 'email_enviado_at', 'email_envio_intentos', 'email_ultimo_error'])
+        logger.info('[GUIA EMAIL] Guía %s enviada a %s', guia.id, ', '.join(resultado.recipients))
+        return True
+    except Exception as exc:
+        guia.email_ultimo_error = str(exc)
+        guia.save(update_fields=['email_envio_intentos', 'email_ultimo_error'])
+        logger.exception('[GUIA EMAIL] Error enviando guía %s', guia.id)
+        return False
+
+
+@login_required
+def consultar_estado_guia_remision_json(request, guia_id):
+    empresa_id = request.session.get('empresa_activa')
+    empresa = None
+    if empresa_id:
+        empresa = request.user.empresas.filter(id=empresa_id).first()
+    if not empresa:
+        return JsonResponse({'success': False, 'message': 'Seleccione una empresa válida.'}, status=400)
+
+    guia = get_object_or_404(GuiaRemision, id=guia_id, empresa=empresa)
+    ya_autorizada = bool(guia.numero_autorizacion and guia.fecha_autorizacion)
+
+    if guia.estado == 'anulada':
+        return JsonResponse({
+            'success': True,
+            'estado': 'ANULADA',
+            'mensaje': 'La guía fue anulada.',
+        })
+
+    if ya_autorizada or guia.estado == 'autorizada':
+        if guia.estado != 'autorizada':
+            guia.estado = 'autorizada'
+            guia.save(update_fields=['estado'])
+        return JsonResponse({
+            'success': True,
+            'estado': 'AUTORIZADA',
+            'mensaje': 'Guía autorizada por el SRI.',
+            'numero_autorizacion': guia.numero_autorizacion or '',
+            'fecha_autorizacion': timezone.localtime(guia.fecha_autorizacion).strftime('%d/%m/%Y %H:%M:%S') if guia.fecha_autorizacion else '',
+        })
+
+    if not guia.clave_acceso:
+        return JsonResponse({
+            'success': True,
+            'estado': 'BORRADOR',
+            'mensaje': 'La guía todavía no tiene clave de acceso ni se ha enviado al SRI.',
+        })
+
+    try:
+        from inventario.guia_remision.integracion_sri_guia import IntegracionGuiaRemisionSRI
+
+        integrador = IntegracionGuiaRemisionSRI(empresa)
+        resultado = integrador.consultar_autorizacion(guia)
+        estado_raw = resultado.get('estado')
+
+        autorizaciones = resultado.get('autorizaciones') or []
+        if isinstance(autorizaciones, list) and autorizaciones and isinstance(autorizaciones[0], dict):
+            aut0 = autorizaciones[0]
+            if aut0.get('estado'):
+                estado_raw = aut0.get('estado')
+
+        estado = _normalizar_estado_guia_sri(estado_raw)
+        mensaje = _extraer_mensaje_guia_sri(resultado)
+        estado_cambio = False
+
+        if estado == 'AUTORIZADA':
+            aut0 = autorizaciones[0] if isinstance(autorizaciones, list) and autorizaciones and isinstance(autorizaciones[0], dict) else {}
+            numero_autorizacion = (aut0.get('numeroAutorizacion') or guia.numero_autorizacion or guia.clave_acceso or '').strip()
+            fecha_autorizacion = guia.fecha_autorizacion
+            fecha_raw = (aut0.get('fechaAutorizacion') or '').strip()
+            if fecha_raw and not fecha_autorizacion:
+                try:
+                    fecha_autorizacion = datetime.fromisoformat(fecha_raw.replace('Z', '+00:00'))
+                except Exception:
+                    fecha_autorizacion = timezone.now()
+            elif not fecha_autorizacion:
+                fecha_autorizacion = timezone.now()
+
+            update_fields = []
+            if guia.estado != 'autorizada':
+                guia.estado = 'autorizada'
+                update_fields.append('estado')
+            if numero_autorizacion and guia.numero_autorizacion != numero_autorizacion:
+                guia.numero_autorizacion = numero_autorizacion
+                update_fields.append('numero_autorizacion')
+            if fecha_autorizacion and guia.fecha_autorizacion != fecha_autorizacion:
+                guia.fecha_autorizacion = fecha_autorizacion
+                update_fields.append('fecha_autorizacion')
+            if update_fields:
+                guia.save(update_fields=update_fields)
+                estado_cambio = True
+            if (not ya_autorizada) and guia.numero_autorizacion and guia.fecha_autorizacion:
+                incrementar_contador_documentos(empresa)
+            _enviar_email_automatico_guia(guia, empresa)
+
+            return JsonResponse({
+                'success': True,
+                'estado': 'AUTORIZADA',
+                'mensaje': 'Guía autorizada por el SRI.',
+                'numero_autorizacion': guia.numero_autorizacion or '',
+                'fecha_autorizacion': timezone.localtime(guia.fecha_autorizacion).strftime('%d/%m/%Y %H:%M:%S') if guia.fecha_autorizacion else '',
+                'estado_cambio': estado_cambio,
+            })
+
+        if estado == 'RECHAZADA':
+            return JsonResponse({
+                'success': True,
+                'estado': 'RECHAZADA',
+                'mensaje': mensaje or 'La guía no fue autorizada por el SRI.',
+            })
+
+        return JsonResponse({
+            'success': True,
+            'estado': estado or 'PENDIENTE',
+            'mensaje': mensaje or 'La guía sigue en proceso en el SRI.',
+        })
+    except Exception as exc:
+        logger.warning('No se pudo consultar estado SRI de guía %s: %s', guia_id, exc)
+        return JsonResponse({
+            'success': False,
+            'message': f'No se pudo consultar el estado SRI: {exc}',
+        }, status=500)
 
 @login_required
 def editar_guia_remision(request, guia_id):
@@ -10187,6 +10500,8 @@ def autorizar_guia_remision(request, guia_id):
             ahora_autorizada = bool(guia.numero_autorizacion and guia.fecha_autorizacion)
             if (not ya_autorizada) and ahora_autorizada:
                 incrementar_contador_documentos(empresa)
+            if ahora_autorizada:
+                _enviar_email_automatico_guia(guia, empresa)
             messages.success(request, f'✅ Guía de remisión {guia.numero_completo} autorizada exitosamente por el SRI.')
         else:
             messages.error(request, f'❌ Error: {resultado["message"]}')

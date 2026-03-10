@@ -4407,6 +4407,24 @@ class GuiaRemision(models.Model):
     numero_autorizacion = models.CharField(max_length=49, null=True, blank=True)
     fecha_autorizacion = models.DateTimeField(null=True, blank=True)
     xml_autorizado = models.TextField(null=True, blank=True)
+    email_enviado = models.BooleanField(
+        default=False,
+        help_text="Indica si ya se envió el correo con XML/RIDE de la guía"
+    )
+    email_enviado_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Fecha/hora del primer envío exitoso de la guía"
+    )
+    email_envio_intentos = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Número de intentos (exitosos + fallidos) de envío de la guía"
+    )
+    email_ultimo_error = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Último error registrado al intentar enviar correo de la guía"
+    )
     
     # Estado
     estado = models.CharField(

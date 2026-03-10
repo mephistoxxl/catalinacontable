@@ -189,6 +189,7 @@ class IntegracionGuiaRemisionSRI:
                 
                 return {
                     'success': False,
+                    'estado': 'DEVUELTA',
                     'message': f"Guía DEVUELTA por el SRI (errores en el XML): {mensaje_error}",
                     'detalle': resultado_envio
                 }
@@ -247,6 +248,7 @@ class IntegracionGuiaRemisionSRI:
                         
                         return {
                             'success': True,
+                            'estado': 'AUTORIZADA',
                             'message': 'Guía de remisión procesada y autorizada exitosamente',
                             'clave_acceso': guia.clave_acceso,
                             'numero_autorizacion': guia.numero_autorizacion
@@ -287,6 +289,7 @@ class IntegracionGuiaRemisionSRI:
                         
                         return {
                             'success': False,
+                            'estado': estado_norm or 'NO_AUTORIZADA',
                             'message': f"Guía no autorizada por el SRI: {mensaje_error}",
                             'detalle': resultado_autorizacion
                         }
@@ -300,6 +303,7 @@ class IntegracionGuiaRemisionSRI:
                             logger.warning(f"⚠️ Alcanzado máximo de intentos - Estado: {estado}")
                             return {
                                 'success': False,
+                                'estado': 'RECIBIDA',
                                 'message': f"La guía fue recibida pero aún no está autorizada. Estado: {estado}. Consulte manualmente en unos minutos.",
                                 'detalle': resultado_autorizacion
                             }
@@ -307,6 +311,7 @@ class IntegracionGuiaRemisionSRI:
             # Si el envío falló, devolver el error
             return {
                 'success': False,
+                'estado': resultado_envio.get('estado'),
                 'message': f"Error al enviar al SRI: {resultado_envio.get('estado')}",
                 'detalle': resultado_envio
             }
@@ -315,12 +320,14 @@ class IntegracionGuiaRemisionSRI:
             logger.error(f"Guía de remisión {guia_id} no encontrada")
             return {
                 'success': False,
+                'estado': 'NO_ENCONTRADA',
                 'message': f'Guía de remisión {guia_id} no encontrada'
             }
         except Exception as e:
             logger.error(f"Error procesando guía de remisión: {e}")
             return {
                 'success': False,
+                'estado': 'ERROR',
                 'message': f'Error procesando guía de remisión: {str(e)}'
             }
     

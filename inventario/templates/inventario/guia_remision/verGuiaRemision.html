@@ -48,6 +48,39 @@
         })();
       </script>
     {% endif %}
+
+    <div id="guia-sri-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="guia-sri-modal-title">
+      <div id="guia-sri-modal-backdrop" class="absolute inset-0 bg-black bg-opacity-50"></div>
+      <div class="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
+        <div id="guia-sri-modal-header" class="px-5 py-4 border-b bg-blue-50">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div id="guia-sri-modal-icon-wrap" class="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center">
+                <i id="guia-sri-modal-icon" class="fas fa-clock"></i>
+              </div>
+              <div>
+                <h3 id="guia-sri-modal-title" class="text-base font-bold text-blue-900">Estado SRI</h3>
+                <p id="guia-sri-modal-subtitle" class="text-xs text-blue-700">Seguimiento automático de la guía</p>
+              </div>
+            </div>
+            <button type="button" id="guia-sri-modal-close" class="text-gray-500 hover:text-gray-700 px-2 py-1" aria-label="Cerrar">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        <div class="px-5 py-4 space-y-3">
+          <div class="text-sm text-gray-700"><strong>Estado:</strong> <span id="guia-sri-modal-estado">{{ guia_estado_visual }}</span></div>
+          <div class="text-sm text-gray-700"><strong>Mensaje:</strong> <span id="guia-sri-modal-mensaje">{{ guia_mensaje_visual }}</span></div>
+          <div id="guia-sri-modal-autorizacion-row" class="text-sm text-gray-700" {% if not guia.numero_autorizacion %}style="display:none;"{% endif %}><strong>Autorización:</strong> <span id="guia-sri-modal-autorizacion">{{ guia.numero_autorizacion|default:'' }}</span></div>
+          <div id="guia-sri-modal-fecha-row" class="text-sm text-gray-700" {% if not guia.fecha_autorizacion %}style="display:none;"{% endif %}><strong>Fecha:</strong> <span id="guia-sri-modal-fecha">{{ guia.fecha_autorizacion|date:"d/m/Y H:i:s" }}</span></div>
+        </div>
+        <div class="px-5 py-4 border-t bg-gray-50 flex justify-end">
+          <button type="button" id="guia-sri-modal-ok" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
+            Entendido
+          </button>
+        </div>
+      </div>
+    </div>
     
     <!-- Header + Resumen (unido) -->
     <div class="bg-white rounded-lg border overflow-hidden mb-4">
@@ -57,11 +90,11 @@
             <i class="fas fa-file-alt text-emerald-700 text-lg mr-3"></i>
             <div>
               <h2 class="text-lg font-semibold text-gray-900">Guía de Remisión #{{ guia.numero_completo }}</h2>
-              <p class="text-gray-500 text-sm">{{ guia.fecha_inicio_traslado|date:"d/m/Y" }} - {{ guia.get_estado_display }}</p>
+              <p class="text-gray-500 text-sm">{{ guia.fecha_inicio_traslado|date:"d/m/Y" }} - <span id="guia-estado-subtitulo">{{ guia_estado_visual_label }}</span></p>
             </div>
           </div>
           <div class="flex space-x-2">
-            {% if guia.estado == 'borrador' %}
+            {% if guia_estado_visual == 'BORRADOR' %}
               <form method="POST" action="{% url 'inventario:autorizar_guia_remision' guia.id %}" class="inline">
                 {% csrf_token %}
                 <button type="submit" 
@@ -70,7 +103,7 @@
                 </button>
               </form>
             {% endif %}
-            {% if guia.estado == 'autorizada' %}
+            {% if guia_estado_visual == 'AUTORIZADA' %}
               <a href="{% url 'inventario:descargar_guia_pdf' guia.id %}" 
                  class="bg-white border border-emerald-200 text-emerald-700 px-3 py-1 rounded text-sm hover:bg-emerald-50 no-underline hover:no-underline"
                  style="text-decoration: none !important;">
@@ -82,12 +115,18 @@
                 <i class="fas fa-file-code mr-1"></i>XML
               </a>
             {% endif %}
-            {% if guia.estado == 'borrador' %}
+            {% if guia_estado_visual == 'BORRADOR' %}
               <a href="{% url 'inventario:editar_guia_remision' guia.id %}" 
                  class="bg-white border border-emerald-200 text-emerald-700 px-3 py-1 rounded text-sm hover:bg-emerald-50 no-underline hover:no-underline"
                  style="text-decoration: none !important;">
                 <i class="fas fa-edit mr-1"></i>Editar
               </a>
+            {% endif %}
+            {% if guia_estado_visual == 'PENDIENTE' %}
+              <button type="button" onclick="consultarEstadoGuiaSRI()"
+                      class="bg-white border border-blue-200 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-50">
+                <i class="fas fa-search mr-1"></i>Consultar Estado SRI
+              </button>
             {% endif %}
             <a href="{% url 'inventario:listar_guias_remision' %}" 
                class="bg-white border border-emerald-200 text-emerald-700 px-3 py-1 rounded text-sm hover:bg-emerald-50 no-underline hover:no-underline"
@@ -114,16 +153,20 @@
             </div>
             <div>
               <label class="text-xs text-gray-500">Estado</label>
-              <div>
-                {% if guia.estado == 'autorizada' %}
+              <div id="guia-estado-badge-wrap">
+                {% if guia_estado_visual == 'AUTORIZADA' %}
                   <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                     Autorizada
                   </span>
-                {% elif guia.estado == 'borrador' %}
+                {% elif guia_estado_visual == 'PENDIENTE' %}
+                  <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                    En proceso
+                  </span>
+                {% elif guia_estado_visual == 'BORRADOR' %}
                   <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
                     Borrador
                   </span>
-                {% elif guia.estado == 'anulada' %}
+                {% elif guia_estado_visual == 'ANULADA' %}
                   <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
                     Anulada
                   </span>
@@ -288,4 +331,159 @@
   </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const GUIA_CONSULTA_URL = '{% url "inventario:consultar_estado_guia_remision_json" guia.id %}';
+const GUIA_ESTADO_ACTUAL = '{{ guia_estado_visual|default:"" }}'.trim().toUpperCase();
+const GUIA_TIENE_CLAVE = '{{ guia.clave_acceso|default:"" }}'.trim().length > 0;
+
+const GuiaSriModal = (() => {
+  const modal = document.getElementById('guia-sri-modal');
+  const closeBtn = document.getElementById('guia-sri-modal-close');
+  const okBtn = document.getElementById('guia-sri-modal-ok');
+  const backdrop = document.getElementById('guia-sri-modal-backdrop');
+
+  function open() {
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function close() {
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.body.style.overflow = '';
+  }
+
+  if (closeBtn) closeBtn.addEventListener('click', close);
+  if (okBtn) okBtn.addEventListener('click', close);
+  if (backdrop) backdrop.addEventListener('click', close);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+      close();
+    }
+  });
+
+  return { open, close };
+})();
+
+function renderGuiaEstado(data) {
+  const estado = String(data.estado || '').trim().toUpperCase();
+  const esAutorizada = estado === 'AUTORIZADA' || estado === 'AUTORIZADO';
+  const esPendiente = estado === 'PENDIENTE' || estado === 'RECIBIDA';
+  const esAnulada = estado === 'ANULADA';
+
+  const titulo = esAutorizada ? 'Autorizada' : (esPendiente ? 'En proceso' : (esAnulada ? 'Anulada' : 'Borrador'));
+  const icon = esAutorizada ? 'fa-check-circle' : (esPendiente ? 'fa-clock' : (esAnulada ? 'fa-times-circle' : 'fa-info-circle'));
+  const headerClass = esAutorizada ? 'bg-green-50' : (esPendiente ? 'bg-blue-50' : (esAnulada ? 'bg-red-50' : 'bg-yellow-50'));
+  const iconWrapClass = esAutorizada ? 'bg-green-100 text-green-700' : (esPendiente ? 'bg-blue-100 text-blue-700' : (esAnulada ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'));
+  const titleClass = esAutorizada ? 'text-green-900' : (esPendiente ? 'text-blue-900' : (esAnulada ? 'text-red-900' : 'text-yellow-900'));
+  const subtitleClass = esAutorizada ? 'text-green-700' : (esPendiente ? 'text-blue-700' : (esAnulada ? 'text-red-700' : 'text-yellow-700'));
+
+  const subtitulo = document.getElementById('guia-estado-subtitulo');
+  const badgeWrap = document.getElementById('guia-estado-badge-wrap');
+  const modalHeader = document.getElementById('guia-sri-modal-header');
+  const modalIconWrap = document.getElementById('guia-sri-modal-icon-wrap');
+  const modalIcon = document.getElementById('guia-sri-modal-icon');
+  const modalTitle = document.getElementById('guia-sri-modal-title');
+  const modalSubtitle = document.getElementById('guia-sri-modal-subtitle');
+  const modalEstado = document.getElementById('guia-sri-modal-estado');
+  const modalMensaje = document.getElementById('guia-sri-modal-mensaje');
+  const modalAutorizacionRow = document.getElementById('guia-sri-modal-autorizacion-row');
+  const modalAutorizacion = document.getElementById('guia-sri-modal-autorizacion');
+  const modalFechaRow = document.getElementById('guia-sri-modal-fecha-row');
+  const modalFecha = document.getElementById('guia-sri-modal-fecha');
+
+  if (subtitulo) subtitulo.textContent = titulo;
+
+  if (modalHeader) modalHeader.className = `px-5 py-4 border-b ${headerClass}`;
+  if (modalIconWrap) modalIconWrap.className = `w-10 h-10 rounded-full flex items-center justify-center ${iconWrapClass}`;
+  if (modalIcon) modalIcon.className = `fas ${icon}`;
+  if (modalTitle) modalTitle.className = `text-base font-bold ${titleClass}`;
+  if (modalSubtitle) {
+    modalSubtitle.className = `text-xs ${subtitleClass}`;
+    modalSubtitle.textContent = esAutorizada ? 'Autorización completada en el SRI' : (esPendiente ? 'Seguimiento automático de la guía' : 'Resultado devuelto por el SRI');
+  }
+  if (modalEstado) modalEstado.textContent = estado || 'BORRADOR';
+  if (modalMensaje) modalMensaje.textContent = data.mensaje || 'Consulta exitosa.';
+
+  if (badgeWrap) {
+    if (esAutorizada) {
+      badgeWrap.innerHTML = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Autorizada</span>';
+    } else if (esPendiente) {
+      badgeWrap.innerHTML = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">En proceso</span>';
+    } else if (esAnulada) {
+      badgeWrap.innerHTML = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Anulada</span>';
+    } else {
+      badgeWrap.innerHTML = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Borrador</span>';
+    }
+  }
+
+  if (modalAutorizacionRow && modalAutorizacion) {
+    if (data.numero_autorizacion) {
+      modalAutorizacion.textContent = data.numero_autorizacion;
+      modalAutorizacionRow.style.display = '';
+    } else {
+      modalAutorizacionRow.style.display = 'none';
+    }
+  }
+  if (modalFechaRow && modalFecha) {
+    if (data.fecha_autorizacion) {
+      modalFecha.textContent = data.fecha_autorizacion;
+      modalFechaRow.style.display = '';
+    } else {
+      modalFechaRow.style.display = 'none';
+    }
+  }
+
+  GuiaSriModal.open();
+}
+
+function consultarEstadoGuiaSRI(opciones = {}) {
+  const fromAuto = opciones.fromAuto === true;
+  fetch(GUIA_CONSULTA_URL)
+    .then((response) => response.json())
+    .then((data) => {
+      if (!data.success) {
+        throw new Error(data.message || 'No se pudo consultar el estado.');
+      }
+      renderGuiaEstado(data);
+      if (data.estado_cambio || String(data.estado || '').trim().toUpperCase() === 'AUTORIZADA') {
+        setTimeout(() => window.location.reload(), fromAuto ? 1200 : 800);
+      }
+    })
+    .catch((error) => {
+      renderGuiaEstado({
+        estado: GUIA_ESTADO_ACTUAL || 'PENDIENTE',
+        mensaje: error.message || 'No se pudo consultar el estado.'
+      });
+    });
+}
+
+function iniciarAutoConsultaGuiaSRI() {
+  if (!GUIA_TIENE_CLAVE) return;
+  if (!(GUIA_ESTADO_ACTUAL === 'PENDIENTE' || GUIA_ESTADO_ACTUAL === 'RECIBIDA')) return;
+
+  renderGuiaEstado({
+    estado: GUIA_ESTADO_ACTUAL,
+    mensaje: 'Envío/consulta al SRI en proceso. Esta ventana se actualiza automáticamente.'
+  });
+
+  let intento = 0;
+  const maxIntentos = 18;
+  const timer = setInterval(() => {
+    intento += 1;
+    consultarEstadoGuiaSRI({ fromAuto: true });
+    if (intento >= maxIntentos) {
+      clearInterval(timer);
+    }
+  }, 5000);
+}
+
+document.addEventListener('DOMContentLoaded', iniciarAutoConsultaGuiaSRI);
+</script>
 {% endblock %}

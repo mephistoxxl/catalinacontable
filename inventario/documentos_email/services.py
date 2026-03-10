@@ -10,6 +10,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 
 from inventario.models import Cliente, Opciones, Transportista
+from inventario.guia_remision.ride_guia_generator import GuiaRemisionRIDEGenerator
 from inventario.guia_remision.xml_generator_guia import XMLGeneratorGuiaRemision
 from inventario.liquidacion_compra.models import LiquidacionCompra
 from inventario.nota_credito.models import NotaCredito
@@ -174,6 +175,10 @@ class DocumentEmailService:
         if not xml:
             return SendResult(False, 'No existe XML para adjuntar en la guía.', [])
 
+        pdf_bytes = self._try_generate_guia_pdf(guia)
+        if not pdf_bytes:
+            return SendResult(False, 'No se pudo generar el PDF RIDE de la guía.', [])
+
         numero = guia.numero_completo
         asunto = f'Guía de remisión electrónica {numero}'
         cuerpo = (
@@ -191,9 +196,10 @@ class DocumentEmailService:
             issue_date=self._format_date(getattr(guia, 'fecha_emision', None)),
             total='N/A',
             intro_text='Se ha emitido una guía de remisión electrónica autorizada para sustento legal del traslado de mercadería.',
-            attachments=['GuiaRemision.xml'],
+            attachments=['GuiaRemision.pdf', 'GuiaRemision.xml'],
         )
         attachments = [
+            (f'guia_remision_{numero.replace("-", "_")}.pdf', pdf_bytes, 'application/pdf'),
             (f'guia_remision_{numero.replace("-", "_")}.xml', xml.encode('utf-8'), 'application/xml')
         ]
         self._send_email(asunto, cuerpo, destinatarios, attachments, html_body=html)
@@ -252,6 +258,13 @@ class DocumentEmailService:
     def _try_generate_nd_pdf(self, nota_debito: NotaDebito, opciones) -> bytes | None:
         try:
             buffer: BytesIO = RIDENotaDebitoGenerator(nota_debito, opciones).generar_pdf()
+            return buffer.read()
+        except Exception:
+            return None
+
+    def _try_generate_guia_pdf(self, guia) -> bytes | None:
+        try:
+            buffer: BytesIO = GuiaRemisionRIDEGenerator().generar_ride_guia_remision(guia)
             return buffer.read()
         except Exception:
             return None
