@@ -8881,6 +8881,7 @@ def _run_guia_sri_background(guia_id, empresa_id, max_attempts=360, interval_sec
             return
 
         ya_contabilizada = False
+        ya_recibida = False
 
         for _ in range(max_attempts):
             try:
@@ -8905,27 +8906,81 @@ def _run_guia_sri_background(guia_id, empresa_id, max_attempts=360, interval_sec
                 break
 
             integrador = IntegracionGuiaRemisionSRI(empresa)
-            resultado = integrador.procesar_guia_remision(guia.id)
-            estado = (resultado.get('estado') or '').upper().strip().replace(' ', '_')
-            logger.info("[GUIA SRI BG] Guia %s intento, estado=%s success=%s", guia_id, estado or 'SIN_ESTADO', resultado.get('success'))
+            if ya_recibida and guia.clave_acceso:
+                resultado = integrador.consultar_autorizacion(guia)
+                estado_raw = resultado.get('estado')
+                autorizaciones = resultado.get('autorizaciones') or []
+                if isinstance(autorizaciones, list) and autorizaciones and isinstance(autorizaciones[0], dict):
+                    aut0 = autorizaciones[0]
+                    if aut0.get('estado'):
+                        estado_raw = aut0.get('estado')
 
-            if resultado.get('success'):
-                try:
-                    guia.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion'])
-                except Exception:
-                    pass
-                if guia.numero_autorizacion and guia.fecha_autorizacion and not ya_contabilizada:
-                    try:
-                        incrementar_contador_documentos(empresa)
-                    except Exception as exc:
-                        logger.warning("[GUIA SRI BG] No se pudo incrementar contador para guia %s: %s", guia_id, exc)
-                    ya_contabilizada = True
-                if guia.numero_autorizacion and guia.fecha_autorizacion:
+                estado = _normalizar_estado_guia_sri(estado_raw)
+                logger.info("[GUIA SRI BG] Guia %s consulta autorizacion, estado=%s", guia_id, estado or 'SIN_ESTADO')
+
+                if estado == 'AUTORIZADA':
+                    aut0 = autorizaciones[0] if isinstance(autorizaciones, list) and autorizaciones and isinstance(autorizaciones[0], dict) else {}
+                    numero_autorizacion = (aut0.get('numeroAutorizacion') or guia.numero_autorizacion or guia.clave_acceso or '').strip()
+                    fecha_autorizacion = guia.fecha_autorizacion
+                    fecha_raw = (aut0.get('fechaAutorizacion') or '').strip()
+                    if fecha_raw and not fecha_autorizacion:
+                        try:
+                            fecha_autorizacion = datetime.fromisoformat(fecha_raw.replace('Z', '+00:00'))
+                        except Exception:
+                            fecha_autorizacion = timezone.now()
+                    elif not fecha_autorizacion:
+                        fecha_autorizacion = timezone.now()
+
+                    update_fields = []
+                    if guia.estado != 'autorizada':
+                        guia.estado = 'autorizada'
+                        update_fields.append('estado')
+                    if numero_autorizacion and guia.numero_autorizacion != numero_autorizacion:
+                        guia.numero_autorizacion = numero_autorizacion
+                        update_fields.append('numero_autorizacion')
+                    if fecha_autorizacion and guia.fecha_autorizacion != fecha_autorizacion:
+                        guia.fecha_autorizacion = fecha_autorizacion
+                        update_fields.append('fecha_autorizacion')
+                    if update_fields:
+                        guia.save(update_fields=update_fields)
+
+                    if not ya_contabilizada:
+                        try:
+                            incrementar_contador_documentos(empresa)
+                        except Exception as exc:
+                            logger.warning("[GUIA SRI BG] No se pudo incrementar contador para guia %s: %s", guia_id, exc)
+                        ya_contabilizada = True
                     _enviar_email_automatico_guia(guia, empresa)
-                break
+                    break
 
-            if estado in ('RECIBIDA', 'AUTORIZADA', 'AUTORIZADO'):
-                break
+                if estado in ('RECHAZADA', 'ERROR'):
+                    logger.warning("[GUIA SRI BG] Guia %s terminó con estado definitivo %s", guia_id, estado)
+                    break
+            else:
+                resultado = integrador.procesar_guia_remision(guia.id)
+                estado = _normalizar_estado_guia_sri(resultado.get('estado'))
+                logger.info("[GUIA SRI BG] Guia %s intento envio, estado=%s success=%s", guia_id, estado or 'SIN_ESTADO', resultado.get('success'))
+
+                if resultado.get('success'):
+                    try:
+                        guia.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion'])
+                    except Exception:
+                        pass
+                    if guia.numero_autorizacion and guia.fecha_autorizacion and not ya_contabilizada:
+                        try:
+                            incrementar_contador_documentos(empresa)
+                        except Exception as exc:
+                            logger.warning("[GUIA SRI BG] No se pudo incrementar contador para guia %s: %s", guia_id, exc)
+                        ya_contabilizada = True
+                    if guia.numero_autorizacion and guia.fecha_autorizacion:
+                        _enviar_email_automatico_guia(guia, empresa)
+                    break
+
+                if estado == 'RECIBIDA':
+                    ya_recibida = True
+                elif estado in ('RECHAZADA', 'ERROR'):
+                    logger.warning("[GUIA SRI BG] Guia %s terminó con estado definitivo %s", guia_id, estado)
+                    break
 
             time.sleep(interval_seconds)
     finally:
@@ -9824,12 +9879,12 @@ def emitir_guia_remision(request):
                 if started:
                     messages.info(
                         request,
-                        f'Guía {guia.numero_completo} emitida. Se iniciaron reintentos automáticos de envío al SRI hasta que quede RECIBIDA.'
+                        f'Guía {guia.numero_completo} emitida. Se reintentará el envío solo hasta quedar RECIBIDA; luego el sistema consultará la autorización automáticamente y enviará el correo al autorizarse.'
                     )
                 else:
                     messages.info(
                         request,
-                        f'Guía {guia.numero_completo} emitida. El auto-envío al SRI ya estaba en proceso.'
+                        f'Guía {guia.numero_completo} emitida. El proceso automático ya estaba en marcha; el correo saldrá solo cuando quede autorizada.'
                     )
                 return redirect('inventario:ver_guia_remision', guia_id=guia.id)
                 

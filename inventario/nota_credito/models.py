@@ -18,6 +18,7 @@ class NotaCredito(models.Model):
     ESTADO_SRI_CHOICES = [
         ('PENDIENTE', 'Pendiente'),
         ('ENVIADO', 'Enviado'),
+        ('RECIBIDA', 'Recibida'),
         ('RECIBIDO', 'Recibido'),
         ('AUTORIZADO', 'Autorizado'),
         ('RECHAZADO', 'Rechazado'),
@@ -219,6 +220,24 @@ class NotaCredito(models.Model):
         blank=True,
         null=True,
         help_text="Mensaje de respuesta del SRI"
+    )
+    email_enviado = models.BooleanField(
+        default=False,
+        help_text="Indica si ya se envió el correo con XML/RIDE de la nota de crédito"
+    )
+    email_enviado_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="Fecha/hora del primer envío exitoso de la nota de crédito"
+    )
+    email_envio_intentos = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Número de intentos de envío de la nota de crédito"
+    )
+    email_ultimo_error = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Último error registrado al intentar enviar correo de la nota de crédito"
     )
     
     # ========== CONTROL DE INVENTARIO ==========

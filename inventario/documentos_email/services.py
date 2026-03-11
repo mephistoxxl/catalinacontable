@@ -86,7 +86,12 @@ class DocumentEmailService:
 
         opciones = self._require_opciones()
         xml = XMLGeneratorNotaCredito(nota_credito, opciones).generar_xml()
+        if not xml:
+            return SendResult(False, 'No se pudo generar el XML de la nota de crédito.', [])
+
         pdf_bytes = self._try_generate_nc_pdf(nota_credito, opciones)
+        if not pdf_bytes:
+            return SendResult(False, 'No se pudo generar el PDF RIDE de la nota de crédito.', [])
 
         numero = nota_credito.numero_completo
         asunto = f'Nota de crédito electrónica {numero}'
@@ -108,10 +113,9 @@ class DocumentEmailService:
             attachments=['NotaCredito.pdf', 'NotaCredito.xml'],
         )
         attachments: List[Attachment] = [
-            (f'nota_credito_{numero.replace("-", "_")}.xml', xml.encode('utf-8'), 'application/xml')
+            (f'nota_credito_{numero.replace("-", "_")}.xml', xml.encode('utf-8'), 'application/xml'),
+            (f'nota_credito_{numero.replace("-", "_")}.pdf', pdf_bytes, 'application/pdf'),
         ]
-        if pdf_bytes:
-            attachments.append((f'nota_credito_{numero.replace("-", "_")}.pdf', pdf_bytes, 'application/pdf'))
 
         self._send_email(asunto, cuerpo, destinatarios, attachments, html_body=html)
         return SendResult(True, 'Nota de crédito enviada por correo.', destinatarios)
@@ -127,7 +131,12 @@ class DocumentEmailService:
 
         opciones = self._require_opciones()
         xml = XMLGeneratorNotaDebito(nota_debito, opciones).generar_xml()
+        if not xml:
+            return SendResult(False, 'No se pudo generar el XML de la nota de débito.', [])
+
         pdf_bytes = self._try_generate_nd_pdf(nota_debito, opciones)
+        if not pdf_bytes:
+            return SendResult(False, 'No se pudo generar el PDF RIDE de la nota de débito.', [])
 
         numero = nota_debito.numero_completo
         asunto = f'Nota de débito electrónica {numero}'
@@ -149,10 +158,9 @@ class DocumentEmailService:
             attachments=['NotaDebito.pdf', 'NotaDebito.xml'],
         )
         attachments: List[Attachment] = [
-            (f'nota_debito_{numero.replace("-", "_")}.xml', xml.encode('utf-8'), 'application/xml')
+            (f'nota_debito_{numero.replace("-", "_")}.xml', xml.encode('utf-8'), 'application/xml'),
+            (f'nota_debito_{numero.replace("-", "_")}.pdf', pdf_bytes, 'application/pdf'),
         ]
-        if pdf_bytes:
-            attachments.append((f'nota_debito_{numero.replace("-", "_")}.pdf', pdf_bytes, 'application/pdf'))
 
         self._send_email(asunto, cuerpo, destinatarios, attachments, html_body=html)
         return SendResult(True, 'Nota de débito enviada por correo.', destinatarios)
@@ -400,6 +408,25 @@ class DocumentEmailService:
 
     def _emails_for_guia(self, guia) -> List[str]:
         values = [getattr(guia, 'correo_envio', '')]
+
+        factura_asociada = getattr(guia, 'factura', None)
+        if factura_asociada is not None:
+            values.extend(self._emails_from_factura_cliente(factura_asociada))
+
+        identificacion_principal = (getattr(guia, 'destinatario_identificacion', '') or '').strip()
+        if identificacion_principal:
+            cliente_principal = Cliente.objects.filter(
+                empresa=self.empresa,
+                identificacion=identificacion_principal,
+            ).first()
+            if cliente_principal:
+                if hasattr(cliente_principal, 'get_email_efectivo'):
+                    try:
+                        values.append(cliente_principal.get_email_efectivo(self.empresa))
+                    except Exception:
+                        pass
+                values.append(getattr(cliente_principal, 'correo', ''))
+                values.append(getattr(cliente_principal, 'email', ''))
 
         try:
             transportista = Transportista.objects.filter(

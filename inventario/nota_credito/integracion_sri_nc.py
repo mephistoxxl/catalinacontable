@@ -85,6 +85,17 @@ class IntegracionSRINotaCredito:
     def procesar_respuesta(self, respuesta):
         """Procesa la respuesta del SRI y actualiza la NC"""
 
+        def _normalizar_estado(estado):
+            estado_norm = str(estado or '').strip().upper().replace(' ', '_')
+            mapa = {
+                'NO_AUTORIZADO': 'RECHAZADO',
+                'RECIBIDO': 'RECIBIDA',
+                'EN_PROCESAMIENTO': 'RECIBIDA',
+                'PROCESANDO': 'RECIBIDA',
+                'PROCESAMIENTO': 'RECIBIDA',
+            }
+            return mapa.get(estado_norm, estado_norm)
+
         def _extraer_autorizacion(respuesta_dict):
             try:
                 autorizaciones = respuesta_dict.get('autorizaciones') or []
@@ -120,7 +131,7 @@ class IntegracionSRINotaCredito:
                 lineas.append(f"{encabezado}: {detalle}")
             return '\n'.join(lineas).strip()
 
-        estado_resp = respuesta.get('estado')
+        estado_resp = _normalizar_estado(respuesta.get('estado'))
 
         if estado_resp == 'AUTORIZADO':
             self.nc.estado_sri = 'AUTORIZADO'
@@ -146,14 +157,14 @@ class IntegracionSRINotaCredito:
             # Actualizar inventario si aplica
             self.nc.actualizar_inventario()
             
-        elif estado_resp in ('RECHAZADO', 'NO AUTORIZADO'):
+        elif estado_resp == 'RECHAZADO':
             self.nc.estado_sri = 'RECHAZADO'
             mensajes = respuesta.get('mensajes', [])
             raw = str(respuesta.get('raw_response') or respuesta)
             self.nc.mensaje_sri = _formatear_mensajes(mensajes) or raw[:2000]
         else:
-            # Estados intermedios típicos: RECIBIDA / PENDIENTE / DEVUELTA / ERROR
-            self.nc.estado_sri = estado_resp or 'ENVIADO'
+            # Estados intermedios: RECIBIDA / PENDIENTE / DEVUELTA / ERROR
+            self.nc.estado_sri = 'RECIBIDA' if estado_resp in ('RECIBIDA', 'PENDIENTE') else (estado_resp or 'ENVIADO')
             mensajes = respuesta.get('mensajes', [])
             raw = str(respuesta.get('raw_response') or respuesta)
             self.nc.mensaje_sri = _formatear_mensajes(mensajes) or raw[:2000]

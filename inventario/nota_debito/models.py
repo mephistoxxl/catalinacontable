@@ -24,6 +24,7 @@ class NotaDebito(models.Model):
     ESTADO_SRI_CHOICES = [
         ('PENDIENTE', 'Pendiente'),
         ('ENVIADO', 'Enviado'),
+        ('RECIBIDA', 'Recibida'),
         ('RECIBIDO', 'Recibido'),
         ('AUTORIZADO', 'Autorizado'),
         ('RECHAZADO', 'Rechazado'),
@@ -87,6 +88,24 @@ class NotaDebito(models.Model):
 
     estado_sri = models.CharField(max_length=20, choices=ESTADO_SRI_CHOICES, default='PENDIENTE')
     mensaje_sri = models.TextField(blank=True, null=True)
+    email_enviado = models.BooleanField(
+        default=False,
+        help_text='Indica si ya se envió el correo con XML/RIDE de la nota de débito',
+    )
+    email_enviado_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text='Fecha/hora del primer envío exitoso de la nota de débito',
+    )
+    email_envio_intentos = models.PositiveSmallIntegerField(
+        default=0,
+        help_text='Número de intentos de envío de la nota de débito',
+    )
+    email_ultimo_error = models.TextField(
+        blank=True,
+        null=True,
+        help_text='Último error registrado al intentar enviar correo de la nota de débito',
+    )
 
     # Auditoría
     creado_por = models.ForeignKey(
