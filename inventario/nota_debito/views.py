@@ -46,6 +46,7 @@ def _normalizar_estado_nd_sri(valor):
     estado = str(valor or '').strip().upper().replace(' ', '_')
     mapa = {
         'NO_AUTORIZADO': 'RECHAZADO',
+        'NO_AUTORIZADA': 'RECHAZADO',
         'RECIBIDO': 'RECIBIDA',
         'EN_PROCESAMIENTO': 'RECIBIDA',
         'PROCESANDO': 'RECIBIDA',
@@ -124,6 +125,10 @@ def _run_nd_sri_background(nota_debito_id, empresa_id, max_attempts=360, interva
 
             integracion = IntegracionSRINotaDebito(nota_debito)
             estado_actual = _normalizar_estado_nd_sri(nota_debito.estado_sri)
+
+            if estado_actual in ('AUTORIZADO', 'AUTORIZADA', 'RECHAZADO'):
+                logger.info('[ND SRI BG] ND %s ya en estado final %s', nota_debito_id, estado_actual)
+                break
 
             if estado_actual in ('RECIBIDA', 'PENDIENTE') and nota_debito.clave_acceso:
                 opciones = Opciones.objects.for_tenant(empresa).first()
@@ -629,7 +634,7 @@ class CrearNotaDebito(LoginRequiredMixin, View):
             if started:
                 messages.success(
                     request,
-                    f'Nota de Débito {nota_debito_numero} creada. Se iniciaron reintentos automáticos al SRI hasta que quede RECIBIDA.'
+                    f'Nota de Débito {nota_debito_numero} creada. Se iniciaron reintentos automáticos al SRI hasta que quede AUTORIZADA o NO AUTORIZADA.'
                 )
             else:
                 messages.success(request, f'Nota de Débito {nota_debito_numero} creada correctamente.')
@@ -721,11 +726,20 @@ class AutorizarNotaDebito(LoginRequiredMixin, View):
                 # Incrementar contador SOLO si queda autorizada por primera vez
                 nota_debito.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion', 'estado_sri'])
                 ahora_autorizada = bool(nota_debito.numero_autorizacion and nota_debito.fecha_autorizacion)
+                estado_actual = _normalizar_estado_nd_sri(nota_debito.estado_sri)
                 if (not ya_autorizada) and ahora_autorizada:
                     incrementar_contador_documentos(empresa)
                 if ahora_autorizada:
                     _enviar_email_automatico_nd(nota_debito)
-                messages.success(request, 'Nota de Débito procesada correctamente en SRI.')
+                    messages.success(request, 'Nota de Débito autorizada correctamente en SRI.')
+                elif estado_actual == 'RECHAZADO':
+                    messages.error(request, f'Nota de Débito no autorizada por el SRI. {nota_debito.mensaje_sri or ""}')
+                else:
+                    started = _start_nd_sri_background(nota_debito.id, empresa.id)
+                    if started:
+                        messages.info(request, 'La Nota de Débito fue enviada al SRI. El sistema seguirá reintentando automáticamente hasta que quede AUTORIZADA o NO AUTORIZADA.')
+                    else:
+                        messages.info(request, 'La Nota de Débito ya tiene un proceso automático en marcha hasta que el SRI responda AUTORIZADA o NO AUTORIZADA.')
             else:
                 messages.error(request, f"Error al autorizar: {resultado.get('mensaje', 'Error desconocido')}")
 
@@ -814,11 +828,15 @@ class ConsultarEstadoNotaDebito(LoginRequiredMixin, View):
                 _enviar_email_automatico_nd(nota_debito)
 
             if nota_debito.estado_sri == 'AUTORIZADO':
-                messages.success(request, f'✅ Estado SRI: {nota_debito.estado_sri}. Autorización: {nota_debito.numero_autorizacion or ""}')
-            elif nota_debito.estado_sri in ('RECHAZADO', 'NO AUTORIZADO'):
-                messages.error(request, f'❌ Estado SRI: {nota_debito.estado_sri}. {nota_debito.mensaje_sri or ""}')
+                messages.success(request, f'✅ Estado SRI: AUTORIZADO. Autorización: {nota_debito.numero_autorizacion or ""}')
+            elif nota_debito.estado_sri in ('RECHAZADO', 'NO AUTORIZADO', 'NO_AUTORIZADO'):
+                messages.error(request, f'❌ Estado SRI: NO AUTORIZADO. {nota_debito.mensaje_sri or ""}')
             else:
-                messages.info(request, f'ℹ️ Estado SRI: {nota_debito.estado_sri}. {nota_debito.mensaje_sri or ""}')
+                started = _start_nd_sri_background(nota_debito.id, nota_debito.empresa_id)
+                if started:
+                    messages.info(request, 'La Nota de Débito sigue en proceso. El sistema continuará automáticamente hasta obtener AUTORIZADO o NO AUTORIZADO.')
+                else:
+                    messages.info(request, 'La Nota de Débito sigue en proceso automático hasta obtener AUTORIZADO o NO AUTORIZADO.')
 
         except Exception as e:
             logger.exception('Error consultando estado SRI de ND')

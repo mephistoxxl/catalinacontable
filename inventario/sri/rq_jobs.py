@@ -186,7 +186,9 @@ def procesar_liquidacion_compra_job(
 ) -> None:
     """Procesa liquidación y re-encola mientras esté pendiente/recibida/en procesamiento."""
     from inventario.models import Empresa
+    from inventario.utils_planes import incrementar_contador_documentos
     from inventario.liquidacion_compra.models import LiquidacionCompra
+    from inventario.liquidacion_compra.email_utils import enviar_email_automatico_liquidacion
     from inventario.liquidacion_compra.integracion_sri_liquidacion import IntegracionSRILiquidacion
 
     try:
@@ -210,9 +212,13 @@ def procesar_liquidacion_compra_job(
             logger.warning("[SRI LC] Liquidacion %s no existe en empresa %s", liquidacion_id, empresa_id)
             return
 
+        ya_autorizada = bool(getattr(liquidacion, 'numero_autorizacion', None) and getattr(liquidacion, 'fecha_autorizacion', None))
+
         estado_actual = _normalize_state(getattr(liquidacion, "estado_sri", None) or getattr(liquidacion, "estado", None))
         if estado_actual in FINAL_OK_STATES or estado_actual in {s.replace(" ", "_") for s in FINAL_FAIL_STATES}:
             logger.info("[SRI LC] Liquidacion %s ya final (%s)", liquidacion_id, estado_actual)
+            if estado_actual in FINAL_OK_STATES and ya_autorizada:
+                enviar_email_automatico_liquidacion(liquidacion)
             return
 
         integracion = IntegracionSRILiquidacion(empresa)
@@ -231,8 +237,13 @@ def procesar_liquidacion_compra_job(
 
         liquidacion.refresh_from_db(fields=["estado_sri", "estado", "numero_autorizacion", "fecha_autorizacion"])
         estado_nuevo = _normalize_state(getattr(liquidacion, "estado_sri", None) or getattr(liquidacion, "estado", None))
+        ahora_autorizada = bool(getattr(liquidacion, 'numero_autorizacion', None) and getattr(liquidacion, 'fecha_autorizacion', None))
 
         if estado_nuevo in FINAL_OK_STATES:
+            if (not ya_autorizada) and ahora_autorizada:
+                incrementar_contador_documentos(empresa)
+            if ahora_autorizada:
+                enviar_email_automatico_liquidacion(liquidacion)
             logger.info("[SRI LC] Liquidacion %s autorizada (%s)", liquidacion_id, estado_nuevo)
             return
 

@@ -1,4 +1,5 @@
 {% extends "inventario/comun/base.html" %}
+{% load form_extras %}
 
 {% block content %}
 <div class="bg-gray-50 p-4" style="padding-bottom: 64px;">
@@ -57,7 +58,7 @@
         <div class="p-4 text-sm text-gray-800 space-y-2">
           <div class="flex justify-between"><span class="text-gray-600">Número</span><span class="font-medium">{{ nota_credito.numero_completo }}</span></div>
           <div class="flex justify-between"><span class="text-gray-600">Fecha emisión</span><span class="font-medium">{{ nota_credito.fecha_emision }}</span></div>
-          <div class="flex justify-between"><span class="text-gray-600">Estado SRI</span><span class="font-medium">{{ nota_credito.estado_sri }}</span></div>
+          <div class="flex justify-between"><span class="text-gray-600">Estado SRI</span><span class="font-medium">{{ nota_credito.estado_sri|display_sri_estado }}</span></div>
           <div class="flex justify-between"><span class="text-gray-600">Factura sustento</span><span class="font-medium">{{ nota_credito.num_doc_modificado }}</span></div>
           <div class="flex justify-between"><span class="text-gray-600">Fecha factura</span><span class="font-medium">{{ nota_credito.fecha_emision_doc_sustento }}</span></div>
           <div class="pt-2">
@@ -126,4 +127,30 @@
 
   </div>
 </div>
+
+{% with estado_sri=nota_credito.estado_sri|default:'' %}
+<script>
+  (function () {
+    const estado = '{{ estado_sri|escapejs }}'.trim().toUpperCase();
+    const tieneAutorizacion = {% if nota_credito.numero_autorizacion and nota_credito.fecha_autorizacion %}true{% else %}false{% endif %};
+    const estadosFinales = new Set(['AUTORIZADO', 'AUTORIZADA', 'RECHAZADO', 'NO AUTORIZADO', 'NO_AUTORIZADO', 'NO AUTORIZADA', 'NO_AUTORIZADA']);
+
+    if (tieneAutorizacion || estadosFinales.has(estado)) {
+      return;
+    }
+
+    const estadosSeguimiento = new Set(['', 'PENDIENTE', 'RECIBIDA']);
+    if (!estadosSeguimiento.has(estado)) {
+      return;
+    }
+
+    const intervalMs = 10000;
+    window.setInterval(function () {
+      if (document.visibilityState === 'visible') {
+        window.location.reload();
+      }
+    }, intervalMs);
+  })();
+</script>
+{% endwith %}
 {% endblock %}

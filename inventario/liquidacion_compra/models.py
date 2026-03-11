@@ -148,6 +148,24 @@ class LiquidacionCompra(models.Model):
     mensaje_sri = models.TextField(blank=True, null=True)
     xml_firmado = models.TextField(blank=True, null=True)
     xml_autorizado = models.TextField(blank=True, null=True)
+    email_enviado = models.BooleanField(
+        default=False,
+        help_text="Indica si ya se envió el correo con XML de la liquidación de compra",
+    )
+    email_enviado_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="Fecha/hora del primer envío exitoso de la liquidación de compra",
+    )
+    email_envio_intentos = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Número de intentos de envío de la liquidación de compra",
+    )
+    email_ultimo_error = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Último error registrado al intentar enviar correo de la liquidación de compra",
+    )
 
     # Auditoría
     actualizado_en = models.DateTimeField(auto_now=True)

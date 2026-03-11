@@ -50,6 +50,7 @@ def _normalizar_estado_nc_sri(valor):
     estado = str(valor or '').strip().upper().replace(' ', '_')
     mapa = {
         'NO_AUTORIZADO': 'RECHAZADO',
+        'NO_AUTORIZADA': 'RECHAZADO',
         'RECIBIDO': 'RECIBIDA',
         'EN_PROCESAMIENTO': 'RECIBIDA',
         'PROCESANDO': 'RECIBIDA',
@@ -96,6 +97,23 @@ def _run_nc_sri_background(nota_credito_id, empresa_id, max_attempts=360, interv
     from .integracion_sri_nc import IntegracionSRINotaCredito
     from inventario.sri.sri_client import SRIClient
 
+    def _respuesta_sigue_pendiente_sin_autorizacion(respuesta):
+        estado = _normalizar_estado_nc_sri((respuesta or {}).get('estado'))
+        if estado in ('AUTORIZADO', 'AUTORIZADA', 'RECHAZADO'):
+            return False
+
+        autorizaciones = (respuesta or {}).get('autorizaciones') or []
+        if autorizaciones:
+            return False
+
+        mensajes = (respuesta or {}).get('mensajes') or []
+        texto = ' '.join(
+            str(item.get('mensaje') if isinstance(item, dict) else item or '') + ' ' +
+            str(item.get('informacionAdicional') if isinstance(item, dict) else '')
+            for item in mensajes
+        ).upper()
+        return 'NO HA SIDO AUTORIZADO AÚN' in texto or 'NO HA SIDO AUTORIZADO AUN' in texto or 'NO EXISTE' in texto or estado in ('PENDIENTE', 'RECIBIDA')
+
     key = f'{empresa_id}:{nota_credito_id}'
     logger.info('[NC SRI BG] Inicio envío en background para NC %s (empresa %s)', nota_credito_id, empresa_id)
     try:
@@ -117,52 +135,66 @@ def _run_nc_sri_background(nota_credito_id, empresa_id, max_attempts=360, interv
                 logger.warning('[NC SRI BG] NC %s no existe en empresa %s', nota_credito_id, empresa_id)
                 break
 
-            if nota_credito.numero_autorizacion and nota_credito.fecha_autorizacion:
-                if not ya_contabilizada:
-                    try:
-                        incrementar_contador_documentos(empresa)
-                    except Exception as exc:
-                        logger.warning('[NC SRI BG] No se pudo incrementar contador para NC %s: %s', nota_credito_id, exc)
-                    ya_contabilizada = True
-                _enviar_email_automatico_nc(nota_credito)
-                break
-
-            integracion = IntegracionSRINotaCredito(nota_credito)
-            estado_actual = _normalizar_estado_nc_sri(nota_credito.estado_sri)
-
-            if estado_actual in ('RECIBIDA', 'PENDIENTE') and nota_credito.clave_acceso:
-                opciones = Opciones.objects.for_tenant(empresa).first()
-                if not opciones:
-                    logger.warning('[NC SRI BG] No se encontró Opciones para empresa %s', empresa_id)
+            try:
+                if nota_credito.numero_autorizacion and nota_credito.fecha_autorizacion:
+                    if not ya_contabilizada:
+                        try:
+                            incrementar_contador_documentos(empresa)
+                        except Exception as exc:
+                            logger.warning('[NC SRI BG] No se pudo incrementar contador para NC %s: %s', nota_credito_id, exc)
+                        ya_contabilizada = True
+                    _enviar_email_automatico_nc(nota_credito)
                     break
 
-                ambiente = 'pruebas' if str(getattr(opciones, 'tipo_ambiente', '1')) == '1' else 'produccion'
-                cliente = SRIClient(ambiente=ambiente)
-                respuesta = cliente.consultar_autorizacion(nota_credito.clave_acceso)
-                estado = _normalizar_estado_nc_sri(integracion.procesar_respuesta(respuesta))
-                logger.info('[NC SRI BG] NC %s consulta autorización, estado=%s', nota_credito_id, estado or 'SIN_ESTADO')
-            else:
-                resultado = integracion.procesar_completo()
-                estado = _normalizar_estado_nc_sri(resultado.get('estado'))
-                logger.info('[NC SRI BG] NC %s intento envío, estado=%s success=%s', nota_credito_id, estado or 'SIN_ESTADO', resultado.get('success'))
+                integracion = IntegracionSRINotaCredito(nota_credito)
+                estado_actual = _normalizar_estado_nc_sri(nota_credito.estado_sri)
 
-            try:
-                nota_credito.refresh_from_db(fields=['estado_sri', 'numero_autorizacion', 'fecha_autorizacion'])
-            except Exception:
-                pass
+                if estado_actual in ('AUTORIZADO', 'AUTORIZADA', 'RECHAZADO'):
+                    logger.info('[NC SRI BG] NC %s ya en estado final %s', nota_credito_id, estado_actual)
+                    break
 
-            if nota_credito.numero_autorizacion and nota_credito.fecha_autorizacion:
-                if not ya_contabilizada:
-                    try:
-                        incrementar_contador_documentos(empresa)
-                    except Exception as exc:
-                        logger.warning('[NC SRI BG] No se pudo incrementar contador para NC %s: %s', nota_credito_id, exc)
-                    ya_contabilizada = True
-                _enviar_email_automatico_nc(nota_credito)
-                break
+                if estado_actual in ('RECIBIDA', 'PENDIENTE') and nota_credito.clave_acceso:
+                    opciones = Opciones.objects.for_tenant(empresa).first()
+                    if not opciones:
+                        logger.warning('[NC SRI BG] No se encontró Opciones para empresa %s', empresa_id)
+                        break
 
-            if estado in ('AUTORIZADO', 'AUTORIZADA', 'RECHAZADO'):
-                break
+                    ambiente = 'pruebas' if str(getattr(opciones, 'tipo_ambiente', '1')) == '1' else 'produccion'
+                    cliente = SRIClient(ambiente=ambiente)
+                    respuesta = cliente.consultar_autorizacion(nota_credito.clave_acceso)
+                    estado = _normalizar_estado_nc_sri(integracion.procesar_respuesta(respuesta))
+                    logger.info('[NC SRI BG] NC %s consulta autorización, estado=%s', nota_credito_id, estado or 'SIN_ESTADO')
+
+                    if _respuesta_sigue_pendiente_sin_autorizacion(respuesta):
+                        logger.info('[NC SRI BG] NC %s sigue sin autorización final; se realiza reenvío automático completo', nota_credito_id)
+                        resultado = integracion.procesar_completo()
+                        estado = _normalizar_estado_nc_sri(resultado.get('estado'))
+                        logger.info('[NC SRI BG] NC %s reenvío automático, estado=%s success=%s', nota_credito_id, estado or 'SIN_ESTADO', resultado.get('success'))
+                else:
+                    resultado = integracion.procesar_completo()
+                    estado = _normalizar_estado_nc_sri(resultado.get('estado'))
+                    logger.info('[NC SRI BG] NC %s intento envío, estado=%s success=%s', nota_credito_id, estado or 'SIN_ESTADO', resultado.get('success'))
+
+                try:
+                    nota_credito.refresh_from_db(fields=['estado_sri', 'numero_autorizacion', 'fecha_autorizacion'])
+                except Exception:
+                    pass
+
+                if nota_credito.numero_autorizacion and nota_credito.fecha_autorizacion:
+                    if not ya_contabilizada:
+                        try:
+                            incrementar_contador_documentos(empresa)
+                        except Exception as exc:
+                            logger.warning('[NC SRI BG] No se pudo incrementar contador para NC %s: %s', nota_credito_id, exc)
+                        ya_contabilizada = True
+                    _enviar_email_automatico_nc(nota_credito)
+                    break
+
+                if estado in ('AUTORIZADO', 'AUTORIZADA', 'RECHAZADO'):
+                    break
+
+            except Exception as exc:
+                logger.exception('[NC SRI BG] Error procesando NC %s en background: %s', nota_credito_id, exc)
 
             time.sleep(interval_seconds)
     finally:
@@ -368,8 +400,12 @@ class CrearNotaCredito(LoginRequiredMixin, View):
             initial['almacen'] = str(factura.almacen_id)
         
         # Obtener correo del cliente si existe
-        if factura.cliente and hasattr(factura.cliente, 'email'):
-            initial['correo_cliente'] = factura.cliente.email or ''
+        if factura.cliente:
+            initial['correo_cliente'] = (
+                getattr(factura.cliente, 'correo', '')
+                or getattr(factura.cliente, 'email', '')
+                or ''
+            )
         
         if secuencia_info:
             initial.update({
@@ -495,6 +531,8 @@ class CrearNotaCredito(LoginRequiredMixin, View):
         empresa = get_object_or_404(Empresa, id=empresa_id)
         
         try:
+            nota_credito_id = None
+            nota_credito_numero = None
             with transaction.atomic():
                 # Obtener datos del formulario
                 factura_id = factura_id or request.POST.get('factura_modificada') or request.POST.get('factura_id')
@@ -667,15 +705,59 @@ class CrearNotaCredito(LoginRequiredMixin, View):
                         valor=valor_imp
                     )
                 
-                started = _start_nc_sri_background(nota_credito.id, empresa.id)
-                if started:
+                nota_credito_id = nota_credito.id
+                nota_credito_numero = nota_credito.numero_completo
+
+            nota_credito = NotaCredito.objects.get(id=nota_credito_id, empresa_id=empresa.id)
+            ya_autorizada = bool(nota_credito.numero_autorizacion and nota_credito.fecha_autorizacion)
+
+            try:
+                from .integracion_sri_nc import IntegracionSRINotaCredito
+
+                integracion = IntegracionSRINotaCredito(nota_credito)
+                resultado = integracion.procesar_completo()
+                nota_credito.refresh_from_db(fields=['estado_sri', 'numero_autorizacion', 'fecha_autorizacion', 'mensaje_sri'])
+                ahora_autorizada = bool(nota_credito.numero_autorizacion and nota_credito.fecha_autorizacion)
+                estado_actual = _normalizar_estado_nc_sri(nota_credito.estado_sri)
+
+                if (not ya_autorizada) and ahora_autorizada:
+                    incrementar_contador_documentos(empresa)
+
+                if ahora_autorizada:
+                    _enviar_email_automatico_nc(nota_credito)
                     messages.success(
                         request,
-                        f'Nota de Crédito {nota_credito.numero_completo} creada correctamente. Se iniciaron reintentos automáticos al SRI hasta que quede RECIBIDA.'
+                        f'Nota de Crédito {nota_credito_numero} creada y autorizada automáticamente. Autorización: {nota_credito.numero_autorizacion or ""}'
+                    )
+                elif estado_actual == 'RECHAZADO':
+                    messages.error(
+                        request,
+                        f'Nota de Crédito {nota_credito_numero} no autorizada por el SRI. {nota_credito.mensaje_sri or ""}'
                     )
                 else:
-                    messages.success(request, f'Nota de Crédito {nota_credito.numero_completo} creada correctamente.')
-                return redirect('inventario:notas_credito_ver', pk=nota_credito.id)
+                    started = _start_nc_sri_background(nota_credito_id, empresa.id)
+                    if started:
+                        messages.info(
+                            request,
+                            f'Nota de Crédito {nota_credito_numero} creada y enviada automáticamente al SRI. El sistema seguirá reintentando hasta que quede AUTORIZADA o NO AUTORIZADA.'
+                        )
+                    else:
+                        messages.info(
+                            request,
+                            f'Nota de Crédito {nota_credito_numero} creada correctamente. El proceso automático ya está en marcha hasta obtener respuesta final del SRI.'
+                        )
+            except Exception:
+                logger.exception('Error procesando automáticamente la NC %s tras su creación', nota_credito_id)
+                started = _start_nc_sri_background(nota_credito_id, empresa.id)
+                if started:
+                    messages.warning(
+                        request,
+                        f'Nota de Crédito {nota_credito_numero} creada. La autorización automática continuará en segundo plano hasta que el SRI responda.'
+                    )
+                else:
+                    messages.success(request, f'Nota de Crédito {nota_credito_numero} creada correctamente.')
+
+            return redirect('inventario:notas_credito_ver', pk=nota_credito_id)
         
         except Exception as e:
             logger.exception("Error creando nota de crédito")
@@ -838,11 +920,20 @@ class AutorizarNotaCredito(LoginRequiredMixin, View):
             if resultado['success']:
                 nota_credito.refresh_from_db(fields=['numero_autorizacion', 'fecha_autorizacion', 'estado_sri'])
                 ahora_autorizada = bool(nota_credito.numero_autorizacion and nota_credito.fecha_autorizacion)
+                estado_actual = _normalizar_estado_nc_sri(nota_credito.estado_sri)
                 if (not ya_autorizada) and ahora_autorizada:
                     incrementar_contador_documentos(empresa)
                 if ahora_autorizada:
                     _enviar_email_automatico_nc(nota_credito)
-                messages.success(request, f'Nota de Crédito autorizada correctamente. Autorización: {resultado.get("numero_autorizacion", "")}')
+                    messages.success(request, f'Nota de Crédito autorizada correctamente. Autorización: {resultado.get("numero_autorizacion", "")}')
+                elif estado_actual == 'RECHAZADO':
+                    messages.error(request, f'Nota de Crédito no autorizada por el SRI. {nota_credito.mensaje_sri or ""}')
+                else:
+                    started = _start_nc_sri_background(nota_credito.id, empresa.id)
+                    if started:
+                        messages.info(request, 'La Nota de Crédito fue enviada al SRI. El sistema seguirá reintentando automáticamente hasta que quede AUTORIZADA o NO AUTORIZADA.')
+                    else:
+                        messages.info(request, 'La Nota de Crédito ya tiene un proceso automático en marcha hasta que el SRI responda AUTORIZADA o NO AUTORIZADA.')
             else:
                 messages.error(request, f'Error al autorizar: {resultado.get("mensaje", "Error desconocido")}')
         
@@ -907,12 +998,15 @@ class ConsultarEstadoNotaCredito(LoginRequiredMixin, View):
                 _enviar_email_automatico_nc(nota_credito)
 
             if estado == 'AUTORIZADO':
-                messages.success(request, f'✅ Estado SRI: {estado}. Autorización: {nota_credito.numero_autorizacion or ""}')
-            elif estado in ('RECHAZADO', 'NO AUTORIZADO'):
-                # mostrar el motivo ya formateado en mensaje_sri
-                messages.error(request, f'❌ Estado SRI: {estado}. {nota_credito.mensaje_sri or ""}')
+                messages.success(request, f'✅ Estado SRI: AUTORIZADO. Autorización: {nota_credito.numero_autorizacion or ""}')
+            elif estado in ('RECHAZADO', 'NO AUTORIZADO', 'NO_AUTORIZADO'):
+                messages.error(request, f'❌ Estado SRI: NO AUTORIZADO. {nota_credito.mensaje_sri or ""}')
             else:
-                messages.info(request, f'ℹ️ Estado SRI: {estado}. {nota_credito.mensaje_sri or ""}')
+                started = _start_nc_sri_background(nota_credito.id, nota_credito.empresa_id)
+                if started:
+                    messages.info(request, 'La Nota de Crédito sigue en proceso. El sistema continuará automáticamente hasta obtener AUTORIZADO o NO AUTORIZADO.')
+                else:
+                    messages.info(request, 'La Nota de Crédito sigue en proceso automático hasta obtener AUTORIZADO o NO AUTORIZADO.')
 
         except Exception as e:
             logger.exception('Error consultando estado SRI de NC')

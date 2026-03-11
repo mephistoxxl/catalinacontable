@@ -223,10 +223,10 @@ class DocumentEmailService:
 
     def send_liquidacion(self, liquidacion: LiquidacionCompra) -> SendResult:
         estado = (liquidacion.estado_sri or '').strip().upper()
-        if estado != 'AUTORIZADA':
+        if estado not in {'AUTORIZADA', 'AUTORIZADO'}:
             return SendResult(False, f'Liquidación no autorizada. Estado actual: {liquidacion.estado_sri}', [])
 
-        destinatarios = self._emails_from_proveedor(liquidacion.proveedor)
+        destinatarios = self._emails_for_liquidacion(liquidacion)
         if not destinatarios:
             return SendResult(False, 'El vendedor/prestador no tiene correo registrado.', [])
 
@@ -246,7 +246,7 @@ class DocumentEmailService:
             document_title='Liquidación de Compra Electrónica',
             number_label='Liquidación No',
             document_number=numero,
-            customer_name=getattr(getattr(liquidacion, 'proveedor', None), 'razon_social_proveedor', '') or 'Proveedor',
+            customer_name=self._resolve_liquidacion_customer_name(liquidacion),
             access_key=liquidacion.clave_acceso or 'N/A',
             issue_date=self._format_date(getattr(liquidacion, 'fecha_emision', None)),
             total=self._format_decimal(getattr(liquidacion, 'importe_total', None)),
@@ -439,6 +439,40 @@ class DocumentEmailService:
             getattr(proveedor, 'correo2', ''),
         ]
         return self._dedupe(self._expand_emails(values))
+
+    def _emails_for_liquidacion(self, liquidacion: LiquidacionCompra) -> List[str]:
+        values = []
+
+        try:
+            prestador = getattr(liquidacion, 'prestador', None)
+        except Exception:
+            prestador = None
+
+        if prestador is not None:
+            values.extend([
+                getattr(prestador, 'correo', ''),
+            ])
+
+        proveedor = getattr(liquidacion, 'proveedor', None)
+        if proveedor is not None:
+            values.extend([
+                getattr(proveedor, 'correo', ''),
+                getattr(proveedor, 'correo2', ''),
+            ])
+
+        return self._dedupe(self._expand_emails(values))
+
+    def _resolve_liquidacion_customer_name(self, liquidacion: LiquidacionCompra) -> str:
+        try:
+            prestador = getattr(liquidacion, 'prestador', None)
+        except Exception:
+            prestador = None
+
+        if prestador is not None and getattr(prestador, 'nombre', ''):
+            return prestador.nombre
+
+        proveedor = getattr(liquidacion, 'proveedor', None)
+        return getattr(proveedor, 'razon_social_proveedor', '') or 'Proveedor'
 
     def _emails_from_factura_cliente(self, factura) -> List[str]:
         if not factura:

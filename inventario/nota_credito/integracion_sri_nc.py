@@ -131,11 +131,40 @@ class IntegracionSRINotaCredito:
                 lineas.append(f"{encabezado}: {detalle}")
             return '\n'.join(lineas).strip()
 
-        estado_resp = _normalizar_estado(respuesta.get('estado'))
+        def _mensajes_indican_clave_en_procesamiento(mensajes, respuesta_dict):
+            for mensaje in (mensajes or []):
+                if isinstance(mensaje, dict):
+                    texto = ' '.join([
+                        str(mensaje.get('mensaje', '') or ''),
+                        str(mensaje.get('informacionAdicional', '') or ''),
+                        str(mensaje.get('detalle', '') or ''),
+                    ])
+                else:
+                    texto = str(mensaje or '')
+                if 'CLAVE' in texto.upper() and 'PROCESAMIENTO' in texto.upper():
+                    return True
+
+            raw = str((respuesta_dict or {}).get('raw_response') or respuesta_dict or '')
+            return 'CLAVE' in raw.upper() and 'PROCESAMIENTO' in raw.upper()
+
+        aut0 = _extraer_autorizacion(respuesta)
+        mensajes = respuesta.get('mensajes', [])
+        estado_resp = _normalizar_estado(
+            aut0.get('estado')
+            or respuesta.get('estado')
+            or respuesta.get('estado_autorizacion')
+        )
+
+        if estado_resp in ('DEVUELTA', 'ERROR') and _mensajes_indican_clave_en_procesamiento(mensajes, respuesta):
+            logger.info(
+                'NC %s: estado %s normalizado a PENDIENTE por reporte de clave en procesamiento',
+                self.nc.id,
+                estado_resp,
+            )
+            estado_resp = 'PENDIENTE'
 
         if estado_resp == 'AUTORIZADO':
             self.nc.estado_sri = 'AUTORIZADO'
-            aut0 = _extraer_autorizacion(respuesta)
             numero_aut = (
                 respuesta.get('numeroAutorizacion')
                 or aut0.get('numeroAutorizacion')
@@ -159,13 +188,11 @@ class IntegracionSRINotaCredito:
             
         elif estado_resp == 'RECHAZADO':
             self.nc.estado_sri = 'RECHAZADO'
-            mensajes = respuesta.get('mensajes', [])
             raw = str(respuesta.get('raw_response') or respuesta)
             self.nc.mensaje_sri = _formatear_mensajes(mensajes) or raw[:2000]
         else:
             # Estados intermedios: RECIBIDA / PENDIENTE / DEVUELTA / ERROR
             self.nc.estado_sri = 'RECIBIDA' if estado_resp in ('RECIBIDA', 'PENDIENTE') else (estado_resp or 'ENVIADO')
-            mensajes = respuesta.get('mensajes', [])
             raw = str(respuesta.get('raw_response') or respuesta)
             self.nc.mensaje_sri = _formatear_mensajes(mensajes) or raw[:2000]
         

@@ -1,4 +1,5 @@
-  {% extends "inventario/comun/base.html" %}
+{% extends "inventario/comun/base.html" %}
+{% load form_extras %}
 
 {% block content %}
 <div class="bg-gray-50 p-4" style="padding-bottom: 64px;">
@@ -85,7 +86,7 @@
                 {% endif %}
               </td>
               <td class="px-3 py-2 text-sm text-gray-800 text-right font-semibold">${{ n.valor_modificacion|floatformat:2 }}</td>
-              <td class="px-3 py-2 text-sm text-gray-800">{{ n.estado_sri }}</td>
+              <td class="px-3 py-2 text-sm text-gray-800">{{ n.estado_sri|display_sri_estado }}</td>
               <td class="px-3 py-2 text-right">
                 <a href="{% url 'inventario:notas_credito_ver' n.id %}" class="inline-flex items-center justify-center px-3 py-2 rounded bg-blue-600 text-white text-xs hover:bg-blue-700">
                   <i class="fas fa-eye mr-1"></i>Ver
