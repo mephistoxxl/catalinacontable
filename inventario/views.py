@@ -10029,6 +10029,16 @@ def ver_guia_remision(request, guia_id):
         return redirect('inventario:seleccionar_empresa')
     guia = get_object_or_404(GuiaRemision, id=guia_id, empresa=empresa)
 
+    if guia.numero_autorizacion and guia.fecha_autorizacion:
+        update_fields = []
+        if guia.estado != 'autorizada':
+            guia.estado = 'autorizada'
+            update_fields.append('estado')
+        if update_fields:
+            guia.save(update_fields=update_fields)
+        if not guia.email_enviado:
+            _enviar_email_automatico_guia(guia, empresa)
+
     estado_visual = 'BORRADOR'
     estado_visual_label = 'Borrador'
     mensaje_visual = 'La guía está pendiente de envío al SRI.'

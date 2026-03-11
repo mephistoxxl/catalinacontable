@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
+import logging
 from typing import Iterable, List, Sequence, Tuple
 
 from django.conf import settings
@@ -20,6 +22,9 @@ from inventario.nota_debito.models import NotaDebito
 from inventario.nota_debito.ride_generator_nd import RIDENotaDebitoGenerator
 from inventario.nota_debito.xml_generator_nd import XMLGeneratorNotaDebito
 from inventario.retenciones.models import ComprobanteRetencion
+
+
+logger = logging.getLogger(__name__)
 
 
 Attachment = Tuple[str, bytes, str]
@@ -167,19 +172,22 @@ class DocumentEmailService:
 
     def send_guia(self, guia) -> SendResult:
         estado = (guia.estado or '').strip().lower()
-        if estado != 'autorizada':
+        esta_autorizada = estado == 'autorizada' or bool(getattr(guia, 'numero_autorizacion', None) and getattr(guia, 'fecha_autorizacion', None))
+        if not esta_autorizada:
             return SendResult(False, f'Guía no autorizada. Estado actual: {guia.estado}', [])
+
+        if estado != 'autorizada' and getattr(guia, 'numero_autorizacion', None) and getattr(guia, 'fecha_autorizacion', None):
+            try:
+                guia.estado = 'autorizada'
+                guia.save(update_fields=['estado'])
+            except Exception:
+                pass
 
         destinatarios = self._emails_for_guia(guia)
         if not destinatarios:
             return SendResult(False, 'No se encontraron correos para destinatario/transportista.', [])
 
-        xml = (guia.xml_autorizado or '').strip()
-        if not xml:
-            try:
-                xml = XMLGeneratorGuiaRemision(guia).generar_xml()
-            except Exception:
-                xml = ''
+        xml = self._get_guia_xml(guia)
         if not xml:
             return SendResult(False, 'No existe XML para adjuntar en la guía.', [])
 
@@ -199,9 +207,9 @@ class DocumentEmailService:
             document_title='Guía de Remisión Electrónica',
             number_label='Guía No',
             document_number=numero,
-            customer_name=getattr(guia, 'destinatario_nombre', '') or 'Destinatario',
+            customer_name=self._resolve_guia_customer_name(guia),
             access_key=guia.clave_acceso or 'N/A',
-            issue_date=self._format_date(getattr(guia, 'fecha_emision', None)),
+            issue_date=self._resolve_guia_issue_date(guia),
             total='N/A',
             intro_text='Se ha emitido una guía de remisión electrónica autorizada para sustento legal del traslado de mercadería.',
             attachments=['GuiaRemision.pdf', 'GuiaRemision.xml'],
@@ -272,10 +280,41 @@ class DocumentEmailService:
 
     def _try_generate_guia_pdf(self, guia) -> bytes | None:
         try:
-            buffer: BytesIO = GuiaRemisionRIDEGenerator().generar_ride_guia_remision(guia)
+            buffer: BytesIO = GuiaRemisionRIDEGenerator(self.empresa, self.opciones).generar_ride_guia_remision(guia)
             return buffer.read()
-        except Exception:
+        except Exception as exc:
+            logger.exception('Error generando PDF RIDE de guía %s: %s', getattr(guia, 'id', None), exc)
             return None
+
+    def _get_guia_xml(self, guia) -> str:
+        xml = (getattr(guia, 'xml_autorizado', '') or '').strip()
+        if xml:
+            return xml
+
+        xml = self._read_guia_xml_file(guia)
+        if xml:
+            return xml
+
+        if not self.opciones:
+            return ''
+
+        try:
+            xml = XMLGeneratorGuiaRemision(guia, self.empresa, self.opciones).generar_xml()
+            return (xml or '').strip()
+        except Exception as exc:
+            logger.exception('Error generando XML de guía %s para correo: %s', getattr(guia, 'id', None), exc)
+            return ''
+
+    def _read_guia_xml_file(self, guia) -> str:
+        try:
+            base_dir = Path(settings.BASE_DIR) / 'media' / 'guias_xml' / str(self.empresa.id)
+            nombre_archivo = f'guia_{guia.numero_completo.replace("-", "_")}.xml'
+            ruta_completa = base_dir / nombre_archivo
+            if ruta_completa.exists():
+                return ruta_completa.read_text(encoding='utf-8').strip()
+        except Exception as exc:
+            logger.warning('No se pudo leer XML local de guía %s: %s', getattr(guia, 'id', None), exc)
+        return ''
 
     def _send_email(
         self,
@@ -356,6 +395,24 @@ class DocumentEmailService:
             getattr(factura, 'nombre_cliente', '')
             or getattr(getattr(factura, 'cliente', None), 'razon_social', '')
             or 'Cliente'
+        )
+
+    def _resolve_guia_customer_name(self, guia) -> str:
+        try:
+            destinatario = guia.destinatarios.order_by('id').first()
+        except Exception:
+            destinatario = None
+
+        return (
+            getattr(destinatario, 'razon_social_destinatario', '')
+            or getattr(getattr(guia, 'factura', None), 'nombre_cliente', '')
+            or 'Destinatario'
+        )
+
+    def _resolve_guia_issue_date(self, guia) -> str:
+        return self._format_date(
+            getattr(guia, 'fecha_inicio_traslado', None)
+            or getattr(guia, 'fecha_creacion', None)
         )
 
     def _format_date(self, value) -> str:
