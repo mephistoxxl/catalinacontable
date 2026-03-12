@@ -15,6 +15,7 @@ from inventario.models import Cliente, Opciones, Transportista
 from inventario.guia_remision.ride_guia_generator import GuiaRemisionRIDEGenerator
 from inventario.guia_remision.xml_generator_guia import XMLGeneratorGuiaRemision
 from inventario.liquidacion_compra.models import LiquidacionCompra
+from inventario.liquidacion_compra.ride_generator_liquidacion import RIDELiquidacionCompraGenerator
 from inventario.nota_credito.models import NotaCredito
 from inventario.nota_credito.ride_generator_nc import RIDEGeneratorNotaCredito
 from inventario.nota_credito.xml_generator_nc import XMLGeneratorNotaCredito
@@ -234,6 +235,10 @@ class DocumentEmailService:
         if not xml:
             return SendResult(False, 'No existe XML para adjuntar en la liquidación.', [])
 
+        pdf_bytes = self._try_generate_liquidacion_pdf(liquidacion)
+        if not pdf_bytes:
+            return SendResult(False, 'No se pudo generar el PDF RIDE de la liquidación.', [])
+
         numero = liquidacion.numero_completo
         asunto = f'Liquidación de compra electrónica {numero}'
         cuerpo = (
@@ -251,9 +256,10 @@ class DocumentEmailService:
             issue_date=self._format_date(getattr(liquidacion, 'fecha_emision', None)),
             total=self._format_decimal(getattr(liquidacion, 'importe_total', None)),
             intro_text='Se ha emitido una liquidación de compra electrónica autorizada por el SRI a su nombre.',
-            attachments=['LiquidacionCompra.xml'],
+            attachments=['LiquidacionCompra.pdf', 'LiquidacionCompra.xml'],
         )
         attachments = [
+            (f'liquidacion_compra_{numero.replace("-", "_")}.pdf', pdf_bytes, 'application/pdf'),
             (f'liquidacion_compra_{numero.replace("-", "_")}.xml', xml.encode('utf-8'), 'application/xml')
         ]
         self._send_email(asunto, cuerpo, destinatarios, attachments, html_body=html)
@@ -284,6 +290,14 @@ class DocumentEmailService:
             return buffer.read()
         except Exception as exc:
             logger.exception('Error generando PDF RIDE de guía %s: %s', getattr(guia, 'id', None), exc)
+            return None
+
+    def _try_generate_liquidacion_pdf(self, liquidacion: LiquidacionCompra) -> bytes | None:
+        try:
+            buffer: BytesIO = RIDELiquidacionCompraGenerator(liquidacion, self.opciones).generar_pdf()
+            return buffer.read()
+        except Exception as exc:
+            logger.exception('Error generando PDF RIDE de liquidación %s: %s', getattr(liquidacion, 'id', None), exc)
             return None
 
     def _get_guia_xml(self, guia) -> str:

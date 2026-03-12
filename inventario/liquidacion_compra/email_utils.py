@@ -8,11 +8,44 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 
+def liquidacion_esta_autorizada(liquidacion) -> bool:
+    estado = (getattr(liquidacion, 'estado_sri', '') or getattr(liquidacion, 'estado', '') or '').strip().upper()
+    return estado in {'AUTORIZADA', 'AUTORIZADO'} or bool(
+        getattr(liquidacion, 'numero_autorizacion', None) and getattr(liquidacion, 'fecha_autorizacion', None)
+    )
+
+
 def enviar_email_automatico_liquidacion(liquidacion) -> bool:
-    if not liquidacion.numero_autorizacion or not liquidacion.fecha_autorizacion:
+    if not liquidacion_esta_autorizada(liquidacion):
         return False
 
     if getattr(liquidacion, 'email_enviado', False):
+        return False
+
+    if (
+        liquidacion_esta_autorizada(liquidacion)
+        and (
+            not getattr(liquidacion, 'numero_autorizacion', None)
+            or not getattr(liquidacion, 'fecha_autorizacion', None)
+            or not getattr(liquidacion, 'xml_autorizado', None)
+        )
+        and getattr(liquidacion, 'clave_acceso', None)
+    ):
+        try:
+            from inventario.liquidacion_compra.integracion_sri_liquidacion import IntegracionSRILiquidacion
+
+            IntegracionSRILiquidacion(liquidacion.empresa).consultar_estado_actual(liquidacion)
+            liquidacion.refresh_from_db(fields=[
+                'estado',
+                'estado_sri',
+                'numero_autorizacion',
+                'fecha_autorizacion',
+                'xml_autorizado',
+            ])
+        except Exception:
+            logger.exception('[LIQ EMAIL] No se pudo refrescar autorización para liquidación %s', liquidacion.id)
+
+    if not liquidacion_esta_autorizada(liquidacion):
         return False
 
     from inventario.documentos_email.services import DocumentEmailService

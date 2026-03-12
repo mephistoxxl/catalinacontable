@@ -24,6 +24,7 @@ from .forms import (
     LiquidacionCompraForm,
 )
 from .email_utils import enviar_email_automatico_liquidacion
+from .email_utils import liquidacion_esta_autorizada
 from .models import LiquidacionCompra
 
 
@@ -337,7 +338,7 @@ def autorizar_liquidacion_compra(request, pk):
                 ahora_autorizada = bool(liquidacion.numero_autorizacion and liquidacion.fecha_autorizacion)
                 if (not ya_autorizada) and ahora_autorizada:
                     incrementar_contador_documentos(empresa)
-                if ahora_autorizada:
+                if liquidacion_esta_autorizada(liquidacion):
                     enviar_email_automatico_liquidacion(liquidacion)
                 try:
                     request.session['mostrar_modal_autorizado'] = True
@@ -417,7 +418,7 @@ def consultar_estado_liquidacion_compra(request, pk):
         ahora_autorizada = bool(liquidacion.numero_autorizacion and liquidacion.fecha_autorizacion)
         if (not ya_autorizada) and ahora_autorizada:
             incrementar_contador_documentos(empresa)
-        if ahora_autorizada:
+        if liquidacion_esta_autorizada(liquidacion):
             enviar_email_automatico_liquidacion(liquidacion)
             # Si al consultar pasó a autorizada, mostrar modal
             try:
@@ -542,7 +543,7 @@ def consultar_estado_liquidacion_compra_json(request, pk):
         except Exception:
             pass
 
-        if liquidacion.numero_autorizacion and liquidacion.fecha_autorizacion:
+        if liquidacion_esta_autorizada(liquidacion):
             enviar_email_automatico_liquidacion(liquidacion)
 
         estado_actual = _normalizar_estado(liquidacion.estado_sri) or _normalizar_estado(resultado.get('estado'))

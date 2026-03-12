@@ -429,19 +429,75 @@ class IntegracionSRILiquidacion:
         """
         import time
         
+        def _first_value(*values):
+            for value in values:
+                if value not in (None, ''):
+                    return value
+            return None
+
+        def _parse_fecha_autorizacion(value):
+            if not value:
+                return None
+            if isinstance(value, datetime):
+                return value
+            value = str(value).strip()
+            if not value:
+                return None
+
+            try:
+                return datetime.fromisoformat(value.replace('Z', '+00:00'))
+            except Exception:
+                pass
+
+            for fmt in ('%d/%m/%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S'):
+                try:
+                    return datetime.strptime(value, fmt)
+                except Exception:
+                    continue
+
+            return None
+
         for intento in range(reintentos):
             try:
                 resultado = self.cliente_sri.consultar_autorizacion(liquidacion.clave_acceso)
                 
                 estado = resultado.get('estado', '')
+                autorizaciones = resultado.get('autorizaciones') or []
+                aut0 = autorizaciones[0] if isinstance(autorizaciones, list) and autorizaciones else {}
+                if not isinstance(aut0, dict):
+                    aut0 = {}
+
+                numero_autorizacion = _first_value(
+                    resultado.get('numero_autorizacion'),
+                    resultado.get('numeroAutorizacion'),
+                    aut0.get('numero_autorizacion'),
+                    aut0.get('numeroAutorizacion'),
+                )
+                fecha_autorizacion = _parse_fecha_autorizacion(_first_value(
+                    resultado.get('fecha_autorizacion'),
+                    resultado.get('fechaAutorizacion'),
+                    aut0.get('fecha_autorizacion'),
+                    aut0.get('fechaAutorizacion'),
+                ))
+                xml_autorizado = _first_value(
+                    resultado.get('xml_autorizado'),
+                    resultado.get('xmlAutorizado'),
+                    resultado.get('comprobante'),
+                    aut0.get('xml_autorizado'),
+                    aut0.get('xmlAutorizado'),
+                    aut0.get('comprobante'),
+                )
                 
                 if estado == 'AUTORIZADO':
                     # Comprobante autorizado
                     liquidacion.estado = 'AUTORIZADA'
                     liquidacion.estado_sri = 'AUTORIZADA'
-                    liquidacion.numero_autorizacion = resultado.get('numero_autorizacion')
-                    liquidacion.fecha_autorizacion = resultado.get('fecha_autorizacion')
-                    liquidacion.xml_autorizado = resultado.get('xml_autorizado')
+                    if numero_autorizacion:
+                        liquidacion.numero_autorizacion = numero_autorizacion
+                    if fecha_autorizacion:
+                        liquidacion.fecha_autorizacion = fecha_autorizacion
+                    if xml_autorizado:
+                        liquidacion.xml_autorizado = xml_autorizado
                     liquidacion.mensaje_sri = 'Comprobante autorizado'
                     liquidacion.save(update_fields=[
                         'estado', 'estado_sri', 'numero_autorizacion', 

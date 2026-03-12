@@ -188,7 +188,7 @@ def procesar_liquidacion_compra_job(
     from inventario.models import Empresa
     from inventario.utils_planes import incrementar_contador_documentos
     from inventario.liquidacion_compra.models import LiquidacionCompra
-    from inventario.liquidacion_compra.email_utils import enviar_email_automatico_liquidacion
+    from inventario.liquidacion_compra.email_utils import enviar_email_automatico_liquidacion, liquidacion_esta_autorizada
     from inventario.liquidacion_compra.integracion_sri_liquidacion import IntegracionSRILiquidacion
 
     try:
@@ -217,7 +217,7 @@ def procesar_liquidacion_compra_job(
         estado_actual = _normalize_state(getattr(liquidacion, "estado_sri", None) or getattr(liquidacion, "estado", None))
         if estado_actual in FINAL_OK_STATES or estado_actual in {s.replace(" ", "_") for s in FINAL_FAIL_STATES}:
             logger.info("[SRI LC] Liquidacion %s ya final (%s)", liquidacion_id, estado_actual)
-            if estado_actual in FINAL_OK_STATES and ya_autorizada:
+            if estado_actual in FINAL_OK_STATES and liquidacion_esta_autorizada(liquidacion):
                 enviar_email_automatico_liquidacion(liquidacion)
             return
 
@@ -242,7 +242,7 @@ def procesar_liquidacion_compra_job(
         if estado_nuevo in FINAL_OK_STATES:
             if (not ya_autorizada) and ahora_autorizada:
                 incrementar_contador_documentos(empresa)
-            if ahora_autorizada:
+            if liquidacion_esta_autorizada(liquidacion):
                 enviar_email_automatico_liquidacion(liquidacion)
             logger.info("[SRI LC] Liquidacion %s autorizada (%s)", liquidacion_id, estado_nuevo)
             return
