@@ -100,6 +100,7 @@ def generar_xlsx_listado_facturacion(
         "Cliente",
         "FP",
         "Emisión",
+        "Autorización",
         "SubTotal",
         "Descuento",
         "SUB.IVA 0%",
@@ -132,6 +133,9 @@ def generar_xlsx_listado_facturacion(
         fecha_em = getattr(fac, "fecha_emision", None)
         fecha_str = fecha_em.strftime("%d/%m/%Y") if hasattr(fecha_em, "strftime") else ""
 
+        fecha_auth = getattr(fac, "fecha_autorizacion", None)
+        fecha_auth_str = fecha_auth.strftime("%d/%m/%Y %H:%M:%S") if hasattr(fecha_auth, "strftime") else ""
+
         sub, desc, sub0, sub12, iva_val, prop, tot = _extract_tax_vals(fac)
 
         total_sub += sub
@@ -150,6 +154,7 @@ def generar_xlsx_listado_facturacion(
                 cliente,
                 fp,
                 fecha_str,
+                fecha_auth_str,
                 _money(sub),
                 _money(desc),
                 _money(sub0),
@@ -166,6 +171,7 @@ def generar_xlsx_listado_facturacion(
             "",
             "",
             "TOTAL",
+            "",
             "",
             "",
             _money(total_sub),
