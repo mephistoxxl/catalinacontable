@@ -86,6 +86,29 @@ def _enviar_email_automatico_nd(nota_debito):
         return False
 
 
+def _respuesta_nd_sigue_pendiente_sin_autorizacion(respuesta):
+    estado = _normalizar_estado_nd_sri((respuesta or {}).get('estado'))
+    if estado in ('AUTORIZADO', 'AUTORIZADA', 'RECHAZADO'):
+        return False
+
+    autorizaciones = (respuesta or {}).get('autorizaciones') or []
+    if autorizaciones:
+        return False
+
+    mensajes = (respuesta or {}).get('mensajes') or []
+    texto = ' '.join(
+        str(item.get('mensaje') if isinstance(item, dict) else item or '') + ' ' +
+        str(item.get('informacionAdicional') if isinstance(item, dict) else '')
+        for item in mensajes
+    ).upper()
+    return (
+        'NO HA SIDO AUTORIZADO AÚN' in texto
+        or 'NO HA SIDO AUTORIZADO AUN' in texto
+        or 'NO EXISTE' in texto
+        or estado in ('PENDIENTE', 'RECIBIDA')
+    )
+
+
 def _run_nd_sri_background(nota_debito_id, empresa_id, max_attempts=360, interval_seconds=10):
     import time
     from inventario.sri.sri_client import SRIClient
@@ -113,56 +136,66 @@ def _run_nd_sri_background(nota_debito_id, empresa_id, max_attempts=360, interva
                 logger.warning('[ND SRI BG] ND %s no existe en empresa %s', nota_debito_id, empresa_id)
                 break
 
-            if nota_debito.numero_autorizacion and nota_debito.fecha_autorizacion:
-                if not ya_contabilizada:
-                    try:
-                        incrementar_contador_documentos(empresa)
-                    except Exception as exc:
-                        logger.warning('[ND SRI BG] No se pudo incrementar contador para ND %s: %s', nota_debito_id, exc)
-                    ya_contabilizada = True
-                _enviar_email_automatico_nd(nota_debito)
-                break
-
-            integracion = IntegracionSRINotaDebito(nota_debito)
-            estado_actual = _normalizar_estado_nd_sri(nota_debito.estado_sri)
-
-            if estado_actual in ('AUTORIZADO', 'AUTORIZADA', 'RECHAZADO'):
-                logger.info('[ND SRI BG] ND %s ya en estado final %s', nota_debito_id, estado_actual)
-                break
-
-            if estado_actual in ('RECIBIDA', 'PENDIENTE') and nota_debito.clave_acceso:
-                opciones = Opciones.objects.for_tenant(empresa).first()
-                if not opciones:
-                    logger.warning('[ND SRI BG] No se encontró Opciones para empresa %s', empresa_id)
+            try:
+                if nota_debito.numero_autorizacion and nota_debito.fecha_autorizacion:
+                    if not ya_contabilizada:
+                        try:
+                            incrementar_contador_documentos(empresa)
+                        except Exception as exc:
+                            logger.warning('[ND SRI BG] No se pudo incrementar contador para ND %s: %s', nota_debito_id, exc)
+                        ya_contabilizada = True
+                    _enviar_email_automatico_nd(nota_debito)
                     break
 
-                ambiente = 'pruebas' if str(getattr(opciones, 'tipo_ambiente', '1')) == '1' else 'produccion'
-                cliente = SRIClient(ambiente=ambiente)
-                respuesta = cliente.consultar_autorizacion(nota_debito.clave_acceso)
-                estado = _normalizar_estado_nd_sri(integracion._actualizar_con_respuesta(respuesta))
-                logger.info('[ND SRI BG] ND %s consulta autorización, estado=%s', nota_debito_id, estado or 'SIN_ESTADO')
-            else:
-                resultado = integracion.procesar_completo()
-                estado = _normalizar_estado_nd_sri(resultado.get('estado'))
-                logger.info('[ND SRI BG] ND %s intento envío, estado=%s success=%s', nota_debito_id, estado or 'SIN_ESTADO', resultado.get('success'))
+                integracion = IntegracionSRINotaDebito(nota_debito)
+                estado_actual = _normalizar_estado_nd_sri(nota_debito.estado_sri)
 
-            try:
-                nota_debito.refresh_from_db(fields=['estado_sri', 'numero_autorizacion', 'fecha_autorizacion'])
-            except Exception:
-                pass
+                if estado_actual in ('AUTORIZADO', 'AUTORIZADA', 'RECHAZADO'):
+                    logger.info('[ND SRI BG] ND %s ya en estado final %s', nota_debito_id, estado_actual)
+                    break
 
-            if nota_debito.numero_autorizacion and nota_debito.fecha_autorizacion:
-                if not ya_contabilizada:
-                    try:
-                        incrementar_contador_documentos(empresa)
-                    except Exception as exc:
-                        logger.warning('[ND SRI BG] No se pudo incrementar contador para ND %s: %s', nota_debito_id, exc)
-                    ya_contabilizada = True
-                _enviar_email_automatico_nd(nota_debito)
-                break
+                if estado_actual in ('RECIBIDA', 'PENDIENTE') and nota_debito.clave_acceso:
+                    opciones = Opciones.objects.for_tenant(empresa).first()
+                    if not opciones:
+                        logger.warning('[ND SRI BG] No se encontró Opciones para empresa %s', empresa_id)
+                        break
 
-            if estado in ('AUTORIZADO', 'AUTORIZADA', 'RECHAZADO'):
-                break
+                    ambiente = 'pruebas' if str(getattr(opciones, 'tipo_ambiente', '1')) == '1' else 'produccion'
+                    cliente = SRIClient(ambiente=ambiente)
+                    respuesta = cliente.consultar_autorizacion(nota_debito.clave_acceso)
+                    estado = _normalizar_estado_nd_sri(integracion._actualizar_con_respuesta(respuesta))
+                    logger.info('[ND SRI BG] ND %s consulta autorización, estado=%s', nota_debito_id, estado or 'SIN_ESTADO')
+
+                    if _respuesta_nd_sigue_pendiente_sin_autorizacion(respuesta):
+                        logger.info('[ND SRI BG] ND %s sigue sin autorización final; se realiza reenvío automático completo', nota_debito_id)
+                        resultado = integracion.procesar_completo()
+                        estado = _normalizar_estado_nd_sri(resultado.get('estado'))
+                        logger.info('[ND SRI BG] ND %s reenvío automático, estado=%s success=%s', nota_debito_id, estado or 'SIN_ESTADO', resultado.get('success'))
+                else:
+                    resultado = integracion.procesar_completo()
+                    estado = _normalizar_estado_nd_sri(resultado.get('estado'))
+                    logger.info('[ND SRI BG] ND %s intento envío, estado=%s success=%s', nota_debito_id, estado or 'SIN_ESTADO', resultado.get('success'))
+
+                try:
+                    nota_debito.refresh_from_db(fields=['estado_sri', 'numero_autorizacion', 'fecha_autorizacion'])
+                except Exception:
+                    pass
+
+                if nota_debito.numero_autorizacion and nota_debito.fecha_autorizacion:
+                    if not ya_contabilizada:
+                        try:
+                            incrementar_contador_documentos(empresa)
+                        except Exception as exc:
+                            logger.warning('[ND SRI BG] No se pudo incrementar contador para ND %s: %s', nota_debito_id, exc)
+                        ya_contabilizada = True
+                    _enviar_email_automatico_nd(nota_debito)
+                    break
+
+                if estado in ('AUTORIZADO', 'AUTORIZADA', 'RECHAZADO'):
+                    break
+
+            except Exception as exc:
+                logger.exception('[ND SRI BG] Error procesando ND %s en background: %s', nota_debito_id, exc)
 
             time.sleep(interval_seconds)
     finally:

@@ -86,6 +86,62 @@ class IntegracionSRINotaDebito:
 
         return 'EN PROCESAMIENTO' in texto.upper()
 
+    def _agregar_mensajes_desde_lista(self, mensajes, destino: list[str]):
+        if not isinstance(mensajes, list):
+            return
+
+        for msg in mensajes:
+            if isinstance(msg, dict):
+                identificador = str(msg.get('identificador') or '').strip()
+                texto = str(msg.get('mensaje') or '').strip()
+                adicional = str(msg.get('informacionAdicional') or '').strip()
+                tipo = str(msg.get('tipo') or '').strip()
+
+                partes = []
+                if identificador:
+                    partes.append(f"[{identificador}]")
+                if texto:
+                    partes.append(texto)
+                if adicional:
+                    partes.append(f"Detalle: {adicional}")
+                if tipo:
+                    partes.append(f"Tipo: {tipo}")
+
+                resumen = ' - '.join([p for p in partes if p])
+                if resumen:
+                    destino.append(resumen)
+            else:
+                bruto = str(msg).strip()
+                if bruto:
+                    destino.append(bruto)
+
+    def _resumir_respuesta_sri(self, respuesta: dict) -> str:
+        if not isinstance(respuesta, dict):
+            return str(respuesta)[:2000]
+
+        partes: list[str] = []
+        estado = str(respuesta.get('estado') or '').strip()
+        if estado:
+            partes.append(f"Estado SRI: {estado}")
+
+        self._agregar_mensajes_desde_lista(respuesta.get('mensajes') or [], partes)
+
+        autorizaciones = respuesta.get('autorizaciones') or []
+        if isinstance(autorizaciones, list):
+            for aut in autorizaciones:
+                if not isinstance(aut, dict):
+                    continue
+                estado_aut = str(aut.get('estado') or '').strip()
+                if estado_aut:
+                    partes.append(f"Autorización: {estado_aut}")
+                self._agregar_mensajes_desde_lista(aut.get('mensajes') or [], partes)
+
+        limpio = [p for p in partes if p]
+        if limpio:
+            return ' | '.join(limpio)[:2000]
+
+        return str(respuesta)[:2000]
+
     def _actualizar_con_respuesta(self, respuesta: dict) -> str:
         estado = (respuesta or {}).get('estado')
         self.nd.estado_sri = estado or self.nd.estado_sri
@@ -114,7 +170,7 @@ class IntegracionSRINotaDebito:
 
             self.nd.mensaje_sri = 'Autorizado correctamente'
         else:
-            self.nd.mensaje_sri = str(respuesta)[:2000]
+            self.nd.mensaje_sri = self._resumir_respuesta_sri(respuesta)
 
         self.nd.save(update_fields=['estado_sri', 'mensaje_sri', 'numero_autorizacion', 'fecha_autorizacion'])
         return self.nd.estado_sri

@@ -282,11 +282,14 @@ class XMLGeneratorNotaDebito:
         motivos = ET.SubElement(root, 'motivos')
 
         razon = self._limpiar_texto(getattr(self.nd, 'motivo', None) or 'MODIFICACIÓN')
-        valor_total = Decimal(str(getattr(self.nd, 'valor_modificacion', 0) or 0)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        # En Nota de Débito el valor de motivo debe cuadrar con totalSinImpuestos.
+        valor_motivo = Decimal(str(getattr(self.nd, 'subtotal_sin_impuestos', 0) or 0)).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
 
         motivo = ET.SubElement(motivos, 'motivo')
         ET.SubElement(motivo, 'razon').text = razon
-        ET.SubElement(motivo, 'valor').text = self._formatear_decimal(valor_total)
+        ET.SubElement(motivo, 'valor').text = self._formatear_decimal(valor_motivo)
 
     def _agregar_detalles(self, root):
         detalles_root = ET.SubElement(root, 'detalles')

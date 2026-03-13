@@ -89,6 +89,19 @@
       </div>
     </div>
 
+    {% if nota_debito.mensaje_sri %}
+    <div class="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden mt-3">
+      <div class="bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-800">
+        Detalle de respuesta SRI
+      </div>
+      <div class="p-4">
+        <div class="text-sm {% if nota_debito.estado_sri == 'RECHAZADO' or nota_debito.estado_sri == 'NO AUTORIZADO' or nota_debito.estado_sri == 'NO_AUTORIZADO' %}text-red-700{% else %}text-gray-700{% endif %} break-words">
+          {{ nota_debito.mensaje_sri }}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     <div class="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden mt-3">
       <div class="bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-800">
         Detalles
