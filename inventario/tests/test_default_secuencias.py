@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from inventario.models import Empresa, Secuencia
+from inventario.models import Almacen, Caja, Empresa, Secuencia
 
 
 class DefaultSecuenciasTests(TestCase):
@@ -31,3 +31,23 @@ class DefaultSecuenciasTests(TestCase):
             self.assertEqual(secuencia.get_establecimiento_formatted(), '001')
             self.assertEqual(secuencia.get_punto_emision_formatted(), '901')
             self.assertEqual(secuencia.get_secuencial_formatted(), '000000001')
+
+    def test_crea_almacen_y_caja_por_defecto_para_empresa_nueva(self):
+        empresa = Empresa.objects.create(
+            ruc='1799999999002',
+            razon_social='Empresa Defaults',
+        )
+
+        almacen = Almacen._unsafe_objects.filter(
+            empresa=empresa,
+            descripcion='ALMACEN GENERAL',
+            activo=True,
+        )
+        caja = Caja._unsafe_objects.filter(
+            empresa=empresa,
+            descripcion='CAJA PRINCIPAL',
+            activo=True,
+        )
+
+        self.assertEqual(almacen.count(), 1)
+        self.assertEqual(caja.count(), 1)

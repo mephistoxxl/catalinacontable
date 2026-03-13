@@ -1347,6 +1347,7 @@ class OpcionesFormulario(forms.Form):
     telefono = forms.CharField(
         label='Telefono',
         max_length=20,
+        required=False,
         widget=forms.TextInput(attrs={
             'id': 'telefono', 
             'class': 'form-control'

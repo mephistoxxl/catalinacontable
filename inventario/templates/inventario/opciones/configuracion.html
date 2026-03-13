@@ -486,12 +486,17 @@ async function consultarRUC(ruc) {
         }
         
         // Mapeo EXACTO como en cliente, pero adaptado a los nombres de configuración
+        // Conservar correo existente si la API no devuelve uno válido.
+        const correoInput = document.getElementById('id_correo')
+            || document.querySelector('input[name="correo"]');
+        const correoActual = correoInput ? correoInput.value : '';
+
         const campos = {
             'razon_social': data.razon_social || '',
             'nombre_comercial': data.nombre_comercial || '',
             'direccion_establecimiento': data.direccion || '',
             'telefono': data.telefono || '',
-            'correo': data.email || ''
+            'correo': (data.email && String(data.email).trim()) ? data.email : correoActual
         };
         
         // Llenar campos con validación individual (IGUAL QUE EN CLIENTE)

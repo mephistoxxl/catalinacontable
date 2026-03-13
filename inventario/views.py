@@ -115,11 +115,10 @@ def necesita_configuracion(empresa):
     3. Nombre Comercial - no puede estar vacío
     4. Dirección - no puede estar vacía
     5. Correo - no puede estar vacío ni ser 'pendiente@empresa.com'
-    6. Teléfono - no puede estar vacío ni ser '0000000000'
-    7. Obligado a llevar contabilidad - debe estar definido
-    8. Régimen tributario - debe estar definido
-    9. Mensaje en facturas - debe estar definido
-    10. Firma electrónica - debe estar cargada
+    6. Obligado a llevar contabilidad - debe estar definido
+    7. Régimen tributario - debe estar definido
+    8. Mensaje en facturas - debe estar definido
+    9. Firma electrónica - debe estar cargada
     
     Args:
         empresa: Instancia de Empresa
@@ -165,19 +164,15 @@ def necesita_configuracion(empresa):
         if not opciones.correo or opciones.correo == 'pendiente@empresa.com':
             campos_faltantes.append('Correo')
         
-        # 6. Teléfono
-        if not opciones.telefono or opciones.telefono == '0000000000':
-            campos_faltantes.append('Teléfono')
-        
-        # 7. Obligado a llevar contabilidad
+        # 6. Obligado a llevar contabilidad
         if opciones.obligado is None:
             campos_faltantes.append('Obligado a llevar contabilidad')
         
-        # 8. Régimen tributario (tipo_regimen)
+        # 7. Régimen tributario (tipo_regimen)
         if not opciones.tipo_regimen or not opciones.tipo_regimen.strip():
             campos_faltantes.append('Régimen tributario')
         
-        # 9. Firma electrónica
+        # 8. Firma electrónica
         if not opciones.firma_electronica:
             campos_faltantes.append('Firma electrónica')
         
@@ -6846,7 +6841,8 @@ class ConfiguracionGeneral(LoginRequiredMixin, View):
             conf.mensaje_en_facturas = form.cleaned_data.get('mensaje_en_facturas', '') or ''
             conf.direccion_establecimiento = form.cleaned_data.get('direccion_establecimiento')
             conf.correo = form.cleaned_data.get('correo')
-            conf.telefono = form.cleaned_data.get('telefono')
+            telefono_valor = (form.cleaned_data.get('telefono') or '').strip()
+            conf.telefono = telefono_valor or '0000000000'
             conf.obligado = form.cleaned_data.get('obligado')
             conf.tipo_regimen = form.cleaned_data.get('tipo_regimen')
             conf.moneda = form.cleaned_data.get('moneda')

@@ -1567,17 +1567,33 @@ class Factura(models.Model):
         if not self.totales_impuestos.exists():
             errores.append("Faltan calcular totales de impuestos")
         
-        # Verificar configuración de empresa
+        # Verificar configuración de empresa con detalle de campos faltantes
         opciones = Opciones.objects.for_tenant(self.empresa).first()
         if not opciones and self.empresa:
             opciones = Opciones.objects.create(empresa=self.empresa, identificacion=self.empresa.ruc)
-        if (not opciones or
-            getattr(opciones, 'identificacion', '0000000000000') == '0000000000000' or
-            '[CONFIGURAR' in getattr(opciones, 'razon_social', '') or
-            '[CONFIGURAR' in getattr(opciones, 'direccion_establecimiento', '') or
-            getattr(opciones, 'correo', 'pendiente@empresa.com') == 'pendiente@empresa.com' or
-            getattr(opciones, 'telefono', '0000000000') == '0000000000'):
-            errores.append("Falta configurar datos de la empresa")
+
+        faltantes_empresa = []
+        if not opciones:
+            faltantes_empresa.append('Configuración de empresa (Opciones)')
+        else:
+            identificacion = (getattr(opciones, 'identificacion', '') or '').strip()
+            razon_social = (getattr(opciones, 'razon_social', '') or '').strip()
+            direccion = (getattr(opciones, 'direccion_establecimiento', '') or '').strip()
+            correo = (getattr(opciones, 'correo', '') or '').strip()
+
+            if not identificacion or identificacion == '0000000000000':
+                faltantes_empresa.append('RUC/Identificación')
+            if not razon_social or '[CONFIGURAR' in razon_social:
+                faltantes_empresa.append('Razón Social')
+            if not direccion or '[CONFIGURAR' in direccion:
+                faltantes_empresa.append('Dirección del establecimiento')
+            if not correo or correo == 'pendiente@empresa.com':
+                faltantes_empresa.append('Correo electrónico')
+
+        if faltantes_empresa:
+            errores.append(
+                f"Falta configurar datos de la empresa: {', '.join(faltantes_empresa)}"
+            )
         
         return len(errores) == 0, errores
 
@@ -2347,11 +2363,34 @@ def ensure_default_secuencias_for_empresa(empresa):
         )
 
 
+def ensure_default_almacen_caja_for_empresa(empresa):
+    """Crea almacén y caja base para una empresa nueva."""
+    if not empresa or not getattr(empresa, 'pk', None):
+        return
+
+    Almacen._unsafe_objects.get_or_create(
+        empresa=empresa,
+        descripcion='ALMACEN GENERAL',
+        defaults={
+            'activo': True,
+        },
+    )
+
+    Caja._unsafe_objects.get_or_create(
+        empresa=empresa,
+        descripcion='CAJA PRINCIPAL',
+        defaults={
+            'activo': True,
+        },
+    )
+
+
 @receiver(post_save, sender=Empresa)
 def create_default_secuencias_for_new_empresa(sender, instance, created, **kwargs):
     if not created:
         return
     ensure_default_secuencias_for_empresa(instance)
+    ensure_default_almacen_caja_for_empresa(instance)
 
 class FacturadorManager(BaseUserManager):
     def create_facturador(self, nombres, telefono, correo, password=None, **extra_fields):

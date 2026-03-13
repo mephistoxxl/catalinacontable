@@ -213,13 +213,26 @@ class SRIXMLGenerator:
                 else:
                     raise ValueError("No existe configuración de empresa (Opciones)")
             
-            # Verificar configuración del emisor
-            if (getattr(emisor, 'identificacion', '0000000000000') == '0000000000000' or 
-                '[CONFIGURAR' in getattr(emisor, 'razon_social', '') or
-                '[CONFIGURAR' in getattr(emisor, 'direccion_establecimiento', '') or
-                getattr(emisor, 'correo', 'pendiente@empresa.com') == 'pendiente@empresa.com' or
-                getattr(emisor, 'telefono', '0000000000') == '0000000000'):
-                raise ValueError("La configuración de empresa está incompleta")
+            # Verificar configuración del emisor y devolver detalle claro de faltantes.
+            campos_faltantes = []
+            identificacion = (getattr(emisor, 'identificacion', '') or '').strip()
+            razon_social = (getattr(emisor, 'razon_social', '') or '').strip()
+            direccion_establecimiento = (getattr(emisor, 'direccion_establecimiento', '') or '').strip()
+            correo = (getattr(emisor, 'correo', '') or '').strip()
+
+            if not identificacion or identificacion == '0000000000000':
+                campos_faltantes.append('RUC/Identificación')
+            if not razon_social or '[CONFIGURAR' in razon_social:
+                campos_faltantes.append('Razón Social')
+            if not direccion_establecimiento or '[CONFIGURAR' in direccion_establecimiento:
+                campos_faltantes.append('Dirección del establecimiento')
+            if not correo or correo == 'pendiente@empresa.com':
+                campos_faltantes.append('Correo electrónico')
+
+            if campos_faltantes:
+                raise ValueError(
+                    f"La configuración de empresa está incompleta. Faltan: {', '.join(campos_faltantes)}"
+                )
             
             logger.info(f"📄 Generando XML con {factura.formas_pago.count()} formas de pago")
             
@@ -243,13 +256,7 @@ class SRIXMLGenerator:
                     raise ValueError("La factura debe tener un cliente asignado")
                 if not hasattr(factura, 'detallefactura_set') or not factura.detallefactura_set.exists():
                     raise ValueError("La factura debe tener al menos un detalle")
-                # Verificar configuración del emisor (solo validación manual)
-                if (getattr(emisor, 'identificacion', '0000000000000') == '0000000000000' or 
-                    '[CONFIGURAR' in getattr(emisor, 'razon_social', '') or
-                    '[CONFIGURAR' in getattr(emisor, 'direccion_establecimiento', '') or
-                    getattr(emisor, 'correo', 'pendiente@empresa.com') == 'pendiente@empresa.com' or
-                    getattr(emisor, 'telefono', '0000000000') == '0000000000'):
-                    raise ValueError("La configuración de empresa está incompleta")
+                # La configuración del emisor ya fue validada arriba con detalle.
             
             # Crear elemento raíz
             root = ET.Element('factura', {
