@@ -23,6 +23,7 @@ class ComprobanteRetencion(models.Model):
     TIPO_DOCUMENTO_SUSTENTO = [
         ("01", "(01) Factura"),
         ("03", "(03) Liquidación de Compra"),
+        ("05", "(05) Nota de Débito"),
     ]
 
     TIPO_RETENCION = [

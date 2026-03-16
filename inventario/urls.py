@@ -136,6 +136,7 @@ urlpatterns = [
     path('retenciones/<int:pk>/editar/', retencion_views.EditarRetencion.as_view(), name='retenciones_editar'),
     path('retenciones/<int:pk>/xml/', retencion_views.DescargarXMLRetencion.as_view(), name='retenciones_xml'),
     path('retenciones/<int:pk>/xml-firmado/', retencion_views.DescargarXMLFirmadoRetencion.as_view(), name='retenciones_xml_firmado'),
+    path('retenciones/<int:pk>/pdf/', retencion_views.DescargarPDFRetencion.as_view(), name='retenciones_pdf'),
     path('retenciones/<int:pk>/autorizar/', retencion_views.AutorizarRetencion.as_view(), name='retenciones_autorizar'),
     path('retenciones/<int:pk>/consultar-estado/', retencion_views.ConsultarEstadoRetencion.as_view(), name='retenciones_consultar_estado'),
     path('retenciones/<int:pk>/enviar-email/', documentos_email_views.enviar_email_retencion, name='retenciones_enviar_email'),

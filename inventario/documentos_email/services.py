@@ -23,6 +23,7 @@ from inventario.nota_debito.models import NotaDebito
 from inventario.nota_debito.ride_generator_nd import RIDENotaDebitoGenerator
 from inventario.nota_debito.xml_generator_nd import XMLGeneratorNotaDebito
 from inventario.retenciones.models import ComprobanteRetencion
+from inventario.retenciones.ride_generator_retencion import RIDERetencionGenerator
 
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,10 @@ class DocumentEmailService:
         if not xml:
             return SendResult(False, 'No existe XML para adjuntar en la retención.', [])
 
+        pdf_bytes = self._try_generate_retencion_pdf(retencion)
+        if not pdf_bytes:
+            return SendResult(False, 'No se pudo generar el PDF RIDE de la retención.', [])
+
         numero = retencion.numero_completo
         asunto = f'Retención electrónica {numero}'
         cuerpo = (
@@ -73,10 +78,11 @@ class DocumentEmailService:
             issue_date=self._format_date(getattr(retencion, 'fecha_emision_retencion', None)),
             total=self._format_decimal(getattr(retencion, 'total_retenido', None)),
             intro_text='Se ha emitido un comprobante de retención autorizado por el SRI a su nombre.',
-            attachments=['Retención.xml'],
+            attachments=['Retencion.pdf', 'Retencion.xml'],
         )
-        attachments = [
-            (f'retencion_{numero.replace("-", "_")}.xml', xml.encode('utf-8'), 'application/xml')
+        attachments: List[Attachment] = [
+            (f'retencion_{numero.replace("-", "_")}.pdf', pdf_bytes, 'application/pdf'),
+            (f'retencion_{numero.replace("-", "_")}.xml', xml.encode('utf-8'), 'application/xml'),
         ]
         self._send_email(asunto, cuerpo, destinatarios, attachments, html_body=html)
         return SendResult(True, 'Retención enviada por correo.', destinatarios)
@@ -280,6 +286,13 @@ class DocumentEmailService:
     def _try_generate_nd_pdf(self, nota_debito: NotaDebito, opciones) -> bytes | None:
         try:
             buffer: BytesIO = RIDENotaDebitoGenerator(nota_debito, opciones).generar_pdf()
+            return buffer.read()
+        except Exception:
+            return None
+
+    def _try_generate_retencion_pdf(self, retencion: ComprobanteRetencion) -> bytes | None:
+        try:
+            buffer: BytesIO = RIDERetencionGenerator(retencion, self.opciones).generar_pdf()
             return buffer.read()
         except Exception:
             return None

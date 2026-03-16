@@ -87,6 +87,9 @@
                   <a href="{% url 'inventario:retenciones_xml' retencion.id %}" class="inline-flex items-center justify-center px-3 py-2 rounded bg-blue-600 text-white text-xs hover:bg-blue-700">
                     <i class="fas fa-file-code mr-1"></i>XML
                   </a>
+                  <a href="{% url 'inventario:retenciones_pdf' retencion.id %}" class="inline-flex items-center justify-center px-3 py-2 rounded bg-slate-700 text-white text-xs hover:bg-slate-800">
+                    <i class="fas fa-file-pdf mr-1"></i>PDF
+                  </a>
                   <a href="{% url 'inventario:retenciones_xml_firmado' retencion.id %}" class="inline-flex items-center justify-center px-3 py-2 rounded bg-indigo-600 text-white text-xs hover:bg-indigo-700">
                     <i class="fas fa-signature mr-1"></i>XML Firmado
                   </a>

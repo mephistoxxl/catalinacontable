@@ -9,6 +9,7 @@ from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.db import transaction
 from django.db.models import Max, Q
@@ -18,7 +19,7 @@ from django.views import View
 from django.views.generic import ListView
 
 from ..mixins import RequireEmpresaActivaMixin, get_empresa_activa
-from ..models import Secuencia
+from ..models import Opciones, Secuencia
 from .forms import ComprobanteRetencionForm
 from .models import ComprobanteRetencion, RetencionDetalle
 from .services import (
@@ -32,6 +33,27 @@ from ..sri.firmador_xades_sri import XAdESError, firmar_xml_xades_bes
 from ..sri.sri_client import SRIClient
 
 logger = logging.getLogger(__name__)
+
+
+PORCENTAJES_IVA_RETENCION_PERMITIDOS = {
+    Decimal('10.00'),
+    Decimal('20.00'),
+    Decimal('30.00'),
+    Decimal('70.00'),
+    Decimal('100.00'),
+}
+
+CODIGOS_RENTA_VIGENTES = {
+    '303', '303A', '304', '304A', '304B', '304C', '304D', '304E',
+    '307', '308', '309', '310', '311', '312', '312A', '312C',
+    '314A', '314B', '314C', '319', '320', '322', '323', '323A',
+    '323B', '323E', '323M', '323P', '324A', '324B', '332', '332A',
+    '332B', '332C', '332D', '332E', '332F', '332G', '332I', '334',
+    '335', '338', '340', '343', '343A', '343B', '343C', '344', '3440',
+    '344A', '346', '3482', '350',
+}
+
+CODIGOS_IVA_VIGENTES = {'721', '723', '725', '729', '731', '7'}
 
 
 def _to_decimal(value, default: str = '0.00') -> Decimal:
@@ -63,6 +85,8 @@ def _normalizar_detalles_payload(renta_rows: list[dict], iva_rows: list[dict], f
 
     for row in renta_rows:
         codigo = (row.get('codigo') or '304B').strip()
+        if codigo not in CODIGOS_RENTA_VIGENTES:
+            raise ValidationError(f'Código de retención renta no vigente o no permitido: {codigo}.')
         base = _to_decimal(row.get('base'))
         porcentaje = _to_decimal(row.get('porcentaje'))
         if porcentaje <= 0:
@@ -81,10 +105,17 @@ def _normalizar_detalles_payload(renta_rows: list[dict], iva_rows: list[dict], f
 
     for row in iva_rows:
         codigo = (row.get('codigo') or '721').strip()
+        if codigo not in CODIGOS_IVA_VIGENTES:
+            raise ValidationError(f'Código de retención IVA no vigente o no permitido: {codigo}.')
         base = _to_decimal(row.get('base'))
         porcentaje = _to_decimal(row.get('porcentaje'))
         if porcentaje <= 0:
             porcentaje = porcentaje_iva_por_codigo(codigo)
+        porcentaje_2 = Decimal(str(porcentaje)).quantize(Decimal('0.00'))
+        if porcentaje_2 not in PORCENTAJES_IVA_RETENCION_PERMITIDOS:
+            raise ValidationError(
+                'El porcentaje de retención de IVA debe ser uno de: 10%, 20%, 30%, 70% o 100%.'
+            )
         if base > 0 and porcentaje > 0:
             detalles.append(
                 {
@@ -119,7 +150,14 @@ def _normalizar_detalles_payload(renta_rows: list[dict], iva_rows: list[dict], f
 
     iva_base = form.cleaned_data.get('iva_base') or Decimal('0.00')
     iva_codigo = (form.cleaned_data.get('codigo_iva') or '721').strip()
+    if iva_codigo not in CODIGOS_IVA_VIGENTES:
+        raise ValidationError(f'Código de retención IVA no vigente o no permitido: {iva_codigo}.')
     iva_porcentaje = porcentaje_iva_por_codigo(iva_codigo)
+    iva_porcentaje_2 = Decimal(str(iva_porcentaje)).quantize(Decimal('0.00'))
+    if iva_porcentaje_2 not in PORCENTAJES_IVA_RETENCION_PERMITIDOS:
+        raise ValidationError(
+            'El porcentaje de retención de IVA debe ser uno de: 10%, 20%, 30%, 70% o 100%.'
+        )
     if iva_base > 0 and iva_porcentaje > 0:
         detalles.append(
             {
@@ -130,6 +168,16 @@ def _normalizar_detalles_payload(renta_rows: list[dict], iva_rows: list[dict], f
                 'porcentaje_retener': iva_porcentaje,
                 'valor_retenido': calcular_valor_retenido(iva_base, iva_porcentaje),
             }
+        )
+
+    total_iva_retenido = sum(
+        (d['valor_retenido'] for d in detalles if d.get('tipo_impuesto') == 'IVA'),
+        Decimal('0.00')
+    )
+    monto_iva_doc = (form.cleaned_data.get('monto_iva') or Decimal('0.00')).quantize(Decimal('0.01'))
+    if total_iva_retenido > monto_iva_doc:
+        raise ValidationError(
+            'El valor de IVA retenido no puede ser mayor al IVA del documento de sustento.'
         )
 
     return detalles
@@ -300,6 +348,25 @@ class CrearRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                 },
             )
 
+        renta_rows, iva_rows = _cargar_detalles_json(request)
+        try:
+            detalles = _normalizar_detalles_payload(renta_rows, iva_rows, form)
+        except ValidationError as exc:
+            form.add_error(None, str(exc))
+            messages.error(request, 'Por favor corrige los campos del formulario de retención.')
+            return render(
+                request,
+                self.template_name,
+                {
+                    'form': form,
+                    'titulo': 'Emitir Retención',
+                    'menu_actual': 'compras',
+                    'opcion_actual': 'emitir_retencion',
+                    'renta_detalles_iniciales': json.dumps(renta_rows),
+                    'iva_detalles_iniciales': json.dumps(iva_rows),
+                },
+            )
+
         with transaction.atomic():
             retencion = form.save(commit=False)
             retencion.empresa = empresa
@@ -307,8 +374,6 @@ class CrearRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
             retencion.limpiar_estado_xml()
             retencion.save()
 
-            renta_rows, iva_rows = _cargar_detalles_json(request)
-            detalles = _normalizar_detalles_payload(renta_rows, iva_rows, form)
             for det in detalles:
                 RetencionDetalle.objects.create(comprobante=retencion, **det)
 
@@ -356,10 +421,8 @@ class CrearRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
                     secuencia_cfg.secuencial = secuencia_guardada
                     secuencia_cfg.save(update_fields=['secuencial'])
 
-        if retencion.xml_validado:
-            messages.success(request, f'Retención {retencion.numero_completo} guardada. XML ATS 2.0.0 válido.')
-        else:
-            messages.warning(request, f'Retención {retencion.numero_completo} guardada, pero el XML tiene observaciones de validación XSD.')
+        nivel, mensaje = _procesar_envio_retencion_sri(retencion, empresa)
+        _agregar_mensaje_request(request, nivel, mensaje)
         return redirect('inventario:retenciones_listar')
 
 
@@ -414,6 +477,22 @@ class EditarRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
             messages.error(request, 'Por favor corrige los campos del formulario de retención.')
             return render(request, self.template_name, self._contexto(form, retencion))
 
+        renta_rows, iva_rows = _cargar_detalles_json(request)
+        try:
+            detalles = _normalizar_detalles_payload(renta_rows, iva_rows, form)
+        except ValidationError as exc:
+            form.add_error(None, str(exc))
+            messages.error(request, 'Por favor corrige los campos del formulario de retención.')
+            return render(
+                request,
+                self.template_name,
+                {
+                    **self._contexto(form, retencion),
+                    'renta_detalles_iniciales': json.dumps(renta_rows),
+                    'iva_detalles_iniciales': json.dumps(iva_rows),
+                },
+            )
+
         with transaction.atomic():
             retencion = form.save(commit=False)
             retencion.empresa = empresa
@@ -425,8 +504,6 @@ class EditarRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
             retencion.save()
 
             retencion.detalles.all().delete()
-            renta_rows, iva_rows = _cargar_detalles_json(request)
-            detalles = _normalizar_detalles_payload(renta_rows, iva_rows, form)
             for det in detalles:
                 RetencionDetalle.objects.create(comprobante=retencion, **det)
 
@@ -439,7 +516,8 @@ class EditarRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
             retencion.xml_validacion_error = '' if validacion.valido else (validacion.errores or validacion.mensaje)
             retencion.save(update_fields=['total_retencion_renta', 'total_retencion_iva', 'total_retenido', 'clave_acceso', 'xml_generado', 'xml_firmado', 'xml_firmado_en', 'xml_validado', 'xml_validacion_error', 'estado_sri', 'numero_autorizacion', 'autorizacion_retencion', 'actualizado_en'])
 
-        messages.success(request, f'Retención {retencion.numero_completo} actualizada correctamente.')
+        nivel, mensaje = _procesar_envio_retencion_sri(retencion, empresa)
+        _agregar_mensaje_request(request, nivel, mensaje)
         return redirect('inventario:retenciones_listar')
 
 
@@ -486,6 +564,33 @@ class DescargarXMLFirmadoRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin
         response = HttpResponse(retencion.xml_firmado, content_type='application/xml; charset=utf-8')
         response['Content-Disposition'] = f'attachment; filename="{nombre}"'
         return response
+
+
+class DescargarPDFRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
+    login_url = '/inventario/login'
+
+    def get(self, request, pk, *args, **kwargs):
+        empresa = get_empresa_activa(request)
+        retencion = ComprobanteRetencion.objects.filter(empresa=empresa, pk=pk).first()
+        if not retencion:
+            messages.error(request, 'Retencion no encontrada.')
+            return redirect('inventario:retenciones_listar')
+
+        try:
+            from .ride_generator_retencion import RIDERetencionGenerator
+
+            opciones = Opciones.objects.for_tenant(retencion.empresa).first()
+            generator = RIDERetencionGenerator(retencion, opciones)
+            pdf_buffer = generator.generar_pdf()
+
+            response = HttpResponse(pdf_buffer.read(), content_type='application/pdf')
+            filename = f"RET_{retencion.numero_completo.replace('-', '_')}.pdf"
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        except Exception as exc:
+            logger.exception('Error generando PDF de retencion %s: %s', retencion.id, exc)
+            messages.error(request, f'Error al generar PDF: {str(exc)}')
+            return redirect('inventario:retenciones_listar')
 
 
 def _normalizar_estado_sri(valor: str) -> str:
@@ -535,6 +640,111 @@ def _formatear_fecha_autorizacion(fecha_txt: str) -> str:
     return fecha_txt
 
 
+def _agregar_mensaje_request(request, nivel: str, texto: str) -> None:
+    if nivel == 'success':
+        messages.success(request, texto)
+    elif nivel == 'warning':
+        messages.warning(request, texto)
+    elif nivel == 'info':
+        messages.info(request, texto)
+    else:
+        messages.error(request, texto)
+
+
+def _procesar_envio_retencion_sri(retencion: ComprobanteRetencion, empresa) -> tuple[str, str]:
+    if retencion.estado_sri == 'AUTORIZADA' and (retencion.numero_autorizacion or '').strip():
+        return 'info', f'Retención {retencion.numero_completo} ya está autorizada en SRI.'
+
+    fd_xml = None
+    fd_firmado = None
+    path_xml = None
+    path_firmado = None
+    try:
+        xml_gen = RetencionXMLGenerator(retencion)
+        if not retencion.clave_acceso:
+            retencion.clave_acceso = xml_gen.generar_clave_acceso()
+        if not retencion.xml_generado:
+            retencion.xml_generado = xml_gen.generar_xml()
+
+        validacion = xml_gen.validar_xml(retencion.xml_generado)
+        retencion.xml_validado = validacion.valido
+        retencion.xml_validacion_error = '' if validacion.valido else (validacion.errores or validacion.mensaje)
+        if not retencion.xml_validado:
+            retencion.estado_sri = 'ERROR'
+            retencion.save(update_fields=['clave_acceso', 'xml_generado', 'xml_validado', 'xml_validacion_error', 'estado_sri', 'actualizado_en'])
+            return 'error', 'El XML de retención no es válido según XSD. Corrige antes de enviar al SRI.'
+
+        ambiente = obtener_ambiente_sri(empresa)
+        cliente = SRIClient(ambiente='produccion' if ambiente == '2' else 'pruebas')
+
+        fd_xml, path_xml = tempfile.mkstemp(prefix='retencion_', suffix='.xml')
+        fd_firmado, path_firmado = tempfile.mkstemp(prefix='retencion_', suffix='_firmado.xml')
+        os.close(fd_xml)
+        os.close(fd_firmado)
+
+        with open(path_xml, 'w', encoding='utf-8') as src:
+            src.write(retencion.xml_generado)
+
+        firmar_xml_xades_bes(path_xml, path_firmado, empresa=empresa)
+
+        with open(path_firmado, 'r', encoding='utf-8') as firmado_file:
+            retencion.xml_firmado = firmado_file.read()
+        retencion.xml_firmado_en = timezone.now()
+
+        resultado_envio = cliente.enviar_comprobante(retencion.xml_firmado, retencion.clave_acceso)
+        estado_recepcion = _normalizar_estado_sri(resultado_envio.get('estado'))
+        retencion.estado_sri = estado_recepcion or 'ERROR'
+
+        if estado_recepcion in {'RECIBIDA', 'PENDIENTE'}:
+            resultado_auth = cliente.consultar_autorizacion(retencion.clave_acceso)
+            estado_auth = _normalizar_estado_sri(resultado_auth.get('estado'))
+            numero_aut, fecha_aut = _extraer_autorizacion(resultado_auth)
+            if numero_aut:
+                retencion.numero_autorizacion = numero_aut
+                retencion.autorizacion_retencion = numero_aut
+            retencion.estado_sri = estado_auth or retencion.estado_sri
+
+            if retencion.estado_sri == 'AUTORIZADA':
+                msg_fecha = _formatear_fecha_autorizacion(fecha_aut)
+                if msg_fecha:
+                    mensaje = f'Retención {retencion.numero_completo} autorizada en SRI ({msg_fecha}).'
+                else:
+                    mensaje = f'Retención {retencion.numero_completo} autorizada en SRI.'
+                nivel = 'success'
+            elif retencion.estado_sri in {'PENDIENTE', 'RECIBIDA'}:
+                _encolar_reintentos_retencion(retencion)
+                mensaje = 'Retención enviada al SRI y pendiente de autorización. El sistema seguirá reintentando automáticamente.'
+                nivel = 'warning'
+            else:
+                mensajes_auth = resultado_auth.get('mensajes') or []
+                mensaje_auth = mensajes_auth[0].get('mensaje') if mensajes_auth and isinstance(mensajes_auth[0], dict) else 'No autorizada por el SRI.'
+                mensaje = f'Retención rechazada por SRI: {mensaje_auth}'
+                nivel = 'error'
+        else:
+            mensajes_envio = resultado_envio.get('mensajes') or []
+            mensaje_envio = mensajes_envio[0].get('mensaje') if mensajes_envio and isinstance(mensajes_envio[0], dict) else 'No fue recibida por SRI.'
+            mensaje = f'Error en recepción SRI: {mensaje_envio}'
+            nivel = 'error'
+
+        retencion.save(update_fields=['clave_acceso', 'xml_generado', 'xml_firmado', 'xml_firmado_en', 'xml_validado', 'xml_validacion_error', 'estado_sri', 'numero_autorizacion', 'autorizacion_retencion', 'actualizado_en'])
+        return nivel, mensaje
+    except XAdESError as err:
+        retencion.estado_sri = 'ERROR'
+        retencion.save(update_fields=['estado_sri', 'actualizado_en'])
+        return 'error', f'Error de firma electrónica: {err}'
+    except Exception as exc:
+        retencion.estado_sri = 'ERROR'
+        retencion.save(update_fields=['estado_sri', 'actualizado_en'])
+        return 'error', f'No se pudo procesar la retención en SRI: {exc}'
+    finally:
+        for p in (path_xml, path_firmado):
+            try:
+                if p and os.path.exists(p):
+                    os.remove(p)
+            except OSError:
+                pass
+
+
 class AutorizarRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
     login_url = '/inventario/login'
 
@@ -545,90 +755,8 @@ class AutorizarRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, View):
             messages.error(request, 'Retención no encontrada.')
             return redirect('inventario:retenciones_listar')
 
-        try:
-            xml_gen = RetencionXMLGenerator(retencion)
-            if not retencion.clave_acceso:
-                retencion.clave_acceso = xml_gen.generar_clave_acceso()
-            if not retencion.xml_generado:
-                retencion.xml_generado = xml_gen.generar_xml()
-                validacion = xml_gen.validar_xml(retencion.xml_generado)
-                retencion.xml_validado = validacion.valido
-                retencion.xml_validacion_error = '' if validacion.valido else (validacion.errores or validacion.mensaje)
-
-            if not retencion.xml_validado:
-                messages.error(request, 'El XML de retención no es válido según XSD. Corrige antes de autorizar.')
-                retencion.estado_sri = 'ERROR'
-                retencion.save(update_fields=['clave_acceso', 'xml_generado', 'xml_validado', 'xml_validacion_error', 'estado_sri', 'actualizado_en'])
-                return redirect('inventario:retenciones_listar')
-
-            ambiente = obtener_ambiente_sri(empresa)
-            cliente = SRIClient(ambiente='produccion' if ambiente == '2' else 'pruebas')
-
-            fd_xml, path_xml = tempfile.mkstemp(prefix='retencion_', suffix='.xml')
-            fd_firmado, path_firmado = tempfile.mkstemp(prefix='retencion_', suffix='_firmado.xml')
-            os.close(fd_xml)
-            os.close(fd_firmado)
-
-            try:
-                with open(path_xml, 'w', encoding='utf-8') as src:
-                    src.write(retencion.xml_generado)
-
-                firmar_xml_xades_bes(path_xml, path_firmado, empresa=empresa)
-
-                with open(path_firmado, 'r', encoding='utf-8') as firmado_file:
-                    xml_firmado = firmado_file.read()
-
-                retencion.xml_firmado = xml_firmado
-                retencion.xml_firmado_en = timezone.now()
-
-                resultado_envio = cliente.enviar_comprobante(xml_firmado, retencion.clave_acceso)
-                estado_recepcion = _normalizar_estado_sri(resultado_envio.get('estado'))
-                retencion.estado_sri = estado_recepcion or 'ERROR'
-
-                if estado_recepcion in {'RECIBIDA', 'PENDIENTE'}:
-                    resultado_auth = cliente.consultar_autorizacion(retencion.clave_acceso)
-                    estado_auth = _normalizar_estado_sri(resultado_auth.get('estado'))
-                    numero_aut, fecha_aut = _extraer_autorizacion(resultado_auth)
-                    if numero_aut:
-                        retencion.numero_autorizacion = numero_aut
-                        retencion.autorizacion_retencion = numero_aut
-                    retencion.estado_sri = estado_auth or retencion.estado_sri
-                    if retencion.estado_sri == 'AUTORIZADA':
-                        msg_fecha = _formatear_fecha_autorizacion(fecha_aut)
-                        if msg_fecha:
-                            messages.success(request, f'Retención {retencion.numero_completo} autorizada en SRI ({msg_fecha}).')
-                        else:
-                            messages.success(request, f'Retención {retencion.numero_completo} autorizada en SRI.')
-                    elif retencion.estado_sri in {'PENDIENTE', 'RECIBIDA'}:
-                        messages.warning(request, 'Retención enviada al SRI y pendiente de autorización. Consulta nuevamente en unos minutos.')
-                        _encolar_reintentos_retencion(retencion)
-                    else:
-                        mensajes = resultado_auth.get('mensajes') or []
-                        mensaje = mensajes[0].get('mensaje') if mensajes and isinstance(mensajes[0], dict) else 'No autorizada por el SRI.'
-                        messages.error(request, f'Retención rechazada por SRI: {mensaje}')
-                else:
-                    mensajes = resultado_envio.get('mensajes') or []
-                    mensaje = mensajes[0].get('mensaje') if mensajes and isinstance(mensajes[0], dict) else 'No fue recibida por SRI.'
-                    messages.error(request, f'Error en recepción SRI: {mensaje}')
-                    if retencion.estado_sri in {'PENDIENTE', 'RECIBIDA'}:
-                        _encolar_reintentos_retencion(retencion)
-            finally:
-                for p in (path_xml, path_firmado):
-                    try:
-                        if os.path.exists(p):
-                            os.remove(p)
-                    except OSError:
-                        pass
-
-            retencion.save(update_fields=['clave_acceso', 'xml_generado', 'xml_firmado', 'xml_firmado_en', 'xml_validado', 'xml_validacion_error', 'estado_sri', 'numero_autorizacion', 'autorizacion_retencion', 'actualizado_en'])
-        except XAdESError as err:
-            retencion.estado_sri = 'ERROR'
-            retencion.save(update_fields=['estado_sri', 'actualizado_en'])
-            messages.error(request, f'Error de firma electrónica: {err}')
-        except Exception as exc:
-            retencion.estado_sri = 'ERROR'
-            retencion.save(update_fields=['estado_sri', 'actualizado_en'])
-            messages.error(request, f'No se pudo procesar la retención en SRI: {exc}')
+        nivel, mensaje = _procesar_envio_retencion_sri(retencion, empresa)
+        _agregar_mensaje_request(request, nivel, mensaje)
 
         return redirect('inventario:retenciones_listar')
 

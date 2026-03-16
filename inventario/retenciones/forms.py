@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from django import forms
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from .models import ComprobanteRetencion
@@ -66,3 +68,50 @@ class ComprobanteRetencionForm(forms.ModelForm):
         base = self.cleaned_data.get("iva_base") or Decimal("0.00")
         porcentaje = self.cleaned_data.get("iva_porcentaje") or Decimal("0.00")
         return self._valor_monetario(base * porcentaje / Decimal("100"))
+
+    @staticmethod
+    def _contar_dias_habiles(fecha_inicio, fecha_fin) -> int:
+        if not fecha_inicio or not fecha_fin or fecha_fin <= fecha_inicio:
+            return 0
+
+        dias = 0
+        cursor = fecha_inicio
+        while cursor < fecha_fin:
+            cursor = cursor + timedelta(days=1)
+            if cursor.weekday() < 5:
+                dias += 1
+        return dias
+
+    def clean_identificacion_sujeto(self):
+        identificacion = (self.cleaned_data.get("identificacion_sujeto") or "").strip()
+        if not identificacion:
+            raise ValidationError("La identificación del proveedor es obligatoria.")
+        if not identificacion.isdigit() or len(identificacion) != 13 or not identificacion.endswith('001'):
+            raise ValidationError("El RUC del proveedor debe tener 13 dígitos y terminar en 001.")
+        return identificacion
+
+    def clean_autorizacion_doc_sustento(self):
+        autorizacion = (self.cleaned_data.get("autorizacion_doc_sustento") or "").strip()
+        if not autorizacion:
+            raise ValidationError("La autorización del documento de sustento es obligatoria.")
+        if not autorizacion.isdigit() or len(autorizacion) != 49:
+            raise ValidationError("La autorización del documento de sustento debe tener exactamente 49 dígitos.")
+        return autorizacion
+
+    def clean(self):
+        cleaned_data = super().clean()
+        fecha_doc = cleaned_data.get("fecha_emision")
+        fecha_ret = cleaned_data.get("fecha_emision_retencion")
+
+        if fecha_doc and fecha_ret:
+            if fecha_ret < fecha_doc:
+                self.add_error("fecha_emision_retencion", "La fecha de retención no puede ser anterior a la fecha del documento de sustento.")
+            else:
+                dias_habiles = self._contar_dias_habiles(fecha_doc, fecha_ret)
+                if dias_habiles > 5:
+                    self.add_error(
+                        "fecha_emision_retencion",
+                        "La retención excede los 5 días hábiles permitidos desde la emisión del documento de sustento.",
+                    )
+
+        return cleaned_data

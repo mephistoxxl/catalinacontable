@@ -10,20 +10,21 @@ IVA_RETENCION_PORCENTAJE_POR_CODIGO = {
     "721": Decimal("10.00"),
     "723": Decimal("20.00"),
     "725": Decimal("30.00"),
-    "727": Decimal("50.00"),
     "729": Decimal("70.00"),
     "731": Decimal("100.00"),
     "7": Decimal("70.00"),
-    "8": Decimal("0.00"),
 }
 
 RENTA_PORCENTAJE_SUGERIDO = {
     "312": Decimal("1.75"),
+    "332": Decimal("2.75"),
     "304": Decimal("2.00"),
     "308": Decimal("2.00"),
+    "343": Decimal("8.00"),
     "320": Decimal("2.00"),
     "322": Decimal("2.00"),
     "344": Decimal("3.00"),
+    "3440": Decimal("10.00"),
     "303": Decimal("10.00"),
     "307": Decimal("10.00"),
     "304B": Decimal("10.00"),
