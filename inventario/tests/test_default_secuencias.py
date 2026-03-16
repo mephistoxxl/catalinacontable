@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from inventario.models import Almacen, Caja, Empresa, Secuencia
+from inventario.models import Almacen, Banco, Caja, Empresa, Secuencia
 
 
 class DefaultSecuenciasTests(TestCase):
@@ -48,6 +48,13 @@ class DefaultSecuenciasTests(TestCase):
             descripcion='CAJA PRINCIPAL',
             activo=True,
         )
+        banco = Banco._unsafe_objects.filter(
+            empresa=empresa,
+            banco='BANCO PICHINCHA',
+            numero_cuenta=f'{empresa.id:013d}',
+            activo=True,
+        )
 
         self.assertEqual(almacen.count(), 1)
         self.assertEqual(caja.count(), 1)
+        self.assertEqual(banco.count(), 1)

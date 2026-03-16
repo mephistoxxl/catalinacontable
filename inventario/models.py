@@ -2385,12 +2385,34 @@ def ensure_default_almacen_caja_for_empresa(empresa):
     )
 
 
+def ensure_default_banco_for_empresa(empresa):
+    """Crea una cuenta bancaria base para una empresa nueva."""
+    if not empresa or not getattr(empresa, 'pk', None):
+        return
+
+    numero_cuenta_default = f"{empresa.pk:013d}"
+
+    Banco._unsafe_objects.get_or_create(
+        empresa=empresa,
+        banco='BANCO PICHINCHA',
+        numero_cuenta=numero_cuenta_default,
+        defaults={
+            'titular': empresa.razon_social,
+            'activo': True,
+            'saldo_inicial': Decimal('0.00'),
+            'tipo_cuenta': 'CORRIENTE',
+            'secuencial_cheque': 1,
+        },
+    )
+
+
 @receiver(post_save, sender=Empresa)
 def create_default_secuencias_for_new_empresa(sender, instance, created, **kwargs):
     if not created:
         return
     ensure_default_secuencias_for_empresa(instance)
     ensure_default_almacen_caja_for_empresa(instance)
+    ensure_default_banco_for_empresa(instance)
 
 class FacturadorManager(BaseUserManager):
     def create_facturador(self, nombres, telefono, correo, password=None, **extra_fields):
