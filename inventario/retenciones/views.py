@@ -39,8 +39,8 @@ PORCENTAJES_IVA_RETENCION_PERMITIDOS = {
     Decimal('10.00'),
     Decimal('20.00'),
     Decimal('30.00'),
+    Decimal('50.00'),
     Decimal('70.00'),
-    Decimal('100.00'),
 }
 
 CODIGOS_RENTA_VIGENTES = {
@@ -53,7 +53,7 @@ CODIGOS_RENTA_VIGENTES = {
     '344A', '346', '3482', '350',
 }
 
-CODIGOS_IVA_VIGENTES = {'721', '723', '725', '729', '731', '7'}
+CODIGOS_IVA_VIGENTES = {'721', '723', '725', '727', '7'}
 
 
 def _to_decimal(value, default: str = '0.00') -> Decimal:
@@ -114,7 +114,7 @@ def _normalizar_detalles_payload(renta_rows: list[dict], iva_rows: list[dict], f
         porcentaje_2 = Decimal(str(porcentaje)).quantize(Decimal('0.00'))
         if porcentaje_2 not in PORCENTAJES_IVA_RETENCION_PERMITIDOS:
             raise ValidationError(
-                'El porcentaje de retención de IVA debe ser uno de: 10%, 20%, 30%, 70% o 100%.'
+                'El porcentaje de retención de IVA debe ser uno de: 10%, 20%, 30%, 50% o 70%.'
             )
         if base > 0 and porcentaje > 0:
             detalles.append(
@@ -156,7 +156,7 @@ def _normalizar_detalles_payload(renta_rows: list[dict], iva_rows: list[dict], f
     iva_porcentaje_2 = Decimal(str(iva_porcentaje)).quantize(Decimal('0.00'))
     if iva_porcentaje_2 not in PORCENTAJES_IVA_RETENCION_PERMITIDOS:
         raise ValidationError(
-            'El porcentaje de retención de IVA debe ser uno de: 10%, 20%, 30%, 70% o 100%.'
+            'El porcentaje de retención de IVA debe ser uno de: 10%, 20%, 30%, 50% o 70%.'
         )
     if iva_base > 0 and iva_porcentaje > 0:
         detalles.append(
@@ -618,8 +618,14 @@ def _extraer_autorizacion(resultado: dict) -> tuple[str, str]:
     if autorizaciones and isinstance(autorizaciones, list):
         aut0 = autorizaciones[0] or {}
         if isinstance(aut0, dict):
-            numero = (aut0.get('numeroAutorizacion') or aut0.get('numero_autorizacion') or '').strip()
-            fecha = (aut0.get('fechaAutorizacion') or aut0.get('fecha_autorizacion') or '').strip()
+            numero_raw = aut0.get('numeroAutorizacion') or aut0.get('numero_autorizacion') or ''
+            fecha_raw = aut0.get('fechaAutorizacion') or aut0.get('fecha_autorizacion') or ''
+
+            numero = str(numero_raw).strip() if numero_raw is not None else ''
+            if isinstance(fecha_raw, datetime):
+                fecha = fecha_raw.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                fecha = str(fecha_raw).strip() if fecha_raw is not None else ''
     return numero, fecha
 
 
@@ -649,6 +655,34 @@ def _agregar_mensaje_request(request, nivel: str, texto: str) -> None:
         messages.info(request, texto)
     else:
         messages.error(request, texto)
+
+
+def _formatear_mensajes_sri_detallado(mensajes: list) -> str:
+    """Convierte los mensajes del SRI en texto legible con código y detalle adicional."""
+    partes = []
+    for msg in (mensajes or []):
+        if isinstance(msg, dict):
+            identificador = str(msg.get('identificador') or '').strip()
+            texto = str(msg.get('mensaje') or '').strip()
+            adicional = str(
+                msg.get('informacionAdicional')
+                or msg.get('informacion_adicional')
+                or ''
+            ).strip()
+
+            segmento = ''
+            if identificador:
+                segmento += f'[{identificador}] '
+            segmento += texto or 'Mensaje sin descripción.'
+            if adicional:
+                segmento += f' - {adicional}'
+            partes.append(segmento)
+        else:
+            texto = str(msg).strip()
+            if texto:
+                partes.append(texto)
+
+    return ' | '.join(partes)
 
 
 def _procesar_envio_retencion_sri(retencion: ComprobanteRetencion, empresa) -> tuple[str, str]:
@@ -717,12 +751,12 @@ def _procesar_envio_retencion_sri(retencion: ComprobanteRetencion, empresa) -> t
                 nivel = 'warning'
             else:
                 mensajes_auth = resultado_auth.get('mensajes') or []
-                mensaje_auth = mensajes_auth[0].get('mensaje') if mensajes_auth and isinstance(mensajes_auth[0], dict) else 'No autorizada por el SRI.'
+                mensaje_auth = _formatear_mensajes_sri_detallado(mensajes_auth) or 'No autorizada por el SRI.'
                 mensaje = f'Retención rechazada por SRI: {mensaje_auth}'
                 nivel = 'error'
         else:
             mensajes_envio = resultado_envio.get('mensajes') or []
-            mensaje_envio = mensajes_envio[0].get('mensaje') if mensajes_envio and isinstance(mensajes_envio[0], dict) else 'No fue recibida por SRI.'
+            mensaje_envio = _formatear_mensajes_sri_detallado(mensajes_envio) or 'No fue recibida por SRI.'
             mensaje = f'Error en recepción SRI: {mensaje_envio}'
             nivel = 'error'
 
@@ -796,7 +830,7 @@ class ConsultarEstadoRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, Vi
                 messages.info(request, 'Retención aún pendiente de autorización en SRI.')
             else:
                 mensajes = resultado.get('mensajes') or []
-                mensaje = mensajes[0].get('mensaje') if mensajes and isinstance(mensajes[0], dict) else 'Estado consultado sin autorización.'
+                mensaje = _formatear_mensajes_sri_detallado(mensajes) or 'Estado consultado sin autorización.'
                 messages.warning(request, f'Estado SRI: {retencion.estado_sri}. {mensaje}')
         except Exception as exc:
             messages.error(request, f'No se pudo consultar estado SRI: {exc}')

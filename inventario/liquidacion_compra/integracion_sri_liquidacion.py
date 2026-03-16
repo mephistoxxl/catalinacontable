@@ -10,11 +10,13 @@ from typing import Dict, Optional, Tuple
 
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import Max
 
 from ..sri.sri_client import SRIClient
 from ..sri.firmador_xades_sri_simple import FirmadorXAdESSRIEcuador
 from .xml_generator_liquidacion import LiquidacionXMLGenerator
 from .models import LiquidacionCompra, LiquidacionLogCambioEstado
+from ..models import Secuencia
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +56,7 @@ class IntegracionSRILiquidacion:
         enviar_solo: bool = False,
         max_envio_intentos: int = 8,
         espera_envio_seg: int = 2,
+        reintentos_secuencial_duplicado: int = 1,
     ) -> Dict:
         """
         Procesa el flujo completo de una liquidación: generar XML, firmar, enviar y autorizar.
@@ -142,6 +145,27 @@ class IntegracionSRILiquidacion:
                         # Para este escenario se debe reintentar el envío hasta obtener RECIBIDA.
                         if self._mensajes_indican_en_procesamiento(mensajes_envio):
                             estado_envio = 'EN PROCESAMIENTO'
+                        elif self._mensajes_indican_secuencial_registrado(mensajes_envio):
+                            if reintentos_secuencial_duplicado > 0:
+                                ok, msg = self._reasignar_secuencial_por_duplicado(liquidacion)
+                                if ok:
+                                    logger.warning(
+                                        "Secuencial duplicado SRI (45) para liquidacion %s. %s Reintentando envio.",
+                                        liquidacion.id,
+                                        msg,
+                                    )
+                                    return self.procesar_liquidacion_completa(
+                                        liquidacion,
+                                        enviar_solo=enviar_solo,
+                                        max_envio_intentos=max_envio_intentos,
+                                        espera_envio_seg=espera_envio_seg,
+                                        reintentos_secuencial_duplicado=reintentos_secuencial_duplicado - 1,
+                                    )
+                                logger.error(
+                                    "No se pudo reasignar secuencial tras error 45 en liquidacion %s: %s",
+                                    liquidacion.id,
+                                    msg,
+                                )
                         else:
                             # DEVUELTA con otros identificadores sí es rechazo en recepción
                             break
@@ -628,6 +652,100 @@ class IntegracionSRILiquidacion:
         except Exception:
             return False
         return False
+
+    def _reasignar_secuencial_por_duplicado(self, liquidacion: LiquidacionCompra) -> Tuple[bool, str]:
+        """Reasigna un nuevo secuencial local cuando SRI responde código 45 y deja lista la liquidación para reenvío."""
+        try:
+            with transaction.atomic():
+                liquidacion = LiquidacionCompra.objects.select_for_update().get(pk=liquidacion.pk, empresa=self.empresa)
+
+                secuencia_qs = Secuencia.objects.select_for_update().filter(
+                    empresa=self.empresa,
+                    tipo_documento='03',
+                    activo=True,
+                    establecimiento=liquidacion.establecimiento,
+                    punto_emision=liquidacion.punto_emision,
+                ).order_by('id')
+                secuencia_cfg = secuencia_qs.first()
+
+                if not secuencia_cfg:
+                    secuencia_cfg = Secuencia.objects.select_for_update().filter(
+                        empresa=self.empresa,
+                        tipo_documento='03',
+                        activo=True,
+                    ).order_by('establecimiento', 'punto_emision', 'id').first()
+
+                if not secuencia_cfg:
+                    return False, 'No existe una secuencia activa para Liquidación de Compra (03).'
+
+                max_local = (
+                    LiquidacionCompra.objects.filter(
+                        empresa=self.empresa,
+                        establecimiento=secuencia_cfg.establecimiento,
+                        punto_emision=secuencia_cfg.punto_emision,
+                    )
+                    .exclude(pk=liquidacion.pk)
+                    .aggregate(m=Max('secuencia'))['m']
+                    or 0
+                )
+
+                try:
+                    base_cfg = int(secuencia_cfg.secuencial or 0)
+                except (TypeError, ValueError):
+                    base_cfg = 0
+
+                siguiente = max(max_local + 1, base_cfg or 1, int(liquidacion.secuencia or 0) + 1)
+                while LiquidacionCompra.objects.filter(
+                    empresa=self.empresa,
+                    establecimiento=secuencia_cfg.establecimiento,
+                    punto_emision=secuencia_cfg.punto_emision,
+                    secuencia=siguiente,
+                ).exclude(pk=liquidacion.pk).exists():
+                    siguiente += 1
+
+                if siguiente > 999_999_999:
+                    return False, 'El secuencial excede el máximo permitido (999999999).'
+
+                sec_anterior = int(liquidacion.secuencia or 0)
+
+                liquidacion.establecimiento = secuencia_cfg.establecimiento
+                liquidacion.punto_emision = secuencia_cfg.punto_emision
+                liquidacion.secuencia = siguiente
+                liquidacion.clave_acceso = ''
+                liquidacion.numero_autorizacion = ''
+                liquidacion.fecha_autorizacion = None
+                liquidacion.xml_firmado = ''
+                liquidacion.xml_autorizado = ''
+                liquidacion.estado = 'BORRADOR'
+                liquidacion.estado_sri = ''
+                liquidacion.mensaje_sri = (
+                    f'Secuencial reasignado automáticamente por duplicado SRI: '
+                    f'{sec_anterior:09d} -> {siguiente:09d}'
+                )
+                liquidacion.generar_clave_acceso()
+                liquidacion.save(
+                    update_fields=[
+                        'establecimiento', 'punto_emision', 'secuencia',
+                        'clave_acceso', 'numero_autorizacion', 'fecha_autorizacion',
+                        'xml_firmado', 'xml_autorizado', 'estado', 'estado_sri', 'mensaje_sri',
+                    ]
+                )
+
+                if int(secuencia_cfg.secuencial or 0) <= siguiente:
+                    secuencia_cfg.secuencial = siguiente + 1
+                    secuencia_cfg.save(update_fields=['secuencial'])
+
+                self._registrar_log(
+                    liquidacion,
+                    'BORRADOR',
+                    '',
+                    f'Reasignado secuencial por duplicado SRI: {sec_anterior:09d} -> {siguiente:09d}',
+                )
+
+                return True, f'Secuencial reasignado a {siguiente:09d}.'
+        except Exception as exc:
+            logger.exception('Error reasignando secuencial por duplicado SRI para liquidacion %s', liquidacion.id)
+            return False, str(exc)
 
     def _mensajes_indican_en_procesamiento(self, mensajes: list) -> bool:
         try:

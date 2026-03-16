@@ -125,6 +125,7 @@ urlpatterns = [
     path('liquidaciones-compra/', liquidacion_views.LiquidacionCompraListView.as_view(), name='liquidaciones_compra_listar'),
     path('liquidaciones-compra/crear/', liquidacion_views.LiquidacionCompraCreateView.as_view(), name='liquidaciones_compra_crear'),
     path('liquidaciones-compra/ver/<int:pk>/', liquidacion_views.LiquidacionCompraDetailView.as_view(), name='liquidaciones_compra_ver'),
+    path('liquidaciones-compra/pdf/<int:pk>/', liquidacion_views.descargar_pdf_liquidacion_compra, name='liquidaciones_compra_pdf'),
     path('liquidaciones-compra/autorizar/<int:pk>/', liquidacion_views.autorizar_liquidacion_compra, name='autorizar_liquidacion_compra'),
     path('liquidaciones-compra/consultar-estado/<int:pk>/', liquidacion_views.consultar_estado_liquidacion_compra, name='consultar_estado_liquidacion_compra'),
     path('liquidaciones-compra/consultar-estado-json/<int:pk>/', liquidacion_views.consultar_estado_liquidacion_compra_json, name='consultar_estado_liquidacion_compra_json'),

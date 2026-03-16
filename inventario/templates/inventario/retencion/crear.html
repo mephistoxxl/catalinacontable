@@ -78,7 +78,17 @@ label {
         {% endif %}
         {% if form.errors %}
             <div class="mb-2 rounded px-3 py-2 text-sm bg-red-100 text-red-800">
-                Revisa los datos ingresados; hay campos con formato inválido.
+                <div class="font-semibold mb-1">Revisa los datos ingresados; hay campos con formato inválido.</div>
+                <ul class="list-disc pl-5 space-y-1">
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                    {% for field in form %}
+                        {% for error in field.errors %}
+                            <li><strong>{{ field.label|default:field.name }}:</strong> {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                </ul>
             </div>
         {% endif %}
         
@@ -367,8 +377,7 @@ label {
                                     <option value="721" {% if form.codigo_iva.value == '721' or not form.codigo_iva.value %}selected{% endif %}>9-721 721 10 % Retención Iva</option>
                                     <option value="723" {% if form.codigo_iva.value == '723' %}selected{% endif %}>10-723 723 20 % Retención Iva</option>
                                     <option value="725" {% if form.codigo_iva.value == '725' %}selected{% endif %}>1-725 725 30 % Retención Iva</option>
-                                    <option value="729" {% if form.codigo_iva.value == '729' %}selected{% endif %}>2-729 729 70 % Retención Iva</option>
-                                    <option value="731" {% if form.codigo_iva.value == '731' %}selected{% endif %}>3-731 731 100 % Retención Iva</option>
+                                    <option value="727" {% if form.codigo_iva.value == '727' %}selected{% endif %}>11-727 727 50 % Retención Iva</option>
                                     <option value="7" {% if form.codigo_iva.value == '7' %}selected{% endif %}>7 70 % Retención Iva en Cero</option>
                                 </select>
                             </div>
@@ -481,8 +490,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '721': '10.00',
         '723': '20.00',
         '725': '30.00',
-        '729': '70.00',
-        '731': '100.00',
+        '727': '50.00',
         '7': '70.00',
     };
 
@@ -502,7 +510,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '309': '3.00',
         '310': '1.00',
         '311': '3.00',
-        '312': '1.75',
+        '312': '2.00',
         '312A': '1.00',
         '312C': '1.75',
         '314A': '10.00',

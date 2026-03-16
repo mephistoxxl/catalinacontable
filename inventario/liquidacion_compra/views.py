@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.db.models import Max
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
@@ -190,8 +190,9 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
 
                     # Actualizar el secuencial en la configuración utilizada
                     secuencia_obj = secuencia_info["secuencia"]
-                    if secuencia_obj.secuencial != secuencia_info["valor"]:
-                        secuencia_obj.secuencial = secuencia_info["valor"]
+                    siguiente_disponible = secuencia_info["valor"] + 1
+                    if int(secuencia_obj.secuencial or 0) < siguiente_disponible:
+                        secuencia_obj.secuencial = siguiente_disponible
                         secuencia_obj.save(update_fields=["secuencial"])
 
                     form.guardar_prestador(liquidacion)
@@ -289,11 +290,33 @@ def autorizar_liquidacion_compra(request, pk):
     
     liquidacion = get_object_or_404(LiquidacionCompra, pk=pk, empresa=empresa)
 
+    def _es_rechazo_por_secuencial_registrado(liq):
+        texto = ((liq.mensaje_sri or '') + ' ' + (liq.estado_sri or '')).upper()
+        return 'SECUENCIAL REGISTRADO' in texto or '[45]' in texto
+
     ya_autorizada = bool(liquidacion.numero_autorizacion and liquidacion.fecha_autorizacion)
     
     estado_sri_norm = (liquidacion.estado_sri or '').strip().upper()
     estado_norm = (liquidacion.estado or '').strip().upper()
     if estado_sri_norm in {'AUTORIZADA', 'AUTORIZADO', 'RECHAZADA', 'NO_AUTORIZADA', 'NO AUTORIZADA', 'NO_AUTORIZADO', 'NO AUTORIZADO'} or estado_norm == 'RECHAZADA':
+        if (estado_sri_norm == 'RECHAZADA' or estado_norm == 'RECHAZADA') and _es_rechazo_por_secuencial_registrado(liquidacion):
+            try:
+                from .integracion_sri_liquidacion import IntegracionSRILiquidacion
+
+                integrador = IntegracionSRILiquidacion(empresa)
+                resultado = integrador.reenviar_liquidacion(liquidacion)
+
+                if resultado.get('exito'):
+                    messages.info(request, 'Se detectó secuencial duplicado. Se reasignó secuencial y se reintentó el envío automáticamente.')
+                else:
+                    mensajes = resultado.get('mensajes', [])
+                    detalle = mensajes[0] if mensajes else 'No se pudo reprocesar automáticamente.'
+                    messages.error(request, f'No se pudo reprocesar la liquidación: {detalle}')
+                return redirect('inventario:liquidaciones_compra_ver', pk=liquidacion.pk)
+            except Exception as exc:
+                messages.error(request, f'No se pudo reprocesar automáticamente por secuencial duplicado: {exc}')
+                return redirect('inventario:liquidaciones_compra_ver', pk=liquidacion.pk)
+
         if estado_sri_norm == 'RECHAZADA' or estado_norm == 'RECHAZADA':
             detalle = (liquidacion.mensaje_sri or '').strip()
             if not detalle:
@@ -602,3 +625,30 @@ def consultar_estado_liquidacion_compra_json(request, pk):
     except Exception as exc:
         logger.error("Error consultando estado JSON liquidacion %s: %s", pk, exc)
         return JsonResponse({'success': False, 'message': f'Error al consultar estado: {exc}'}, status=500)
+
+
+@login_required
+def descargar_pdf_liquidacion_compra(request, pk):
+    """Descarga el RIDE PDF de la liquidación de compra."""
+    empresa = get_empresa_activa(request)
+    if not empresa:
+        messages.error(request, 'Seleccione una empresa válida.')
+        return redirect('inventario:seleccionar_empresa')
+
+    liquidacion = get_object_or_404(LiquidacionCompra, pk=pk, empresa=empresa)
+
+    try:
+        from ..models import Opciones
+        from .ride_generator_liquidacion import RIDELiquidacionCompraGenerator
+
+        opciones = Opciones.objects.for_tenant(empresa).first()
+        pdf_buffer = RIDELiquidacionCompraGenerator(liquidacion, opciones).generar_pdf()
+
+        response = HttpResponse(pdf_buffer.read(), content_type='application/pdf')
+        filename = f"LC_{liquidacion.numero_completo.replace('-', '_')}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+    except Exception as exc:
+        logger.exception('Error generando PDF de liquidación %s: %s', liquidacion.id, exc)
+        messages.error(request, f'No se pudo generar el PDF de la liquidación: {exc}')
+        return redirect('inventario:liquidaciones_compra_ver', pk=liquidacion.pk)
