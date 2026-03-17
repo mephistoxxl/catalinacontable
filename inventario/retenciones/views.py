@@ -31,6 +31,7 @@ from .xml_generator_retencion import RetencionXMLGenerator
 from ..sri.ambiente import obtener_ambiente_sri
 from ..sri.firmador_xades_sri import XAdESError, firmar_xml_xades_bes
 from ..sri.sri_client import SRIClient
+from ..documentos_email.services import DocumentEmailService
 
 logger = logging.getLogger(__name__)
 
@@ -246,7 +247,7 @@ class ListarRetenciones(LoginRequiredMixin, RequireEmpresaActivaMixin, ListView)
     login_url = '/inventario/login'
     template_name = 'inventario/retencion/listar.html'
     context_object_name = 'retenciones'
-    paginate_by = 20
+    paginate_by = 7
 
     def get_queryset(self):
         empresa = get_empresa_activa(self.request)
@@ -711,6 +712,35 @@ def _formatear_mensajes_sri_detallado(mensajes: list) -> str:
     return ' | '.join(partes)
 
 
+def _mensajes_contienen_codigo(mensajes: list, codigo: str) -> bool:
+    objetivo = (codigo or '').strip()
+    if not objetivo:
+        return False
+    for msg in (mensajes or []):
+        if isinstance(msg, dict):
+            identificador = str(msg.get('identificador') or '').strip()
+            if identificador == objetivo:
+                return True
+        else:
+            texto = str(msg or '')
+            if f'[{objetivo}]' in texto:
+                return True
+    return False
+
+
+def _enviar_retencion_email_automatico(retencion: ComprobanteRetencion, empresa) -> tuple[bool, str]:
+    try:
+        servicio = DocumentEmailService(empresa)
+        resultado = servicio.send_retencion(retencion)
+        if resultado.success:
+            destinatarios = ', '.join(resultado.recipients) if resultado.recipients else 'destinatario configurado'
+            return True, f'Correo automático enviado a: {destinatarios}.'
+        return False, f'No se pudo enviar correo automático: {resultado.message}'
+    except Exception as exc:
+        logger.exception('Error enviando correo automático de retención %s: %s', retencion.id, exc)
+        return False, f'No se pudo enviar correo automático: {exc}'
+
+
 def _procesar_envio_retencion_sri(retencion: ComprobanteRetencion, empresa) -> tuple[str, str]:
     if retencion.estado_sri == 'AUTORIZADA' and (retencion.numero_autorizacion or '').strip():
         return 'info', f'Retención {retencion.numero_completo} ya está autorizada en SRI.'
@@ -771,6 +801,12 @@ def _procesar_envio_retencion_sri(retencion: ComprobanteRetencion, empresa) -> t
                 else:
                     mensaje = f'Retención {retencion.numero_completo} autorizada en SRI.'
                 nivel = 'success'
+                ok_mail, msg_mail = _enviar_retencion_email_automatico(retencion, empresa)
+                if ok_mail:
+                    mensaje = f'{mensaje} {msg_mail}'
+                else:
+                    mensaje = f'{mensaje} {msg_mail}'
+                    nivel = 'warning'
             elif retencion.estado_sri in {'PENDIENTE', 'RECIBIDA'}:
                 _encolar_reintentos_retencion(retencion)
                 mensaje = 'Retención enviada al SRI y pendiente de autorización. El sistema seguirá reintentando automáticamente.'
@@ -783,8 +819,19 @@ def _procesar_envio_retencion_sri(retencion: ComprobanteRetencion, empresa) -> t
         else:
             mensajes_envio = resultado_envio.get('mensajes') or []
             mensaje_envio = _formatear_mensajes_sri_detallado(mensajes_envio) or 'No fue recibida por SRI.'
-            mensaje = f'Error en recepción SRI: {mensaje_envio}'
-            nivel = 'error'
+            # Caso clásico SRI: clave de acceso en procesamiento (identificador 70).
+            # Se trata como pendiente y se reintenta consulta automática.
+            if _mensajes_contienen_codigo(mensajes_envio, '70'):
+                retencion.estado_sri = 'PENDIENTE'
+                _encolar_reintentos_retencion(retencion)
+                mensaje = (
+                    f'Clave en procesamiento en SRI: {mensaje_envio} '
+                    'Se realizará reconsulta automática hasta obtener estado final.'
+                )
+                nivel = 'warning'
+            else:
+                mensaje = f'Error en recepción SRI: {mensaje_envio}'
+                nivel = 'error'
 
         retencion.save(update_fields=['clave_acceso', 'xml_generado', 'xml_firmado', 'xml_firmado_en', 'xml_validado', 'xml_validacion_error', 'estado_sri', 'numero_autorizacion', 'autorizacion_retencion', 'actualizado_en'])
         return nivel, mensaje
@@ -838,6 +885,7 @@ class ConsultarEstadoRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, Vi
         try:
             ambiente = obtener_ambiente_sri(empresa)
             cliente = SRIClient(ambiente='produccion' if ambiente == '2' else 'pruebas')
+            estado_anterior = _normalizar_estado_sri(retencion.estado_sri)
             resultado = cliente.consultar_autorizacion(retencion.clave_acceso)
 
             estado = _normalizar_estado_sri(resultado.get('estado'))
@@ -851,7 +899,15 @@ class ConsultarEstadoRetencion(LoginRequiredMixin, RequireEmpresaActivaMixin, Vi
 
             if retencion.estado_sri == 'AUTORIZADA':
                 msg_fecha = _formatear_fecha_autorizacion(fecha_aut)
-                messages.success(request, f'Retención autorizada. {msg_fecha}'.strip())
+                msg_base = f'Retención autorizada. {msg_fecha}'.strip()
+                if estado_anterior != 'AUTORIZADA':
+                    ok_mail, msg_mail = _enviar_retencion_email_automatico(retencion, empresa)
+                    if ok_mail:
+                        messages.success(request, f'{msg_base} {msg_mail}'.strip())
+                    else:
+                        messages.warning(request, f'{msg_base} {msg_mail}'.strip())
+                else:
+                    messages.success(request, msg_base)
             elif retencion.estado_sri in {'PENDIENTE', 'RECIBIDA'}:
                 messages.info(request, 'Retención aún pendiente de autorización en SRI.')
             else:

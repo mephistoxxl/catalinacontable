@@ -28,6 +28,30 @@ class _EmptyManager:
 class _RetencionPartyAdapter:
     def __init__(self, retencion):
         proveedor = getattr(retencion, 'proveedor', None)
+        identificacion = (
+            getattr(retencion, 'identificacion_sujeto', None)
+            or getattr(proveedor, 'identificacion_proveedor', None)
+            or ''
+        )
+
+        proveedor_lookup = None
+        prestador_lookup = None
+        cliente_lookup = None
+        try:
+            from inventario.models import Cliente, Proveedor
+            from inventario.liquidacion_compra.models import Prestador
+
+            if identificacion and getattr(retencion, 'empresa', None):
+                qs_prov = Proveedor.objects.for_tenant(retencion.empresa) if hasattr(Proveedor.objects, 'for_tenant') else Proveedor.objects.filter(empresa=retencion.empresa)
+                proveedor_lookup = qs_prov.filter(identificacion_proveedor=identificacion).first()
+
+                qs_prest = Prestador.objects.for_tenant(retencion.empresa) if hasattr(Prestador.objects, 'for_tenant') else Prestador.objects.filter(empresa=retencion.empresa)
+                prestador_lookup = qs_prest.filter(identificacion=identificacion).first()
+
+                qs_cliente = Cliente.objects.for_tenant(retencion.empresa) if hasattr(Cliente.objects, 'for_tenant') else Cliente.objects.filter(empresa=retencion.empresa)
+                cliente_lookup = qs_cliente.filter(identificacion=identificacion).first()
+        except Exception:
+            pass
 
         self.razon_social = (
             getattr(retencion, 'razon_social_sujeto', None)
@@ -37,13 +61,31 @@ class _RetencionPartyAdapter:
         )
         self.nombres = self.razon_social
         self.identificacion = (
-            getattr(retencion, 'identificacion_sujeto', None)
-            or getattr(proveedor, 'identificacion_proveedor', None)
+            identificacion
+        )
+        self.direccion = (
+            getattr(proveedor, 'direccion', '')
+            or getattr(proveedor_lookup, 'direccion', '')
+            or getattr(prestador_lookup, 'direccion', '')
+            or getattr(cliente_lookup, 'direccion', '')
             or ''
         )
-        self.direccion = getattr(proveedor, 'direccion', '') or ''
-        self.correo = getattr(proveedor, 'correo', '') or ''
-        self.telefono = getattr(proveedor, 'telefono', '') or ''
+        self.correo = (
+            getattr(proveedor, 'correo', '')
+            or getattr(proveedor_lookup, 'correo', '')
+            or getattr(prestador_lookup, 'correo', '')
+            or getattr(cliente_lookup, 'correo', '')
+            or getattr(cliente_lookup, 'email', '')
+            or ''
+        )
+        self.telefono = (
+            getattr(proveedor, 'telefono', '')
+            or getattr(proveedor_lookup, 'telefono', '')
+            or getattr(proveedor_lookup, 'telefono2', '')
+            or getattr(prestador_lookup, 'telefono', '')
+            or getattr(cliente_lookup, 'telefono', '')
+            or ''
+        )
 
 
 class _RetencionFacturaAdapter:

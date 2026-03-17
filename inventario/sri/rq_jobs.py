@@ -320,9 +320,11 @@ def enqueue_poll_autorizacion_retencion(
 
 def poll_autorizacion_retencion(retencion_id: int, empresa_id: int, attempt: int = 1, max_attempts: int = 240) -> None:
     from inventario.models import Empresa
+    from inventario.documentos_email.services import DocumentEmailService
     from inventario.retenciones.models import ComprobanteRetencion
     from inventario.sri.ambiente import obtener_ambiente_sri
     from inventario.sri.sri_client import SRIClient
+    from inventario.tenant.queryset import set_current_tenant
 
     def _norm_estado(valor: str | None) -> str:
         estado = str(valor or '').upper().strip()
@@ -340,11 +342,17 @@ def poll_autorizacion_retencion(retencion_id: int, empresa_id: int, attempt: int
             logger.warning("[SRI RET] Empresa %s no existe", empresa_id)
             return
 
+        try:
+            set_current_tenant(empresa)
+        except Exception as exc:
+            logger.warning("[SRI RET] No se pudo establecer tenant (empresa %s): %s", empresa_id, exc)
+
         retencion = ComprobanteRetencion.objects.filter(id=retencion_id, empresa_id=empresa_id).first()
         if retencion is None:
             logger.warning("[SRI RET] Retencion %s no existe en empresa %s", retencion_id, empresa_id)
             return
 
+        estado_anterior = _norm_estado(retencion.estado_sri)
         estado_actual = _norm_estado(retencion.estado_sri)
         if estado_actual in {'AUTORIZADA', 'RECHAZADA', 'ERROR'}:
             logger.info("[SRI RET] Retencion %s ya final (%s)", retencion_id, estado_actual)
@@ -370,6 +378,28 @@ def poll_autorizacion_retencion(retencion_id: int, empresa_id: int, attempt: int
                 retencion.autorizacion_retencion = numero
 
         retencion.save(update_fields=['estado_sri', 'numero_autorizacion', 'autorizacion_retencion', 'actualizado_en'])
+
+        if estado_anterior != 'AUTORIZADA' and retencion.estado_sri == 'AUTORIZADA':
+            try:
+                resultado_email = DocumentEmailService(empresa).send_retencion(retencion)
+                if resultado_email.success:
+                    logger.info(
+                        "[SRI RET] Correo automático enviado para retención %s a %s",
+                        retencion_id,
+                        ', '.join(resultado_email.recipients),
+                    )
+                else:
+                    logger.warning(
+                        "[SRI RET] Retención %s autorizada pero falló correo automático: %s",
+                        retencion_id,
+                        resultado_email.message,
+                    )
+            except Exception as exc:
+                logger.exception(
+                    "[SRI RET] Error en correo automático de retención %s: %s",
+                    retencion_id,
+                    exc,
+                )
 
         if retencion.estado_sri in {'AUTORIZADA', 'RECHAZADA', 'ERROR'}:
             logger.info("[SRI RET] Retencion %s finalizó en estado %s", retencion_id, retencion.estado_sri)

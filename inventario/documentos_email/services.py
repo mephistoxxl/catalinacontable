@@ -11,7 +11,7 @@ from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 
-from inventario.models import Cliente, Opciones, Transportista
+from inventario.models import Cliente, Opciones, Proveedor, Transportista
 from inventario.guia_remision.ride_guia_generator import GuiaRemisionRIDEGenerator
 from inventario.guia_remision.xml_generator_guia import XMLGeneratorGuiaRemision
 from inventario.liquidacion_compra.models import LiquidacionCompra
@@ -49,7 +49,7 @@ class DocumentEmailService:
         if estado != 'AUTORIZADA':
             return SendResult(False, f'Retención no autorizada. Estado actual: {retencion.estado_sri}', [])
 
-        destinatarios = self._emails_from_proveedor(retencion.proveedor)
+        destinatarios = self._emails_for_retencion(retencion)
         if not destinatarios:
             return SendResult(False, 'El proveedor/sujeto retenido no tiene correo registrado.', [])
 
@@ -465,6 +465,60 @@ class DocumentEmailService:
             getattr(proveedor, 'correo', ''),
             getattr(proveedor, 'correo2', ''),
         ]
+        return self._dedupe(self._expand_emails(values))
+
+    def _emails_for_retencion(self, retencion: ComprobanteRetencion) -> List[str]:
+        values = []
+
+        def _qs_for_tenant(model):
+            manager = getattr(model, 'objects', None)
+            if manager is not None and hasattr(manager, 'for_tenant'):
+                return manager.for_tenant(self.empresa)
+            return model.objects.filter(empresa=self.empresa)
+
+        proveedor = getattr(retencion, 'proveedor', None)
+        if proveedor is not None:
+            values.extend([
+                getattr(proveedor, 'correo', ''),
+                getattr(proveedor, 'correo2', ''),
+            ])
+
+        identificacion = (getattr(retencion, 'identificacion_sujeto', '') or '').strip()
+        if identificacion:
+            prov = _qs_for_tenant(Proveedor).filter(
+                identificacion_proveedor=identificacion,
+            ).first()
+            if prov:
+                values.extend([
+                    getattr(prov, 'correo', ''),
+                    getattr(prov, 'correo2', ''),
+                ])
+
+            cliente = _qs_for_tenant(Cliente).filter(
+                identificacion=identificacion,
+            ).first()
+            if cliente:
+                if hasattr(cliente, 'get_email_efectivo'):
+                    try:
+                        values.append(cliente.get_email_efectivo(self.empresa))
+                    except Exception:
+                        pass
+                values.extend([
+                    getattr(cliente, 'correo', ''),
+                    getattr(cliente, 'email', ''),
+                ])
+
+            try:
+                from inventario.liquidacion_compra.models import Prestador
+
+                prestador = _qs_for_tenant(Prestador).filter(
+                    identificacion=identificacion,
+                ).first()
+                if prestador:
+                    values.append(getattr(prestador, 'correo', ''))
+            except Exception:
+                pass
+
         return self._dedupe(self._expand_emails(values))
 
     def _emails_for_liquidacion(self, liquidacion: LiquidacionCompra) -> List[str]:

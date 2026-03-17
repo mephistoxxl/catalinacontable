@@ -86,8 +86,8 @@ class ComprobanteRetencionForm(forms.ModelForm):
         identificacion = (self.cleaned_data.get("identificacion_sujeto") or "").strip()
         if not identificacion:
             raise ValidationError("La identificación del proveedor es obligatoria.")
-        if not identificacion.isdigit() or len(identificacion) != 13 or not identificacion.endswith('001'):
-            raise ValidationError("El RUC del proveedor debe tener 13 dígitos y terminar en 001.")
+        if not identificacion.isdigit():
+            raise ValidationError("La identificación del proveedor debe contener solo dígitos.")
         return identificacion
 
     def clean_autorizacion_doc_sustento(self):
@@ -102,6 +102,8 @@ class ComprobanteRetencionForm(forms.ModelForm):
         cleaned_data = super().clean()
         fecha_doc = cleaned_data.get("fecha_emision")
         fecha_ret = cleaned_data.get("fecha_emision_retencion")
+        tipo_doc_sustento = (cleaned_data.get("tipo_documento_sustento") or "").strip()
+        identificacion = (cleaned_data.get("identificacion_sujeto") or "").strip()
 
         if fecha_doc and fecha_ret:
             if fecha_ret < fecha_doc:
@@ -112,6 +114,21 @@ class ComprobanteRetencionForm(forms.ModelForm):
                     self.add_error(
                         "fecha_emision_retencion",
                         "La retención excede los 5 días hábiles permitidos desde la emisión del documento de sustento.",
+                    )
+
+        # Regla de identificación del sujeto retenido según documento de sustento.
+        if identificacion:
+            if tipo_doc_sustento == "03":
+                if len(identificacion) != 10:
+                    self.add_error(
+                        "identificacion_sujeto",
+                        "Para sustento Liquidación de Compra, la identificación debe ser cédula de 10 dígitos.",
+                    )
+            else:
+                if len(identificacion) != 13 or not identificacion.endswith("001"):
+                    self.add_error(
+                        "identificacion_sujeto",
+                        "El RUC del proveedor debe tener 13 dígitos y terminar en 001.",
                     )
 
         return cleaned_data
