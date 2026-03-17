@@ -41,6 +41,7 @@ PORCENTAJES_IVA_RETENCION_PERMITIDOS = {
     Decimal('30.00'),
     Decimal('50.00'),
     Decimal('70.00'),
+    Decimal('100.00'),
 }
 
 CODIGOS_RENTA_VIGENTES = {
@@ -53,7 +54,21 @@ CODIGOS_RENTA_VIGENTES = {
     '344A', '346', '3482', '350',
 }
 
-CODIGOS_IVA_VIGENTES = {'721', '723', '725', '727', '7'}
+CODIGOS_IVA_VIGENTES = {'9', '10', '1', '11', '2', '3'}
+
+# Compatibilidad con datos históricos (mapeos previos 7xx -> códigos SRI vigentes).
+CODIGOS_IVA_LEGACY_MAP = {
+    '721': '9',
+    '723': '10',
+    '725': '1',
+    '727': '11',
+    '7': '2',
+    '729': '3',
+    '731': '11',
+}
+
+# En estos códigos el porcentaje puede variar según condición (no se fuerza).
+CODIGOS_RENTA_PORCENTAJE_VARIABLE = {'338', '346', '350', '3481'}
 
 
 def _to_decimal(value, default: str = '0.00') -> Decimal:
@@ -61,6 +76,11 @@ def _to_decimal(value, default: str = '0.00') -> Decimal:
         return Decimal(str(value or default))
     except Exception:
         return Decimal(default)
+
+
+def _normalizar_codigo_iva(codigo: str) -> str:
+    valor = (codigo or '').strip()
+    return CODIGOS_IVA_LEGACY_MAP.get(valor, valor)
 
 
 def _cargar_detalles_json(request) -> tuple[list[dict], list[dict]]:
@@ -89,8 +109,11 @@ def _normalizar_detalles_payload(renta_rows: list[dict], iva_rows: list[dict], f
             raise ValidationError(f'Código de retención renta no vigente o no permitido: {codigo}.')
         base = _to_decimal(row.get('base'))
         porcentaje = _to_decimal(row.get('porcentaje'))
-        if porcentaje <= 0:
-            porcentaje = porcentaje_renta_sugerido(codigo)
+        porcentaje_sri = porcentaje_renta_sugerido(codigo)
+        if codigo not in CODIGOS_RENTA_PORCENTAJE_VARIABLE and porcentaje_sri > 0:
+            porcentaje = porcentaje_sri
+        elif porcentaje <= 0:
+            porcentaje = porcentaje_sri
         if base > 0 and porcentaje > 0:
             detalles.append(
                 {
@@ -104,7 +127,7 @@ def _normalizar_detalles_payload(renta_rows: list[dict], iva_rows: list[dict], f
             )
 
     for row in iva_rows:
-        codigo = (row.get('codigo') or '721').strip()
+        codigo = _normalizar_codigo_iva(row.get('codigo') or '9')
         if codigo not in CODIGOS_IVA_VIGENTES:
             raise ValidationError(f'Código de retención IVA no vigente o no permitido: {codigo}.')
         base = _to_decimal(row.get('base'))
@@ -114,7 +137,7 @@ def _normalizar_detalles_payload(renta_rows: list[dict], iva_rows: list[dict], f
         porcentaje_2 = Decimal(str(porcentaje)).quantize(Decimal('0.00'))
         if porcentaje_2 not in PORCENTAJES_IVA_RETENCION_PERMITIDOS:
             raise ValidationError(
-                'El porcentaje de retención de IVA debe ser uno de: 10%, 20%, 30%, 50% o 70%.'
+                'El porcentaje de retención de IVA debe ser uno de: 10%, 20%, 30%, 50%, 70% o 100%.'
             )
         if base > 0 and porcentaje > 0:
             detalles.append(
@@ -134,8 +157,11 @@ def _normalizar_detalles_payload(renta_rows: list[dict], iva_rows: list[dict], f
     renta_base = form.cleaned_data.get('renta_base') or Decimal('0.00')
     renta_codigo = (form.cleaned_data.get('codigo_renta') or '304B').strip()
     renta_porcentaje = form.cleaned_data.get('renta_porcentaje') or Decimal('0.00')
-    if renta_porcentaje <= 0:
-        renta_porcentaje = porcentaje_renta_sugerido(renta_codigo)
+    renta_porcentaje_sri = porcentaje_renta_sugerido(renta_codigo)
+    if renta_codigo not in CODIGOS_RENTA_PORCENTAJE_VARIABLE and renta_porcentaje_sri > 0:
+        renta_porcentaje = renta_porcentaje_sri
+    elif renta_porcentaje <= 0:
+        renta_porcentaje = renta_porcentaje_sri
     if renta_base > 0 and renta_porcentaje > 0:
         detalles.append(
             {
@@ -149,14 +175,14 @@ def _normalizar_detalles_payload(renta_rows: list[dict], iva_rows: list[dict], f
         )
 
     iva_base = form.cleaned_data.get('iva_base') or Decimal('0.00')
-    iva_codigo = (form.cleaned_data.get('codigo_iva') or '721').strip()
+    iva_codigo = _normalizar_codigo_iva(form.cleaned_data.get('codigo_iva') or '9')
     if iva_codigo not in CODIGOS_IVA_VIGENTES:
         raise ValidationError(f'Código de retención IVA no vigente o no permitido: {iva_codigo}.')
     iva_porcentaje = porcentaje_iva_por_codigo(iva_codigo)
     iva_porcentaje_2 = Decimal(str(iva_porcentaje)).quantize(Decimal('0.00'))
     if iva_porcentaje_2 not in PORCENTAJES_IVA_RETENCION_PERMITIDOS:
         raise ValidationError(
-            'El porcentaje de retención de IVA debe ser uno de: 10%, 20%, 30%, 50% o 70%.'
+            'El porcentaje de retención de IVA debe ser uno de: 10%, 20%, 30%, 50%, 70% o 100%.'
         )
     if iva_base > 0 and iva_porcentaje > 0:
         detalles.append(

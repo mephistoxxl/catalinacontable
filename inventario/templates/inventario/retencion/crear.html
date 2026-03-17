@@ -374,11 +374,12 @@ label {
                             <div class="flex-[2]">
                                 <label>Concepto</label>
                                 <select name="codigo_iva" id="codigo_iva_select">
-                                    <option value="721" {% if form.codigo_iva.value == '721' or not form.codigo_iva.value %}selected{% endif %}>9-721 721 10 % Retención Iva</option>
-                                    <option value="723" {% if form.codigo_iva.value == '723' %}selected{% endif %}>10-723 723 20 % Retención Iva</option>
-                                    <option value="725" {% if form.codigo_iva.value == '725' %}selected{% endif %}>1-725 725 30 % Retención Iva</option>
-                                    <option value="727" {% if form.codigo_iva.value == '727' %}selected{% endif %}>11-727 727 50 % Retención Iva</option>
-                                    <option value="7" {% if form.codigo_iva.value == '7' %}selected{% endif %}>7 70 % Retención Iva en Cero</option>
+                                    <option value="9" {% if form.codigo_iva.value == '9' or form.codigo_iva.value == '721' or not form.codigo_iva.value %}selected{% endif %}>9 - 10% Retención IVA</option>
+                                    <option value="10" {% if form.codigo_iva.value == '10' or form.codigo_iva.value == '723' %}selected{% endif %}>10 - 20% Retención IVA</option>
+                                    <option value="1" {% if form.codigo_iva.value == '1' or form.codigo_iva.value == '725' %}selected{% endif %}>1 - 30% Retención IVA</option>
+                                    <option value="11" {% if form.codigo_iva.value == '11' or form.codigo_iva.value == '727' or form.codigo_iva.value == '731' %}selected{% endif %}>11 - 50% Retención IVA</option>
+                                    <option value="2" {% if form.codigo_iva.value == '2' or form.codigo_iva.value == '7' %}selected{% endif %}>2 - 70% Retención IVA</option>
+                                    <option value="3" {% if form.codigo_iva.value == '3' or form.codigo_iva.value == '729' %}selected{% endif %}>3 - 100% Retención IVA</option>
                                 </select>
                             </div>
                             <div class="flex-1">
@@ -487,11 +488,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     const mapaPorcentajesIva = {
-        '721': '10.00',
-        '723': '20.00',
-        '725': '30.00',
-        '727': '50.00',
-        '7': '70.00',
+        '9': '10.00',
+        '10': '20.00',
+        '1': '30.00',
+        '11': '50.00',
+        '2': '70.00',
+        '3': '100.00',
     };
 
     // Porcentajes automáticos para conceptos de retención Renta
@@ -527,7 +529,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '323P': '3.00',
         '324A': '2.00',
         '324B': '2.00',
-        '332': '2.75',
+        '332': '0.00',
         '332A': '0.00',
         '332B': '0.00',
         '332C': '0.00',
@@ -540,12 +542,12 @@ document.addEventListener('DOMContentLoaded', function () {
         '335': '15.00',
         '338': '1.00',
         '340': '3.00',
-        '343': '8.00',
+        '343': '1.00',
         '343A': '2.00',
         '343B': '2.00',
         '343C': '2.00',
         '344': '3.00',
-        '3440': '10.00',
+        '3440': '3.00',
         '344A': '2.00',
         '346': '0.00',
         '3482': '5.00',

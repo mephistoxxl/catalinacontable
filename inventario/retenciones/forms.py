@@ -17,7 +17,7 @@ class ComprobanteRetencionForm(forms.ModelForm):
 
     iva_base = forms.DecimalField(required=False, min_value=0, decimal_places=2, max_digits=20, initial=Decimal("0.00"))
     iva_porcentaje = forms.DecimalField(required=False, min_value=0, decimal_places=4, max_digits=7, initial=Decimal("0.00"))
-    codigo_iva = forms.CharField(required=False, max_length=10, initial="721")
+    codigo_iva = forms.CharField(required=False, max_length=10, initial="9")
 
     class Meta:
         model = ComprobanteRetencion
