@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from io import BytesIO
 from types import SimpleNamespace
+from xml.sax.saxutils import escape
 
 from django.utils import timezone
 
@@ -87,6 +88,39 @@ class _RetencionFacturaAdapter:
         self.totales_impuestos = _EmptyManager()
         self.formas_pago = _EmptyManager()
         self.empresa = retencion.empresa
+        self.ride_total_label = 'TOTAL RETENIDO'
+        self.ride_detalle_headers = [
+            'Comprob ante',
+            'Numero',
+            'Fecha emision',
+            'Ejercicio fiscal',
+            'Base imponible',
+            'Impuesto',
+            'Codigo',
+            '%Retencion',
+            'Valor',
+        ]
+        self.ride_detalle_col_widths = [0.12, 0.14, 0.11, 0.11, 0.11, 0.09, 0.08, 0.10, 0.14]
+        self.ride_detalle_numeric_cols = [4, 7, 8]
+
+        info_lines = []
+        direccion = getattr(self.cliente, 'direccion', '') or ''
+        telefono = getattr(self.cliente, 'telefono', '') or ''
+        correo = getattr(self.cliente, 'correo', '') or ''
+        if direccion:
+            info_lines.append(f"Dirección: {direccion}")
+        if telefono:
+            info_lines.append(f"Teléfono: {telefono}")
+        if correo:
+            info_lines.append(f"Email: {correo}")
+
+        sanitized_lines = []
+        for line in info_lines:
+            if 'anfibius' in line.lower():
+                continue
+            sanitized_lines.append(escape(line))
+
+        self.ride_info_adicional_text = '<br/>'.join(sanitized_lines)
 
         # Mantener el encabezado del RIDE consistente cuando ya fue autorizada.
         if (getattr(retencion, 'estado_sri', '') or '').upper() == 'AUTORIZADA':
@@ -98,10 +132,23 @@ class _RetencionFacturaAdapter:
 
 
 class _DetalleRetencionAdapter:
-    def __init__(self, detalle):
+    def __init__(self, detalle, retencion):
         base = f"{detalle.base_imponible:.2f}"
-        porcentaje = f"{detalle.porcentaje_retener:.4f}"
+        porcentaje = f"{detalle.porcentaje_retener:.2f}"
         valor = f"{detalle.valor_retenido:.2f}"
+        fecha_doc = getattr(retencion, 'fecha_emision', None)
+        fecha_doc_txt = fecha_doc.strftime('%d/%m/%Y') if fecha_doc else ''
+        ejercicio_fiscal = fecha_doc.strftime('%m/%Y') if fecha_doc else ''
+        tipo_doc = {
+            '01': 'FACTURA',
+            '03': 'LIQUIDACION',
+            '05': 'NOTA DE DEBITO',
+        }.get(getattr(retencion, 'tipo_documento_sustento', ''), 'DOCUMENTO')
+        numero_doc = (
+            f"{str(getattr(retencion, 'establecimiento_doc', '001')).zfill(3)}"
+            f"{str(getattr(retencion, 'punto_emision_doc', '001')).zfill(3)}"
+            f"{str(getattr(retencion, 'secuencia_doc', '000000001')).zfill(9)}"
+        )
         self.codigo_principal = f"{detalle.tipo_impuesto}-{detalle.codigo_retencion}"
         self.cantidad = 1
         self.unidad_medida = 'UND'
@@ -113,6 +160,17 @@ class _DetalleRetencionAdapter:
         self.descuento = 0
         self.producto = None
         self.servicio = None
+        self.ride_row_values = [
+            tipo_doc,
+            numero_doc,
+            fecha_doc_txt,
+            ejercicio_fiscal,
+            base,
+            detalle.tipo_impuesto,
+            str(detalle.codigo_retencion),
+            porcentaje,
+            valor,
+        ]
 
 
 class RIDERetencionGenerator:
@@ -122,7 +180,7 @@ class RIDERetencionGenerator:
 
     def generar_pdf(self):
         factura_adapter = _RetencionFacturaAdapter(self.retencion)
-        detalles = [_DetalleRetencionAdapter(d) for d in self.retencion.detalles.all().order_by('id')]
+        detalles = [_DetalleRetencionAdapter(d, self.retencion) for d in self.retencion.detalles.all().order_by('id')]
 
         ride = RIDEGenerator()
         pdf_bytes = ride.generar_ride_factura(

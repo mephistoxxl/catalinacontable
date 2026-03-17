@@ -525,75 +525,99 @@ class RIDEGenerator:
             # Separar tabla de productos
             elementos.append(Spacer(1, 6*mm))
 
-            # === TABLA DE PRODUCTOS ===
-            headers = [
-                Paragraph('<b>Cod. Principal</b>', self.styles['CabeceraBlanca']),
-                Paragraph('<b>Cantidad</b>', self.styles['CabeceraBlanca']),
-                Paragraph('<b>UND</b>', self.styles['CabeceraBlanca']),
-                Paragraph('<b>Descripción</b>', self.styles['CabeceraBlanca']),
-                Paragraph('<b>Precio Unitario</b>', self.styles['CabeceraBlanca']),
-                Paragraph('<b>Descuento</b>', self.styles['CabeceraBlanca']),
-                Paragraph('<b>Precio Total</b>', self.styles['CabeceraBlanca'])
-            ]
-            tabla_data = [headers]
-            for detalle in detalles:
-                cod_principal = getattr(detalle, 'codigo_principal', None)
-                if not cod_principal:
-                    if detalle.producto:
-                        cod_principal = detalle.producto.codigo
-                    elif detalle.servicio:
-                        cod_principal = detalle.servicio.codigo
+            # === TABLA DE DETALLES ===
+            custom_headers = getattr(factura, 'ride_detalle_headers', None)
+            custom_col_widths = getattr(factura, 'ride_detalle_col_widths', None)
+            custom_numeric_cols = set(getattr(factura, 'ride_detalle_numeric_cols', []))
 
-                # ✅ PROTECCIÓN: Asegurar que valores numéricos no sean None
-                cantidad_raw = getattr(detalle, 'cantidad', 1)
-                cantidad_val = float(cantidad_raw) if cantidad_raw is not None else 1.0
-                cantidad = f"{cantidad_val:.2f}"
-                unidad = getattr(detalle, 'unidad_medida', 'UND') or 'UND'
+            if custom_headers:
+                headers = [Paragraph(f'<b>{h}</b>', self.styles['CabeceraBlanca']) for h in custom_headers]
+                tabla_data = [headers]
+                for detalle in detalles:
+                    row_values = getattr(detalle, 'ride_row_values', None)
+                    if not row_values:
+                        continue
+                    fila = []
+                    for idx, value in enumerate(row_values):
+                        style = self.styles['NumericoDecimals'] if idx in custom_numeric_cols else self.styles['Campo']
+                        fila.append(Paragraph(str(value), style))
+                    tabla_data.append(fila)
 
-                descripcion = getattr(detalle, 'descripcion', None)
-                if not descripcion:
-                    if detalle.producto:
-                        descripcion = detalle.producto.descripcion
-                    elif detalle.servicio:
-                        descripcion = detalle.servicio.descripcion
-                    else:
-                        descripcion = str(detalle)
-
-                # ✅ PROTECCIÓN: Obtener precio_unitario con fallbacks seguros
-                precio_unitario_raw = getattr(detalle, 'precio_unitario', None)
-                if precio_unitario_raw is None:
-                    precio_unitario_raw = getattr(detalle, 'precio', None)
-                if precio_unitario_raw is None:
-                    if detalle.producto:
-                        precio_unitario_raw = detalle.producto.precio
-                    elif detalle.servicio:
-                        precio_unitario_raw = detalle.servicio.precio1
-                precio_unitario_val = float(precio_unitario_raw) if precio_unitario_raw is not None else 0.0
-                
-                descuento_raw = getattr(detalle, 'descuento', 0)
-                descuento_val = float(descuento_raw) if descuento_raw is not None else 0.0
-                
-                precio_unitario = f"${precio_unitario_val:.2f}"
-                descuento = f"${descuento_val:.2f}"
-                # Calculate subtotal without IVA: (precio_unitario * cantidad) - descuento
-                subtotal = (precio_unitario_val * cantidad_val) - descuento_val
-                precio_total = f"${subtotal:.2f}"
-                fila = [
-                    Paragraph(str(cod_principal), self.styles['Campo']),
-                    Paragraph(str(cantidad), self.styles['Campo']),
-                    Paragraph(str(unidad), self.styles['Campo']),
-                    Paragraph(str(descripcion), self.styles['Campo']),
-                    Paragraph(str(precio_unitario), self.styles['NumericoDecimals']),
-                    Paragraph(str(descuento), self.styles['NumericoDecimals']),
-                    Paragraph(str(precio_total), self.styles['NumericoDecimals'])
+                ancho_tabla = ANCHO_TOTAL_TABLA * mm
+                if custom_col_widths and len(custom_col_widths) == len(custom_headers):
+                    col_widths = [ancho_tabla * float(w) for w in custom_col_widths]
+                else:
+                    col_widths = [ancho_tabla / len(custom_headers)] * len(custom_headers)
+                tabla_productos = Table(tabla_data, colWidths=col_widths)
+            else:
+                headers = [
+                    Paragraph('<b>Cod. Principal</b>', self.styles['CabeceraBlanca']),
+                    Paragraph('<b>Cantidad</b>', self.styles['CabeceraBlanca']),
+                    Paragraph('<b>UND</b>', self.styles['CabeceraBlanca']),
+                    Paragraph('<b>Descripción</b>', self.styles['CabeceraBlanca']),
+                    Paragraph('<b>Precio Unitario</b>', self.styles['CabeceraBlanca']),
+                    Paragraph('<b>Descuento</b>', self.styles['CabeceraBlanca']),
+                    Paragraph('<b>Precio Total</b>', self.styles['CabeceraBlanca'])
                 ]
-                tabla_data.append(fila)
-            # Ejemplo para la tabla de productos
-            ancho_tabla = ANCHO_TOTAL_TABLA * mm
-            tabla_productos = Table(tabla_data, colWidths=[
-                ancho_tabla*0.11, ancho_tabla*0.09, ancho_tabla*0.06,
-                ancho_tabla*0.38, ancho_tabla*0.12, ancho_tabla*0.09, ancho_tabla*0.15
-            ])
+                tabla_data = [headers]
+                for detalle in detalles:
+                    cod_principal = getattr(detalle, 'codigo_principal', None)
+                    if not cod_principal:
+                        if detalle.producto:
+                            cod_principal = detalle.producto.codigo
+                        elif detalle.servicio:
+                            cod_principal = detalle.servicio.codigo
+
+                    # ✅ PROTECCIÓN: Asegurar que valores numéricos no sean None
+                    cantidad_raw = getattr(detalle, 'cantidad', 1)
+                    cantidad_val = float(cantidad_raw) if cantidad_raw is not None else 1.0
+                    cantidad = f"{cantidad_val:.2f}"
+                    unidad = getattr(detalle, 'unidad_medida', 'UND') or 'UND'
+
+                    descripcion = getattr(detalle, 'descripcion', None)
+                    if not descripcion:
+                        if detalle.producto:
+                            descripcion = detalle.producto.descripcion
+                        elif detalle.servicio:
+                            descripcion = detalle.servicio.descripcion
+                        else:
+                            descripcion = str(detalle)
+
+                    # ✅ PROTECCIÓN: Obtener precio_unitario con fallbacks seguros
+                    precio_unitario_raw = getattr(detalle, 'precio_unitario', None)
+                    if precio_unitario_raw is None:
+                        precio_unitario_raw = getattr(detalle, 'precio', None)
+                    if precio_unitario_raw is None:
+                        if detalle.producto:
+                            precio_unitario_raw = detalle.producto.precio
+                        elif detalle.servicio:
+                            precio_unitario_raw = detalle.servicio.precio1
+                    precio_unitario_val = float(precio_unitario_raw) if precio_unitario_raw is not None else 0.0
+                    
+                    descuento_raw = getattr(detalle, 'descuento', 0)
+                    descuento_val = float(descuento_raw) if descuento_raw is not None else 0.0
+                    
+                    precio_unitario = f"${precio_unitario_val:.2f}"
+                    descuento = f"${descuento_val:.2f}"
+                    # Calculate subtotal without IVA: (precio_unitario * cantidad) - descuento
+                    subtotal = (precio_unitario_val * cantidad_val) - descuento_val
+                    precio_total = f"${subtotal:.2f}"
+                    fila = [
+                        Paragraph(str(cod_principal), self.styles['Campo']),
+                        Paragraph(str(cantidad), self.styles['Campo']),
+                        Paragraph(str(unidad), self.styles['Campo']),
+                        Paragraph(str(descripcion), self.styles['Campo']),
+                        Paragraph(str(precio_unitario), self.styles['NumericoDecimals']),
+                        Paragraph(str(descuento), self.styles['NumericoDecimals']),
+                        Paragraph(str(precio_total), self.styles['NumericoDecimals'])
+                    ]
+                    tabla_data.append(fila)
+                # Ejemplo para la tabla de productos
+                ancho_tabla = ANCHO_TOTAL_TABLA * mm
+                tabla_productos = Table(tabla_data, colWidths=[
+                    ancho_tabla*0.11, ancho_tabla*0.09, ancho_tabla*0.06,
+                    ancho_tabla*0.38, ancho_tabla*0.12, ancho_tabla*0.09, ancho_tabla*0.15
+                ])
             tabla_productos.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
@@ -631,11 +655,18 @@ class RIDEGenerator:
             empresa_telefono = getattr(empresa_config, 'telefono', 'N/A') if empresa_config else 'N/A'
             empresa_correo = getattr(empresa_config, 'correo', 'N/A') if empresa_config else 'N/A'
             
-            info_adicional = f"""
-            <b>Información Adicional</b><br/>
-            Vendedor: {facturador_nombre}<br/>
-            Sistema: Catalina Fact
-            """
+            info_adicional_custom = getattr(factura, 'ride_info_adicional_text', None)
+            if info_adicional_custom:
+                info_adicional = f"""
+                <b>Información Adicional</b><br/>
+                {info_adicional_custom}
+                """
+            else:
+                info_adicional = f"""
+                <b>Información Adicional</b><br/>
+                Vendedor: {facturador_nombre}<br/>
+                Sistema: Catalina Fact
+                """
 
             # --- TOTALES DINÁMICOS E INTELIGENTES ---
             totales_labels = []
@@ -701,7 +732,8 @@ class RIDEGenerator:
             # Valor total (siempre)
             total_factura = getattr(factura, 'total', None)
             total_val = float(total_factura) if total_factura is not None else 0.0
-            totales_labels.append('VALOR TOTAL')
+            total_label = getattr(factura, 'ride_total_label', 'VALOR TOTAL')
+            totales_labels.append(str(total_label))
             totales_values.append(f"{total_val:.2f}")
 
             totales_text = '<br/>'.join(totales_labels)
