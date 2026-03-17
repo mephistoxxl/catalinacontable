@@ -1055,8 +1055,9 @@
     'use strict';
 
     const MSG_PROV_IDENT_EMPTY = '{{ _("Ingrese la identificación antes de consultar.")|escapejs }}';
-    const MSG_PROV_TIPO_INVALIDO = '{{ _("Seleccione Cédula (05) o RUC (04) para consultar.")|escapejs }}';
+    const MSG_PROV_TIPO_INVALIDO = '{{ _("Para Liquidación de Compra solo aplica Cédula (05).")|escapejs }}';
     const MSG_PROV_LONGITUD_INVALIDA = '{{ _("La identificación ingresada no tiene el número de dígitos esperado.")|escapejs }}';
+    const MSG_PROV_RUC_NO_PERMITIDO = '{{ _("Si la identificación tiene 13 dígitos (RUC), corresponde Factura y no Liquidación de Compra.")|escapejs }}';
     const MSG_PROV_NO_RESULTADOS = '{{ _("No se encontraron datos para la identificación ingresada.")|escapejs }}';
     const MSG_PROV_ERROR = '{{ _("No se pudo consultar la identificación. Inténtelo nuevamente.")|escapejs }}';
     const MSG_PROV_EXITO = '{{ _("Datos del proveedor cargados correctamente.")|escapejs }}';
@@ -1201,77 +1202,23 @@
       }
 
       let consultaEnProgreso = false;
-      let ultimaConsulta = 0;
-      const DEBOUNCE_MS = 800;
-      let timeoutId = null;
 
-      // Función para detectar automáticamente el tipo según la longitud
+      // En liquidación de compra solo se permite cédula de 10 dígitos.
       function detectarTipoIdentificacion(identificacion) {
-        const longitud = identificacion.length;
-        if (longitud === 13) {
-          return '04'; // RUC
-        } else if (longitud === 10) {
-          return '05'; // Cédula
-        }
-        return null;
-      }
-
-      // Función para consultar automáticamente
-      async function consultarAutomatico() {
-        if (consultaEnProgreso) {
-          return;
-        }
-
-        const identificacion = identificacionInput.value.trim();
-        
-        if (!identificacion || identificacion.length < 10) {
-          return;
-        }
-
-        const tipo = detectarTipoIdentificacion(identificacion);
-        if (!tipo) {
-          return;
-        }
-
-        // Actualizar el select automáticamente
-        tipoSelect.value = tipo;
-
-        const ahora = Date.now();
-        if (ahora - ultimaConsulta < DEBOUNCE_MS) {
-          return;
-        }
-        ultimaConsulta = ahora;
-
-        consultaEnProgreso = true;
-        botonBuscar.disabled = true;
-        botonBuscar.classList.add('opacity-70', 'cursor-not-allowed');
-
-        try {
-          await consultarIdentificacionProveedor(identificacion, tipo);
-        } finally {
-          consultaEnProgreso = false;
-          botonBuscar.disabled = false;
-          botonBuscar.classList.remove('opacity-70', 'cursor-not-allowed');
-        }
+        return identificacion.length === 10 ? '05' : null;
       }
 
       // Listener para detectar cuando se ingresa la identificación completa
       identificacionInput.addEventListener('input', () => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
+        // Solo permitir dígitos y máximo 10 caracteres en la caja.
+        identificacionInput.value = (identificacionInput.value || '').replace(/\D/g, '').slice(0, 10);
 
         const identificacion = identificacionInput.value.trim();
         const tipo = detectarTipoIdentificacion(identificacion);
         
-        // Actualizar el select automáticamente
+        // Solo sincroniza el tipo; no consulta API automáticamente.
         if (tipo) {
           tipoSelect.value = tipo;
-          
-          // Consultar automáticamente después de un pequeño delay
-          timeoutId = setTimeout(() => {
-            consultarAutomatico();
-          }, DEBOUNCE_MS);
         }
       });
 
@@ -1291,9 +1238,15 @@
           return;
         }
 
+        if (identificacion.length === 13) {
+          mostrarMensajeProveedor(MSG_PROV_RUC_NO_PERMITIDO, 'warning');
+          identificacionInput.focus();
+          return;
+        }
+
         const tipo = detectarTipoIdentificacion(identificacion);
         if (!tipo) {
-          mostrarMensajeProveedor('Ingrese una cédula (10 dígitos) o RUC (13 dígitos) válido', 'warning');
+          mostrarMensajeProveedor('Ingrese una cédula válida de 10 dígitos', 'warning');
           identificacionInput.focus();
           return;
         }
@@ -1313,17 +1266,10 @@
         }
       });
 
-      // También permitir búsqueda con Enter (con validación)
+      // Evitar consulta con Enter: solo con clic en "Buscar".
       identificacionInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          const identificacion = identificacionInput.value.trim();
-          // Solo buscar si tiene al menos 10 caracteres (cédula mínima)
-          if (identificacion.length >= 10) {
-            botonBuscar.click();
-          } else {
-            mostrarMensajeProveedor('Ingrese al menos 10 dígitos para buscar', 'warning');
-          }
         }
       });
     }

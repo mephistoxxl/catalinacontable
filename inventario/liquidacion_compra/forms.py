@@ -48,12 +48,15 @@ class LiquidacionCompraForm(forms.ModelForm):
     )
     beneficiario_identificacion = forms.CharField(
         label=_("C.I. / Identificación"),
-        max_length=13,
+        max_length=10,
         widget=forms.TextInput(
             attrs={
                 "class": "form-control",
-                "maxlength": "13",
-                "placeholder": _("Ingrese identificación"),
+                "maxlength": "10",
+                "minlength": "10",
+                "inputmode": "numeric",
+                "pattern": r"\d{10}",
+                "placeholder": _("Ingrese cédula (10 dígitos)"),
             }
         ),
     )
@@ -297,13 +300,31 @@ class LiquidacionCompraForm(forms.ModelForm):
         if self.errors:
             return cleaned_data
 
-        if tipo_id == "05" and len(identificacion) not in (10, 13):
-            self.add_error("beneficiario_identificacion", _("La cédula debe tener 10 o 13 dígitos."))
-        if tipo_id == "04" and len(identificacion) != 13:
-            self.add_error("beneficiario_identificacion", _("El RUC debe tener 13 dígitos."))
+        if tipo_id == "04":
+            self.add_error(
+                "beneficiario_identificacion",
+                _("Para Liquidación de Compra no corresponde RUC. Debe ingresar cédula (10 dígitos); si tiene RUC solicite Factura."),
+            )
+
+        if identificacion.isdigit() and len(identificacion) == 13:
+            self.add_error(
+                "beneficiario_identificacion",
+                _("La identificación ingresada es RUC (13 dígitos). Para este caso corresponde Factura, no Liquidación de Compra."),
+            )
+
+        if not identificacion.isdigit() or len(identificacion) != 10:
+            self.add_error(
+                "beneficiario_identificacion",
+                _("Para Liquidación de Compra debe ingresar una cédula válida de 10 dígitos."),
+            )
 
         if self.errors:
             return cleaned_data
+
+        # Campo oculto: normalizar a cédula cuando la identificación ya es válida de 10 dígitos.
+        if identificacion.isdigit() and len(identificacion) == 10:
+            tipo_id = "05"
+            cleaned_data["beneficiario_tipo_identificacion"] = "05"
 
         if not self.empresa:
             raise forms.ValidationError(_("No se pudo determinar la empresa activa para la liquidación."))
