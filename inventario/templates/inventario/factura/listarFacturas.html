@@ -289,7 +289,7 @@
                                         </button>
                                         <div class="dropdown-panel hidden" id="facturas-dropdown-panel-{{ forloop.counter }}">
                                             <div class="py-1">
-                                                <a href="/inventario/verFactura/{{ fila.id }}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                                <a href="/inventario/verFactura/{{ fila.id }}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900 no-underline" style="text-decoration:none;">
                                                     <i class="fa fa-eye mr-2 text-blue-500 action-icon"></i>
                                                     <span>Editar/Ver</span>
                                                 </a>
@@ -346,15 +346,15 @@
                                                 </button>
                                                 {% endif %}
                                                 <div class="border-t border-gray-100"></div>
-                                                <a href="/inventario/generarFactura/{{ fila.id }}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                                <a href="/inventario/generarFactura/{{ fila.id }}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900 no-underline" style="text-decoration:none;">
                                                     <i class="fa fa-file-text-o mr-2 text-gray-500 action-icon"></i>
                                                     <span>CSV</span>
                                                 </a>
-                                                <a href="{% url 'inventario:generarFacturaPDF' fila.id %}" class="flex items-center px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 hover:text-red-700" target="_blank">
+                                                <a href="{% url 'inventario:generarFacturaPDF' fila.id %}" class="flex items-center px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 no-underline" style="text-decoration:none;" target="_blank">
                                                     <i class="fa fa-file-pdf-o mr-2 text-red-500 action-icon"></i>
                                                     <span>PDF</span>
                                                 </a>
-                                                <a href="/inventario/sri/xml/{{ fila.id }}" class="flex items-center px-3 py-1.5 text-xs text-purple-700 hover:bg-purple-50 hover:text-purple-900" target="_blank">
+                                                <a href="/inventario/sri/xml/{{ fila.id }}" class="flex items-center px-3 py-1.5 text-xs text-purple-700 hover:bg-purple-50 hover:text-purple-900 no-underline" style="text-decoration:none;" target="_blank">
                                                     <i class="fa fa-file-code-o mr-2 text-purple-500 action-icon"></i>
                                                     <span>XML</span>
                                                 </a>
