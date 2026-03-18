@@ -155,7 +155,7 @@ else:
             "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
         },
     }
-    print("⚠️ Usando almacenamiento local - Los archivos se pueden perder en Heroku")
+    print("ADVERTENCIA: Usando almacenamiento local - Los archivos se pueden perder en Heroku")
 
 # ✅ Configuración de WhiteNoise - No fallar por archivos faltantes en CSS
 WHITENOISE_MANIFEST_STRICT = False
@@ -359,6 +359,7 @@ INSTALLED_APPS = [
     'django_rq',
     'axes',
     'inventario.apps.InventarioConfig',
+    'cxc',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -441,7 +442,7 @@ AXES_META_PRECEDENCE_ORDER = ['HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR']
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'cxc', 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

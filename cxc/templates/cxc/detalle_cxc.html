@@ -1,0 +1,168 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+<style>
+    /* Tabla compacta */
+    .tabla-compacta th {
+        padding: 8px 12px !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        background-color: #f9fafb !important;
+        border-bottom: 1px solid #e5e7eb !important;
+    }
+    .tabla-compacta td {
+        padding: 6px 12px !important;
+        font-size: 12px !important;
+        border-bottom: 1px solid #f3f4f6 !important;
+    }
+</style>
+
+<div class="bg-gray-50 p-3" style="padding-top: 8px; padding-bottom: 12px; min-height: 80vh;">
+    <div class="max-w-5xl mx-auto">
+        
+        <div class="flex items-center justify-between mb-4 mt-2">
+            <div class="flex items-center gap-2">
+                <div class="bg-white p-2 rounded-lg shadow-sm border border-gray-100">
+                    <i class="fa fa-file-text-o text-blue-600 text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-gray-800 leading-tight">Detalles de Deuda</h3>
+                    <p class="text-xs text-gray-500">Información de la Cuenta por Cobrar</p>
+                </div>
+            </div>
+            <a href="{% url 'cxc:lista_cuentas' %}" class="px-3 py-1.5 text-xs bg-white shadow-sm border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors no-underline font-medium">
+                <i class="fa fa-arrow-left mr-1"></i> Volver al Listado
+            </a>
+        </div>
+
+        <!-- Info Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+            <!-- Datos Generales -->
+            <div class="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transform transition duration-200">
+                <div class="bg-gray-50 px-4 py-3 border-b border-gray-100">
+                    <h4 class="text-xs font-bold text-gray-600 uppercase tracking-wider flex items-center">
+                        <i class="fa fa-user mr-2"></i> Cliente y Documento
+                    </h4>
+                </div>
+                <div class="p-4 space-y-3 text-sm text-gray-700">
+                    <div class="flex justify-between border-b border-gray-50 pb-2">
+                        <span class="text-gray-500 text-xs">Cliente:</span>
+                        <span class="font-semibold text-gray-900 text-right">{{ cuenta.cliente.razon_social }}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-50 pb-2">
+                        <span class="text-gray-500 text-xs">Identificación (RUC/CI):</span>
+                        <span class="font-medium text-gray-900 text-right">{{ cuenta.cliente.identificacion }}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-50 pb-2">
+                        <span class="text-gray-500 text-xs">Doc. Relacionado:</span>
+                        <span class="font-medium text-blue-600 text-right">
+                            {% if cuenta.factura %}
+                                Factura #{{ cuenta.factura.establecimiento|default:"000" }}-{{ cuenta.factura.punto_emision|default:"000" }}-{{ cuenta.factura.secuencia|default:cuenta.factura.id }}
+                            {% else %}
+                                Manual
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center pt-1">
+                        <span class="text-gray-500 text-xs font-medium">Total Facturado original:</span>
+                        <span class="font-bold text-gray-900 text-lg">${{ cuenta.monto_total|floatformat:2 }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estado de Cuenta -->
+            <div class="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden relative">
+                <div class="bg-gray-50 px-4 py-3 border-b border-gray-100">
+                    <h4 class="text-xs font-bold text-gray-600 uppercase tracking-wider flex items-center">
+                        <i class="fa fa-pie-chart mr-2"></i> Resumen de Cuenta
+                    </h4>
+                </div>
+                <div class="p-4 space-y-3 text-sm text-gray-700">
+                    <div class="flex justify-between border-b border-gray-50 pb-2">
+                        <span class="text-gray-500 text-xs">F. de Emisión:</span>
+                        <span class="font-medium text-gray-900">{{ cuenta.fecha_emision|date:"d/m/Y" }}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-50 pb-2">
+                        <span class="text-gray-500 text-xs text-red-500">F. de Vencimiento:</span>
+                        <span class="font-bold text-red-600">{{ cuenta.fecha_vencimiento|date:"d/m/Y" }}</span>
+                    </div>
+                    
+                    <div class="mt-4 pt-3 flex justify-between items-end">
+                        <div>
+                            <p class="text-[10px] uppercase tracking-wider font-bold text-gray-400 mb-1">Estado</p>
+                            {% if cuenta.estado == 'PENDIENTE' %}
+                                <span class="inline-flex items-center px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-xs font-bold border border-yellow-200 shadow-sm"><i class="fa fa-clock-o mr-1"></i> PENDIENTE</span>
+                            {% elif cuenta.estado == 'PAGADA_PARCIAL' %}
+                                <span class="inline-flex items-center px-2 py-1 rounded bg-blue-100 text-blue-800 text-xs font-bold border border-blue-200 shadow-sm"><i class="fa fa-adjust mr-1"></i> PAGO PARCIAL</span>
+                            {% elif cuenta.estado == 'PAGADA' %}
+                                <span class="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-bold border border-green-200 shadow-sm"><i class="fa fa-check-circle mr-1"></i> PAGADA</span>
+                            {% elif cuenta.estado == 'VENCIDA' %}
+                                <span class="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 text-xs font-bold border border-red-200 shadow-sm"><i class="fa fa-exclamation-circle mr-1"></i> VENCIDA</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[10px] uppercase tracking-wider font-bold text-gray-400 mb-0">Saldo Pendiente</p>
+                            <p class="text-3xl font-black {% if cuenta.saldo_pendiente > 0 %}text-red-500{% else %}text-green-500{% endif %} m-0 drop-shadow-sm">
+                                ${{ cuenta.saldo_pendiente|floatformat:2 }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Abonos Section -->
+        <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+            <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                <h4 class="text-sm font-bold text-gray-700 m-0"><i class="fa fa-history text-gray-400 mr-2"></i>Historial de Pagos Recibidos</h4>
+                {% if cuenta.saldo_pendiente > 0 %}
+                <a href="{% url 'cxc:nuevo_abono' cuenta.id %}" class="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 shadow-sm text-white rounded-lg transition-colors no-underline font-medium flex items-center border border-green-700">
+                    <i class="fa fa-plus mr-1"></i> Registrar Nuevo Pago
+                </a>
+                {% endif %}
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 tabla-compacta">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b">Recibo # / Fecha</th>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b">Método de Pago</th>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b">Comprobante / Referencia</th>
+                            <th class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider border-b">Valor Abonado</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-100">
+                        {% for abono in abonos %}
+                        <tr class="hover:bg-blue-50 transition-colors">
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-medium">
+                                <i class="fa fa-calendar-check-o text-green-500 mr-1"></i> {{ abono.fecha_pago|date:"d M Y" }}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded border border-gray-200 text-xs font-medium bg-gray-50 text-gray-700">
+                                    {{ abono.get_metodo_pago_display }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 italic">{{ abono.referencia_pago|default:"N/A" }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm font-black text-green-600 text-right">+ ${{ abono.monto|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="px-6 py-12 text-center">
+                                <div class="flex flex-col items-center justify-center">
+                                    <div class="bg-gray-100 p-4 rounded-full mb-3">
+                                        <i class="fa fa-folder-open-o text-3xl text-gray-400"></i>
+                                    </div>
+                                    <p class="text-sm font-medium text-gray-500">Aún no se han registrado abonos para esta factura.</p>
+                                    <p class="text-xs text-gray-400 mt-1">Cuando lo hagas, aparecerán en este historial.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
