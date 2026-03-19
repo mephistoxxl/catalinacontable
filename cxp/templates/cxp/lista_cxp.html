@@ -4,7 +4,7 @@
 <style>
     /* Compact helpers */
     .action-icon { font-size: 14px !important; width: 16px !important; height: 16px !important; line-height: 16px !important; display: inline-block !important; text-align: center !important; }
-    .cxc-dropdown-wrapper .dropdown-panel { position: absolute; right: 0; width: 11rem; background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); z-index: 9999; }
+    .cxp-dropdown-wrapper .dropdown-panel { position: absolute; right: 0; width: 11rem; background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); z-index: 9999; }
     
     /* Tabla compacta */
     .tabla-compacta th {
@@ -44,12 +44,13 @@
             <div class="p-3">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 space-y-2 sm:space-y-0 gap-3">
                     <div class="flex items-center gap-2">
-                        <i class="fa fa-money text-green-600 text-lg"></i>
-                        <h3 class="text-sm font-semibold text-gray-800">Cuentas por Cobrar (CxC)</h3>
+                        <i class="fa fa-shopping-cart text-red-600 text-lg"></i>
+                        <h3 class="text-sm font-semibold text-gray-800">Cuentas por Pagar (CxP)</h3>
                     </div>
                     <div class="flex items-center gap-2">
-                        <a href="#" class="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold py-1.5 px-3 rounded-md shadow-sm transition-colors flex items-center gap-1 no-underline" style="color: white !important; text-decoration: none !important;">
-                            <i class="fa fa-plus"></i> Agregar
+                        <!-- Boton agregar pendiente de implementar logica de creacion manual si se requiere, por ahora oculto o link a compra -->
+                        <a href="#" class="bg-gray-600 hover:bg-gray-700 text-white text-xs font-semibold py-1.5 px-3 rounded-md shadow-sm transition-colors flex items-center gap-1 no-underline" style="color: white !important; text-decoration: none !important; opacity: 0.5; cursor: not-allowed;">
+                            <i class="fa fa-plus"></i> Nueva Compra
                         </a>
                         <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-1.5 px-3 rounded-md shadow-sm transition-colors flex items-center gap-1 border-0" style="color: white !important;">
                             <i class="fa fa-print"></i> Imprimir
@@ -62,8 +63,8 @@
                     <table class="min-w-full divide-y divide-gray-200 tabla-compacta">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="text-left font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                                <th class="text-left font-medium text-gray-500 uppercase tracking-wider">Factura #</th>
+                                <th class="text-left font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
+                                <th class="text-left font-medium text-gray-500 uppercase tracking-wider">Documento / Ref</th>
                                 <th class="text-left font-medium text-gray-500 uppercase tracking-wider">F. Emisión</th>
                                 <th class="text-left font-medium text-gray-500 uppercase tracking-wider">Vencimiento</th>
                                 <th class="text-left font-medium text-gray-500 uppercase tracking-wider">Total</th>
@@ -75,13 +76,9 @@
                         <tbody class="bg-white divide-y divide-gray-200">
                             {% for cuenta in cuentas %}
                             <tr class="hover:bg-gray-50 transition-colors duration-150">
-                                <td class="whitespace-nowrap text-gray-900 font-medium">{{ cuenta.cliente.razon_social|truncatechars:35 }}</td>
+                                <td class="whitespace-nowrap text-gray-900 font-medium">{{ cuenta.proveedor.razon_social|truncatechars:35 }}</td>
                                 <td class="whitespace-nowrap text-gray-900">
-                                    {% if cuenta.factura %}
-                                        {{ cuenta.factura.establecimiento|default:"000" }}-{{ cuenta.factura.punto_emision|default:"000" }}-{{ cuenta.factura.secuencia|default:cuenta.factura.id }}
-                                    {% else %}
-                                        <span class="text-gray-500 italic">Manual</span>
-                                    {% endif %}
+                                    {{ cuenta.referencia_documento|default:"Manual" }}
                                 </td>
                                 <td class="whitespace-nowrap text-gray-900">{{ cuenta.fecha_emision|date:"d/m/Y" }}</td>
                                 <td class="whitespace-nowrap text-gray-900">{{ cuenta.fecha_vencimiento|date:"d/m/Y" }}</td>
@@ -109,19 +106,19 @@
                                     {% endif %}
                                 </td>
                                 <td class="whitespace-nowrap text-xs font-medium">
-                                    <div class="relative inline-block text-left cxc-dropdown-wrapper">
+                                    <div class="relative inline-block text-left cxp-dropdown-wrapper">
                                         <button type="button" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-2 py-1 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500" onclick="toggleDropdown(this)">
                                             Acciones <i class="fa fa-chevron-down ml-1 -mr-0.5 h-3 w-3"></i>
                                         </button>
                                         <div class="dropdown-panel hidden mt-1 right-0 absolute">
                                             <div class="py-1">
-                                                <a href="{% url 'cxc:detalle_cuenta' cuenta.id %}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900 no-underline" style="text-decoration:none;">
+                                                <a href="{% url 'cxp:detalle_cuenta' cuenta.id %}" class="flex items-center px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900 no-underline" style="text-decoration:none;">
                                                     <i class="fa fa-eye mr-2 text-blue-500 action-icon"></i>
                                                     <span>Ver Detalles</span>
                                                 </a>
                                                 {% if cuenta.saldo_pendiente > 0 %}
                                                 <div class="border-t border-gray-100 my-1"></div>
-                                                <a href="{% url 'cxc:nuevo_abono' cuenta.id %}" class="flex items-center px-3 py-1.5 text-xs text-green-700 hover:bg-green-50 hover:text-green-900 no-underline" style="text-decoration:none;">
+                                                <a href="{% url 'cxp:nuevo_pago' cuenta.id %}" class="flex items-center px-3 py-1.5 text-xs text-green-700 hover:bg-green-50 hover:text-green-900 no-underline" style="text-decoration:none;">
                                                     <i class="fa fa-money mr-2 text-green-500 action-icon"></i>
                                                     <span>Registrar Pago</span>
                                                 </a>
@@ -136,7 +133,7 @@
                                 <td colspan="8" class="px-6 py-12 text-center text-sm text-gray-500">
                                     <div class="flex flex-col items-center">
                                         <i class="fa fa-inbox text-4xl text-gray-300 mb-2"></i>
-                                        <p>No hay cuentas por cobrar registradas.</p>
+                                        <p>No hay cuentas por pagar registradas.</p>
                                     </div>
                                 </td>
                             </tr>
@@ -153,7 +150,7 @@
 <script>
     function toggleDropdown(btn) {
         // Cerrar todos los demás dropdowns
-        document.querySelectorAll('.cxc-dropdown-wrapper .dropdown-panel').forEach(panel => {
+        document.querySelectorAll('.cxp-dropdown-wrapper .dropdown-panel').forEach(panel => {
             if (panel !== btn.nextElementSibling) {
                 panel.classList.add('hidden');
             }
@@ -165,8 +162,8 @@
 
     // Cerrar si hace clic fuera del menú
     document.addEventListener('click', function(e) {
-        if (!e.target.closest('.cxc-dropdown-wrapper')) {
-            document.querySelectorAll('.cxc-dropdown-wrapper .dropdown-panel').forEach(panel => {
+        if (!e.target.closest('.cxp-dropdown-wrapper')) {
+            document.querySelectorAll('.cxp-dropdown-wrapper .dropdown-panel').forEach(panel => {
                 panel.classList.add('hidden');
             });
         }

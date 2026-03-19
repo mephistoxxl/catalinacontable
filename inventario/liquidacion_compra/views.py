@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+from datetime import timedelta
+from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -26,6 +28,7 @@ from .forms import (
 from .email_utils import enviar_email_automatico_liquidacion
 from .email_utils import liquidacion_esta_autorizada
 from .models import LiquidacionCompra
+from cxp.models import CuentaPagar
 
 
 class LiquidacionCompraListView(LoginRequiredMixin, RequireEmpresaActivaMixin, ListView):
@@ -137,6 +140,66 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
             "secuencia_info": secuencia_info,
         }
 
+    def _crear_cxp_si_credito(self, liquidacion: LiquidacionCompra) -> None:
+        """Crea CxP automáticamente cuando la liquidación tenga pagos con plazo (crédito)."""
+        pagos_credito = [
+            p for p in liquidacion.formas_pago.all()
+            if (
+                (p.plazo is not None and Decimal(str(p.plazo)) > Decimal("0.00"))
+                or str(p.forma_pago) in {"20", "19"}
+            )
+        ]
+        if not pagos_credito:
+            return
+
+        monto_credito = sum((p.total for p in pagos_credito), Decimal("0.00"))
+        if monto_credito <= Decimal("0.00"):
+            return
+
+        fecha_base = liquidacion.fecha_emision or timezone.localdate()
+        fecha_vencimiento = fecha_base
+
+        # Tomamos el mayor plazo de los pagos a crédito para vencimiento de la cuenta.
+        for pago in pagos_credito:
+            plazo_decimal = Decimal(str(pago.plazo or 0))
+            if plazo_decimal <= Decimal("0.00") and str(pago.forma_pago) in {"20", "19"}:
+                plazo_decimal = Decimal("30")
+            plazo_dias = int(plazo_decimal)
+            unidad = (pago.unidad_tiempo or "dias").strip().lower()
+
+            if unidad.startswith("mes"):
+                delta = timedelta(days=plazo_dias * 30)
+            elif unidad.startswith("anio") or unidad.startswith("año"):
+                delta = timedelta(days=plazo_dias * 365)
+            else:
+                delta = timedelta(days=plazo_dias)
+
+            fecha_candidata = fecha_base + delta
+            if fecha_candidata > fecha_vencimiento:
+                fecha_vencimiento = fecha_candidata
+
+        referencia = f"LC {liquidacion.serie_formateada}-{liquidacion.secuencia_formateada}"
+
+        ya_existe = CuentaPagar.objects.filter(
+            empresa=liquidacion.empresa,
+            proveedor=liquidacion.proveedor,
+            referencia_documento=referencia,
+        ).exists()
+        if ya_existe:
+            return
+
+        CuentaPagar.objects.create(
+            empresa=liquidacion.empresa,
+            proveedor=liquidacion.proveedor,
+            referencia_documento=referencia,
+            fecha_emision=fecha_base,
+            fecha_vencimiento=fecha_vencimiento,
+            monto_total=monto_credito,
+            saldo_pendiente=monto_credito,
+            estado="PENDIENTE",
+            observaciones="Generado automaticamente desde liquidacion de compra.",
+        )
+
     def get(self, request, *args, **kwargs):
         empresa = get_empresa_activa(request)
         secuencia_info = self._obtener_siguiente_secuencia(empresa)
@@ -209,6 +272,7 @@ class LiquidacionCompraCreateView(LoginRequiredMixin, RequireEmpresaActivaMixin,
                     liquidacion.calcular_totales()
                     liquidacion.sincronizar_formas_pago()
                     liquidacion.save()
+                    self._crear_cxp_si_credito(liquidacion)
 
                 return redirect("inventario:autorizar_liquidacion_compra", pk=liquidacion.pk)
             except Secuencia.DoesNotExist:

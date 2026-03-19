@@ -11,10 +11,15 @@ class CuentaCobrarListView(LoginRequiredMixin, ListView):
     context_object_name = 'cuentas'
 
     def get_queryset(self):
-        # Asumiendo que podemos obtener la empresa del request, de momento devolvemos todas o
-        # las conectadas al usuario a través de alguna lógica.
-        # Ajustaremos la lógica de filtrado de empresa cuando revisemos cómo lo hace inventario.
-        return CuentaCobrar.objects.select_related('cliente', 'factura').all()
+        # Habilitada nuevamente para mostrar las cuentas generadas desde facturación
+        user = self.request.user
+        qs = CuentaCobrar.objects.select_related('cliente', 'factura').all()
+        
+        # Filtrar por empresas del usuario
+        if hasattr(user, 'empresas'):
+            qs = qs.filter(empresa__in=user.empresas.all())
+            
+        return qs
 
 class CuentaCobrarDetailView(LoginRequiredMixin, DetailView):
     model = CuentaCobrar

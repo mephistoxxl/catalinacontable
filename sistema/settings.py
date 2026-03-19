@@ -360,6 +360,7 @@ INSTALLED_APPS = [
     'axes',
     'inventario.apps.InventarioConfig',
     'cxc',
+    'cxp',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

@@ -1,0 +1,97 @@
+{% extends "inventario/comun/base.html" %}
+
+{% block content %}
+<div class="bg-gray-50 p-3" style="padding-top: 20px; padding-bottom: 20px; min-height: 80vh;">
+    <div class="max-w-xl mx-auto">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+                <div class="bg-green-100 p-2 rounded-full border border-green-200">
+                    <i class="fa fa-usd text-green-600 text-xl px-1"></i>
+                </div>
+                <h2 class="text-lg font-bold text-gray-800 m-0">Registro de Pago a Proveedor</h2>
+            </div>
+            <a href="{% url 'cxp:detalle_cuenta' view.kwargs.pk %}" class="px-3 py-1.5 text-xs bg-white border border-gray-300 shadow-sm hover:bg-gray-50 text-gray-700 rounded-lg transition-colors no-underline font-medium">
+                <i class="fa fa-times mr-1"></i> Cancelar
+            </a>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+            <div class="p-6">
+                <!-- Info Section -->
+                <div class="bg-blue-50/50 border border-blue-100 rounded-lg p-4 flex gap-3 mb-6">
+                    <i class="fa fa-info-circle text-blue-500 mt-0.5 text-lg"></i>
+                    <div>
+                        <p class="text-sm font-semibold text-blue-900 m-0">Cuenta por Pagar #{{ view.kwargs.pk }}</p>
+                        <p class="text-xs text-blue-700 mt-1 m-0">Registra el método, monto y comprobante de un pago realizado al proveedor. Este pago disminuirá la deuda pendiente.</p>
+                        <p class="text-xs font-bold text-red-700 mt-2 m-0">Saldo Pendiente Actual: ${{ cuenta.saldo_pendiente|floatformat:2 }}</p>
+                    </div>
+                </div>
+
+                <!-- Form -->
+                <form method="post" class="space-y-4">
+                    {% csrf_token %}
+                    
+                    {% for field in form %}
+                    <div class="form-group mb-4">
+                        <label for="{{ field.id_for_label }}" class="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">{{ field.label }}</label>
+                        <div class="mt-1 relative rounded-md shadow-sm">
+                            {{ field }}
+                        </div>
+                        {% if field.errors %}
+                            <p class="mt-1 text-xs text-red-600"><i class="fa fa-exclamation-circle"></i> {{ field.errors.0 }}</p>
+                        {% endif %}
+                        {% if field.help_text %}
+                            <p class="mt-1 text-xs text-gray-400 italic">{{ field.help_text }}</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+
+                    <div class="pt-5 mt-6 border-t border-gray-100 flex justify-end gap-3">
+                        <a href="{% url 'cxp:detalle_cuenta' view.kwargs.pk %}" class="inline-flex justify-center flex-1 sm:flex-none items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition-colors no-underline">
+                            Volver Atrás
+                        </a>
+                        <button type="submit" class="inline-flex justify-center flex-1 sm:flex-none items-center px-6 py-2 border border-transparent shadow text-sm font-bold rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors">
+                            <i class="fa fa-check mr-2"></i> Confirmar Pago
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Forzar Tailwind UI a los inputs genéricos de crispy/django */
+form input[type="text"], 
+form input[type="number"], 
+form input[type="date"], 
+form select,
+form textarea {
+    display: block !important;
+    width: 100% !important;
+    padding: 0.6rem 0.75rem !important;
+    font-size: 0.875rem !important;
+    line-height: 1.25rem !important;
+    color: #111827 !important;
+    background-color: #fff !important;
+    background-clip: padding-box !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 0.5rem !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+form input:focus, 
+form select:focus, 
+form textarea:focus {
+    outline: none !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Evitar outline negrito feo a veces heredado de bootstrap base */
+form input, form select, form textarea {
+    font-family: inherit;
+}
+</style>
+{% endblock %}

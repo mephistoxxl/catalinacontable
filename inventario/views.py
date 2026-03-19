@@ -35,6 +35,9 @@ from .models import *
 from .models import FormaPago  # Importación explícita para evitar errores de scope
 from .models import Banco, CampoAdicional  # Para pagos con cheque y guardar datos adicionales
 from .models import Empresa  # Acceder a la empresa activa
+from cxc.models import CuentaCobrar  # Importamos el modelo de Cuenta por Cobrar
+from datetime import timedelta
+from decimal import Decimal, ROUND_HALF_UP
 #formularios dinamicos
 from django.forms import formset_factory
 #funciones personalizadas
@@ -2841,7 +2844,14 @@ def consultar_identificacion(request):
 
         # 1) Cache en BD: si el cliente existe para la empresa, NO consumir API
         try:
+            # Intentar búsqueda directa
             cliente_bd = Cliente.objects.filter(empresa=empresa, identificacion=identificacion).first()
+            
+            # Si no encuentra, intentar búsqueda tolerante (solo dígitos)
+            if not cliente_bd:
+                identificacion_limpia = ''.join(filter(str.isdigit, identificacion))
+                if identificacion_limpia and identificacion_limpia != identificacion:
+                    cliente_bd = Cliente.objects.filter(empresa=empresa, identificacion=identificacion_limpia).first()
         except Exception:
             cliente_bd = None
 
@@ -2863,17 +2873,26 @@ def consultar_identificacion(request):
                 'correo': cliente_bd.correo or '',
             }, status=200)
 
-        from services import consultar_identificacion as servicio_consultar_identificacion
+        # from services import consultar_identificacion as servicio_consultar_identificacion
 
-        resultado = servicio_consultar_identificacion(identificacion)
-        resultado['tipo_identificacion'] = tipo_mapeado
-        logger.info(f"Resultado del servicio: {resultado}")
+        # resultado = servicio_consultar_identificacion(identificacion)
+        # resultado['tipo_identificacion'] = tipo_mapeado
+        # logger.info(f"Resultado del servicio: {resultado}")
+
+        # Se comenta la consulta a la API externa para forzar el ingreso manual
+        resultado = {
+            'error': True,
+            'message': 'Cliente no encontrado en BD local. Ingrese los datos manualmente.',
+            'status_code': 404
+        }
+        
+        return JsonResponse(resultado, status=404)
 
         # 2) Si la consulta externa fue exitosa, persistir como Cliente para evitar futuras consultas
-        try:
-            status_code = int(resultado.get('status_code', 200) or 200)
-        except Exception:
-            status_code = 200
+        # try:
+        #     status_code = int(resultado.get('status_code', 200) or 200)
+        # except Exception:
+        #     status_code = 200
 
         # Normalizar razón social
         razon_social_api = (
@@ -3794,10 +3813,10 @@ class EmitirFactura(LoginRequiredMixin, View):
                     if monto <= 0:
                         raise Exception("El monto debe ser mayor a cero")
                     
-                    # Obtener caja (opcional para depósitos)
+                    # Obtener caja (opcional para depósitos y créditos)
                     tipo_pago = str(pago.get('tipo', '')).lower()
                     caja = None
-                    if tipo_pago != 'deposito':
+                    if tipo_pago not in ('deposito', 'credito'):
                         caja_id = pago.get('caja') or pago.get('caja_id')
                         if caja_id:
                             try:
@@ -3813,6 +3832,32 @@ class EmitirFactura(LoginRequiredMixin, View):
                         caja=caja,
                         empresa=empresa
                     )
+
+                    # 5. CREAR CUENTA POR COBRAR (CxC) SI ES CRÉDITO
+                    # El tipo 'credito' viene del frontend para el botón "A Crédito"
+                    if tipo_pago == 'credito':
+                        try:
+                            plazo_dias = int(pago.get('plazo', 30))
+                        except (ValueError, TypeError):
+                            plazo_dias = 30
+                        
+                        observacion_credito = pago.get('observacion', '') or 'Generado automáticamente al emitir factura.'
+                        
+                        f_emision = factura.fecha_emision or timezone.now().date()
+                        f_vencimiento = f_emision + timedelta(days=plazo_dias)
+                        
+                        CuentaCobrar.objects.create(
+                            empresa=empresa,
+                            cliente=factura.cliente,
+                            factura=factura,
+                            fecha_emision=f_emision,
+                            fecha_vencimiento=f_vencimiento,
+                            monto_total=monto,
+                            saldo_pendiente=monto,  # Inicialmente se debe todo el monto del crédito
+                            estado='PENDIENTE',     # Nace pendiente
+                            observaciones=observacion_credito
+                        )
+                        print(f"✅ CxC creada para factura {factura.secuencia} por ${monto} a {plazo_dias} días.")
                     
                     print(f"   ✅ Forma de pago: {tipo_pago} ${monto}")
                 
@@ -10835,8 +10880,17 @@ def enriquecer_cliente_api(request):
     """
     if request.method != 'GET':
         return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=405)
+
+    # Consulta desactivada manualmente
+    return JsonResponse({
+        'success': True,
+        'message': 'Datos tomados localmente. API externa desactivada.',
+        'data_enriquecida': {}
+    }, status=200)
+
     empresa_id = request.session.get('empresa_activa')
     if not empresa_id or not request.user.empresas.filter(id=empresa_id).exists():
+        return JsonResponse({'success': False, 'message': 'Empresa no válida'}, status=403)
         return JsonResponse({'success': False, 'message': 'Empresa no válida'}, status=403)
     cliente = None
     identificacion = (request.GET.get('identificacion') or '').strip()

@@ -26,6 +26,7 @@ urlpatterns = [
     ),
     path('inventario/', include('inventario.urls')),
     path('cxc/', include('cxc.urls')),
+    path('cxp/', include('cxp.urls')),
     path('', RedirectView.as_view(pattern_name='inventario:login', permanent=False)),
 ]
 

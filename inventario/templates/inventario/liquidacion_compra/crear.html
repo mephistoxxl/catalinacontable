@@ -2016,6 +2016,11 @@
         return false;
       }
 
+      // Forma SRI 20: tratar como compra a credito con plazo por defecto.
+      const esCredito = formaPago === '20';
+      const plazoCredito = esCredito ? '30' : '';
+      const unidadTiempoCredito = esCredito ? 'dias' : '';
+
       const resumen = calcularResumenTotales();
       const totalGeneral = resumen.total;
 
@@ -2035,8 +2040,8 @@
         wrapper.innerHTML = `
           <input type="hidden" name="pagos-0-forma_pago" value="${formaPago}">
           <input type="hidden" name="pagos-0-total" value="${formatDecimal(totalGeneral, 2)}">
-          <input type="hidden" name="pagos-0-plazo" value="">
-          <input type="hidden" name="pagos-0-unidad_tiempo" value="">
+          <input type="hidden" name="pagos-0-plazo" value="${plazoCredito}">
+          <input type="hidden" name="pagos-0-unidad_tiempo" value="${unidadTiempoCredito}">
           <input type="hidden" name="pagos-0-DELETE" value="">
         `;
         container.appendChild(wrapper);

@@ -140,6 +140,7 @@ class LiquidacionCompraForm(forms.ModelForm):
             ("16", _("Tarjeta débito")),
             ("19", _("Tarjeta crédito")),
             ("17", _("Dinero electrónico")),
+            ("20", _("Crédito")),
         ],
         initial="01",
         widget=forms.Select(attrs={"class": "form-control"}),
